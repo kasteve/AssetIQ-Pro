@@ -366,31 +366,43 @@ public class PdfGenerationService {
         grid.setWidth(UnitValue.createPercentValue(100));
         grid.setMarginBottom(4);
 
-        grid.addCell(buildSignatureBox("From Employee", transfer.getFromEmployeeSignature(),
-                transfer.getFromEmployeeSignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("To Employee", transfer.getToEmployeeSignature(),
-                transfer.getToEmployeeSignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Configured By", transfer.getConfiguredBySignature(),
+        // REMOVED: From Employee and To Employee
+        grid.addCell(buildSignatureBox("Configured By",
+                transfer.getConfiguredByName(),  // name
+                transfer.getConfiguredBySignature(),
                 transfer.getConfiguredBySignedAt(), boldFont, regularFont));
 
-        grid.addCell(buildSignatureBox("Old Handover", transfer.getOldHandoverBySignature(),
+        grid.addCell(buildSignatureBox("Old Handover",
+                transfer.getOldHandoverByName(),  // name
+                transfer.getOldHandoverBySignature(),
                 transfer.getOldHandoverBySignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Old Received", transfer.getOldReceivedBySignature(),
+        grid.addCell(buildSignatureBox("Old Received",
+                transfer.getOldReceivedByName(),  // name
+                transfer.getOldReceivedBySignature(),
                 transfer.getOldReceivedBySignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("New Handover", transfer.getNewHandoverBySignature(),
-                transfer.getNewHandoverBySignedAt(), boldFont, regularFont));
 
-        grid.addCell(buildSignatureBox("New Received", transfer.getNewReceivedBySignature(),
+        grid.addCell(buildSignatureBox("New Handover",
+                transfer.getNewHandoverByName(),  // name
+                transfer.getNewHandoverBySignature(),
+                transfer.getNewHandoverBySignedAt(), boldFont, regularFont));
+        grid.addCell(buildSignatureBox("New Received",
+                transfer.getNewReceivedByName(),  // name
+                transfer.getNewReceivedBySignature(),
                 transfer.getNewReceivedBySignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Infrastructure Rep", transfer.getInfraRepSignature(),
+
+        grid.addCell(buildSignatureBox("Infrastructure Rep",
+                transfer.getInfraRepresentativeName(),  // name
+                transfer.getInfraRepSignature(),
                 transfer.getInfraRepSignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Finance Rep", transfer.getFinanceRepSignature(),
+        grid.addCell(buildSignatureBox("Finance Rep",
+                transfer.getFinanceRepresentativeName(),  // name
+                transfer.getFinanceRepSignature(),
                 transfer.getFinanceRepSignedAt(), boldFont, regularFont));
 
         document.add(grid);
     }
 
-    private Cell buildSignatureBox(String role, String signature, LocalDateTime signedAt,
+    private Cell buildSignatureBox(String role, String name, String signature, LocalDateTime signedAt,
                                    PdfFont boldFont, PdfFont regularFont) {
         Cell box = new Cell().setBorder(new SolidBorder(LINE_SOFT, 0.75f)).setPadding(9);
 
@@ -422,6 +434,10 @@ public class PdfGenerationService {
                     .setFont(regularFont).setFontSize(8.5f).setFontColor(MUTED));
         }
         box.add(sigLine);
+
+        // Show signer name
+        box.add(new Paragraph(val(name))
+                .setFont(boldFont).setFontSize(9.5f).setFontColor(isSigned ? INK : MUTED).setMarginBottom(1));
 
         String metaText = (isSigned && signedAt != null)
                 ? "Signed " + signedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"))

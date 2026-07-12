@@ -18,7 +18,9 @@ public class Transfer {
     @Column(name = "transferId")
     private Integer transferId;
 
+    // ============================================
     // Asset Information
+    // ============================================
     @Column(name = "assetTag")
     private String assetTag;
 
@@ -34,21 +36,27 @@ public class Transfer {
     @Column(name = "transferDate")
     private LocalDate transferDate;
 
+    // ============================================
     // Department IDs
+    // ============================================
     @Column(name = "OldDepartmentId")
     private Integer oldDepartmentId;
 
     @Column(name = "NewDepartmentId")
     private Integer newDepartmentId;
 
+    // ============================================
     // Employee IDs
+    // ============================================
     @Column(name = "OldEmployeeId")
     private Long oldEmployeeId;
 
     @Column(name = "NewEmployeeId")
     private Long newEmployeeId;
 
+    // ============================================
     // Signer IDs
+    // ============================================
     @Column(name = "OldHandoverById")
     private Long oldHandoverById;
 
@@ -70,7 +78,9 @@ public class Transfer {
     @Column(name = "FinanceRepresentativeId")
     private Long financeRepresentativeId;
 
-    // Signer Names
+    // ============================================
+    // Signer Names (populated from Employee table)
+    // ============================================
     @Column(name = "oldHandoverByName")
     private String oldHandoverByName;
 
@@ -92,7 +102,9 @@ public class Transfer {
     @Column(name = "FinanceRepresentativeName")
     private String financeRepresentativeName;
 
+    // ============================================
     // Asset Condition
+    // ============================================
     @Column(name = "conditionOld")
     private String conditionOld;
 
@@ -111,14 +123,18 @@ public class Transfer {
     @Column(name = "comments")
     private String comments;
 
+    // ============================================
     // Category and Company
+    // ============================================
     @Column(name = "CategoryId")
     private Integer categoryId;
 
     @Column(name = "CompanyId")
     private Long companyId;
 
-    // Legacy signature fields
+    // ============================================
+    // Legacy Signature Fields
+    // ============================================
     @Column(name = "FromEmployeeSignature")
     private String fromEmployeeSignature;
 
@@ -131,7 +147,9 @@ public class Transfer {
     @Column(name = "ToEmployeeSignedAt")
     private LocalDateTime toEmployeeSignedAt;
 
-    // Signature fields (Base64) - CHANGE THESE TO @Lob
+    // ============================================
+    // Signature Fields (Base64) - NVARCHAR(MAX)
+    // ============================================
     @Lob
     @Column(name = "OldHandoverBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String oldHandoverBySignature;
@@ -181,7 +199,9 @@ public class Transfer {
     @Column(name = "FinanceRepSignedAt")
     private LocalDateTime financeRepSignedAt;
 
-    // PDF - CHANGE THIS TO @Lob
+    // ============================================
+    // PDF
+    // ============================================
     @Lob
     @Column(name = "FullySignedPDF", columnDefinition = "NVARCHAR(MAX)")
     private String fullySignedPdf;
@@ -189,11 +209,20 @@ public class Transfer {
     @Column(name = "IsFullySigned")
     private Boolean isFullySigned = false;
 
+    // ============================================
+    // Transient Fields (for display purposes)
+    // ============================================
     @Transient
     private String oldDepartmentName;
 
     @Transient
     private String newDepartmentName;
+
+    @Transient
+    private String oldEmployeeName;
+
+    @Transient
+    private String newEmployeeName;
 
     // ============================================
     // Helper Methods
@@ -214,6 +243,10 @@ public class Transfer {
     }
 
     public boolean isFullySigned() {
+        return Boolean.TRUE.equals(isFullySigned);
+    }
+
+    public boolean getFullySigned() {
         return Boolean.TRUE.equals(isFullySigned);
     }
 
@@ -261,8 +294,20 @@ public class Transfer {
         this.newDepartmentName = newDepartmentName;
     }
 
-    public boolean getFullySigned() {
-        return Boolean.TRUE.equals(isFullySigned);
+    public String getOldEmployeeName() {
+        return oldEmployeeName != null ? oldEmployeeName : "";
+    }
+
+    public void setOldEmployeeName(String oldEmployeeName) {
+        this.oldEmployeeName = oldEmployeeName;
+    }
+
+    public String getNewEmployeeName() {
+        return newEmployeeName != null ? newEmployeeName : "";
+    }
+
+    public void setNewEmployeeName(String newEmployeeName) {
+        this.newEmployeeName = newEmployeeName;
     }
 
     public void setFullySignedPDF(String pdfBase64) {

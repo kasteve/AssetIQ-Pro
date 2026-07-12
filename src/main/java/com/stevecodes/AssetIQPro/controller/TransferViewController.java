@@ -64,6 +64,26 @@ public class TransferViewController {
             TransferToken transferToken = transferSigningService.validateToken(token);
             Transfer transfer = transferService.getTransferById(transferToken.getTransferId());
 
+            // Populate department names
+            if (transfer.getOldDepartmentId() != null) {
+                departmentService.getDepartmentById(transfer.getOldDepartmentId())
+                        .ifPresent(dept -> transfer.setOldDepartmentName(dept.getName()));
+            }
+            if (transfer.getNewDepartmentId() != null) {
+                departmentService.getDepartmentById(transfer.getNewDepartmentId())
+                        .ifPresent(dept -> transfer.setNewDepartmentName(dept.getName()));
+            }
+
+            // Populate employee names
+            if (transfer.getOldEmployeeId() != null) {
+                employeeService.getEmployeeById(transfer.getOldEmployeeId())
+                        .ifPresent(emp -> transfer.setOldEmployeeName(emp.getFullName()));
+            }
+            if (transfer.getNewEmployeeId() != null) {
+                employeeService.getEmployeeById(transfer.getNewEmployeeId())
+                        .ifPresent(emp -> transfer.setNewEmployeeName(emp.getFullName()));
+            }
+
             // Get role display name
             String roleDisplay = getRoleDisplayName(transferToken.getSignerRole());
 
