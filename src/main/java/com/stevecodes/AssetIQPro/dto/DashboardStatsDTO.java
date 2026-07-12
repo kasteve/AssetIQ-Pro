@@ -40,7 +40,7 @@ public class DashboardStatsDTO {
     private long totalUsers;
     private long activeUsers;
     private long blockedUsers;
-    private long pendingPasswordChange;  // ADD THIS FIELD
+    private long pendingPasswordChange;
 
     // Charts data
     private Map<String, Long> assetsByCategory;

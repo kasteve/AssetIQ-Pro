@@ -92,7 +92,12 @@ public class AppUserService {
         user.setEmail(userDTO.getEmail());
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setFullName(userDTO.getFullName());
-        user.setDepartment(userDTO.getDepartment());
+
+        // Handle department - store as string directly
+        if (userDTO.getDepartment() != null && !userDTO.getDepartment().isEmpty()) {
+            user.setDepartment(userDTO.getDepartment());
+        }
+
         user.setActive(true);
         user.setBlocked(false);
         user.setMustChangePassword(true);
@@ -100,7 +105,7 @@ public class AppUserService {
         user.setCreatedAt(LocalDateTime.now());
 
         // Assign permissions
-        if (userDTO.getPermissions() != null) {
+        if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
                         .ifPresent(user::addPermission);
@@ -109,6 +114,14 @@ public class AppUserService {
 
         AppUser saved = userRepository.save(user);
         log.info("User created successfully: {}", saved.getUsername());
+
+        // LOG CREDENTIALS BEFORE RETURNING
+        log.info("=========================================");
+        log.info("👤 NEW USER CREATED");
+        log.info("Username: {}", saved.getUsername());
+        log.info("Temporary Password: {}", tempPassword);
+        log.info("Email: {}", saved.getEmail());
+        log.info("=========================================");
 
         // Send welcome email
         try {
@@ -140,6 +153,9 @@ public class AppUserService {
         if (userDTO.getDepartment() != null) user.setDepartment(userDTO.getDepartment());
         if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
         if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
+        if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
+        if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
+        if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
 
         // Update permissions
         if (userDTO.getPermissions() != null) {
@@ -171,10 +187,6 @@ public class AppUserService {
         user.setLastPasswordChanged(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
-        if (isFirstLogin) {
-            user.setFirstLogin(false);
-        }
-
         userRepository.save(user);
         log.info("Password changed for user: {}", userId);
 
@@ -185,6 +197,41 @@ public class AppUserService {
         }
 
         auditService.logAction("PASSWORD_CHANGED", "Password changed for user: " + user.getUsername(), user.getUserId());
+    }
+
+    @Transactional
+    public void resetPassword(Long userId) {
+        log.info("Resetting password for user: {}", userId);
+
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        String tempPassword = generateTemporaryPassword();
+
+        log.info("=========================================");
+        log.info("🔑 PASSWORD RESET FOR USER: {}", user.getUsername());
+        log.info("Temporary Password: {}", tempPassword);
+        log.info("=========================================");
+
+        user.setPasswordHash(passwordEncoder.encode(tempPassword));
+        user.setMustChangePassword(true);
+        user.setFirstLogin(true);
+        user.setLastPasswordChanged(LocalDateTime.now());
+        userRepository.save(user);
+
+        // Send email with new password
+        try {
+            emailService.sendWelcomeEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    user.getUsername(),
+                    tempPassword
+            );
+            log.info("Reset email sent to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to send reset email: {}", e.getMessage());
+            throw new RuntimeException("Failed to send reset email");
+        }
     }
 
     @Transactional
@@ -447,6 +494,7 @@ public class AppUserService {
         dto.setBlocked(user.isBlocked());
         dto.setFirstLogin(user.isFirstLogin());
         dto.setMustChangePassword(user.isMustChangePassword());
+        dto.setPasswordHash(user.getPasswordHash());
         dto.setUserType(user.getPermissions().stream()
                 .map(Permission::getPermissionName)
                 .collect(Collectors.toList())

@@ -27,7 +27,9 @@ public class FirstLoginFilter extends OncePerRequestFilter {
             "/error",
             "/api/auth/login",
             "/api/auth/web-login",
-            "/api/auth/validate"
+            "/api/auth/validate",
+            "/api/auth/change-password",
+            "/api/auth/change-password-first-login"
     ));
 
     @Override
@@ -45,10 +47,12 @@ public class FirstLoginFilter extends OncePerRequestFilter {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
         if (auth != null && auth.isAuthenticated() && !isExcludedPath(path)) {
-            Boolean isFirstLogin = (Boolean) request.getSession().getAttribute("isFirstLogin");
+            // Check if user must change password via session attributes
             Boolean mustChangePassword = (Boolean) request.getSession().getAttribute("mustChangePassword");
+            Boolean isFirstLogin = (Boolean) request.getSession().getAttribute("isFirstLogin");
 
-            if ((isFirstLogin != null && isFirstLogin) || (mustChangePassword != null && mustChangePassword)) {
+            if ((mustChangePassword != null && mustChangePassword) ||
+                    (isFirstLogin != null && isFirstLogin)) {
                 response.sendRedirect(request.getContextPath() + "/change-password?firstLogin=true");
                 return;
             }

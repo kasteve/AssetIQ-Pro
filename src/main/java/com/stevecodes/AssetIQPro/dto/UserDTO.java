@@ -15,6 +15,7 @@ public class UserDTO {
     private String username;
     private String email;
     private String password;
+    private String passwordHash;  // ADD THIS
     private String fullName;
     private String department;
     private boolean active = true;

@@ -129,6 +129,11 @@ public class LoginController {
 
         try {
             userService.changePassword(userId, newPassword, firstLogin);
+
+            // ✅ CLEAR SESSION FLAGS AFTER PASSWORD CHANGE
+            session.setAttribute("mustChangePassword", false);
+            session.setAttribute("isFirstLogin", false);
+
             redirectAttributes.addFlashAttribute("success", "Password changed successfully!");
             log.info("Password changed for user ID: {}", userId);
 
