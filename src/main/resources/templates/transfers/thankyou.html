@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+        <html lang="en" xmlns:th="http://www.thymeleaf.org">
+        <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Signature Complete - Asset Management System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .thank-you-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.6s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .success-icon i {
+            color: white;
+            font-size: 40px;
+        }
+
+        .main-message {
+            color: #333;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+
+        .sub-message {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+
+        .action-message {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .details-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .details-title {
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .details-content {
+            color: #555;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .detail-value {
+            color: #666;
+            font-weight: 400;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .fully-signed-badge {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            display: inline-block;
+            margin: 15px 0;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
+            to {
+                box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            }
+        }
+
+        .pending-badge {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            display: inline-block;
+            margin: 15px 0;
+        }
+
+        .close-instruction {
+            background: #e3f2fd;
+            border: 2px dashed #2196F3;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+            color: #1976D2;
+        }
+
+        .close-instruction i {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .close-instruction h4 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .token-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        .token-info i {
+            margin-right: 8px;
+            color: #f39c12;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .thank-you-container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            .main-message {
+                font-size: 28px;
+            }
+
+            .sub-message {
+                font-size: 16px;
+            }
+
+            .details-card {
+                padding: 20px;
+            }
+
+            .detail-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="thank-you-container">
+    <!-- Success Icon -->
+    <div class="success-icon">
+        <i class="fas fa-check"></i>
+    </div>
+
+    <!-- Main Message -->
+    <h1 class="main-message" th:text="${message}">Thank you for signing this document!</h1>
+
+    <!-- Sub Message -->
+    <p class="sub-message" th:text="${subMessage}">Your signature has been successfully recorded.</p>
+
+    <!-- Action Message -->
+    <p class="action-message" th:text="${actionMessage}">The token has now expired and you cannot recall the signature. Please feel free to close this tab.Asante sana and Goodbye!.</p>
+
+    <!-- Details Card -->
+    <div class="details-card">
+        <div class="details-title">
+            <i class="fas fa-clipboard-check"></i>
+            Signature Details
+        </div>
+        <div class="details-content">
+            <div class="detail-item" th:if="${transferId}">
+                <span class="detail-label">Transfer ID:</span>
+                <span class="detail-value" th:text="${transferId}">12345</span>
+            </div>
+            <div class="detail-item" th:if="${signerRole}">
+                <span class="detail-label">Your Role:</span>
+                <span class="detail-value" th:text="${signerRole}">Asset Configurator</span>
+            </div>
+            <div class="detail-item" th:if="${signerName}">
+                <span class="detail-label">Signed By:</span>
+                <span class="detail-value" th:text="${signerName}">John Doe</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Signed At:</span>
+                <span class="detail-value" th:text="${#temporals.format(#temporals.createNow(), 'dd MMM yyyy HH:mm')}">23 Sep 2025 14:30</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Information -->
+    <div th:if="${signedCount != null and totalSigners != null}">
+        <div class="details-title" style="margin-top: 20px;">
+            <i class="fas fa-chart-line"></i>
+            Transfer Progress
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill"
+                 th:style="'width: ' + ${signedCount * 100 / totalSigners} + '%'"
+                 th:text="${signedCount} + ' / ' + ${totalSigners} + ' signed'">
+                5 / 7 signed
+            </div>
+        </div>
+
+        <!-- Status Badge -->
+        <div th:if="${isFullySigned != null}">
+            <div th:if="${isFullySigned}" class="fully-signed-badge">
+                <i class="fas fa-certificate"></i> Transfer Fully Signed!
+            </div>
+            <div th:if="${!isFullySigned}" class="pending-badge">
+                <i class="fas fa-clock"></i> Awaiting Additional Signatures
+            </div>
+        </div>
+    </div>
+
+    <!-- Token Information -->
+    <div class="token-info">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Security Notice:</strong> Your signing token has been permanently disabled to prevent unauthorized reuse. This ensures the integrity of the signature process.
+    </div>
+
+    <!-- Close Tab Instruction -->
+    <div class="close-instruction">
+        <i class="fas fa-times-circle"></i>
+        <h4>You may now safely close this tab</h4>
+        <p>No further action is required. If you need a copy of the signed document, please contact your system administrator.</p>
+    </div>
+</div>
+
+<script>
+    // Auto-close tab after 30 seconds (optional)
+    setTimeout(function() {
+        if (confirm("This tab will close automatically. Close now?")) {
+            window.close();
+        }
+    }, 30000);
+
+    // Prevent back button navigation
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        history.go(1);
+    };
+</script>
+</body>
+</html></title>
+</head>
+<body>
+
+</body>
+</html>

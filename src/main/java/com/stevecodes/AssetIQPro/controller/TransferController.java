@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/transfers")
 @RequiredArgsConstructor
@@ -101,10 +103,15 @@ public class TransferController {
     @GetMapping("/{transferId}/pdf")
     @Operation(summary = "Get fully signed transfer PDF")
     public ResponseEntity<byte[]> getTransferPdf(@PathVariable Integer transferId) {
-        byte[] pdf = signingService.getFullySignedPdf(transferId);
-        return ResponseEntity.ok()
-                .header("Content-Type", "application/pdf")
-                .header("Content-Disposition", "attachment; filename=transfer_" + transferId + ".pdf")
-                .body(pdf);
+        try {
+            byte[] pdf = signingService.getFullySignedPdf(transferId);  // Change from TransferSigningService.getFullySignedPdf to signingService.getFullySignedPdf
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=transfer_" + transferId + ".pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Error generating PDF for transfer {}: {}", transferId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 }

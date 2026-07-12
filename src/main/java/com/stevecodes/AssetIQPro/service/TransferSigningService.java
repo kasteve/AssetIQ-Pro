@@ -2,12 +2,14 @@ package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.entity.TransferToken;
+import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import com.stevecodes.AssetIQPro.repository.TransferRepository;
 import com.stevecodes.AssetIQPro.repository.TransferTokenRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import com.stevecodes.AssetIQPro.entity.Employee;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -24,12 +26,31 @@ public class TransferSigningService {
     private final TransferTokenService tokenService;
     private final PdfGenerationService pdfGenerationService;
     private final EmailService emailService;
+    private final EmployeeRepository employeeRepository;
 
     public void initiateTransferSigning(Integer transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
+
+        log.info("=========================================");
+        log.info("🔐 INITIATING SIGNING PROCESS FOR TRANSFER: {}", transferId);
+        log.info("=========================================");
+
         tokenService.createTokensAndSendEmails(transfer);
-        log.info("Initiated signing process for transfer {} - emails sent to all signers", transferId);
+
+        // Log all generated tokens for manual retrieval
+        List<TransferToken> tokens = tokenRepository.findByTransferId(transferId);
+        log.info("📋 ALL SIGNING LINKS FOR TRANSFER {}:", transferId);
+        for (TransferToken token : tokens) {
+            String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+            log.info("   👤 {}: {}", token.getSignerRole(), signingLink);
+            log.info("   📧 Email: {}", token.getSignerEmail());
+            log.info("   ⏰ Expires: {}", token.getExpiresAt());
+            log.info("   ---");
+        }
+        log.info("=========================================");
+        log.info("✅ Signing process initiated for transfer {}", transferId);
+        log.info("=========================================");
     }
 
     public void signTransferWithSignature(Integer transferId, String tokenValue, String base64Signature) {
@@ -68,9 +89,9 @@ public class TransferSigningService {
         if (transfer.getConfiguredById() != null && transfer.getConfiguredById().equals(employeeId))
             return "CONFIGURED_BY";
         if (transfer.getInfraRepresentativeId() != null && transfer.getInfraRepresentativeId().equals(employeeId))
-            return "INFRA_REPRESENTATIVE";
+            return "INFRA_REP";  // Match the case in saveSignature
         if (transfer.getFinanceRepresentativeId() != null && transfer.getFinanceRepresentativeId().equals(employeeId))
-            return "FINANCE_REPRESENTATIVE";
+            return "FINANCE_REP";  // Match the case in saveSignature
 
         throw new IllegalArgumentException("Employee " + employeeId + " is not a signer for transfer " + transferId);
     }
@@ -286,33 +307,40 @@ public class TransferSigningService {
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
         LocalDateTime now = LocalDateTime.now();
 
+        // Trim if too long (just in case)
+        String signature = base64Signature;
+        if (signature != null && signature.length() > 1000000) {
+            signature = signature.substring(0, 1000000);
+            log.warn("Signature truncated for transfer {} role {}", transferId, role);
+        }
+
         switch (role) {
             case "OLD_HANDOVER":
-                transfer.setOldHandoverBySignature(base64Signature);
+                transfer.setOldHandoverBySignature(signature);
                 transfer.setOldHandoverBySignedAt(now);
                 break;
             case "OLD_RECEIVED":
-                transfer.setOldReceivedBySignature(base64Signature);
+                transfer.setOldReceivedBySignature(signature);
                 transfer.setOldReceivedBySignedAt(now);
                 break;
             case "NEW_HANDOVER":
-                transfer.setNewHandoverBySignature(base64Signature);
+                transfer.setNewHandoverBySignature(signature);
                 transfer.setNewHandoverBySignedAt(now);
                 break;
             case "NEW_RECEIVED":
-                transfer.setNewReceivedBySignature(base64Signature);
+                transfer.setNewReceivedBySignature(signature);
                 transfer.setNewReceivedBySignedAt(now);
                 break;
             case "CONFIGURED_BY":
-                transfer.setConfiguredBySignature(base64Signature);
+                transfer.setConfiguredBySignature(signature);
                 transfer.setConfiguredBySignedAt(now);
                 break;
-            case "INFRA_REPRESENTATIVE":
-                transfer.setInfraRepSignature(base64Signature);
+            case "INFRA_REP":  // Changed from INFRA_REPRESENTATIVE
+                transfer.setInfraRepSignature(signature);
                 transfer.setInfraRepSignedAt(now);
                 break;
-            case "FINANCE_REPRESENTATIVE":
-                transfer.setFinanceRepSignature(base64Signature);
+            case "FINANCE_REP":  // Changed from FINANCE_REPRESENTATIVE
+                transfer.setFinanceRepSignature(signature);
                 transfer.setFinanceRepSignedAt(now);
                 break;
             default:
@@ -330,7 +358,6 @@ public class TransferSigningService {
                     transfer.getAssetTag(), transfer.getSerialNumber(), transferId);
 
             byte[] pdfBytes = pdfGenerationService.generateTransferCertificatePdf(transfer, related);
-            // Use the correct method name
             transfer.setFullySignedPDF(Base64.getEncoder().encodeToString(pdfBytes));
             transfer.setIsFullySigned(true);
             transferRepository.save(transfer);
@@ -348,6 +375,7 @@ public class TransferSigningService {
 
         List<String> signerEmails = new ArrayList<>();
 
+        // Get emails from employee IDs
         if (transfer.getOldHandoverById() != null) {
             String email = getEmployeeEmail(transfer.getOldHandoverById());
             if (email != null) signerEmails.add(email);
@@ -377,19 +405,32 @@ public class TransferSigningService {
             if (email != null) signerEmails.add(email);
         }
 
+        // Also add requester (admin) - you can get from session or hardcode
+        signerEmails.add("admin@company.com");
+
         if (!signerEmails.isEmpty()) {
-            byte[] pdfBytes = Base64.getDecoder().decode(transfer.getFullySignedPdf());
-            emailService.sendCompletedTransferReport(signerEmails, transfer, pdfBytes);
-            log.info("Sent completed transfer report to {} recipients for transfer {}",
-                    signerEmails.size(), transferId);
+            try {
+                byte[] pdfBytes = Base64.getDecoder().decode(transfer.getFullySignedPdf());
+                log.info("Sending completed transfer email to {} recipients for transfer {}", signerEmails.size(), transferId);
+                emailService.sendCompletedTransferReport(signerEmails, transfer, pdfBytes);
+            } catch (Exception e) {
+                log.error("Failed to send email for transfer {}: {}", transferId, e.getMessage());
+            }
         } else {
             log.warn("No valid email addresses found for transfer {} signers", transferId);
         }
     }
 
     private String getEmployeeEmail(Long employeeId) {
-        // TODO: Implement using EmployeeRepository
-        return "employee_" + employeeId + "@company.com";
+        if (employeeId == null) return null;
+        try {
+            return employeeRepository.findById(employeeId)
+                    .map(Employee::getEmailAddress)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.error("Error getting email for employee {}: {}", employeeId, e.getMessage());
+            return null;
+        }
     }
 
     public boolean manuallyCheckTransferCompletion(Integer transferId) {

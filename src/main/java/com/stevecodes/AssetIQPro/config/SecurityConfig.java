@@ -39,7 +39,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/**")
+                        .ignoringRequestMatchers("/api/**", "/transfers/**", "/assets/**", "/infra-requests/**", "/bookings/**", "/vouchers/**")
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -56,6 +56,9 @@ public class SecurityConfig {
                                 "/api/public/**",
                                 "/transfer/sign/**",
                                 "/transfers/sign/**",
+                                "/transfers/create",
+                                "/transfers/debug-transfer/**",
+                                "/transfers/test-signing/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**"

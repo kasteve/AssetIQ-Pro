@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Asset Transfer Signing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a2332;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --light-bg: #f1f4f9;
+            --text-muted: #6b7280;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--light-bg);
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            padding: 1.5rem;
+            font-size: 14px;
+        }
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            border: 1px solid #eef2f6;
+            overflow: hidden;
+        }
+        .page-header {
+            background: white;
+            border-bottom: 1px solid #eef2f6;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .page-header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--primary-color);
+        }
+        .page-header h1 i { color: var(--accent-color); margin-right: 0.5rem; }
+        .page-header .subtitle {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin: 0.25rem 0 0 0;
+        }
+        .header-status-badge {
+            padding: 0.4rem 1.2rem;
+            border-radius: 25px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .header-status-badge.pending { background: #fef3c7; color: #92400e; }
+        .header-status-badge.completed { background: #d1fae5; color: #065f46; }
+        .body-content { padding: 1.5rem 2rem; }
+        .alert-modern {
+            border: none;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            border-left: 4px solid;
+        }
+        .alert-modern.alert-success { background: #d1fae5; border-left-color: var(--success-color); color: #065f46; }
+        .alert-modern.alert-danger { background: #fee2e2; border-left-color: var(--danger-color); color: #991b1b; }
+        .card-modern {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #eef2f6;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+        .card-header-modern {
+            padding: 0.8rem 1.5rem;
+            border-bottom: 1px solid #eef2f6;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            background: #fafbfc;
+        }
+        .card-header-modern i { color: var(--accent-color); margin-right: 0.5rem; }
+        .card-header-modern .badge { margin-left: auto; font-size: 0.7rem; padding: 0.2rem 0.8rem; border-radius: 20px; }
+        .card-body-modern { padding: 1.25rem 1.5rem; }
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem 2rem;
+        }
+        .detail-item .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 0.2rem;
+        }
+        .detail-item .value {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--primary-color);
+            word-break: break-word;
+        }
+        .section-divider { border: none; border-top: 1px solid #eef2f6; margin: 1.25rem 0; }
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .section-title i { color: var(--accent-color); }
+        @media (max-width: 992px) { .details-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) {
+            body { padding: 0.5rem; }
+            .page-header { padding: 1rem; flex-direction: column; align-items: stretch; }
+            .body-content { padding: 1rem; }
+            .details-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 576px) { .details-grid { grid-template-columns: 1fr 1fr; } }
+
+        .signature-container {
+            padding: 1.5rem;
+            text-align: center;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 2px dashed #d1d5db;
+        }
+        .signature-pad-wrapper { display: flex; justify-content: center; margin: 0.5rem 0; }
+        .signature-pad {
+            border: 2px solid #dee2e6;
+            border-radius: 12px;
+            background: white;
+            cursor: crosshair;
+            touch-action: none;
+            width: 100%;
+            max-width: 500px;
+            height: 180px;
+        }
+        .signature-instructions {
+            background: #eff6ff;
+            border-radius: 10px;
+            padding: 0.8rem 1.2rem;
+            color: #1e40af;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        .btn-modern {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.5rem 1.5rem;
+            border: none;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-primary-modern { background: var(--accent-color); color: white; }
+        .btn-primary-modern:hover:not(:disabled) { background: #2563eb; }
+        .btn-secondary-modern { background: #6b7280; color: white; }
+        .btn-group-modern { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem; }
+        .signed-indicator { text-align: center; padding: 2rem; background: #d1fae5; border-radius: 12px; }
+        .signed-indicator .icon { font-size: 3rem; color: var(--success-color); margin-bottom: 0.5rem; }
+        .role-badge { padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .role-badge.default { background: #3b82f6; color: white; }
+        .role-badge.infra-rep { background: #10b981; color: white; }
+        .role-badge.finance-rep { background: #f59e0b; color: white; }
+        .signature-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .signature-table th { background: #f8fafc; color: var(--text-muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; padding: 0.6rem 0.8rem; border-bottom: 2px solid #eef2f6; text-align: left; }
+        .signature-table td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .signature-detail { padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; display: inline-block; }
+        .signature-detail.signed { background: #d1fae5; color: #065f46; }
+        .signature-detail.unsigned { background: #fef3c7; color: #92400e; }
+        .progress-item { display: flex; align-items: center; padding: 0.4rem 0.6rem; border-radius: 6px; margin-bottom: 0.2rem; }
+        .progress-item.completed { background: #d1fae5; color: #065f46; }
+        .progress-item.pending { background: #f8fafc; color: var(--text-muted); }
+        .progress-item.current-user { background: #dbeafe; border: 1px solid var(--accent-color); }
+        .progress-item .icon { width: 1.3rem; text-align: center; margin-right: 0.5rem; flex-shrink: 0; }
+        .progress-item .content { flex: 1; }
+        .current-user-badge { background: var(--accent-color); color: white; padding: 0.1rem 0.5rem; border-radius: 12px; font-size: 0.6rem; font-weight: 600; margin-left: 0.3rem; }
+        .spinner-modern { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-file-signature"></i> Asset Transfer Signing</h1>
+            <p class="subtitle"><i class="fas fa-info-circle me-1"></i>Review the transfer details below and sign to complete your approval</p>
+        </div>
+        <div>
+            <span class="header-status-badge" th:classappend="${alreadySigned != null and alreadySigned ? 'completed' : 'pending'}">
+                <i th:class="${alreadySigned != null and alreadySigned} ? 'fas fa-check-circle' : 'fas fa-clock'"></i>
+                <span th:text="${alreadySigned != null and alreadySigned} ? 'Already Signed' : 'Pending Your Signature'">Pending Your Signature</span>
+            </span>
+        </div>
+    </div>
+
+    <div class="body-content">
+
+        <div th:if="${successMessage}" class="alert-modern alert-success">
+            <div><i class="fas fa-check-circle"></i></div>
+            <div><strong>Success!</strong> <span th:text="${successMessage}"></span></div>
+        </div>
+        <div th:if="${error}" class="alert-modern alert-danger">
+            <div><i class="fas fa-exclamation-triangle"></i></div>
+            <div><strong>Error!</strong> <span th:text="${error}"></span></div>
+        </div>
+
+        <!-- Signer Information -->
+        <div class="card-modern">
+            <div class="card-header-modern">
+                <i class="fas fa-user-check"></i> Signer Information
+                <span class="badge bg-primary" th:text="${signerRoleDisplay}">Finance Representative</span>
+            </div>
+            <div class="card-body-modern">
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="label">Your Name</span>
+                        <span class="value" th:text="${signerName}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Your Role</span>
+                        <span class="value">
+                            <span th:class="${#strings.equals(signerRole, 'INFRA_REP')} ? 'role-badge infra-rep' : (${#strings.equals(signerRole, 'FINANCE_REP')} ? 'role-badge finance-rep' : 'role-badge default')"
+                                  th:text="${signerRoleDisplay}">Finance Representative</span>
+                        </span>
+                    </div>
+                    <div class="detail-item" th:if="${alreadySigned != null and alreadySigned}">
+                        <span class="label">Signed At</span>
+                        <span class="value" th:text="${signedAtFormatted}">Unknown</span>
+                    </div>
+                    <div class="detail-item" th:unless="${alreadySigned != null and alreadySigned}">
+                        <span class="label">Status</span>
+                        <span class="value"><span style="background:#fef3c7;color:#92400e;padding:0.15rem 0.6rem;border-radius:12px;font-size:0.75rem;font-weight:600;">⏳ Pending Signature</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Details -->
+        <div class="card-modern">
+            <div class="card-header-modern">
+                <i class="fas fa-exchange-alt"></i> Asset Transfer Details
+                <span class="badge" th:classappend="${transfer?.isFullySigned ? 'bg-success' : 'bg-warning'}"
+                      th:text="${transfer?.isFullySigned ? 'COMPLETED' : 'PENDING'}">PENDING</span>
+            </div>
+            <div class="card-body-modern">
+
+                <div class="section-title"><i class="fas fa-laptop"></i> Asset Information</div>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="label">Asset Tag</span>
+                        <span class="value" th:text="${transfer?.assetTag}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Serial Number</span>
+                        <span class="value" th:text="${transfer?.serialNumber}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Model / Build</span>
+                        <span class="value" th:text="${transfer?.modelBuild}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Version / Make</span>
+                        <span class="value" th:text="${transfer?.versionMake}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Transfer Date</span>
+                        <span class="value" th:text="${transferDateFormatted}">N/A</span>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="section-title"><i class="fas fa-building"></i> Department Transfer</div>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="label">From Department ID</span>
+                        <span class="value" th:text="${transfer?.oldDepartmentId}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">To Department ID</span>
+                        <span class="value" th:text="${transfer?.newDepartmentId}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">From Employee ID</span>
+                        <span class="value" th:text="${transfer?.oldEmployeeId}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">To Employee ID</span>
+                        <span class="value" th:text="${transfer?.newEmployeeId}">N/A</span>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="section-title"><i class="fas fa-clipboard-check"></i> Condition & Accessories</div>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="label">Condition (Old)</span>
+                        <span class="value" th:text="${transfer?.conditionOld}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Condition (New)</span>
+                        <span class="value" th:text="${transfer?.conditionNew}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Accessories (Old)</span>
+                        <span class="value" th:text="${transfer?.accessoriesOld}">N/A</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Accessories (New)</span>
+                        <span class="value" th:text="${transfer?.accessoriesNew}">N/A</span>
+                    </div>
+                </div>
+
+                <div th:if="${transfer?.softwareInstalled != null}" class="mt-3">
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="label">Software Installed</span>
+                            <span class="value" th:text="${transfer.softwareInstalled}">N/A</span>
+                        </div>
+                    </div>
+                </div>
+                <div th:if="${transfer?.comments != null}" class="mt-2">
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="label">Comments</span>
+                            <span class="value" th:text="${transfer.comments}">N/A</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signature Pad -->
+        <div class="card-modern" th:unless="${alreadySigned != null and alreadySigned}">
+            <div class="card-header-modern">
+                <i class="fas fa-pen-fancy"></i> Digital Signature Required
+                <span class="badge bg-danger">Required</span>
+            </div>
+            <div class="card-body-modern">
+                <div class="signature-instructions">
+                    <i class="fas fa-info-circle"></i>
+                    By signing below, you confirm that you have reviewed the transfer details above and agree to the transfer as specified in your role as <strong th:text="${signerRoleDisplay}">Finance Representative</strong>.
+                </div>
+
+                <form id="signForm" th:action="@{/transfers/sign}" method="post" novalidate>
+                    <input type="hidden" name="transferId" th:value="${transfer?.transferId}"/>
+                    <input type="hidden" name="token" th:value="${token}"/>
+                    <input type="hidden" name="signature" id="signatureInput"/>
+
+                    <div class="signature-container">
+                        <span class="signature-label"><i class="fas fa-signature me-2"></i>Please sign in the box below:</span>
+                        <div class="signature-pad-wrapper">
+                            <canvas id="signature-pad" class="signature-pad" width="500" height="180"></canvas>
+                        </div>
+                        <div class="btn-group-modern">
+                            <button type="button" id="clear-signature" class="btn-modern btn-secondary-modern"><i class="fas fa-eraser"></i> Clear</button>
+                            <button type="button" id="preview-signature" class="btn-modern btn-secondary-modern"><i class="fas fa-eye"></i> Preview</button>
+                            <button type="submit" id="submit-signature" class="btn-modern btn-primary-modern" disabled><i class="fas fa-check"></i> Submit Signature</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Already Signed -->
+        <div class="card-modern" th:if="${alreadySigned != null and alreadySigned}">
+            <div class="card-body-modern">
+                <div class="signed-indicator">
+                    <div class="icon"><i class="fas fa-check-circle"></i></div>
+                    <h2>Thank You!</h2>
+                    <p>You have successfully signed this transfer</p>
+                    <p>You will receive the fully signed document via email once all parties have signed.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <div class="spinner-modern mx-auto mb-4"></div>
+                <h2 class="h5 mb-2">Processing Your Signature</h2>
+                <p class="text-muted mb-0">Please wait while we save your digital signature...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-eye me-2"></i>Signature Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <canvas id="preview-canvas" class="signature-preview" width="400" height="150"></canvas>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitSignature()"><i class="fas fa-check me-2"></i>Submit Signature</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    var signedCount = /*[[${signedCount}]]*/ 0;
+    var totalSigners = /*[[${totalSigners}]]*/ 7;
+    if (totalSigners > 0) {
+        var percent = (signedCount / totalSigners) * 100;
+        var progressBar = document.getElementById('progressBar');
+        if (progressBar) progressBar.style.width = percent + '%';
+    }
+
+    (function() {
+        'use strict';
+        var signaturePad, loadingModal, previewModal;
+        var signatureHistory = [];
+        var currentHistoryIndex = -1;
+
+        function initializeApp() {
+            var canvas = document.getElementById('signature-pad');
+            if (!canvas) { console.error('Canvas not found!'); return; }
+            canvas.width = 500; canvas.height = 180;
+            canvas.style.width = '100%'; canvas.style.maxWidth = '500px';
+            canvas.style.height = '180px';
+            canvas.style.border = '2px solid #dee2e6';
+            canvas.style.borderRadius = '12px';
+            canvas.style.backgroundColor = 'white';
+            canvas.style.touchAction = 'none';
+
+            try {
+                signaturePad = new SignaturePad(canvas, {
+                    backgroundColor: 'rgba(255,255,255,1)',
+                    penColor: '#1a2332',
+                    minWidth: 1, maxWidth: 2.5
+                });
+            } catch(e) { console.error('Error:', e); return; }
+
+            try {
+                loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+                previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+            } catch(e) {}
+
+            setupEventListeners();
+            toggleSubmitButton();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('clear-signature').addEventListener('click', function(e) {
+                e.preventDefault(); signaturePad.clear(); signatureHistory = []; currentHistoryIndex = -1; toggleSubmitButton();
+            });
+            document.getElementById('preview-signature').addEventListener('click', function(e) {
+                e.preventDefault();
+                if (signaturePad.isEmpty()) { alert('Please provide a signature before previewing.'); return; }
+                showPreview();
+            });
+            document.getElementById('signForm').addEventListener('submit', function(e) { e.preventDefault(); submitSignature(); });
+            signaturePad.addEventListener('endStroke', function() { saveToHistory(); toggleSubmitButton(); });
+        }
+
+        function saveToHistory() {
+            try { signatureHistory.push(signaturePad.toData()); currentHistoryIndex = signatureHistory.length - 1; } catch(e) {}
+        }
+
+        function toggleSubmitButton() {
+            var submitBtn = document.getElementById('submit-signature');
+            if (submitBtn) { submitBtn.disabled = signaturePad.isEmpty(); }
+        }
+
+        function showPreview() {
+            var previewCanvas = document.getElementById('preview-canvas');
+            if (previewCanvas) {
+                try {
+                    var ps = new SignaturePad(previewCanvas, { backgroundColor: 'rgba(255,255,255,1)', penColor: '#1a2332' });
+                    ps.fromData(signaturePad.toData());
+                    previewModal.show();
+                } catch(e) { alert('Unable to show preview.'); }
+            }
+        }
+
+        function submitSignature() {
+            if (signaturePad.isEmpty()) { alert('Please provide your signature before submitting.'); return; }
+            var signatureInput = document.getElementById('signatureInput');
+            var signForm = document.getElementById('signForm');
+            if (signatureInput && signForm) {
+                try {
+                    signatureInput.value = signaturePad.toDataURL('image/png');
+                    loadingModal.show();
+                    signForm.submit();
+                } catch(e) { alert('Error processing signature.'); loadingModal.hide(); }
+            }
+        }
+        window.submitSignature = submitSignature;
+        initializeApp();
+    })();
+</script>
+</body>
+</html>

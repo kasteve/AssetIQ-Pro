@@ -131,51 +131,59 @@ public class Transfer {
     @Column(name = "ToEmployeeSignedAt")
     private LocalDateTime toEmployeeSignedAt;
 
-    // Signature fields (Base64)
-    @Column(name = "OldHandoverBySignature")
+    // Signature fields (Base64) - CHANGE THESE TO @Lob
+    @Lob
+    @Column(name = "OldHandoverBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String oldHandoverBySignature;
 
     @Column(name = "OldHandoverBySignedAt")
     private LocalDateTime oldHandoverBySignedAt;
 
-    @Column(name = "OldReceivedBySignature")
+    @Lob
+    @Column(name = "OldReceivedBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String oldReceivedBySignature;
 
     @Column(name = "OldReceivedBySignedAt")
     private LocalDateTime oldReceivedBySignedAt;
 
-    @Column(name = "NewHandoverBySignature")
+    @Lob
+    @Column(name = "NewHandoverBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String newHandoverBySignature;
 
     @Column(name = "NewHandoverBySignedAt")
     private LocalDateTime newHandoverBySignedAt;
 
-    @Column(name = "NewReceivedBySignature")
+    @Lob
+    @Column(name = "NewReceivedBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String newReceivedBySignature;
 
     @Column(name = "NewReceivedBySignedAt")
     private LocalDateTime newReceivedBySignedAt;
 
-    @Column(name = "ConfiguredBySignature")
+    @Lob
+    @Column(name = "ConfiguredBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String configuredBySignature;
 
     @Column(name = "ConfiguredBySignedAt")
     private LocalDateTime configuredBySignedAt;
 
-    @Column(name = "InfraRepSignature")
+    @Lob
+    @Column(name = "InfraRepSignature", columnDefinition = "NVARCHAR(MAX)")
     private String infraRepSignature;
 
     @Column(name = "InfraRepSignedAt")
     private LocalDateTime infraRepSignedAt;
 
-    @Column(name = "FinanceRepSignature")
+    @Lob
+    @Column(name = "FinanceRepSignature", columnDefinition = "NVARCHAR(MAX)")
     private String financeRepSignature;
 
     @Column(name = "FinanceRepSignedAt")
     private LocalDateTime financeRepSignedAt;
 
-    // PDF
-    @Column(name = "FullySignedPDF")
+    // PDF - CHANGE THIS TO @Lob
+    @Lob
+    @Column(name = "FullySignedPDF", columnDefinition = "NVARCHAR(MAX)")
     private String fullySignedPdf;
 
     @Column(name = "IsFullySigned")
@@ -253,12 +261,10 @@ public class Transfer {
         this.newDepartmentName = newDepartmentName;
     }
 
-    // Add this for the template
     public boolean getFullySigned() {
         return Boolean.TRUE.equals(isFullySigned);
     }
 
-    // Setter for PDF with correct name
     public void setFullySignedPDF(String pdfBase64) {
         this.fullySignedPdf = pdfBase64;
     }

@@ -447,11 +447,11 @@
                                 <a th:href="@{/transfers/{id}/pdf(id=${transfer.transferId})}" class="btn btn-outline-secondary" title="Download PDF">
                                     <i class="fas fa-file-pdf"></i>
                                 </a>
-                                <button type="button" th:if="${!transfer.fullySigned}"
-                                        class="btn btn-outline-primary" title="Initiate Signing"
-                                        th:onclick="'initiateSigning(' + ${transfer.transferId} + ')'">
-                                    <i class="fas fa-envelope"></i>
-                                </button>
+                                <form th:action="@{/transfers/{id}/initiate-signing(id=${transfer.transferId})}" method="post" style="display:inline;">
+                                    <button type="submit" th:if="${!transfer.fullySigned}" class="btn btn-outline-primary" title="Initiate Signing">
+                                        <i class="fas fa-envelope"></i>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -695,12 +695,6 @@
     window.addEventListener('resize', function () {
         if (window.innerWidth > 768) document.getElementById('sidebar').classList.remove('open');
     });
-
-    function initiateSigning(transferId) {
-        if (confirm('Send signing links to all signers?')) {
-            window.location.href = '/transfers/' + transferId + '/initiate-signing';
-        }
-    }
 
     /* ===== Transfer wizard ===== */
     const totalSteps = 3;

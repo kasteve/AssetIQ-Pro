@@ -372,6 +372,41 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    @Async
     public void sendCompletedTransferReport(List<String> signerEmails, Transfer transfer, byte[] pdfBytes) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(signerEmails.toArray(new String[0]));
+            helper.setSubject("Transfer Complete: " + transfer.getAssetTag() + " - #" + transfer.getTransferId());
+            helper.setText(String.format("""
+            Dear Team,
+            
+            The asset transfer for %s has been completed successfully.
+            
+            Transfer ID: %s
+            Asset Tag: %s
+            Transfer Date: %s
+            
+            Please find the fully signed transfer certificate attached.
+            
+            Best regards,
+            Asset Management Team
+            AssetIQ-Pro
+            """,
+                    transfer.getAssetTag(),
+                    transfer.getTransferId(),
+                    transfer.getAssetTag(),
+                    transfer.getTransferDate()));
+
+            helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
+                    new org.springframework.core.io.ByteArrayResource(pdfBytes));
+
+            mailSender.send(message);
+            log.info("Transfer completion notification sent to {} recipients", signerEmails.size());
+        } catch (MessagingException e) {
+            log.error("Failed to send transfer completion notification: {}", e.getMessage());
+        }
     }
 }

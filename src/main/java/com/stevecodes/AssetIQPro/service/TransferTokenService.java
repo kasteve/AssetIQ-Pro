@@ -91,6 +91,18 @@ public class TransferTokenService {
         log.info("🚀 STARTING TOKEN CREATION FOR TRANSFER: {}", transfer.getTransferId());
         log.info("=========================================");
 
+        log.info("🔍 DEBUG - Transfer details:");
+        log.info("   Transfer ID: {}", transfer.getTransferId());
+        log.info("   Asset Tag: {}", transfer.getAssetTag());
+        log.info("   OldHandoverById: {}", transfer.getOldHandoverById());
+        log.info("   OldReceivedById: {}", transfer.getOldReceivedById());
+        log.info("   NewHandoverById: {}", transfer.getNewHandoverById());
+        log.info("   NewReceivedById: {}", transfer.getNewReceivedById());
+        log.info("   ConfiguredById: {}", transfer.getConfiguredById());
+        log.info("   InfraRepresentativeId: {}", transfer.getInfraRepresentativeId());
+        log.info("   FinanceRepresentativeId: {}", transfer.getFinanceRepresentativeId());
+        log.info("=========================================");
+
         List<SignerInfo> signers = getRequiredSigners(transfer);
         if (signers.isEmpty()) {
             log.warn("⚠️ No signers found for transfer: {}", transfer.getTransferId());
@@ -120,7 +132,7 @@ public class TransferTokenService {
                 TransferToken savedToken = transferTokenRepository.save(token);
                 createdTokens.add(savedToken);
 
-                String signingLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + savedToken.getToken();
+                String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + savedToken.getToken();
 
                 log.info("=========================================");
                 log.info("🔐 SIGNING LINK GENERATED FOR TRANSFER: {}", transfer.getTransferId());
@@ -157,7 +169,7 @@ public class TransferTokenService {
             } catch (Exception e) {
                 log.error("❌ Failed to send email to {} [Thread: {}]: {}",
                         token.getSignerEmail(), Thread.currentThread().getName(), e.getMessage());
-                String manualLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + token.getToken();
+                String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
                 log.info("🔗 MANUAL LINK FOR {}: {}", token.getSignerEmail(), manualLink);
             }
         }
@@ -184,7 +196,7 @@ public class TransferTokenService {
                 failureCount++;
                 log.error("❌ Failed to send email to {} for transfer {} [Thread: {}]: {}",
                         token.getSignerEmail(), transfer.getTransferId(), Thread.currentThread().getName(), e.getMessage(), e);
-                String manualLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + token.getToken();
+                String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
                 log.info("🔗 MANUAL LINK FOR {}: {}", token.getSignerEmail(), manualLink);
             }
         }
@@ -198,59 +210,81 @@ public class TransferTokenService {
         List<SignerInfo> signers = new ArrayList<>();
         log.info("📋 Getting required signers for transfer: {}", transfer.getTransferId());
 
+        log.info("🔍 Checking OLD_HANDOVER - ID: {}", transfer.getOldHandoverById());
         if (transfer.getOldHandoverById() != null) {
             String email = getEmployeeEmail(transfer.getOldHandoverById());
+            log.info("   OLD_HANDOVER email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(transfer.getOldHandoverById(), email, "OLD_HANDOVER"));
                 log.debug("✅ Added OLD_HANDOVER signer: {} (ID: {})", email, transfer.getOldHandoverById());
             } else {
                 log.warn("⚠️ No email found for OLD_HANDOVER employee ID: {}", transfer.getOldHandoverById());
             }
+        } else {
+            log.info("   OLD_HANDOVER is NULL");
         }
 
+        log.info("🔍 Checking OLD_RECEIVED - ID: {}", transfer.getOldReceivedById());
         if (transfer.getOldReceivedById() != null) {
             String email = getEmployeeEmail(transfer.getOldReceivedById());
+            log.info("   OLD_RECEIVED email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(transfer.getOldReceivedById(), email, "OLD_RECEIVED"));
                 log.debug("✅ Added OLD_RECEIVED signer: {} (ID: {})", email, transfer.getOldReceivedById());
             } else {
                 log.warn("⚠️ No email found for OLD_RECEIVED employee ID: {}", transfer.getOldReceivedById());
             }
+        } else {
+            log.info("   OLD_RECEIVED is NULL");
         }
 
+        log.info("🔍 Checking NEW_HANDOVER - ID: {}", transfer.getNewHandoverById());
         if (transfer.getNewHandoverById() != null) {
             String email = getEmployeeEmail(transfer.getNewHandoverById());
+            log.info("   NEW_HANDOVER email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(transfer.getNewHandoverById(), email, "NEW_HANDOVER"));
                 log.debug("✅ Added NEW_HANDOVER signer: {} (ID: {})", email, transfer.getNewHandoverById());
             } else {
                 log.warn("⚠️ No email found for NEW_HANDOVER employee ID: {}", transfer.getNewHandoverById());
             }
+        } else {
+            log.info("   NEW_HANDOVER is NULL");
         }
 
+        log.info("🔍 Checking NEW_RECEIVED - ID: {}", transfer.getNewReceivedById());
         if (transfer.getNewReceivedById() != null) {
             String email = getEmployeeEmail(transfer.getNewReceivedById());
+            log.info("   NEW_RECEIVED email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(transfer.getNewReceivedById(), email, "NEW_RECEIVED"));
                 log.debug("✅ Added NEW_RECEIVED signer: {} (ID: {})", email, transfer.getNewReceivedById());
             } else {
                 log.warn("⚠️ No email found for NEW_RECEIVED employee ID: {}", transfer.getNewReceivedById());
             }
+        } else {
+            log.info("   NEW_RECEIVED is NULL");
         }
 
+        log.info("🔍 Checking CONFIGURED_BY - ID: {}", transfer.getConfiguredById());
         if (transfer.getConfiguredById() != null) {
             String email = getEmployeeEmail(transfer.getConfiguredById());
+            log.info("   CONFIGURED_BY email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(transfer.getConfiguredById(), email, "CONFIGURED_BY"));
                 log.debug("✅ Added CONFIGURED_BY signer: {} (ID: {})", email, transfer.getConfiguredById());
             } else {
                 log.warn("⚠️ No email found for CONFIGURED_BY employee ID: {}", transfer.getConfiguredById());
             }
+        } else {
+            log.info("   CONFIGURED_BY is NULL");
         }
 
+        log.info("🔍 Checking INFRA_REP - ID: {}", transfer.getInfraRepresentativeId());
         if (transfer.getInfraRepresentativeId() != null) {
             Long infraId = transfer.getInfraRepresentativeId();
             String email = getEmployeeEmail(infraId);
+            log.info("   INFRA_REP email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(infraId, email, "INFRA_REP"));
                 log.debug("✅ Added INFRA_REP signer: {} (ID: {})", email, infraId);
@@ -258,12 +292,15 @@ public class TransferTokenService {
                 log.warn("⚠️ No email found for INFRA_REP employee ID: {}", infraId);
             }
         } else {
+            log.info("   INFRA_REP is NULL");
             log.warn("⚠️ No Infrastructure Representative assigned to transfer: {}", transfer.getTransferId());
         }
 
+        log.info("🔍 Checking FINANCE_REP - ID: {}", transfer.getFinanceRepresentativeId());
         if (transfer.getFinanceRepresentativeId() != null) {
             Long financeId = transfer.getFinanceRepresentativeId();
             String email = getEmployeeEmail(financeId);
+            log.info("   FINANCE_REP email found: {}", email);
             if (email != null) {
                 signers.add(new SignerInfo(financeId, email, "FINANCE_REP"));
                 log.debug("✅ Added FINANCE_REP signer: {} (ID: {})", email, financeId);
@@ -271,6 +308,7 @@ public class TransferTokenService {
                 log.warn("⚠️ No email found for FINANCE_REP employee ID: {}", financeId);
             }
         } else {
+            log.info("   FINANCE_REP is NULL");
             log.warn("⚠️ No Finance Representative assigned to transfer: {}", transfer.getTransferId());
         }
 
@@ -312,7 +350,18 @@ public class TransferTokenService {
 
             String employeeName = getEmployeeName(signer.getEmployeeId());
             String greeting = (employeeName != null) ? employeeName : getRoleDisplayName(signer.getRole());
-            String signingLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + token.getToken();
+            String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+
+            // LOG THE LINK FOR MANUAL RETRIEVAL
+            log.info("=========================================");
+            log.info("🔗 SIGNING LINK GENERATED");
+            log.info("   Transfer ID: {}", transfer.getTransferId());
+            log.info("   Role: {}", signer.getRole());
+            log.info("   Signer: {}", signer.getEmail());
+            log.info("   LINK: {}", signingLink);
+            log.info("   Token: {}", token.getToken());
+            log.info("   Expires: {}", token.getExpiresAt());
+            log.info("=========================================");
 
             String subject = "Transfer Signature Required - Asset: " + transfer.getAssetTag() + " (Role: " + getRoleDisplayName(signer.getRole()) + ")";
             String body = String.format("""
@@ -342,7 +391,7 @@ public class TransferTokenService {
                     
                     Best regards,
                     Asset Management System
-                    Interswitch E.A (U) Ltd
+                    AssetIQ-Pro
                     """,
                     greeting, transfer.getAssetTag(), transfer.getTransferId(), transfer.getAssetTag(),
                     getRoleDisplayName(signer.getRole()),
@@ -356,7 +405,7 @@ public class TransferTokenService {
             message.setTo(signer.getEmail());
             message.setSubject(subject);
             message.setText(body);
-            message.setFrom("products_ea@interswitchgroup.com");
+            message.setFrom("assetiq@company.com");
             mailSender.send(message);
 
             log.info("✅ Email sent successfully to: {} (Link: {})", signer.getEmail(), signingLink);
@@ -365,7 +414,7 @@ public class TransferTokenService {
             log.error("❌ Failed to send email to: {} (Role: {}) on thread: {}",
                     signer.getEmail(), signer.getRole(), Thread.currentThread().getName(), e);
 
-            String manualLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + token.getToken();
+            String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
             log.info("🔗 MANUAL LINK FOR {}: {}", signer.getEmail(), manualLink);
 
             throw new RuntimeException("Email sending failed", e);
@@ -473,7 +522,7 @@ public class TransferTokenService {
                 log.info("📧 Sending reminder email to: {} for token: {}", token.getSignerEmail(), token.getToken());
                 String employeeName = getEmployeeName(token.getSignerEmployeeId());
                 String greeting = (employeeName != null) ? employeeName : getRoleDisplayName(token.getSignerRole());
-                String signingLink = "https://sandbox.interswitch.io/digitalassetsmgmt/transfers/sign?token=" + token.getToken();
+                String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
 
                 String subject = "URGENT: Transfer Signature Required - Token Expires Soon (Role: " + getRoleDisplayName(token.getSignerRole()) + ")";
                 String body = String.format("""
@@ -495,7 +544,7 @@ public class TransferTokenService {
                         
                         Best regards,
                         Asset Management System
-                        Interswitch E.A (U) Ltd
+                        AssetIQ-Pro
                         """,
                         greeting, token.getTransferId(), getRoleDisplayName(token.getSignerRole()),
                         token.getExpiresAt(), signingLink);
@@ -504,7 +553,7 @@ public class TransferTokenService {
                 message.setTo(token.getSignerEmail());
                 message.setSubject(subject);
                 message.setText(body);
-                message.setFrom("products_ea@interswitchgroup.com");
+                message.setFrom("assetiq@company.com");
                 mailSender.send(message);
                 log.info("✅ Reminder email sent successfully to: {}", token.getSignerEmail());
                 log.info("🔗 Link: {}", signingLink);

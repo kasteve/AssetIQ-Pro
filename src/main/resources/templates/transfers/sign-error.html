@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Signing Error - AssetIQ-Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h4><i class="fas fa-exclamation-triangle"></i> Signing Link Error</h4>
+        </div>
+        <div class="card-body">
+            <p class="lead" th:text="${error}">Invalid or expired signing link.</p>
+            <hr>
+            <p>Possible reasons:</p>
+            <ul>
+                <li>The signing link has expired (tokens expire after 7 days)</li>
+                <li>The link has already been used</li>
+                <li>The link is invalid or has been tampered with</li>
+            </ul>
+            <a href="/assetIQ-pro/transfers" class="btn btn-primary">Back to Transfers</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
