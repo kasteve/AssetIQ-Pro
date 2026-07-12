@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'AssetIQ-Pro'">AssetIQ-Pro</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --primary-dark: #0b5ed7;
+            --accent-color: #4fc3f7;
+            --sidebar-width: 260px;
+            --header-height: 70px;
+            --bg-color: #f4f6f9;
+            --card-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            --card-shadow-hover: 0 10px 30px rgba(15, 23, 42, 0.10);
+            --border-radius: 14px;
+            --ink: #1a1a2e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ========== SIDEBAR ========== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 0;
+            transition: all 0.3s ease;
+            z-index: 1050;
+            overflow-y: auto;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+            border-right: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+
+        .sidebar .logo {
+            padding: 26px 20px 22px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            margin-bottom: 16px;
+        }
+
+        .sidebar .logo h3 {
+            font-weight: 800;
+            font-size: 22px;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar .logo h3 i {
+            color: var(--accent-color);
+            filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.35));
+        }
+        .sidebar .logo h3 span {
+            color: var(--accent-color);
+        }
+        .sidebar .logo small {
+            color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            display: block;
+            margin-top: 3px;
+        }
+
+        .sidebar .nav {
+            padding: 0 12px;
+        }
+
+        .sidebar .nav-item {
+            margin-bottom: 3px;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.65);
+            padding: 11px 16px;
+            border-radius: 10px;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.08);
+            color: white;
+            transform: translateX(2px);
+        }
+
+        .sidebar .nav-link.active {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35);
+        }
+
+        .sidebar .nav-link i {
+            width: 22px;
+            margin-right: 12px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .sidebar .nav-link .badge {
+            margin-left: auto;
+            background: #dc3545;
+            color: white;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .sidebar .nav-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.07);
+            margin: 12px 16px;
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            background: white;
+            padding: 15px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            min-height: var(--header-height);
+            height: var(--header-height);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+
+        .header .page-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+
+        .header .page-title i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+
+        .header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header .user-info .dropdown-toggle::after {
+            display: none;
+        }
+
+        .header .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), #6610f2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25);
+        }
+
+        .header .user-avatar:hover {
+            transform: scale(1.06);
+            box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+        }
+
+        .header .notif-btn {
+            position: relative;
+            background: none;
+            border: none;
+            color: #6c757d;
+            font-size: 20px;
+            padding: 4px 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header .notif-btn:hover {
+            color: var(--ink);
+        }
+
+        .header .notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* ========== CONTENT ========== */
+        .content {
+            padding: 25px 30px;
+            flex: 1;
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .header {
+                padding: 12px 16px;
+            }
+
+            .header .page-title {
+                font-size: 15px;
+            }
+
+            .content {
+                padding: 16px;
+            }
+
+            .sidebar-toggle {
+                display: block !important;
+            }
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 22px;
+            color: var(--ink);
+            cursor: pointer;
+            padding: 0 6px;
+        }
+
+        /* ========== COMMON UTILITIES ========== */
+        .badge-premium {
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Modal Override */
+        .modal-content {
+            border-radius: 16px !important;
+            border: none !important;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28) !important;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            padding: 20px 24px !important;
+        }
+
+        .modal-footer {
+            border-top: 1px solid rgba(0,0,0,0.06) !important;
+            padding: 16px 24px !important;
+        }
+
+        .modal-body {
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 10px 14px !important;
+            font-size: 14px !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.08) !important;
+        }
+
+        .form-label {
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            color: var(--ink) !important;
+            margin-bottom: 5px !important;
+        }
+
+        .btn {
+            border-radius: 10px !important;
+            padding: 9px 22px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            transition: all 0.25s ease !important;
+        }
+
+        .btn-primary {
+            background: var(--primary-color) !important;
+            border: none !important;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3) !important;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+        }
+
+        .modal-title i {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<div class="sidebar" id="sidebar">
+    <div class="logo">
+        <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
+        <small>Professional Asset Management</small>
+    </div>
+    <nav class="nav flex-column">
+        <!-- Dashboard -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
+                <i class="fas fa-chart-pie"></i> Dashboard
+            </a>
+        </div>
+
+        <!-- Asset Management -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                <i class="fas fa-laptop"></i> Assets
+                <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+            </a>
+        </div>
+
+        <!-- Transfers -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
+                <i class="fas fa-exchange-alt"></i> Transfers
+            </a>
+        </div>
+
+        <!-- Infrastructure -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'infra-requests'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
+                <i class="fas fa-tools"></i> Infrastructure
+                <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
+            </a>
+        </div>
+
+        <!-- Administration Resources -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'resources'} ? 'active' : ''" href="/assetIQ-pro/resources">
+                <i class="fas fa-boxes"></i> Resources
+            </a>
+        </div>
+
+        <!-- Bookings -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'bookings'} ? 'active' : ''" href="/assetIQ-pro/bookings">
+                <i class="fas fa-calendar-check"></i> Bookings
+            </a>
+        </div>
+
+        <!-- Vouchers -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
+                <i class="fas fa-ticket-alt"></i> Vouchers
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Reports -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
+                <i class="fas fa-file-alt"></i> Reports
+            </a>
+        </div>
+
+        <!-- Admin -->
+        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
+            <a class="nav-link" th:classappend="${currentPage == 'admin'} ? 'active' : ''" href="/assetIQ-pro/admin/users">
+                <i class="fas fa-users-cog"></i> User Management
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Logout -->
+        <div class="nav-item">
+            <a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- ========== MAIN CONTENT ========== -->
+<div class="main-content">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="page-title">
+                <i class="fas fa-chevron-right" style="font-size: 14px; opacity: 0.4;"></i>
+                <span th:text="${pageTitle} ?: 'Dashboard'">Dashboard</span>
+            </span>
+        </div>
+
+        <div class="user-info">
+            <!-- Notifications -->
+            <div class="dropdown">
+                <button class="notif-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end" style="min-width: 320px; max-height: 400px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
+                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;">
+                        <h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6>
+                    </div>
+                    <div th:each="notification : ${notifications}">
+                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
+                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
+                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
+                        </a>
+                    </div>
+                    <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
+                        <i class="fas fa-inbox text-muted" style="font-size: 24px;"></i>
+                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-link p-0" data-bs-toggle="dropdown">
+                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 200px;">
+                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
+                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+        <div th:replace="~{::content}"></div>
+    </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // Close sidebar on outside click (mobile)
+    document.addEventListener('click', function(event) {
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.querySelector('.sidebar-toggle');
+        if (!sidebar) return;
+
+        const isClickInside = sidebar.contains(event.target);
+        const isClickOnToggle = toggleBtn && toggleBtn.contains(event.target);
+
+        if (!isClickInside && !isClickOnToggle && window.innerWidth <= 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+
+    // Close sidebar when window resizes to desktop
+    window.addEventListener('resize', function() {
+        const sidebar = document.getElementById('sidebar');
+        if (window.innerWidth > 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+
+    // NOTE: Bootstrap's data-bs-toggle="modal" already opens modals automatically
+    // via its built-in event delegation (this works for dynamically rendered content
+    // too, since Bootstrap listens on document level). The previous version of this
+    // script manually re-attached click listeners and called modal.show() a second
+    // time on top of Bootstrap's own handler, which created duplicate modal/backdrop
+    // instances and made modals open incorrectly or fail to close cleanly. That extra
+    // logic has been removed - no manual re-initialization is needed.
+</script>
+
+</body>
+</html>

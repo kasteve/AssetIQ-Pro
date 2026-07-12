@@ -1,0 +1,79 @@
+<!-- templates/transfers/list.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/base}">
+<head>
+    <title>Transfers - AssetIQ-Pro</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Asset Transfers</h4>
+        <div>
+            <a href="/transfers/create" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create Transfer
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Transfer ID</th>
+                        <th>Asset Tag</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="transfer : ${transfers}">
+                        <td>
+                            <span class="fw-semibold" th:text="'#' + ${transfer.transferId}">#1</span>
+                        </td>
+                        <td th:text="${transfer.assetTag}">AST-001</td>
+                        <td th:text="${transfer.oldDepartmentName}">IT Department</td>
+                        <td th:text="${transfer.newDepartmentName}">Finance</td>
+                        <td th:text="${#temporals.format(transfer.transferDate, 'dd/MM/yyyy')}">2024-01-01</td>
+                        <td>
+                                <span class="badge" th:classappend="${transfer.fullySigned} ? 'bg-success' : 'bg-warning'"
+                                      th:text="${transfer.fullySigned} ? 'Completed' : 'Pending Signatures'">Pending</span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a th:href="@{/transfers/{id}(id=${transfer.transferId})}" class="btn btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a th:href="@{/transfers/{id}/pdf(id=${transfer.transferId})}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <button th:if="${!transfer.fullySigned}"
+                                        class="btn btn-outline-primary"
+                                        onclick="initiateSigning(${transfer.transferId})">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function initiateSigning(transferId) {
+        if (confirm('Send signing links to all signers?')) {
+            window.location.href = '/transfers/' + transferId + '/initiate-signing';
+        }
+    }
+</script>
+</body>
+</html>

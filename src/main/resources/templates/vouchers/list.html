@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/base}">
+<head>
+    <title>Vouchers - AssetIQ-Pro</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0"><i class="fas fa-ticket-alt me-2"></i>Meal Vouchers</h4>
+        <div>
+            <a href="/vouchers/create" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Generate Voucher
+            </a>
+            <a href="/vouchers/bulk" class="btn btn-outline-primary">
+                <i class="fas fa-layer-group me-2"></i>Bulk Generate
+            </a>
+        </div>
+    </div>
+
+    <!-- Voucher Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #0d6efd;">
+                <div class="stat-number" th:text="${todayStats.total}">0</div>
+                <div class="stat-label">Today's Vouchers</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #28a745;">
+                <div class="stat-number" th:text="${todayStats.active}">0</div>
+                <div class="stat-label">Active</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #ffc107;">
+                <div class="stat-number" th:text="${todayStats.used}">0</div>
+                <div class="stat-label">Used Today</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #dc3545;">
+                <div class="stat-number" th:text="${todayStats.cancelled}">0</div>
+                <div class="stat-label">Cancelled</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Voucher Code</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>QR</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="voucher : ${vouchers}">
+                        <td>
+                            <span class="fw-semibold" th:text="${voucher.voucherCode}">VCH-2024-XXXX</span>
+                        </td>
+                        <td th:text="${voucher.userFullName}">John Doe</td>
+                        <td>
+                                <span class="badge" th:classappend="${voucher.mealType} == 'BREAKFAST' ? 'bg-warning' :
+                                                                     ${voucher.mealType} == 'LUNCH' ? 'bg-success' : 'bg-info'"
+                                      th:text="${voucher.mealType}">Lunch</span>
+                        </td>
+                        <td th:text="${#temporals.format(voucher.voucherDate, 'dd/MM/yyyy')}">2024-01-01</td>
+                        <td>
+                                <span class="badge" th:classappend="${voucher.status} == 'ACTIVE' ? 'bg-success' :
+                                                                      ${voucher.status} == 'USED' ? 'bg-secondary' :
+                                                                      ${voucher.status} == 'CANCELLED' ? 'bg-danger' : 'bg-warning'"
+                                      th:text="${voucher.status}">Active</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info" onclick="viewQR('${voucher.voucherCode}')">
+                                <i class="fas fa-qrcode"></i>
+                            </button>
+                        </td>
+                        <td>
+                            <button th:if="${voucher.status} == 'ACTIVE'"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="cancelVoucher('${voucher.voucherCode}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function viewQR(code) {
+        alert('QR Code for: ' + code);
+    }
+
+    function cancelVoucher(code) {
+        if (confirm('Cancel this voucher?')) {
+            window.location.href = '/vouchers/' + code + '/cancel';
+        }
+    }
+</script>
+</body>
+</html>

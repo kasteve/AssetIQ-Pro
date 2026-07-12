@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'Dashboard - AssetIQ-Pro'">Dashboard - AssetIQ-Pro</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --primary-dark: #0b5ed7;
+            --accent-color: #4fc3f7;
+            --sidebar-width: 250px;
+            --header-height: 68px;
+            --bg-color: #f4f6f9;
+            --ink: #1a1a2e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ========== SIDEBAR ========== */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            z-index: 1050;
+            overflow-y: auto;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+        }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .sidebar .logo {
+            padding: 24px 20px 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            margin-bottom: 14px;
+        }
+        .sidebar .logo h3 { font-weight: 800; font-size: 21px; letter-spacing: -0.5px; }
+        .sidebar .logo h3 i, .sidebar .logo h3 span { color: var(--accent-color); }
+        .sidebar .logo small {
+            color: rgba(255,255,255,0.4);
+            font-size: 10.5px; font-weight: 500; letter-spacing: 2px;
+            text-transform: uppercase; display: block; margin-top: 3px;
+        }
+
+        .sidebar .nav { padding: 0 12px; }
+        .sidebar .nav-item { margin-bottom: 3px; }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.65);
+            padding: 11px 16px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: flex; align-items: center;
+            font-size: 14px; font-weight: 500;
+        }
+        .sidebar .nav-link:hover { background: rgba(255,255,255,0.08); color: white; }
+        .sidebar .nav-link.active {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35);
+        }
+        .sidebar .nav-link i { width: 22px; margin-right: 12px; font-size: 15px; text-align: center; }
+        .sidebar .nav-link .badge {
+            margin-left: auto; background: #dc3545; color: white;
+            padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+        }
+        .sidebar .nav-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 12px 16px; }
+
+        /* ========== MAIN ========== */
+        .main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
+
+        .header {
+            background: white;
+            padding: 0 28px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 1040;
+            height: var(--header-height);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .header .page-title { font-size: 17px; font-weight: 700; color: var(--ink); }
+        .header .page-title i { color: var(--primary-color); margin-right: 6px; }
+
+        .header .user-info { display: flex; align-items: center; gap: 14px; }
+        .header .dropdown-toggle::after { display: none; }
+        .header .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), #6610f2);
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px; cursor: pointer;
+        }
+        .header .notif-btn {
+            position: relative; background: none; border: none; color: #6c757d; font-size: 19px; cursor: pointer;
+        }
+        .header .notif-badge {
+            position: absolute; top: -4px; right: -6px; background: #dc3545; color: white;
+            font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+        }
+
+        .sidebar-toggle { display: none; background: none; border: none; font-size: 22px; color: var(--ink); cursor: pointer; }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .sidebar-toggle { display: block !important; margin-right: 12px; }
+        }
+
+        /* ========== CONTENT ========== */
+        .content { padding: 28px 32px; max-width: 1400px; }
+
+        .welcome-section {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0d6efd 140%);
+            border-radius: 16px;
+            padding: 26px 32px;
+            color: white;
+            margin-bottom: 24px;
+        }
+        .welcome-section h2 { font-weight: 700; font-size: 21px; letter-spacing: -0.3px; }
+        .welcome-section p { opacity: 0.75; font-size: 13.5px; margin: 4px 0 16px; }
+
+        .quick-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .quick-action-btn {
+            padding: 9px 16px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.08);
+            text-decoration: none; color: white; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .quick-action-btn:hover { background: rgba(255,255,255,0.18); color: white; }
+
+        /* Stats */
+        .stats-row { margin-bottom: 24px; }
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            height: 100%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(15,23,42,0.10); }
+        .stat-icon {
+            width: 46px; height: 46px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 19px; flex-shrink: 0;
+        }
+        .stat-number { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+        .stat-label { color: #6c757d; font-size: 12.5px; font-weight: 500; margin-top: 2px; }
+
+        .icon-blue { background: #e3f2fd; color: #0d6efd; }
+        .icon-green { background: #d4edda; color: #28a745; }
+        .icon-yellow { background: #fff3cd; color: #cf9500; }
+        .icon-red { background: #f8d7da; color: #dc3545; }
+
+        /* Cards */
+        .card-premium {
+            border-radius: 14px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            background: white;
+            margin-bottom: 24px;
+        }
+        .card-premium .card-header {
+            background: transparent;
+            border-bottom: 1px solid #f0f0f0;
+            padding: 16px 22px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .card-premium .card-body { padding: 18px 22px; }
+
+        .activity-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f5f5f5;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon {
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+        }
+        .status-badge { padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+        .chart-box { position: relative; height: 260px; }
+
+        /* Modal polish */
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-title i { margin-right: 8px; }
+        .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .form-control, .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
+        .form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+        .btn { border-radius: 10px; padding: 9px 22px; font-weight: 600; font-size: 14px; }
+        .btn-primary { background: var(--primary-color); border: none; }
+        .btn-primary:hover { background: var(--primary-dark); }
+    </style>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<div class="sidebar" id="sidebar">
+    <div class="logo">
+        <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
+        <small>Asset Management</small>
+    </div>
+    <nav class="nav flex-column">
+        <!-- Dashboard -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
+                <i class="fas fa-chart-pie"></i> Dashboard
+            </a>
+        </div>
+
+        <!-- Asset Management -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                <i class="fas fa-laptop"></i> Assets
+                <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+            </a>
+        </div>
+
+        <!-- Transfers -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
+                <i class="fas fa-exchange-alt"></i> Transfers
+            </a>
+        </div>
+
+        <!-- Infrastructure -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'infra-requests'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
+                <i class="fas fa-tools"></i> Infrastructure
+                <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
+            </a>
+        </div>
+
+        <!-- Administration Resources -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'resources'} ? 'active' : ''" href="/assetIQ-pro/resources">
+                <i class="fas fa-boxes"></i> Resources
+            </a>
+        </div>
+
+        <!-- Bookings -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'bookings'} ? 'active' : ''" href="/assetIQ-pro/bookings">
+                <i class="fas fa-calendar-check"></i> Bookings
+            </a>
+        </div>
+
+        <!-- Vouchers -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
+                <i class="fas fa-ticket-alt"></i> Vouchers
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Reports -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
+                <i class="fas fa-file-alt"></i> Reports
+            </a>
+        </div>
+
+        <!-- Admin -->
+        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
+            <a class="nav-link" th:classappend="${currentPage == 'admin'} ? 'active' : ''" href="/assetIQ-pro/admin/users">
+                <i class="fas fa-users-cog"></i> User Management
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Logout -->
+        <div class="nav-item">
+            <a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- ========== MAIN ========== -->
+<div class="main-content">
+
+    <header class="header">
+        <div style="display:flex; align-items:center;">
+            <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="page-title"><i class="fas fa-chart-pie"></i>Dashboard</span>
+        </div>
+        <div class="user-info">
+            <div class="dropdown">
+                <button class="notif-btn" data-bs-toggle="dropdown">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px; max-height: 380px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
+                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;">
+                        <h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6>
+                    </div>
+                    <div th:each="notification : ${notifications}">
+                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
+                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
+                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
+                        </a>
+                    </div>
+                    <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
+                        <i class="fas fa-inbox text-muted" style="font-size: 22px;"></i>
+                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-link p-0" data-bs-toggle="dropdown">
+                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 190px;">
+                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
+                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <div class="content">
+
+        <!-- Welcome -->
+        <div class="welcome-section">
+            <h2>Welcome back, <span th:text="${session.fullName} ?: 'User'">User</span> 👋</h2>
+            <p>Here's what's happening with your assets and requests today.</p>
+            <div class="quick-actions">
+                <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createAssetModal">
+                    <i class="fas fa-plus-circle"></i> New Asset
+                </a>
+                <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createTransferModal">
+                    <i class="fas fa-exchange-alt"></i> Transfer
+                </a>
+                <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createRequestModal">
+                    <i class="fas fa-tools"></i> Infra Request
+                </a>
+                <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
+                    <i class="fas fa-calendar-plus"></i> Book Room
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="row g-3 stats-row">
+            <div class="col-lg-3 col-sm-6" onclick="window.location.href='/assetIQ-pro/assets'">
+                <div class="stat-card">
+                    <div class="stat-icon icon-blue"><i class="fas fa-laptop"></i></div>
+                    <div>
+                        <div class="stat-number" th:text="${stats != null ? stats.totalAssets : 0}">0</div>
+                        <div class="stat-label">Total Assets</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6" onclick="window.location.href='/assetIQ-pro/assets?status=AVAILABLE'">
+                <div class="stat-card">
+                    <div class="stat-icon icon-green"><i class="fas fa-check-circle"></i></div>
+                    <div>
+                        <div class="stat-number" th:text="${stats != null ? stats.availableAssets : 0}">0</div>
+                        <div class="stat-label">Available Assets</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6" onclick="window.location.href='/assetIQ-pro/infra-requests'">
+                <div class="stat-card">
+                    <div class="stat-icon icon-yellow"><i class="fas fa-clock"></i></div>
+                    <div>
+                        <div class="stat-number" th:text="${stats != null ? stats.pendingRequests : 0}">0</div>
+                        <div class="stat-label">Pending Requests</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6" onclick="window.location.href='/assetIQ-pro/assets?warranty=expiring'">
+                <div class="stat-card">
+                    <div class="stat-icon icon-red"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div>
+                        <div class="stat-number" th:text="${stats != null ? stats.warrantyExpiringSoon : 0}">0</div>
+                        <div class="stat-label">Warranty Expiring</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div class="card-premium">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-line me-2" style="color: #0d6efd;"></i>Monthly Trends</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.location.href='/assetIQ-pro/reports'">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-box"><canvas id="trendsChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card-premium">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-pie me-2" style="color: #6f42c1;"></i>Asset Distribution</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-box"><canvas id="distributionChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card-premium">
+                    <div class="card-header">
+                        <span><i class="fas fa-exchange-alt me-2" style="color: #17a2b8;"></i>Recent Transfers</span>
+                        <a href="/assetIQ-pro/transfers" class="text-decoration-none" style="font-size: 13px;">View all →</a>
+                    </div>
+                    <div class="card-body">
+                        <div th:each="transfer : ${recentTransfers}" class="activity-item">
+                            <div class="activity-icon" style="background: #e3f2fd; color: #0d6efd;">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold" th:text="${transfer.assetTag}">AST-001</div>
+                                <small class="text-muted" th:text="${transfer.transferDate}">2024-01-01</small>
+                            </div>
+                            <span class="status-badge" th:classappend="${transfer.fullySigned} ? 'bg-success text-white' : 'bg-warning text-dark'"
+                                  th:text="${transfer.fullySigned} ? 'Completed' : 'Pending'">Pending</span>
+                        </div>
+                        <div class="text-center p-4" th:if="${recentTransfers == null or recentTransfers.isEmpty()}">
+                            <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">No recent transfers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card-premium">
+                    <div class="card-header">
+                        <span><i class="fas fa-tools me-2" style="color: #cf9500;"></i>Pending Infrastructure Requests</span>
+                        <a href="/assetIQ-pro/infra-requests" class="text-decoration-none" style="font-size: 13px;">View all →</a>
+                    </div>
+                    <div class="card-body">
+                        <div th:each="request : ${recentRequests}" class="activity-item">
+                            <div class="activity-icon" style="background: #fff3cd; color: #cf9500;">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold" th:text="${request.resourceType}">Laptop</div>
+                                <small class="text-muted" th:text="${request.requestedBy}">User Name</small>
+                            </div>
+                            <span class="status-badge" th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'bg-warning text-dark' : 'bg-info text-white'"
+                                  th:text="${request.statusDisplay}">Pending</span>
+                        </div>
+                        <div class="text-center p-4" th:if="${recentRequests == null or recentRequests.isEmpty()}">
+                            <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">No pending requests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========== MODALS ========== -->
+<div class="modal fade" id="createAssetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle" style="color: #0d6efd;"></i> Create New Asset</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/api/assets}" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tag *</label>
+                            <input type="text" name="tag" class="form-control" placeholder="e.g., AST-001" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g., MacBook Pro" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Serial Number</label>
+                            <input type="text" name="serialNumber" class="form-control" placeholder="e.g., SN123456789">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Category</label>
+                            <select name="categoryId" class="form-select">
+                                <option value="">Select Category</option>
+                                <option value="1">Hardware</option>
+                                <option value="2">Laptop</option>
+                                <option value="3">Consumable</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Purchase Date</label>
+                            <input type="date" name="purchaseDate" class="form-control">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Purchase Cost</label>
+                            <input type="number" step="0.01" name="purchaseCost" class="form-control" placeholder="0.00">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Warranty Years</label>
+                            <input type="number" name="warrantyYears" class="form-control" value="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Purchase Invoice</label>
+                        <input type="file" name="invoice" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exchange-alt" style="color: #17a2b8;"></i> Create Transfer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/api/transfers}" method="post">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Asset Tag *</label>
+                            <input type="text" name="assetTag" class="form-control" placeholder="e.g., AST-001" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Serial Number</label>
+                            <input type="text" name="serialNumber" class="form-control" placeholder="e.g., SN123456789">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">From Department</label>
+                            <select name="oldDepartmentId" class="form-select">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">To Department</label>
+                            <select name="newDepartmentId" class="form-select">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Transfer Date</label>
+                        <input type="date" name="transferDate" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comments</label>
+                        <textarea name="comments" class="form-control" rows="3" placeholder="Additional details about the transfer..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info text-white">Create Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-tools" style="color: #cf9500;"></i> Infrastructure Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/api/infra-requests}" method="post">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Resource Type *</label>
+                            <select name="resourceType" class="form-select" required>
+                                <option value="">Select Resource</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Mouse">Mouse</option>
+                                <option value="Keyboard">Keyboard</option>
+                                <option value="Monitor">Monitor</option>
+                                <option value="Stationery">Stationery</option>
+                                <option value="Apparel">Apparel</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" name="quantity" class="form-control" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Line Manager *</label>
+                            <select name="lineManagerId" class="form-select" required>
+                                <option value="">Select Line Manager</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Specification</label>
+                            <input type="text" name="specification" class="form-control" placeholder="e.g., 16GB RAM, 512GB SSD">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Justification *</label>
+                        <textarea name="justification" class="form-control" rows="3" placeholder="Why do you need this resource?" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning text-dark">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="bookRoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-calendar-plus" style="color: #28a745;"></i> Book a Room</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/api/bookings/rooms}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Room *</label>
+                        <select name="roomId" class="form-select" required>
+                            <option value="">Select Room</option>
+                            <option value="1">Boardroom</option>
+                            <option value="2">Meeting Room 1</option>
+                            <option value="3">Meeting Room 2</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Time *</label>
+                        <input type="datetime-local" name="startTime" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Time *</label>
+                        <input type="datetime-local" name="endTime" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Purpose</label>
+                        <input type="text" name="purpose" class="form-control" placeholder="e.g., Team Meeting">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Book Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('click', function (event) {
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.querySelector('.sidebar-toggle');
+        if (!sidebar) return;
+        const inside = sidebar.contains(event.target);
+        const onToggle = toggleBtn && toggleBtn.contains(event.target);
+        if (!inside && !onToggle && window.innerWidth <= 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+    window.addEventListener('resize', function () {
+        if (window.innerWidth > 768) document.getElementById('sidebar').classList.remove('open');
+    });
+
+    // Trends chart
+    const trendsData = [[${stats != null ? stats.monthlyTrends : null}]];
+    new Chart(document.getElementById('trendsChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: trendsData && trendsData.length ? trendsData.map(d => d.month) : ['Jan','Feb','Mar','Apr','May','Jun'],
+            datasets: [
+                {
+                    label: 'Requests',
+                    data: trendsData && trendsData.length ? trendsData.map(d => d.requests) : [0,0,0,0,0,0],
+                    borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.08)',
+                    fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                },
+                {
+                    label: 'Completed',
+                    data: trendsData && trendsData.length ? trendsData.map(d => d.completed) : [0,0,0,0,0,0],
+                    borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.08)',
+                    fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } }
+        }
+    });
+
+    // Distribution chart
+    const distributionData = [[${stats != null ? stats.assetsByCategory : null}]];
+    const colors = ['#0d6efd','#6610f2','#6f42c1','#d63384','#dc3545','#fd7e14','#ffc107','#28a745','#20c997','#17a2b8'];
+    new Chart(document.getElementById('distributionChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: distributionData && Object.keys(distributionData).length ? Object.keys(distributionData) : ['No Data'],
+            datasets: [{
+                data: distributionData && Object.keys(distributionData).length ? Object.values(distributionData) : [1],
+                backgroundColor: colors.slice(0, distributionData ? Object.keys(distributionData).length : 1),
+                borderWidth: 2, borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10.5 } } } },
+            cutout: '65%'
+        }
+    });
+</script>
+
+</body>
+</html>
