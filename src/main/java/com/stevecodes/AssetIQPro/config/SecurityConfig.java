@@ -39,7 +39,15 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/**", "/transfers/**", "/assets/**", "/infra-requests/**", "/bookings/**", "/vouchers/**")
+                        .ignoringRequestMatchers(
+                                "/api/**",
+                                "/transfers/**",
+                                "/assets/**",
+                                "/infra-requests/**",
+                                "/bookings/**",
+                                "/vouchers/**",
+                                "/admin/**"
+                        )
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -59,9 +67,21 @@ public class SecurityConfig {
                                 "/transfers/create",
                                 "/transfers/debug-transfer/**",
                                 "/transfers/test-signing/**",
+                                "/transfers/thankyou",
+                                "/transfers/sign-error",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/actuator/**"
+                                "/actuator/**",
+                                // Admin module paths
+                                "/admin/categories",
+                                "/admin/companies",
+                                "/admin/departments",
+                                "/admin/employees",
+                                "/admin/locations",
+                                "/admin/suppliers",
+                                "/admin/rooms",
+                                "/admin/permissions",
+                                "/admin/users"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

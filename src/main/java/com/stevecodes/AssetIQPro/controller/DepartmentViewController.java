@@ -6,15 +6,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+// DepartmentViewController.java
 @Slf4j
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/admin/dashboard")  // Changed from /admin
-public class AdminViewController {
-
+@RequestMapping("/admin/departments")
+public class DepartmentViewController {
     @GetMapping
-    public String adminDashboard() {  // Renamed from users()
-        log.info("Loading admin dashboard page");
-        return "admin/dashboard";
+    public String departments() {
+        return "admin/departments";
     }
 }

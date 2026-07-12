@@ -1,11 +1,10 @@
-<!-- templates/bookings/list.html -->
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bookings - AssetIQ-Pro</title>
+    <title>Suppliers - AssetIQ-Pro</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -75,48 +74,40 @@
         .btn { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; }
         .btn-primary { background: var(--primary-color) !important; border: none !important; }
         .btn-primary:hover { background: var(--primary-dark) !important; }
-        .btn-outline-primary { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; }
         .btn-secondary { background: #eef0f3 !important; border: none !important; color: var(--ink) !important; }
         .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
 
-        .panel-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; }
-        .panel-card .panel-header { padding: 16px 20px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; justify-content: space-between; }
-        .panel-card .panel-header h6 { font-weight: 700; font-size: 14px; color: var(--ink); margin: 0; }
-        .panel-card .panel-header h6 i { color: var(--primary-color); }
-
-        .bk-table { margin-bottom: 0; }
-        .bk-table thead th {
+        .table-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; }
+        .sup-table { margin-bottom: 0; }
+        .sup-table thead th {
             background: #f8f9fb; border-bottom: 1px solid #eef0f3; color: #6c757d;
-            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 12px 16px; white-space: nowrap;
+            font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 13px 16px; white-space: nowrap;
         }
-        .bk-table tbody td { padding: 13px 16px; vertical-align: middle; font-size: 13.5px; border-bottom: 1px solid #f5f6f8; }
-        .bk-table tbody tr:hover { background: #f8f9fc; }
-        .bk-table tbody tr:last-child td { border-bottom: none; }
-        .bk-room { font-weight: 700; color: var(--ink); }
-        .bk-user { color: #495057; }
-        .bk-time { color: #6c757d; font-variant-numeric: tabular-nums; }
-
-        .status-badge { display: inline-block; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-        .status-badge.booked { background: #e6f7ec; color: #198754; }
-        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
-        .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
-        .status-badge.accepted { background: #e6f7ec; color: #198754; }
-        .status-badge.declined { background: #fdeeee; color: #dc3545; }
-        .status-badge.completed { background: #eef0fd; color: #6610f2; }
-
-        .room-list-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 13px 20px; border-bottom: 1px solid #f5f6f8; font-size: 13.5px;
-        }
-        .room-list-item:last-child { border-bottom: none; }
-        .room-list-item .room-name { font-weight: 600; color: var(--ink); }
+        .sup-table tbody td { padding: 14px 16px; vertical-align: middle; font-size: 13.5px; border-bottom: 1px solid #f5f6f8; }
+        .sup-table tbody tr { transition: background 0.15s ease; }
+        .sup-table tbody tr:hover { background: #f8f9fc; }
+        .sup-table tbody tr:last-child td { border-bottom: none; }
+        .sup-id { color: #9aa0a6; font-weight: 600; }
+        .sup-name { font-weight: 700; color: var(--ink); }
+        .sup-contact { color: #495057; }
+        .sup-email { color: #6c757d; }
+        .sup-phone { color: #6c757d; }
 
         .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
         .action-btn-group .btn:last-child { margin-right: 0; }
+        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
         .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
 
-        .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
-        .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
+        .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
+        .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
+
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
+        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
     </style>
 </head>
 <body>
@@ -141,7 +132,7 @@
                 <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
             </a>
         </div>
-        <div class="nav-item"><a class="nav-link active" href="/assetIQ-pro/bookings"><i class="fas fa-calendar-check"></i> Bookings</a></div>
+        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/bookings"><i class="fas fa-calendar-check"></i> Bookings</a></div>
         <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/vouchers"><i class="fas fa-ticket-alt"></i> Vouchers</a></div>
         <div class="nav-divider"></div>
         <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
@@ -160,7 +151,7 @@
             <a class="nav-link" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
         </div>
         <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a class="nav-link active" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
         </div>
         <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
             <a class="nav-link" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Admin</a>
@@ -173,7 +164,7 @@
     <header class="header">
         <div style="display:flex; align-items:center;">
             <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="fas fa-bars"></i></button>
-            <span class="page-title"><i class="fas fa-calendar-check"></i>Bookings</span>
+            <span class="page-title"><i class="fas fa-truck"></i>Suppliers</span>
         </div>
         <div class="user-info">
             <div class="dropdown">
@@ -213,116 +204,81 @@
 
     <div class="content">
         <div class="page-header-row">
-            <h4><i class="fas fa-calendar-check me-2"></i>Bookings</h4>
-            <div>
-                <a href="/bookings/room/create" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Book Room
-                </a>
-                <a href="/bookings/driver/request" class="btn btn-outline-primary">
-                    <i class="fas fa-car me-2"></i>Request Driver
-                </a>
-            </div>
+            <h4><i class="fas fa-truck me-2"></i>Suppliers</h4>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createSupplierModal">
+                <i class="fas fa-plus me-2"></i>Add Supplier
+            </button>
         </div>
 
-        <div class="row g-4">
-            <!-- Today's Room Bookings -->
-            <div class="col-lg-8">
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-calendar-day me-2"></i>Today's Bookings</h6></div>
-                    <div class="table-responsive">
-                        <table class="table table-hover bk-table">
-                            <thead>
-                            <tr>
-                                <th>Room</th><th>Booked By</th><th>Purpose</th><th>Time</th><th>Status</th><th>Action</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="booking : ${todayBookings}">
-                                <td class="bk-room" th:text="${booking.roomName}">Boardroom</td>
-                                <td class="bk-user" th:text="${booking.userName}">John Doe</td>
-                                <td th:text="${booking.purpose}">Team Sync</td>
-                                <td class="bk-time">
-                                    <span th:text="${#temporals.format(booking.startTime, 'HH:mm')}">10:00</span>
-                                    &ndash;
-                                    <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">11:00</span>
-                                </td>
-                                <td>
-                                    <span class="status-badge"
-                                          th:classappend="${booking.status} == 'BOOKED' ? 'booked' : (${booking.status} == 'CANCELLED' ? 'cancelled' : 'pending')"
-                                          th:text="${booking.status}">Booked</span>
-                                </td>
-                                <td>
-                                    <div class="action-btn-group">
-                                        <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                        <div class="empty-state" th:if="${todayBookings == null or todayBookings.isEmpty()}">
-                            <i class="fas fa-calendar-day"></i>
-                            No bookings today
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Driver Requests -->
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-car me-2"></i>Driver Requests</h6></div>
-                    <div class="table-responsive">
-                        <table class="table table-hover bk-table">
-                            <thead>
-                            <tr>
-                                <th>Requested By</th><th>Destination</th><th>Reason</th><th>Driver</th><th>Status</th><th>Action</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="req : ${driverRequests}">
-                                <td class="bk-user" th:text="${req.requestedBy}">John Doe</td>
-                                <td th:text="${req.destination}">City Hall</td>
-                                <td th:text="${req.reason}">Client meeting</td>
-                                <td th:text="${req.driverId} ?: 'Unassigned'">Unassigned</td>
-                                <td>
-                                    <span class="status-badge"
-                                          th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'declined' : (${req.status} == 'COMPLETED' ? 'completed' : 'pending'))"
-                                          th:text="${req.status}">Pending</span>
-                                </td>
-                                <td>
-                                    <div class="action-btn-group">
-                                        <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelDriverRequest(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                        <div class="empty-state" th:if="${driverRequests == null or driverRequests.isEmpty()}">
-                            <i class="fas fa-car"></i>
-                            No driver requests
-                        </div>
-                    </div>
+        <div class="table-card">
+            <div class="table-responsive">
+                <table class="table table-hover sup-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="sup : ${suppliers}">
+                        <td class="sup-id" th:text="${sup.supplierId}">1</td>
+                        <td class="sup-name" th:text="${sup.name}">HP Authorized Reseller</td>
+                        <td class="sup-contact" th:text="${sup.contact}">John Smith</td>
+                        <td class="sup-email" th:text="${sup.email}">john@hp.com</td>
+                        <td class="sup-phone" th:text="${sup.phone}">+1-555-0123</td>
+                        <td>
+                            <div class="btn-group btn-group-sm action-btn-group">
+                                <button type="button" class="btn btn-outline-primary" title="Edit" th:onclick="'editSupplier(' + ${sup.supplierId} + ')'">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" title="Delete" th:onclick="'deleteSupplier(' + ${sup.supplierId} + ')'">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div class="empty-state" th:if="${suppliers == null or suppliers.isEmpty()}">
+                    <i class="fas fa-truck"></i>
+                    No suppliers found
                 </div>
             </div>
+        </div>
+    </div>
+</div>
 
-            <!-- Available Rooms -->
-            <div class="col-lg-4">
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-door-open me-2"></i>Available Rooms</h6></div>
-                    <div>
-                        <div th:each="room : ${availableRooms}" class="room-list-item">
-                            <span class="room-name" th:text="${room.roomName}">Boardroom</span>
-                            <span class="status-badge booked">Available</span>
-                        </div>
-                        <div class="empty-state" th:if="${availableRooms == null or availableRooms.isEmpty()}">
-                            <i class="fas fa-door-open"></i>
-                            No rooms available
-                        </div>
+<!-- Create Supplier Modal -->
+<div class="modal fade" id="createSupplierModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2" style="color: #0d6efd;"></i>Add Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/api/suppliers}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contact Person</label>
+                        <input type="text" name="contact" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control">
                     </div>
                 </div>
-            </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Supplier</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -341,11 +297,9 @@
         if (window.innerWidth > 768) document.getElementById('sidebar').classList.remove('open');
     });
 
-    function cancelBooking(id) {
-        if (confirm('Cancel this booking?')) window.location.href = '/bookings/' + id + '/cancel';
-    }
-    function cancelDriverRequest(id) {
-        if (confirm('Cancel this driver request?')) window.location.href = '/bookings/driver/' + id + '/cancel';
+    function editSupplier(id) { window.location.href = '/admin/suppliers/' + id + '/edit'; }
+    function deleteSupplier(id) {
+        if (confirm('Delete this supplier?')) window.location.href = '/admin/suppliers/' + id + '/delete';
     }
 </script>
 </body>

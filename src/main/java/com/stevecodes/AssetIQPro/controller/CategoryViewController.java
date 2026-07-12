@@ -1,3 +1,4 @@
+// CategoryViewController.java
 package com.stevecodes.AssetIQPro.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -9,12 +10,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/admin/dashboard")  // Changed from /admin
-public class AdminViewController {
-
+@RequestMapping("/admin/categories")
+public class CategoryViewController {
     @GetMapping
-    public String adminDashboard() {  // Renamed from users()
-        log.info("Loading admin dashboard page");
-        return "admin/dashboard";
+    public String categories() {
+        return "admin/categories";
     }
 }
+

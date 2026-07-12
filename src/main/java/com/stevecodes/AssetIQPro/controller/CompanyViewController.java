@@ -9,12 +9,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/admin/dashboard")  // Changed from /admin
-public class AdminViewController {
-
+@RequestMapping("/admin/companies")
+public class CompanyViewController {
     @GetMapping
-    public String adminDashboard() {  // Renamed from users()
-        log.info("Loading admin dashboard page");
-        return "admin/dashboard";
+    public String companies() {
+        return "admin/companies";
     }
 }
+
