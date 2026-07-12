@@ -181,6 +181,12 @@ public class Transfer {
     @Column(name = "IsFullySigned")
     private Boolean isFullySigned = false;
 
+    @Transient
+    private String oldDepartmentName;
+
+    @Transient
+    private String newDepartmentName;
+
     // ============================================
     // Helper Methods
     // ============================================
@@ -229,6 +235,27 @@ public class Transfer {
 
     public String getFinanceRepresentativeName() {
         return financeRepresentativeName != null ? financeRepresentativeName : "";
+    }
+
+    public String getOldDepartmentName() {
+        return oldDepartmentName != null ? oldDepartmentName : "";
+    }
+
+    public void setOldDepartmentName(String oldDepartmentName) {
+        this.oldDepartmentName = oldDepartmentName;
+    }
+
+    public String getNewDepartmentName() {
+        return newDepartmentName != null ? newDepartmentName : "";
+    }
+
+    public void setNewDepartmentName(String newDepartmentName) {
+        this.newDepartmentName = newDepartmentName;
+    }
+
+    // Add this for the template
+    public boolean getFullySigned() {
+        return Boolean.TRUE.equals(isFullySigned);
     }
 
     // Setter for PDF with correct name

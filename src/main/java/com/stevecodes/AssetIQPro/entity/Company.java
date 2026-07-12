@@ -5,14 +5,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "Company")
+@Table(name = "company")
 @Data
 @NoArgsConstructor
 public class Company {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "CompanyId")
+    @Column(name = "company_id")
     private Long companyId;
 
     @Column(nullable = false, unique = true)
@@ -23,5 +23,10 @@ public class Company {
 
     public Company(String name) {
         this.name = name;
+    }
+
+    public Company(String name, String description) {
+        this.name = name;
+        this.description = description;
     }
 }

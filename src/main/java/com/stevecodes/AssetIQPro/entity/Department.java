@@ -15,14 +15,19 @@ public class Department {
     @Column(name = "DepartmentId")
     private Integer departmentId;
 
-    @Column(nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
+    @Column(name = "Name", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String name;
 
     @OneToOne
-    @JoinColumn(name = "managerId")
+    @JoinColumn(name = "ManagerId")
     private AppUser manager;
 
     public Department(String name) {
         this.name = name;
+    }
+
+    public Department(String name, AppUser manager) {
+        this.name = name;
+        this.manager = manager;
     }
 }
