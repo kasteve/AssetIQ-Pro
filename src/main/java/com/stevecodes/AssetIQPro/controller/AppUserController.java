@@ -39,6 +39,34 @@ public class AppUserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{userId}/permissions")
+    @Operation(summary = "Get user permissions")
+    public ResponseEntity<List<String>> getUserPermissions(@PathVariable Long userId) {
+        AppUser user = userService.getUserById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        List<String> permissions = user.getPermissions().stream()
+                .map(p -> p.getPermissionName())
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(permissions);
+    }
+
+    @PutMapping("/{userId}/permissions")
+    @Operation(summary = "Sync user permissions")
+    public ResponseEntity<Void> syncPermissions(@PathVariable Long userId,
+                                                @RequestBody List<String> permissions) {
+        userService.syncPermissions(userId, permissions);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{userId}/role")
+    @Operation(summary = "Update user role")
+    public ResponseEntity<Void> updateUserRole(@PathVariable Long userId,
+                                               @RequestBody Map<String, String> payload) {
+        String role = payload.get("role");
+        userService.updateUserRole(userId, role);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping
     @Operation(summary = "Create new user")
     public ResponseEntity<AppUser> createUser(@Valid @RequestBody UserDTO userDTO) {
@@ -95,14 +123,6 @@ public class AppUserController {
         response.put("message", "Password reset email sent");
         response.put("resetToken", token);
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{userId}/permissions")
-    @Operation(summary = "Sync user permissions")
-    public ResponseEntity<Void> syncPermissions(@PathVariable Long userId,
-                                                @RequestBody List<String> permissions) {
-        userService.syncPermissions(userId, permissions);
-        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/permissions/{permissionName}")

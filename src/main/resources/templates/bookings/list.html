@@ -1,73 +1,131 @@
-<!-- templates/bookings/list.html -->
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bookings - AssetIQ-Pro</title>
+</head>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-calendar-check me-2"></i>Bookings</h4>
+        <div>
+            <a href="/bookings/room/create" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Book Room
+            </a>
+            <a href="/bookings/driver/request" class="btn btn-outline-primary">
+                <i class="fas fa-car me-2"></i>Request Driver
+            </a>
+        </div>
+    </div>
 
+    <div class="row g-4">
+        <!-- Today's Room Bookings -->
+        <div class="col-lg-8">
+            <div class="panel-card">
+                <div class="panel-header"><h6><i class="fas fa-calendar-day me-2"></i>Today's Bookings</h6></div>
+                <div class="table-responsive">
+                    <table class="table table-hover bk-table">
+                        <thead>
+                        <tr>
+                            <th>Room</th><th>Booked By</th><th>Purpose</th><th>Time</th><th>Status</th><th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="booking : ${todayBookings}">
+                            <td class="bk-room" th:text="${booking.roomName}">Boardroom</td>
+                            <td class="bk-user" th:text="${booking.userName}">John Doe</td>
+                            <td th:text="${booking.purpose}">Team Sync</td>
+                            <td class="bk-time">
+                                <span th:text="${#temporals.format(booking.startTime, 'HH:mm')}">10:00</span>
+                                &ndash;
+                                <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">11:00</span>
+                            </td>
+                            <td>
+                                    <span class="status-badge"
+                                          th:classappend="${booking.status} == 'BOOKED' ? 'booked' : (${booking.status} == 'CANCELLED' ? 'cancelled' : 'pending')"
+                                          th:text="${booking.status}">Booked</span>
+                            </td>
+                            <td>
+                                <div class="action-btn-group">
+                                    <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div class="empty-state" th:if="${todayBookings == null or todayBookings.isEmpty()}">
+                        <i class="fas fa-calendar-day"></i>
+                        No bookings today
+                    </div>
+                </div>
+            </div>
+
+            <!-- Driver Requests -->
+            <div class="panel-card">
+                <div class="panel-header"><h6><i class="fas fa-car me-2"></i>Driver Requests</h6></div>
+                <div class="table-responsive">
+                    <table class="table table-hover bk-table">
+                        <thead>
+                        <tr>
+                            <th>Requested By</th><th>Destination</th><th>Reason</th><th>Driver</th><th>Status</th><th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="req : ${driverRequests}">
+                            <td class="bk-user" th:text="${req.requestedBy}">John Doe</td>
+                            <td th:text="${req.destination}">City Hall</td>
+                            <td th:text="${req.reason}">Client meeting</td>
+                            <td th:text="${req.driverId} ?: 'Unassigned'">Unassigned</td>
+                            <td>
+                                    <span class="status-badge"
+                                          th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'declined' : (${req.status} == 'COMPLETED' ? 'completed' : 'pending'))"
+                                          th:text="${req.status}">Pending</span>
+                            </td>
+                            <td>
+                                <div class="action-btn-group">
+                                    <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelDriverRequest(' + ${req.requestId} + ')'">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div class="empty-state" th:if="${driverRequests == null or driverRequests.isEmpty()}">
+                        <i class="fas fa-car"></i>
+                        No driver requests
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Rooms -->
+        <div class="col-lg-4">
+            <div class="panel-card">
+                <div class="panel-header"><h6><i class="fas fa-door-open me-2"></i>Available Rooms</h6></div>
+                <div>
+                    <div th:each="room : ${availableRooms}" class="room-list-item">
+                        <span class="room-name" th:text="${room.roomName}">Boardroom</span>
+                        <span class="status-badge booked">Available</span>
+                    </div>
+                    <div class="empty-state" th:if="${availableRooms == null or availableRooms.isEmpty()}">
+                        <i class="fas fa-door-open"></i>
+                        No rooms available
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
     <style>
-        :root {
-            --primary-color: #0d6efd; --primary-dark: #0b5ed7; --accent-color: #4fc3f7;
-            --sidebar-width: 250px; --header-height: 68px; --bg-color: #f4f6f9; --ink: #1a1a2e;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; }
-        body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); -webkit-font-smoothing: antialiased; }
-
-        .sidebar {
-            position: fixed; top: 0; left: 0; width: var(--sidebar-width); height: 100vh;
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color: white;
-            z-index: 1050; overflow-y: auto; box-shadow: 4px 0 24px rgba(0,0,0,0.12);
-        }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-        .sidebar .logo { padding: 24px 20px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 14px; }
-        .sidebar .logo h3 { font-weight: 800; font-size: 21px; letter-spacing: -0.5px; }
-        .sidebar .logo h3 i, .sidebar .logo h3 span { color: var(--accent-color); }
-        .sidebar .logo small { color: rgba(255,255,255,0.4); font-size: 10.5px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; display: block; margin-top: 3px; }
-        .sidebar .nav { padding: 0 12px; }
-        .sidebar .nav-item { margin-bottom: 3px; }
-        .sidebar .nav-link { color: rgba(255,255,255,0.65); padding: 11px 16px; border-radius: 10px; transition: all 0.2s ease; text-decoration: none; display: flex; align-items: center; font-size: 14px; font-weight: 500; }
-        .sidebar .nav-link:hover { background: rgba(255,255,255,0.08); color: white; }
-        .sidebar .nav-link.active { background: linear-gradient(135deg, var(--primary-color), #3b82f6); color: white; box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35); }
-        .sidebar .nav-link i { width: 22px; margin-right: 12px; font-size: 15px; text-align: center; }
-        .sidebar .nav-link .badge { margin-left: auto; background: #dc3545; color: white; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .sidebar .nav-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 12px 16px; }
-
-        .main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
-        .header {
-            background: white; padding: 0 28px; border-bottom: 1px solid #e9ecef;
-            display: flex; justify-content: space-between; align-items: center;
-            position: sticky; top: 0; z-index: 1040; height: var(--header-height);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-        }
-        .header .page-title { font-size: 17px; font-weight: 700; color: var(--ink); }
-        .header .page-title i { color: var(--primary-color); margin-right: 6px; }
-        .header .user-info { display: flex; align-items: center; gap: 14px; }
-        .header .dropdown-toggle::after { display: none; }
-        .header .user-avatar {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), #6610f2);
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 14px; cursor: pointer;
-        }
-        .header .notif-btn { position: relative; background: none; border: none; color: #6c757d; font-size: 19px; cursor: pointer; }
-        .header .notif-badge { position: absolute; top: -4px; right: -6px; background: #dc3545; color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
-        .sidebar-toggle { display: none; background: none; border: none; font-size: 22px; color: var(--ink); cursor: pointer; }
-        @media (max-width: 768px) {
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .sidebar-toggle { display: block !important; margin-right: 12px; }
-        }
-
-        .content { padding: 28px 32px; max-width: 1300px; }
+        .content { padding: 28px 32px; width: 100%; }
         .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
         .page-header-row h4 i { color: var(--primary-color); }
@@ -85,10 +143,7 @@
         .panel-card .panel-header h6 i { color: var(--primary-color); }
 
         .bk-table { margin-bottom: 0; }
-        .bk-table thead th {
-            background: #f8f9fb; border-bottom: 1px solid #eef0f3; color: #6c757d;
-            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 12px 16px; white-space: nowrap;
-        }
+        .bk-table thead th { background: #f8f9fb; border-bottom: 1px solid #eef0f3; color: #6c757d; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 12px 16px; white-space: nowrap; }
         .bk-table tbody td { padding: 13px 16px; vertical-align: middle; font-size: 13.5px; border-bottom: 1px solid #f5f6f8; }
         .bk-table tbody tr:hover { background: #f8f9fc; }
         .bk-table tbody tr:last-child td { border-bottom: none; }
@@ -104,10 +159,7 @@
         .status-badge.declined { background: #fdeeee; color: #dc3545; }
         .status-badge.completed { background: #eef0fd; color: #6610f2; }
 
-        .room-list-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 13px 20px; border-bottom: 1px solid #f5f6f8; font-size: 13.5px;
-        }
+        .room-list-item { display: flex; justify-content: space-between; align-items: center; padding: 13px 20px; border-bottom: 1px solid #f5f6f8; font-size: 13.5px; }
         .room-list-item:last-child { border-bottom: none; }
         .room-list-item .room-name { font-weight: 600; color: var(--ink); }
 
@@ -118,235 +170,17 @@
         .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
         .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
     </style>
-</head>
-<body>
-
-<div class="sidebar" id="sidebar">
-    <div class="logo">
-        <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
-        <small>Professional Asset Management</small>
-    </div>
-    <nav class="nav flex-column">
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/dashboard"><i class="fas fa-chart-pie"></i> Dashboard</a></div>
-        <div class="nav-item">
-            <a class="nav-link" href="/assetIQ-pro/assets">
-                <i class="fas fa-laptop"></i> Assets
-                <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
-            </a>
-        </div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/transfers"><i class="fas fa-exchange-alt"></i> Transfers</a></div>
-        <div class="nav-item">
-            <a class="nav-link" href="/assetIQ-pro/infra-requests">
-                <i class="fas fa-tools"></i> Infrastructure
-                <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
-            </a>
-        </div>
-        <div class="nav-item"><a class="nav-link active" href="/assetIQ-pro/bookings"><i class="fas fa-calendar-check"></i> Bookings</a></div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/vouchers"><i class="fas fa-ticket-alt"></i> Vouchers</a></div>
-        <div class="nav-divider"></div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Admin</a>
-        </div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
-    </nav>
 </div>
 
-<div class="main-content">
-    <header class="header">
-        <div style="display:flex; align-items:center;">
-            <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="fas fa-bars"></i></button>
-            <span class="page-title"><i class="fas fa-calendar-check"></i>Bookings</span>
-        </div>
-        <div class="user-info">
-            <div class="dropdown">
-                <button class="notif-btn" data-bs-toggle="dropdown">
-                    <i class="fas fa-bell"></i>
-                    <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
-                </button>
-                <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px; max-height: 380px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
-                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;"><h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6></div>
-                    <div th:each="notification : ${notifications}">
-                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
-                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
-                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
-                        </a>
-                    </div>
-                    <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
-                        <i class="fas fa-inbox text-muted" style="font-size: 22px;"></i>
-                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
-                    </div>
-                </div>
-            </div>
-            <div class="dropdown">
-                <button class="btn btn-link p-0" data-bs-toggle="dropdown">
-                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 190px;">
-                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
-                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
-                </ul>
-            </div>
-        </div>
-    </header>
-
-    <div class="content">
-        <div class="page-header-row">
-            <h4><i class="fas fa-calendar-check me-2"></i>Bookings</h4>
-            <div>
-                <a href="/bookings/room/create" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Book Room
-                </a>
-                <a href="/bookings/driver/request" class="btn btn-outline-primary">
-                    <i class="fas fa-car me-2"></i>Request Driver
-                </a>
-            </div>
-        </div>
-
-        <div class="row g-4">
-            <!-- Today's Room Bookings -->
-            <div class="col-lg-8">
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-calendar-day me-2"></i>Today's Bookings</h6></div>
-                    <div class="table-responsive">
-                        <table class="table table-hover bk-table">
-                            <thead>
-                            <tr>
-                                <th>Room</th><th>Booked By</th><th>Purpose</th><th>Time</th><th>Status</th><th>Action</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="booking : ${todayBookings}">
-                                <td class="bk-room" th:text="${booking.roomName}">Boardroom</td>
-                                <td class="bk-user" th:text="${booking.userName}">John Doe</td>
-                                <td th:text="${booking.purpose}">Team Sync</td>
-                                <td class="bk-time">
-                                    <span th:text="${#temporals.format(booking.startTime, 'HH:mm')}">10:00</span>
-                                    &ndash;
-                                    <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">11:00</span>
-                                </td>
-                                <td>
-                                    <span class="status-badge"
-                                          th:classappend="${booking.status} == 'BOOKED' ? 'booked' : (${booking.status} == 'CANCELLED' ? 'cancelled' : 'pending')"
-                                          th:text="${booking.status}">Booked</span>
-                                </td>
-                                <td>
-                                    <div class="action-btn-group">
-                                        <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                        <div class="empty-state" th:if="${todayBookings == null or todayBookings.isEmpty()}">
-                            <i class="fas fa-calendar-day"></i>
-                            No bookings today
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Driver Requests -->
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-car me-2"></i>Driver Requests</h6></div>
-                    <div class="table-responsive">
-                        <table class="table table-hover bk-table">
-                            <thead>
-                            <tr>
-                                <th>Requested By</th><th>Destination</th><th>Reason</th><th>Driver</th><th>Status</th><th>Action</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="req : ${driverRequests}">
-                                <td class="bk-user" th:text="${req.requestedBy}">John Doe</td>
-                                <td th:text="${req.destination}">City Hall</td>
-                                <td th:text="${req.reason}">Client meeting</td>
-                                <td th:text="${req.driverId} ?: 'Unassigned'">Unassigned</td>
-                                <td>
-                                    <span class="status-badge"
-                                          th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'declined' : (${req.status} == 'COMPLETED' ? 'completed' : 'pending'))"
-                                          th:text="${req.status}">Pending</span>
-                                </td>
-                                <td>
-                                    <div class="action-btn-group">
-                                        <button type="button" class="btn btn-outline-danger" title="Cancel" th:onclick="'cancelDriverRequest(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                        <div class="empty-state" th:if="${driverRequests == null or driverRequests.isEmpty()}">
-                            <i class="fas fa-car"></i>
-                            No driver requests
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Available Rooms -->
-            <div class="col-lg-4">
-                <div class="panel-card">
-                    <div class="panel-header"><h6><i class="fas fa-door-open me-2"></i>Available Rooms</h6></div>
-                    <div>
-                        <div th:each="room : ${availableRooms}" class="room-list-item">
-                            <span class="room-name" th:text="${room.roomName}">Boardroom</span>
-                            <span class="status-badge booked">Available</span>
-                        </div>
-                        <div class="empty-state" th:if="${availableRooms == null or availableRooms.isEmpty()}">
-                            <i class="fas fa-door-open"></i>
-                            No rooms available
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div layout:fragment="scripts">
+    <script>
+        function cancelBooking(id) {
+            if (confirm('Cancel this booking?')) window.location.href = '/bookings/' + id + '/cancel';
+        }
+        function cancelDriverRequest(id) {
+            if (confirm('Cancel this driver request?')) window.location.href = '/bookings/driver/' + id + '/cancel';
+        }
+    </script>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    document.addEventListener('click', function (event) {
-        const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.querySelector('.sidebar-toggle');
-        if (!sidebar) return;
-        const inside = sidebar.contains(event.target);
-        const onToggle = toggleBtn && toggleBtn.contains(event.target);
-        if (!inside && !onToggle && window.innerWidth <= 768) sidebar.classList.remove('open');
-    });
-    window.addEventListener('resize', function () {
-        if (window.innerWidth > 768) document.getElementById('sidebar').classList.remove('open');
-    });
-
-    function cancelBooking(id) {
-        if (confirm('Cancel this booking?')) window.location.href = '/bookings/' + id + '/cancel';
-    }
-    function cancelDriverRequest(id) {
-        if (confirm('Cancel this driver request?')) window.location.href = '/bookings/driver/' + id + '/cancel';
-    }
-</script>
 </body>
 </html>

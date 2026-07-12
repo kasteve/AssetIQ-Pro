@@ -193,6 +193,85 @@ public class EmailService {
     }
 
     // ============================================
+    // Driver Request Emails
+    // ============================================
+
+    @Async
+    public void sendDriverRequestStatusUpdate(String toEmail, String title, String message) {
+        String subject = "Driver Request Update - " + title;
+        String body = String.format("""
+            Dear User,
+            
+            %s
+            
+            For more details, please check your dashboard.
+            
+            Best regards,
+            Transport Team
+            AssetIQ-Pro
+            """, message);
+
+        try {
+            sendSimpleEmail(toEmail, subject, body);
+            log.info("✅ Driver request status update sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send driver request status update to {}: {}", toEmail, e.getMessage());
+            logEmailContent("Driver Request Status Update", toEmail, subject, body);
+        }
+    }
+
+    // ============================================
+    // Resource Request Emails
+    // ============================================
+
+    @Async
+    public void sendResourceRequestNotification(String toEmail, String title, String message) {
+        String subject = "Resource Request - " + title;
+        String body = String.format("""
+            Dear Admin,
+            
+            %s
+            
+            Please review and take appropriate action.
+            
+            Best regards,
+            AssetIQ-Pro System
+            """, message);
+
+        try {
+            sendSimpleEmail(toEmail, subject, body);
+            log.info("✅ Resource request notification sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send resource request notification to {}: {}", toEmail, e.getMessage());
+            logEmailContent("Resource Request Notification", toEmail, subject, body);
+        }
+    }
+
+    @Async
+    public void sendResourceRequestStatusUpdate(String toEmail, String title, String message) {
+        String subject = "Resource Request Update - " + title;
+        String body = String.format("""
+            Dear User,
+            
+            %s
+            
+            For more details, please check your dashboard.
+            
+            Best regards,
+            Resource Management Team
+            AssetIQ-Pro
+            """, message);
+
+        try {
+            sendSimpleEmail(toEmail, subject, body);
+            log.info("✅ Resource request status update sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send resource request status update to {}: {}", toEmail, e.getMessage());
+            logEmailContent("Resource Request Status Update", toEmail, subject, body);
+        }
+    }
+
+    // ============================================
     // Transfer/Asset Emails
     // ============================================
 

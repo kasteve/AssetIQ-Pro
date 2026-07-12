@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ public class FirstLoginFilter extends OncePerRequestFilter {
             "/api/auth/validate",
             "/api/auth/change-password",
             "/api/auth/change-password-first-login"
+            // REMOVED: "/dashboard" - so it gets intercepted
     ));
 
     @Override
@@ -38,7 +40,6 @@ public class FirstLoginFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        // Remove context path if present
         String contextPath = request.getContextPath();
         if (path.startsWith(contextPath)) {
             path = path.substring(contextPath.length());
@@ -47,14 +48,17 @@ public class FirstLoginFilter extends OncePerRequestFilter {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
         if (auth != null && auth.isAuthenticated() && !isExcludedPath(path)) {
-            // Check if user must change password via session attributes
-            Boolean mustChangePassword = (Boolean) request.getSession().getAttribute("mustChangePassword");
-            Boolean isFirstLogin = (Boolean) request.getSession().getAttribute("isFirstLogin");
+            HttpSession session = request.getSession(false);
 
-            if ((mustChangePassword != null && mustChangePassword) ||
-                    (isFirstLogin != null && isFirstLogin)) {
-                response.sendRedirect(request.getContextPath() + "/change-password?firstLogin=true");
-                return;
+            if (session != null) {
+                Boolean mustChangePassword = (Boolean) session.getAttribute("mustChangePassword");
+                Boolean isFirstLogin = (Boolean) session.getAttribute("isFirstLogin");
+
+                if ((mustChangePassword != null && mustChangePassword) ||
+                        (isFirstLogin != null && isFirstLogin)) {
+                    response.sendRedirect(request.getContextPath() + "/change-password?firstLogin=true");
+                    return;
+                }
             }
         }
 

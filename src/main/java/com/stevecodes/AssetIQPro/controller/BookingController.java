@@ -1,135 +1,79 @@
 package com.stevecodes.AssetIQPro.controller;
 
-import com.stevecodes.AssetIQPro.dto.BookingDTO;
-import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
-import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
+import com.stevecodes.AssetIQPro.entity.Booking;
 import com.stevecodes.AssetIQPro.entity.Room;
-import com.stevecodes.AssetIQPro.service.BookingService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+import com.stevecodes.AssetIQPro.repository.BookingRepository;
+import com.stevecodes.AssetIQPro.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@RestController
-@RequestMapping("/api/bookings")
+@Slf4j
+@Controller
 @RequiredArgsConstructor
-@Tag(name = "Bookings", description = "Room, driver, and resource booking APIs")
+@RequestMapping("/bookings")
 public class BookingController {
 
-    private final BookingService bookingService;
+    private final BookingRepository bookingRepository;
+    private final RoomRepository roomRepository;
 
-    // ============================================
-    // Room Bookings
-    // ============================================
-
-    @PostMapping("/rooms")
-    @Operation(summary = "Create a room booking")
-    @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN')")
-    public ResponseEntity<BookingDTO> createRoomBooking(@Valid @RequestBody BookingDTO bookingDTO) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.createRoomBooking(bookingDTO));
+    @GetMapping("/rooms")
+    public String roomBookings(Model model) {
+        model.addAttribute("rooms", roomRepository.findAll());
+        model.addAttribute("bookings", bookingRepository.findTop5ByOrderByStartTimeDesc());
+        return "bookings/rooms";
     }
 
-    @GetMapping("/rooms/available")
-    @Operation(summary = "Get available rooms")
-    public ResponseEntity<List<Room>> getAvailableRooms() {
-        return ResponseEntity.ok(bookingService.getAvailableRooms());
+    @PostMapping("/room")
+    public String createRoomBooking(@RequestParam Long userId,
+                                    @RequestParam Long roomId,
+                                    @RequestParam LocalDateTime startTime,
+                                    @RequestParam LocalDateTime endTime,
+                                    @RequestParam(required = false) String purpose,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            Booking booking = new Booking();
+            booking.setUserId(userId);
+            booking.setRoomId(roomId);
+            booking.setStartTime(startTime);
+            booking.setEndTime(endTime);
+            booking.setPurpose(purpose);
+            booking.setStatus(Booking.BookingStatus.BOOKED);
+
+            bookingRepository.save(booking);
+            redirectAttributes.addFlashAttribute("success", "Room booked successfully!");
+        } catch (Exception e) {
+            log.error("Error booking room: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to book room.");
+        }
+        return "redirect:/bookings/my-requests";
     }
 
-    @GetMapping("/rooms/{roomId}/availability")
-    @Operation(summary = "Check room availability")
-    public ResponseEntity<Boolean> checkRoomAvailability(@PathVariable Long roomId,
-                                                         @RequestParam LocalDateTime startTime,
-                                                         @RequestParam LocalDateTime endTime) {
-        return ResponseEntity.ok(bookingService.isRoomAvailable(roomId, startTime, endTime));
+    @PostMapping("/room/{bookingId}/cancel")
+    public String cancelRoomBooking(@PathVariable Long bookingId,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new RuntimeException("Booking not found"));
+            booking.setStatus(Booking.BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+            redirectAttributes.addFlashAttribute("success", "Booking cancelled.");
+        } catch (Exception e) {
+            log.error("Error cancelling booking: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to cancel booking.");
+        }
+        return "redirect:/bookings/my-requests";
     }
 
-    @GetMapping("/users/{userId}")
-    @Operation(summary = "Get bookings for a user")
-    public ResponseEntity<List<BookingDTO>> getUserBookings(@PathVariable Long userId) {
-        return ResponseEntity.ok(bookingService.getUserBookings(userId));
-    }
-
-    @PutMapping("/{bookingId}/cancel")
-    @Operation(summary = "Cancel a booking")
-    @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN')")
-    public ResponseEntity<Void> cancelBooking(@PathVariable Long bookingId) {
-        bookingService.cancelBooking(bookingId);
-        return ResponseEntity.ok().build();
-    }
-
-    // ============================================
-    // Driver Requests
-    // ============================================
-
-    @PostMapping("/drivers")
-    @Operation(summary = "Request a driver")
-    @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN')")
-    public ResponseEntity<DriverRequestDTO> requestDriver(@Valid @RequestBody DriverRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.requestDriver(request));
-    }
-
-    @GetMapping("/drivers/{driverId}/requests")
-    @Operation(summary = "Get driver requests")
-    public ResponseEntity<List<DriverRequestDTO>> getDriverRequests(@PathVariable Long driverId) {
-        return ResponseEntity.ok(bookingService.getDriverRequests(driverId));
-    }
-
-    @PutMapping("/drivers/{requestId}/accept")
-    @Operation(summary = "Accept a driver request")
-    @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<Void> acceptDriverRequest(@PathVariable Long requestId) {
-        bookingService.acceptDriverRequest(requestId);
-        return ResponseEntity.ok().build();
-    }
-
-    @PutMapping("/drivers/{requestId}/decline")
-    @Operation(summary = "Decline a driver request")
-    @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<Void> declineDriverRequest(@PathVariable Long requestId,
-                                                     @RequestParam String reason) {
-        bookingService.declineDriverRequest(requestId, reason);
-        return ResponseEntity.ok().build();
-    }
-
-    // ============================================
-    // Resource Requests (Stationery, Apparel, etc.)
-    // ============================================
-
-    @PostMapping("/resources")
-    @Operation(summary = "Request a resource")
-    @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN')")
-    public ResponseEntity<ResourceRequestDTO> requestResource(@Valid @RequestBody ResourceRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.requestResource(request));
-    }
-
-    @GetMapping("/resources/{userId}")
-    @Operation(summary = "Get resource requests for a user")
-    public ResponseEntity<List<ResourceRequestDTO>> getUserResourceRequests(@PathVariable Long userId) {
-        return ResponseEntity.ok(bookingService.getUserResourceRequests(userId));
-    }
-
-    @PutMapping("/resources/{requestId}/approve")
-    @Operation(summary = "Approve a resource request")
-    @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<Void> approveResourceRequest(@PathVariable Long requestId,
-                                                       @RequestParam String comment) {
-        bookingService.approveResourceRequest(requestId, comment);
-        return ResponseEntity.ok().build();
-    }
-
-    @PutMapping("/resources/{requestId}/reject")
-    @Operation(summary = "Reject a resource request")
-    @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<Void> rejectResourceRequest(@PathVariable Long requestId,
-                                                      @RequestParam String reason) {
-        bookingService.rejectResourceRequest(requestId, reason);
-        return ResponseEntity.ok().build();
+    @GetMapping("/available-rooms")
+    @ResponseBody
+    public List<Room> getAvailableRooms() {
+        return roomRepository.findAvailableRooms(LocalDateTime.now());
     }
 }

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>My Requests - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-list me-2"></i>My Requests</h4>
+        <div class="header-actions">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestDriverModal">
+                <i class="fas fa-car me-2"></i>Request Driver
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
+                <i class="fas fa-calendar-plus me-2"></i>Book Room
+            </button>
+            <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#resourceRequestModal">
+                <i class="fas fa-boxes me-2"></i>Request Resource
+            </button>
+        </div>
+    </div>
+
+    <!-- Driver Requests -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <h6><i class="fas fa-car me-2"></i>Driver Requests</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th>Destination</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                    <th>Driver</th>
+                    <th>Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="req : ${driverRequests}">
+                    <td th:text="${req.destination}">N/A</td>
+                    <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                    <td>
+                            <span class="status-badge"
+                                  th:classappend="${req.status} == 'PENDING' ? 'pending' : (${req.status} == 'ACCEPTED' ? 'accepted' : 'rejected')"
+                                  th:text="${req.status}">PENDING</span>
+                    </td>
+                    <td th:text="${req.driverId}">N/A</td>
+                    <td>
+                        <button th:if="${req.status} == 'PENDING'" class="btn btn-sm btn-danger" th:onclick="'cancelRequest(' + ${req.requestId} + ')'">
+                            Cancel
+                        </button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" th:if="${driverRequests == null or driverRequests.isEmpty()}">
+            <i class="fas fa-car"></i>
+            No driver requests found
+        </div>
+    </div>
+
+    <!-- Room Bookings -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <h6><i class="fas fa-calendar-check me-2"></i>Room Bookings</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th>Room</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="booking : ${roomBookings}">
+                    <td th:text="${booking.roomId}">N/A</td>
+                    <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                    <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                    <td>
+                            <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
+                                  th:text="${booking.status}">BOOKED</span>
+                    </td>
+                    <td>
+                        <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
+                            Cancel
+                        </button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" th:if="${roomBookings == null or roomBookings.isEmpty()}">
+            <i class="fas fa-calendar-check"></i>
+            No room bookings found
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .content { padding: 28px 32px; width: 100%; }
+        .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
+        .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
+        .page-header-row h4 i { color: var(--primary-color); }
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; }
+        .btn-primary { background: var(--primary-color) !important; }
+        .btn-primary:hover { background: var(--primary-dark) !important; }
+        .btn-secondary { background: #eef0f3 !important; color: var(--ink) !important; }
+        .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
+        .btn-success { background: #198754 !important; }
+        .btn-warning { background: #fd7e14 !important; color: white !important; }
+        .btn-danger { background: #dc3545 !important; }
+        .btn-sm { padding: 7px 14px !important; font-size: 12.5px !important; }
+
+        .panel-card { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; border: none; }
+        .panel-card .panel-header { padding: 16px 22px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; justify-content: space-between; }
+        .panel-card .panel-header h6 { font-weight: 700; font-size: 14.5px; color: var(--ink); margin: 0; }
+        .panel-card .panel-header h6 i { color: var(--primary-color); }
+
+        .table { margin-bottom: 0; }
+        .table thead th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #9aa0a6; border-bottom: 1px solid #eef0f3; padding: 12px 22px; background: #fafbfc; }
+        .table tbody td { padding: 14px 22px; font-size: 13.5px; color: var(--ink); vertical-align: middle; border-bottom: 1px solid #f5f6f8; }
+        .table tbody tr:last-child td { border-bottom: none; }
+        .table tbody tr:hover { background: #f8f9fb; }
+
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
+        .status-badge.accepted, .status-badge.booked { background: #e6f7ec; color: #198754; }
+        .status-badge.rejected, .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
+        .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script>
+        function cancelRequest(id) {
+            if (confirm('Cancel this driver request?')) {
+                window.location.href = '/bookings/driver-request/' + id + '/cancel';
+            }
+        }
+        function cancelBooking(id) {
+            if (confirm('Cancel this room booking?')) {
+                window.location.href = '/bookings/room/' + id + '/cancel';
+            }
+        }
+    </script>
+</div>
+</body>
+</html>

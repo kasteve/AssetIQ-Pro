@@ -92,8 +92,8 @@ public class AppUserService {
         user.setEmail(userDTO.getEmail());
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setFullName(userDTO.getFullName());
+        user.setRole(userDTO.getRole() != null ? userDTO.getRole() : "EMPLOYEE");
 
-        // Handle department - store as string directly
         if (userDTO.getDepartment() != null && !userDTO.getDepartment().isEmpty()) {
             user.setDepartment(userDTO.getDepartment());
         }
@@ -104,9 +104,15 @@ public class AppUserService {
         user.setFirstLogin(true);
         user.setCreatedAt(LocalDateTime.now());
 
-        // Assign permissions
+        // Assign permissions from DTO or default based on role
         if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
+                permissionRepository.findByPermissionName(permName)
+                        .ifPresent(user::addPermission);
+            }
+        } else {
+            List<String> defaultPermissions = getDefaultPermissions(userDTO.getRole());
+            for (String permName : defaultPermissions) {
                 permissionRepository.findByPermissionName(permName)
                         .ifPresent(user::addPermission);
             }
@@ -115,15 +121,14 @@ public class AppUserService {
         AppUser saved = userRepository.save(user);
         log.info("User created successfully: {}", saved.getUsername());
 
-        // LOG CREDENTIALS BEFORE RETURNING
         log.info("=========================================");
         log.info("👤 NEW USER CREATED");
         log.info("Username: {}", saved.getUsername());
+        log.info("Role: {}", saved.getRole());
         log.info("Temporary Password: {}", tempPassword);
         log.info("Email: {}", saved.getEmail());
         log.info("=========================================");
 
-        // Send welcome email
         try {
             emailService.sendWelcomeEmail(
                     saved.getEmail(),
@@ -136,10 +141,43 @@ public class AppUserService {
             log.error("Failed to send welcome email to {}: {}", saved.getEmail(), e.getMessage());
         }
 
-        // Audit log
-        auditService.logAction("USER_CREATED", "User created: " + saved.getUsername(), saved.getUserId());
+        auditService.logAction("USER_CREATED",
+                "User created: " + saved.getUsername() + " with role: " + saved.getRole(),
+                saved.getUserId());
 
         return saved;
+    }
+
+    private List<String> getDefaultPermissions(String role) {
+        if (role == null) return List.of();
+
+        return switch(role.toUpperCase()) {
+            case "ADMIN" -> List.of(
+                    "VIEW_REPORTS", "DOWNLOAD_REPORTS", "VIEW_ALL_TRANSACTIONS",
+                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "APPROVE_LM", "APPROVE_FINANCE",
+                    "CREATE_USERS", "RESET_PASSWORDS", "MANAGE_ROLES", "MANAGE_CONFIG",
+                    "EDIT_ASSETS", "DELETE_ASSETS", "MANAGE_WARRANTY", "MANAGE_EOL",
+                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS", "MANAGE_BOOKINGS",
+                    "VIEW_AUDIT"
+            );
+            case "DRIVER" -> List.of(
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS"
+            );
+            case "INFRA" -> List.of(
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
+                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "MANAGE_BOOKINGS",
+                    "VIEW_AUDIT"
+            );
+            case "FINANCE" -> List.of(
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
+                    "APPROVE_FINANCE", "VIEW_ALL_TRANSACTIONS"
+            );
+            case "MANAGER" -> List.of(
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
+                    "APPROVE_LM", "MANAGE_BOOKINGS"
+            );
+            default -> List.of("VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS");
+        };
     }
 
     @Transactional
@@ -151,13 +189,13 @@ public class AppUserService {
 
         if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName());
         if (userDTO.getDepartment() != null) user.setDepartment(userDTO.getDepartment());
+        if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
         if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
         if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
         if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
         if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
         if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
 
-        // Update permissions
         if (userDTO.getPermissions() != null) {
             user.getPermissions().clear();
             for (String permName : userDTO.getPermissions()) {
@@ -169,9 +207,35 @@ public class AppUserService {
         user.setUpdatedAt(LocalDateTime.now());
         AppUser updated = userRepository.save(user);
 
-        auditService.logAction("USER_UPDATED", "User updated: " + updated.getUsername(), updated.getUserId());
+        auditService.logAction("USER_UPDATED",
+                "User updated: " + updated.getUsername() + " role: " + updated.getRole(),
+                updated.getUserId());
 
         return updated;
+    }
+
+    @Transactional
+    public void updateUserRole(Long userId, String role) {
+        log.info("Updating role for user: {}", userId);
+
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        user.setRole(role);
+        user.getPermissions().clear();
+
+        List<String> defaultPermissions = getDefaultPermissions(role);
+        for (String permName : defaultPermissions) {
+            permissionRepository.findByPermissionName(permName)
+                    .ifPresent(user::addPermission);
+        }
+
+        userRepository.save(user);
+        log.info("Role updated to {} for user: {}", role, user.getUsername());
+
+        auditService.logAction("ROLE_UPDATED",
+                "Role updated to " + role + " for user: " + user.getUsername(),
+                user.getUserId());
     }
 
     @Transactional
@@ -196,7 +260,9 @@ public class AppUserService {
             log.error("Failed to send password change confirmation: {}", e.getMessage());
         }
 
-        auditService.logAction("PASSWORD_CHANGED", "Password changed for user: " + user.getUsername(), user.getUserId());
+        auditService.logAction("PASSWORD_CHANGED",
+                "Password changed for user: " + user.getUsername(),
+                user.getUserId());
     }
 
     @Transactional
@@ -219,7 +285,6 @@ public class AppUserService {
         user.setLastPasswordChanged(LocalDateTime.now());
         userRepository.save(user);
 
-        // Send email with new password
         try {
             emailService.sendWelcomeEmail(
                     user.getEmail(),
@@ -457,13 +522,11 @@ public class AppUserService {
         SecureRandom random = new SecureRandom();
         StringBuilder password = new StringBuilder(12);
 
-        // Ensure at least one of each character type
         password.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(random.nextInt(26)));
         password.append("abcdefghijklmnopqrstuvwxyz".charAt(random.nextInt(26)));
         password.append("0123456789".charAt(random.nextInt(10)));
         password.append("!@#$%^&*".charAt(random.nextInt(9)));
 
-        // Fill remaining characters
         for (int i = 4; i < 12; i++) {
             password.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
         }
@@ -490,6 +553,7 @@ public class AppUserService {
         dto.setEmail(user.getEmail());
         dto.setFullName(user.getFullName());
         dto.setDepartment(user.getDepartment());
+        dto.setRole(user.getRole());
         dto.setActive(user.isActive());
         dto.setBlocked(user.isBlocked());
         dto.setFirstLogin(user.isFirstLogin());

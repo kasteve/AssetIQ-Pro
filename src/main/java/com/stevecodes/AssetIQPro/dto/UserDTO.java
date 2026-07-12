@@ -15,9 +15,10 @@ public class UserDTO {
     private String username;
     private String email;
     private String password;
-    private String passwordHash;  // ADD THIS
+    private String passwordHash;
     private String fullName;
     private String department;
+    private String role = "EMPLOYEE";  // ADD THIS
     private boolean active = true;
     private boolean blocked = false;
     private boolean firstLogin = true;
@@ -26,8 +27,6 @@ public class UserDTO {
     private List<String> permissions = new ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime lastPasswordChanged;
-
-    // For creation
     private Long createdBy;
     private String resetPasswordUrl;
 }

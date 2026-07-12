@@ -47,6 +47,15 @@ public class InfraRequestService {
         return List.of();
     }
 
+    /**
+     * Get infrastructure requests by requester ID
+     * This method is used by UserRequestController
+     */
+    public List<InfraRequest> getRequestsByRequesterId(Long userId) {
+        log.info("Getting infrastructure requests for requester: {}", userId);
+        return requestRepository.findRequestsForUser(userId);
+    }
+
     // ============================================
     // Request Lifecycle Management
     // ============================================
@@ -317,18 +326,42 @@ public class InfraRequestService {
 
     private void notifyFinanceTeam(InfraRequest request) {
         // Similar to notifyInfraTeam
+        String financeLink = "https://assetiq.company.com/infra-requests/" + request.getRequestId() + "/finance";
+        createNotification(
+                null,
+                Notification.NotificationType.REQUEST_STATUS,
+                "Infrastructure Request for Finance Approval",
+                "Request #" + request.getRequestId() + " requires Finance approval.",
+                financeLink
+        );
     }
 
     private void notifyProcurementTeam(InfraRequest request) {
         // Similar to notifyInfraTeam
+        String procurementLink = "https://assetiq.company.com/infra-requests/" + request.getRequestId() + "/procurement";
+        createNotification(
+                null,
+                Notification.NotificationType.REQUEST_STATUS,
+                "Infrastructure Request in Procurement",
+                "Request #" + request.getRequestId() + " is now in procurement.",
+                procurementLink
+        );
     }
 
     private void notifyFinanceTeamDelivery(InfraRequest request) {
         // Notify finance that items have been delivered
+        createNotification(
+                null,
+                Notification.NotificationType.REQUEST_STATUS,
+                "Infrastructure Request Delivered",
+                "Request #" + request.getRequestId() + " items have been delivered.",
+                "/infra-requests/" + request.getRequestId()
+        );
     }
 
     private void sendCompletionReport(InfraRequest request) {
         // Generate and send final PDF report to all parties
+        log.info("Sending completion report for request: {}", request.getRequestId());
     }
 
     private void createNotification(Long userId, Notification.NotificationType type,

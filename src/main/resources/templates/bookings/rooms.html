@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Room Bookings - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0"><i class="fas fa-door-open me-2"></i>Room Bookings</h4>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
+            <i class="fas fa-plus me-2"></i>Book Room
+        </button>
+    </div>
+
+    <!-- Available Rooms -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-check-circle me-2" style="color: #28a745;"></i>Available Rooms</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3" th:each="room : ${availableRooms}">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-door-open fa-2x mb-2" style="color: #0d6efd;"></i>
+                            <h6 th:text="${room.roomName}">Boardroom</h6>
+                            <span class="badge bg-success">Available</span>
+                            <button class="btn btn-sm btn-primary mt-2 d-block w-100" onclick="quickBook(${room.roomId})">
+                                <i class="fas fa-calendar-plus me-1"></i>Book
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Bookings -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Bookings</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                    <tr>
+                        <th>Room</th>
+                        <th>Booked By</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="booking : ${bookings}">
+                        <td th:text="${booking.roomId}">N/A</td>
+                        <td th:text="${booking.userId}">N/A</td>
+                        <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                        <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                        <td>
+                                <span class="badge" th:classappend="${booking.status} == 'BOOKED' ? 'bg-success' :
+                                                                     ${booking.status} == 'CANCELLED' ? 'bg-danger' : 'bg-warning'"
+                                      th:text="${booking.status}">BOOKED</span>
+                        </td>
+                        <td>
+                            <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" onclick="cancelBooking(${booking.bookingId})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .card { border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .card-header { background: transparent; border-bottom: 1px solid #eef0f3; padding: 16px 22px; font-weight: 600; font-size: 14px; }
+        .card-body { padding: 18px 22px; }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script>
+        function cancelBooking(id) {
+            if (confirm('Cancel this booking?')) {
+                window.location.href = '/bookings/room/' + id + '/cancel';
+            }
+        }
+        function quickBook(roomId) {
+            document.querySelector('select[name="roomId"]').value = roomId;
+            const modal = new bootstrap.Modal(document.getElementById('bookRoomModal'));
+            modal.show();
+        }
+    </script>
+</div>
+</body>
+</html>

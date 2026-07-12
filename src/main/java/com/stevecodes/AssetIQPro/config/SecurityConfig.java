@@ -72,7 +72,6 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
-                                // Admin module paths
                                 "/admin/categories",
                                 "/admin/companies",
                                 "/admin/departments",
@@ -81,7 +80,10 @@ public class SecurityConfig {
                                 "/admin/suppliers",
                                 "/admin/rooms",
                                 "/admin/permissions",
-                                "/admin/users"
+                                "/admin/users",
+                                "/bookings/rooms",
+                                "/bookings/driver-requests",
+                                "/bookings/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

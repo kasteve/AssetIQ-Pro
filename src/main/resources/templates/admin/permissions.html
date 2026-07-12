@@ -1,72 +1,369 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Permissions - AssetIQ-Pro</title>
+    <title>User Permissions - AssetIQ-Pro</title>
+</head>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-lock me-2"></i>User Permissions</h4>
+        <div>
+            <button class="btn btn-success" onclick="saveChanges()">
+                <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+            <a href="/admin/users" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Users
+            </a>
+        </div>
+    </div>
 
+    <!-- User Selector -->
+    <div class="panel-card">
+        <div class="panel-body">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Select User</label>
+                    <select id="userSelect" class="form-select user-select-dropdown" onchange="loadUserData()">
+                        <option value="">-- Select User --</option>
+                        <option th:each="user : ${users}" th:value="${user.userId}"
+                                th:text="${user.fullName} + ' (' + ${user.username} + ')'"></option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Select a user to view and manage their permissions
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="status-badge" id="userStatusBadge">No user selected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permissions Grid -->
+    <div id="permissionsContainer" style="display: none;">
+        <div class="panel-card">
+            <div class="permissions-header">
+                <div>
+                    <i class="fas fa-user me-2" style="color: var(--primary-color);"></i>
+                    <span class="selected-user" id="selectedUserName">User</span>
+                    <span class="dept-pill" id="userDepartment">Department</span>
+                    <span class="role-pill" id="userRole">Role: EMPLOYEE</span>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="selectAllPermissions(true)">
+                        <i class="fas fa-check-double me-1"></i>Select All
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary select-all-btn" onclick="selectAllPermissions(false)">
+                        <i class="fas fa-times me-1"></i>Clear All
+                    </button>
+                </div>
+            </div>
+            <div class="panel-body">
+
+                <!-- Role Selector -->
+                <div class="role-selector mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold mb-0">Change Role</label>
+                        </div>
+                        <div class="col-md-4">
+                            <select id="roleSelect" class="form-select">
+                                <option value="EMPLOYEE">Employee</option>
+                                <option value="MANAGER">Manager</option>
+                                <option value="DRIVER">Driver</option>
+                                <option value="INFRA">Infrastructure</option>
+                                <option value="FINANCE">Finance</option>
+                                <option value="ADMIN">Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <button class="btn btn-sm btn-warning" onclick="updateRole()">
+                                <i class="fas fa-sync me-1"></i>Update Role
+                            </button>
+                            <span class="text-muted small ms-2">Changing role will auto-assign default permissions</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Asset Management Permissions -->
+                <div class="permission-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="permission-group-title">
+                            <i class="fas fa-laptop" style="color: #0d6efd;"></i>Asset Management
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('asset-group')">
+                            <i class="fas fa-check me-1"></i>Toggle All
+                        </button>
+                    </div>
+                    <div id="asset-group">
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="EDIT_ASSETS" id="perm-edit-assets">
+                                <label class="form-check-label fw-semibold" for="perm-edit-assets">
+                                    Edit Assets <span class="badge-permission crud">CRUD</span>
+                                </label>
+                                <div class="text-muted small">Create, update, and delete asset records</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="DELETE_ASSETS" id="perm-delete-assets">
+                                <label class="form-check-label fw-semibold" for="perm-delete-assets">
+                                    Delete Assets <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">Permanently delete assets from the system</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_WARRANTY" id="perm-manage-warranty">
+                                <label class="form-check-label fw-semibold" for="perm-manage-warranty">
+                                    Manage Warranty <span class="badge-permission lifecycle">Lifecycle</span>
+                                </label>
+                                <div class="text-muted small">Configure warranty settings and notifications</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_EOL" id="perm-manage-eol">
+                                <label class="form-check-label fw-semibold" for="perm-manage-eol">
+                                    Manage EOL <span class="badge-permission lifecycle">Lifecycle</span>
+                                </label>
+                                <div class="text-muted small">Configure End-of-Life settings and notifications</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Infrastructure & Approvals -->
+                <div class="permission-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="permission-group-title">
+                            <i class="fas fa-tools" style="color: #fd7e14;"></i>Infrastructure &amp; Approvals
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('infra-group')">
+                            <i class="fas fa-check me-1"></i>Toggle All
+                        </button>
+                    </div>
+                    <div id="infra-group">
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_INFRA_REQUESTS" id="perm-approve-infra">
+                                <label class="form-check-label fw-semibold" for="perm-approve-infra">
+                                    Approve Infrastructure Requests <span class="badge-permission approval">Approval</span>
+                                </label>
+                                <div class="text-muted small">Approve or reject infrastructure resource requests</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_LM" id="perm-approve-lm">
+                                <label class="form-check-label fw-semibold" for="perm-approve-lm">
+                                    Line Manager Approval <span class="badge-permission approval">Approval</span>
+                                </label>
+                                <div class="text-muted small">Approve requests as a Line Manager</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_INFRA" id="perm-approve-infra-dept">
+                                <label class="form-check-label fw-semibold" for="perm-approve-infra-dept">
+                                    Infrastructure Department Approval <span class="badge-permission approval">Approval</span>
+                                </label>
+                                <div class="text-muted small">Approve requests as Infrastructure Department</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_FINANCE" id="perm-approve-finance">
+                                <label class="form-check-label fw-semibold" for="perm-approve-finance">
+                                    Finance Approval <span class="badge-permission approval">Approval</span>
+                                </label>
+                                <div class="text-muted small">Approve requests as Finance Department</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reporting & Views -->
+                <div class="permission-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="permission-group-title">
+                            <i class="fas fa-file-alt" style="color: #6f42c1;"></i>Reporting &amp; Views
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('report-group')">
+                            <i class="fas fa-check me-1"></i>Toggle All
+                        </button>
+                    </div>
+                    <div id="report-group">
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_REPORTS" id="perm-view-reports">
+                                <label class="form-check-label fw-semibold" for="perm-view-reports">
+                                    View Reports <span class="badge-permission read">Read</span>
+                                </label>
+                                <div class="text-muted small">Access all reports and dashboards</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="DOWNLOAD_REPORTS" id="perm-download-reports">
+                                <label class="form-check-label fw-semibold" for="perm-download-reports">
+                                    Download Reports <span class="badge-permission export">Export</span>
+                                </label>
+                                <div class="text-muted small">Export reports as PDF or Excel</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_AUDIT" id="perm-view-audit">
+                                <label class="form-check-label fw-semibold" for="perm-view-audit">
+                                    View Audit Logs <span class="badge-permission audit">Audit</span>
+                                </label>
+                                <div class="text-muted small">Access audit trail and system logs</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_ALL_TRANSACTIONS" id="perm-view-all-transactions">
+                                <label class="form-check-label fw-semibold" for="perm-view-all-transactions">
+                                    View All Transactions <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">View all transactions across the system</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_OWN_TRANSACTIONS" id="perm-view-own-transactions">
+                                <label class="form-check-label fw-semibold" for="perm-view-own-transactions">
+                                    View Own Transactions <span class="badge-permission read">Read</span>
+                                </label>
+                                <div class="text-muted small">View only your own transactions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vouchers & Bookings -->
+                <div class="permission-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="permission-group-title">
+                            <i class="fas fa-ticket-alt" style="color: #198754;"></i>Vouchers &amp; Bookings
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('voucher-group')">
+                            <i class="fas fa-check me-1"></i>Toggle All
+                        </button>
+                    </div>
+                    <div id="voucher-group">
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="GENERATE_VOUCHERS" id="perm-generate-vouchers">
+                                <label class="form-check-label fw-semibold" for="perm-generate-vouchers">
+                                    Generate Vouchers <span class="badge-permission create">Create</span>
+                                </label>
+                                <div class="text-muted small">Generate meal and break vouchers</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="GENERATE_MULTIPLE_VOUCHERS" id="perm-generate-multiple-vouchers">
+                                <label class="form-check-label fw-semibold" for="perm-generate-multiple-vouchers">
+                                    Bulk Generate Vouchers <span class="badge-permission bulk">Bulk</span>
+                                </label>
+                                <div class="text-muted small">Generate multiple vouchers at once</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_BOOKINGS" id="perm-manage-bookings">
+                                <label class="form-check-label fw-semibold" for="perm-manage-bookings">
+                                    Manage Bookings <span class="badge-permission manage">Manage</span>
+                                </label>
+                                <div class="text-muted small">Manage room, driver, and resource bookings</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Administration -->
+                <div class="permission-group">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="permission-group-title">
+                            <i class="fas fa-users-cog" style="color: #dc3545;"></i>Administration
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('admin-group')">
+                            <i class="fas fa-check me-1"></i>Toggle All
+                        </button>
+                    </div>
+                    <div id="admin-group">
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="CREATE_USERS" id="perm-create-users">
+                                <label class="form-check-label fw-semibold" for="perm-create-users">
+                                    Create Users <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">Create new user accounts</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="RESET_PASSWORDS" id="perm-reset-passwords">
+                                <label class="form-check-label fw-semibold" for="perm-reset-passwords">
+                                    Reset Passwords <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">Reset user passwords</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_ROLES" id="perm-manage-roles">
+                                <label class="form-check-label fw-semibold" for="perm-manage-roles">
+                                    Manage Roles <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">Assign and manage user roles and permissions</div>
+                            </div>
+                        </div>
+                        <div class="permission-card">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_CONFIG" id="perm-manage-config">
+                                <label class="form-check-label fw-semibold" for="perm-manage-config">
+                                    Manage Configuration <span class="badge-permission admin">Admin</span>
+                                </label>
+                                <div class="text-muted small">Configure system settings and parameters</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-1 mb-4 text-end">
+            <button class="btn btn-success btn-lg" onclick="saveChanges()">
+                <i class="fas fa-save me-2"></i>Save All Changes
+            </button>
+        </div>
+    </div>
+
+    <div id="noUserMessage" class="panel-card">
+        <div class="empty-state">
+            <i class="fas fa-user"></i>
+            <h5>Select a user to manage permissions</h5>
+            <p class="text-muted small mb-0">Choose a user from the dropdown above to view and modify their permissions</p>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
     <style>
-        :root {
-            --primary-color: #0d6efd; --primary-dark: #0b5ed7; --accent-color: #4fc3f7;
-            --sidebar-width: 250px; --header-height: 68px; --bg-color: #f4f6f9; --ink: #1a1a2e;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; }
-        body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); -webkit-font-smoothing: antialiased; }
-
-        .sidebar {
-            position: fixed; top: 0; left: 0; width: var(--sidebar-width); height: 100vh;
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color: white;
-            z-index: 1050; overflow-y: auto; box-shadow: 4px 0 24px rgba(0,0,0,0.12);
-        }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-        .sidebar .logo { padding: 24px 20px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 14px; }
-        .sidebar .logo h3 { font-weight: 800; font-size: 21px; letter-spacing: -0.5px; }
-        .sidebar .logo h3 i, .sidebar .logo h3 span { color: var(--accent-color); }
-        .sidebar .logo small { color: rgba(255,255,255,0.4); font-size: 10.5px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; display: block; margin-top: 3px; }
-        .sidebar .nav { padding: 0 12px; }
-        .sidebar .nav-item { margin-bottom: 3px; }
-        .sidebar .nav-link { color: rgba(255,255,255,0.65); padding: 11px 16px; border-radius: 10px; transition: all 0.2s ease; text-decoration: none; display: flex; align-items: center; font-size: 14px; font-weight: 500; }
-        .sidebar .nav-link:hover { background: rgba(255,255,255,0.08); color: white; }
-        .sidebar .nav-link.active { background: linear-gradient(135deg, var(--primary-color), #3b82f6); color: white; box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35); }
-        .sidebar .nav-link i { width: 22px; margin-right: 12px; font-size: 15px; text-align: center; }
-        .sidebar .nav-link .badge { margin-left: auto; background: #dc3545; color: white; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .sidebar .nav-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 12px 16px; }
-
-        .main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
-        .header {
-            background: white; padding: 0 28px; border-bottom: 1px solid #e9ecef;
-            display: flex; justify-content: space-between; align-items: center;
-            position: sticky; top: 0; z-index: 1040; height: var(--header-height);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-        }
-        .header .page-title { font-size: 17px; font-weight: 700; color: var(--ink); }
-        .header .page-title i { color: var(--primary-color); margin-right: 6px; }
-        .header .user-info { display: flex; align-items: center; gap: 14px; }
-        .header .dropdown-toggle::after { display: none; }
-        .header .user-avatar {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), #6610f2);
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 14px; cursor: pointer;
-        }
-        .header .notif-btn { position: relative; background: none; border: none; color: #6c757d; font-size: 19px; cursor: pointer; }
-        .header .notif-badge { position: absolute; top: -4px; right: -6px; background: #dc3545; color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
-        .sidebar-toggle { display: none; background: none; border: none; font-size: 22px; color: var(--ink); cursor: pointer; }
-        @media (max-width: 768px) {
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .sidebar-toggle { display: block !important; margin-right: 12px; }
-        }
-
-        .content { padding: 28px 32px; max-width: 1300px; }
+        .content { padding: 28px 32px; width: 100%; }
         .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
         .page-header-row h4 i { color: var(--primary-color); }
@@ -91,16 +388,16 @@
         .permissions-header { padding: 16px 22px; border-bottom: 1px solid #eef0f3; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .permissions-header .selected-user { font-weight: 700; font-size: 15px; color: var(--ink); }
         .permissions-header .dept-pill { display: inline-block; padding: 3px 11px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; margin-left: 10px; }
+        .role-pill { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #fff4e0; color: #fd7e14; margin-left: 10px; }
         .select-all-btn { border-radius: 20px !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 600 !important; }
+
+        .role-selector { background: #f8f9fb; padding: 16px 20px; border-radius: 12px; border: 1px solid #eef0f3; }
 
         .permission-group { background: #f8f9fb; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
         .permission-group-title { font-weight: 700; font-size: 13.5px; color: var(--ink); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #eef0f3; display: flex; align-items: center; }
         .permission-group-title i { margin-right: 8px; }
 
-        .permission-card {
-            transition: all 0.2s ease; border-radius: 10px; border: 1px solid #eef2f6;
-            background: white; padding: 14px 15px; margin-bottom: 10px;
-        }
+        .permission-card { transition: all 0.2s ease; border-radius: 10px; border: 1px solid #eef2f6; background: white; padding: 14px 15px; margin-bottom: 10px; }
         .permission-card:last-child { margin-bottom: 0; }
         .permission-card:hover { border-color: var(--primary-color); box-shadow: 0 2px 12px rgba(13,110,253,0.08); }
         .permission-card .form-check { padding-left: 2.5rem; }
@@ -124,572 +421,165 @@
         .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
         .empty-state h5 { color: #6c757d; font-weight: 700; margin-bottom: 6px; }
     </style>
-</head>
-<body>
-
-<div class="sidebar" id="sidebar">
-    <div class="logo">
-        <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
-        <small>Professional Asset Management</small>
-    </div>
-    <nav class="nav flex-column">
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/dashboard"><i class="fas fa-chart-pie"></i> Dashboard</a></div>
-        <div class="nav-item">
-            <a class="nav-link" href="/assetIQ-pro/assets">
-                <i class="fas fa-laptop"></i> Assets
-                <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
-            </a>
-        </div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/transfers"><i class="fas fa-exchange-alt"></i> Transfers</a></div>
-        <div class="nav-item">
-            <a class="nav-link" href="/assetIQ-pro/infra-requests">
-                <i class="fas fa-tools"></i> Infrastructure
-                <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
-            </a>
-        </div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/bookings"><i class="fas fa-calendar-check"></i> Bookings</a></div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/vouchers"><i class="fas fa-ticket-alt"></i> Vouchers</a></div>
-        <div class="nav-divider"></div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link" href="/assetIQ-pro/admin/resources"><i class="fas fa-box-open"></i> Resources</a>
-        </div>
-        <div class="nav-item" sec:authorize="hasAuthority('ADMIN')">
-            <a class="nav-link active" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Admin</a>
-        </div>
-        <div class="nav-item"><a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
-    </nav>
 </div>
 
-<div class="main-content">
-    <header class="header">
-        <div style="display:flex; align-items:center;">
-            <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="fas fa-bars"></i></button>
-            <span class="page-title"><i class="fas fa-lock"></i>User Permissions</span>
-        </div>
-        <div class="user-info">
-            <div class="dropdown">
-                <button class="notif-btn" data-bs-toggle="dropdown">
-                    <i class="fas fa-bell"></i>
-                    <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
-                </button>
-                <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px; max-height: 380px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
-                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;"><h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6></div>
-                    <div th:each="notification : ${notifications}">
-                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
-                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
-                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
-                        </a>
-                    </div>
-                    <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
-                        <i class="fas fa-inbox text-muted" style="font-size: 22px;"></i>
-                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
-                    </div>
-                </div>
-            </div>
-            <div class="dropdown">
-                <button class="btn btn-link p-0" data-bs-toggle="dropdown">
-                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 190px;">
-                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
-                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
-                </ul>
-            </div>
-        </div>
-    </header>
+<div layout:fragment="scripts">
+    <script>
+        let currentUserId = null;
 
-    <div class="content">
-        <div class="page-header-row">
-            <h4><i class="fas fa-lock me-2"></i>User Permissions</h4>
-            <div>
-                <button class="btn btn-success" onclick="savePermissions()">
-                    <i class="fas fa-save me-2"></i>Save Permissions
-                </button>
-                <a href="/admin/users" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Users
-                </a>
-            </div>
-        </div>
-
-        <!-- User Selector -->
-        <div class="panel-card">
-            <div class="panel-body">
-                <div class="row align-items-center">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Select User</label>
-                        <select id="userSelect" class="form-select user-select-dropdown" onchange="loadUserPermissions()">
-                            <option value="">-- Select User --</option>
-                            <option th:each="user : ${users}" th:value="${user.userId}" th:text="${user.fullName} + ' (' + ${user.username} + ')'"></option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-muted small">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Select a user to view and manage their permissions
-                        </div>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <span class="status-badge" id="userStatusBadge">No user selected</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Permissions Grid -->
-        <div id="permissionsContainer" style="display: none;">
-            <div class="panel-card">
-                <div class="permissions-header">
-                    <div>
-                        <i class="fas fa-user me-2" style="color: var(--primary-color);"></i>
-                        <span class="selected-user" id="selectedUserName">User</span>
-                        <span class="dept-pill" id="userDepartment">Department</span>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="selectAllPermissions(true)">
-                            <i class="fas fa-check-double me-1"></i>Select All
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary select-all-btn" onclick="selectAllPermissions(false)">
-                            <i class="fas fa-times me-1"></i>Clear All
-                        </button>
-                    </div>
-                </div>
-                <div class="panel-body">
-
-                    <!-- Asset Management Permissions -->
-                    <div class="permission-group">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="permission-group-title">
-                                <i class="fas fa-laptop" style="color: #0d6efd;"></i>Asset Management
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('asset-group')">
-                                <i class="fas fa-check me-1"></i>Toggle All
-                            </button>
-                        </div>
-                        <div id="asset-group">
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="EDIT_ASSETS" id="perm-edit-assets">
-                                    <label class="form-check-label fw-semibold" for="perm-edit-assets">
-                                        Edit Assets
-                                        <span class="badge-permission crud">CRUD</span>
-                                    </label>
-                                    <div class="text-muted small">Create, update, and delete asset records</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="DELETE_ASSETS" id="perm-delete-assets">
-                                    <label class="form-check-label fw-semibold" for="perm-delete-assets">
-                                        Delete Assets
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">Permanently delete assets from the system</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_WARRANTY" id="perm-manage-warranty">
-                                    <label class="form-check-label fw-semibold" for="perm-manage-warranty">
-                                        Manage Warranty
-                                        <span class="badge-permission lifecycle">Lifecycle</span>
-                                    </label>
-                                    <div class="text-muted small">Configure warranty settings and notifications</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_EOL" id="perm-manage-eol">
-                                    <label class="form-check-label fw-semibold" for="perm-manage-eol">
-                                        Manage EOL
-                                        <span class="badge-permission lifecycle">Lifecycle</span>
-                                    </label>
-                                    <div class="text-muted small">Configure End-of-Life settings and notifications</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Infrastructure & Approvals -->
-                    <div class="permission-group">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="permission-group-title">
-                                <i class="fas fa-tools" style="color: #fd7e14;"></i>Infrastructure &amp; Approvals
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('infra-group')">
-                                <i class="fas fa-check me-1"></i>Toggle All
-                            </button>
-                        </div>
-                        <div id="infra-group">
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_INFRA_REQUESTS" id="perm-approve-infra">
-                                    <label class="form-check-label fw-semibold" for="perm-approve-infra">
-                                        Approve Infrastructure Requests
-                                        <span class="badge-permission approval">Approval</span>
-                                    </label>
-                                    <div class="text-muted small">Approve or reject infrastructure resource requests</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_LM" id="perm-approve-lm">
-                                    <label class="form-check-label fw-semibold" for="perm-approve-lm">
-                                        Line Manager Approval
-                                        <span class="badge-permission approval">Approval</span>
-                                    </label>
-                                    <div class="text-muted small">Approve requests as a Line Manager</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_INFRA" id="perm-approve-infra-dept">
-                                    <label class="form-check-label fw-semibold" for="perm-approve-infra-dept">
-                                        Infrastructure Department Approval
-                                        <span class="badge-permission approval">Approval</span>
-                                    </label>
-                                    <div class="text-muted small">Approve requests as Infrastructure Department</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="APPROVE_FINANCE" id="perm-approve-finance">
-                                    <label class="form-check-label fw-semibold" for="perm-approve-finance">
-                                        Finance Approval
-                                        <span class="badge-permission approval">Approval</span>
-                                    </label>
-                                    <div class="text-muted small">Approve requests as Finance Department</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Reporting & Views -->
-                    <div class="permission-group">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="permission-group-title">
-                                <i class="fas fa-file-alt" style="color: #6f42c1;"></i>Reporting &amp; Views
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('report-group')">
-                                <i class="fas fa-check me-1"></i>Toggle All
-                            </button>
-                        </div>
-                        <div id="report-group">
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_REPORTS" id="perm-view-reports">
-                                    <label class="form-check-label fw-semibold" for="perm-view-reports">
-                                        View Reports
-                                        <span class="badge-permission read">Read</span>
-                                    </label>
-                                    <div class="text-muted small">Access all reports and dashboards</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="DOWNLOAD_REPORTS" id="perm-download-reports">
-                                    <label class="form-check-label fw-semibold" for="perm-download-reports">
-                                        Download Reports
-                                        <span class="badge-permission export">Export</span>
-                                    </label>
-                                    <div class="text-muted small">Export reports as PDF or Excel</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_AUDIT" id="perm-view-audit">
-                                    <label class="form-check-label fw-semibold" for="perm-view-audit">
-                                        View Audit Logs
-                                        <span class="badge-permission audit">Audit</span>
-                                    </label>
-                                    <div class="text-muted small">Access audit trail and system logs</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_ALL_TRANSACTIONS" id="perm-view-all-transactions">
-                                    <label class="form-check-label fw-semibold" for="perm-view-all-transactions">
-                                        View All Transactions
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">View all transactions across the system</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="VIEW_OWN_TRANSACTIONS" id="perm-view-own-transactions">
-                                    <label class="form-check-label fw-semibold" for="perm-view-own-transactions">
-                                        View Own Transactions
-                                        <span class="badge-permission read">Read</span>
-                                    </label>
-                                    <div class="text-muted small">View only your own transactions</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Vouchers & Bookings -->
-                    <div class="permission-group">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="permission-group-title">
-                                <i class="fas fa-ticket-alt" style="color: #198754;"></i>Vouchers &amp; Bookings
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('voucher-group')">
-                                <i class="fas fa-check me-1"></i>Toggle All
-                            </button>
-                        </div>
-                        <div id="voucher-group">
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="GENERATE_VOUCHERS" id="perm-generate-vouchers">
-                                    <label class="form-check-label fw-semibold" for="perm-generate-vouchers">
-                                        Generate Vouchers
-                                        <span class="badge-permission create">Create</span>
-                                    </label>
-                                    <div class="text-muted small">Generate meal and break vouchers</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="GENERATE_MULTIPLE_VOUCHERS" id="perm-generate-multiple-vouchers">
-                                    <label class="form-check-label fw-semibold" for="perm-generate-multiple-vouchers">
-                                        Bulk Generate Vouchers
-                                        <span class="badge-permission bulk">Bulk</span>
-                                    </label>
-                                    <div class="text-muted small">Generate multiple vouchers at once</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_BOOKINGS" id="perm-manage-bookings">
-                                    <label class="form-check-label fw-semibold" for="perm-manage-bookings">
-                                        Manage Bookings
-                                        <span class="badge-permission manage">Manage</span>
-                                    </label>
-                                    <div class="text-muted small">Manage room, driver, and resource bookings</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Administration -->
-                    <div class="permission-group">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="permission-group-title">
-                                <i class="fas fa-users-cog" style="color: #dc3545;"></i>Administration
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary select-all-btn" onclick="toggleGroup('admin-group')">
-                                <i class="fas fa-check me-1"></i>Toggle All
-                            </button>
-                        </div>
-                        <div id="admin-group">
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="CREATE_USERS" id="perm-create-users">
-                                    <label class="form-check-label fw-semibold" for="perm-create-users">
-                                        Create Users
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">Create new user accounts</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="RESET_PASSWORDS" id="perm-reset-passwords">
-                                    <label class="form-check-label fw-semibold" for="perm-reset-passwords">
-                                        Reset Passwords
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">Reset user passwords</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_ROLES" id="perm-manage-roles">
-                                    <label class="form-check-label fw-semibold" for="perm-manage-roles">
-                                        Manage Roles
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">Assign and manage user roles and permissions</div>
-                                </div>
-                            </div>
-                            <div class="permission-card">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="permissions" value="MANAGE_CONFIG" id="perm-manage-config">
-                                    <label class="form-check-label fw-semibold" for="perm-manage-config">
-                                        Manage Configuration
-                                        <span class="badge-permission admin">Admin</span>
-                                    </label>
-                                    <div class="text-muted small">Configure system settings and parameters</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- Save Button -->
-            <div class="mt-1 mb-4 text-end">
-                <button class="btn btn-success btn-lg" onclick="savePermissions()">
-                    <i class="fas fa-save me-2"></i>Save All Permissions
-                </button>
-            </div>
-        </div>
-
-        <!-- No User Selected Message -->
-        <div id="noUserMessage" class="panel-card">
-            <div class="empty-state">
-                <i class="fas fa-user"></i>
-                <h5>Select a user to manage permissions</h5>
-                <p class="text-muted small mb-0">Choose a user from the dropdown above to view and modify their permissions</p>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    document.addEventListener('click', function (event) {
-        const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.querySelector('.sidebar-toggle');
-        if (!sidebar) return;
-        const inside = sidebar.contains(event.target);
-        const onToggle = toggleBtn && toggleBtn.contains(event.target);
-        if (!inside && !onToggle && window.innerWidth <= 768) sidebar.classList.remove('open');
-    });
-    window.addEventListener('resize', function () {
-        if (window.innerWidth > 768) document.getElementById('sidebar').classList.remove('open');
-    });
-
-    let currentUserId = null;
-
-    function loadUserPermissions() {
-        const select = document.getElementById('userSelect');
-        const userId = select.value;
-
-        if (!userId) {
-            document.getElementById('permissionsContainer').style.display = 'none';
-            document.getElementById('noUserMessage').style.display = 'block';
-            document.getElementById('userStatusBadge').textContent = 'No user selected';
-            document.getElementById('userStatusBadge').classList.remove('filled');
-            return;
-        }
-
-        currentUserId = userId;
-        document.getElementById('permissionsContainer').style.display = 'block';
-        document.getElementById('noUserMessage').style.display = 'none';
-        document.getElementById('userStatusBadge').textContent = 'Loading permissions...';
-
-        // Get user info
-        const selectedOption = select.options[select.selectedIndex];
-        document.getElementById('selectedUserName').textContent = selectedOption.text;
-
-        // Fetch user permissions
-        fetch('/api/admin/users/' + userId + '/permissions')
-            .then(response => response.json())
-            .then(permissions => {
-                // Uncheck all checkboxes
-                document.querySelectorAll('input[name="permissions"]').forEach(cb => cb.checked = false);
-
-                // Check user's permissions
-                if (Array.isArray(permissions)) {
-                    permissions.forEach(perm => {
-                        const cb = document.querySelector('input[name="permissions"][value="' + perm + '"]');
-                        if (cb) cb.checked = true;
-                    });
-                }
-
-                const count = document.querySelectorAll('input[name="permissions"]:checked').length;
-                const badge = document.getElementById('userStatusBadge');
-                badge.textContent = count + ' permissions assigned';
-                badge.classList.add('filled');
-            })
-            .catch(error => {
-                console.error('Error loading permissions:', error);
-                document.getElementById('userStatusBadge').textContent = 'Error loading permissions';
-            });
-    }
-
-    function selectAllPermissions(select) {
-        document.querySelectorAll('input[name="permissions"]').forEach(cb => cb.checked = select);
-    }
-
-    function toggleGroup(groupId) {
-        const group = document.getElementById(groupId);
-        const checkboxes = group.querySelectorAll('input[name="permissions"]');
-        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-        checkboxes.forEach(cb => cb.checked = !allChecked);
-    }
-
-    function savePermissions() {
-        if (!currentUserId) {
-            alert('Please select a user first.');
-            return;
-        }
-
-        const selectedPermissions = [];
-        document.querySelectorAll('input[name="permissions"]:checked').forEach(cb => {
-            selectedPermissions.push(cb.value);
-        });
-
-        if (selectedPermissions.length === 0) {
-            if (!confirm('This user will have no permissions. Are you sure?')) {
+        function loadUserData() {
+            const select = document.getElementById('userSelect');
+            const userId = select.value;
+            if (!userId) {
+                document.getElementById('permissionsContainer').style.display = 'none';
+                document.getElementById('noUserMessage').style.display = 'block';
+                document.getElementById('userStatusBadge').textContent = 'No user selected';
+                document.getElementById('userStatusBadge').classList.remove('filled');
                 return;
             }
+            currentUserId = userId;
+            document.getElementById('permissionsContainer').style.display = 'block';
+            document.getElementById('noUserMessage').style.display = 'none';
+            document.getElementById('userStatusBadge').textContent = 'Loading...';
+
+            const selectedOption = select.options[select.selectedIndex];
+            document.getElementById('selectedUserName').textContent = selectedOption.text;
+
+            // Fetch user data including role
+            fetch('/assetIQ-pro/api/admin/users/' + userId)
+                .then(response => {
+                    if (!response.ok) throw new Error('User not found');
+                    return response.json();
+                })
+                .then(user => {
+                    document.getElementById('roleSelect').value = user.role || 'EMPLOYEE';
+                    document.getElementById('userRole').textContent = 'Role: ' + (user.role || 'EMPLOYEE');
+                    document.getElementById('userDepartment').textContent = user.department || 'No Department';
+
+                    // Load permissions
+                    return fetch('/assetIQ-pro/api/admin/users/' + userId + '/permissions');
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load permissions');
+                    return response.json();
+                })
+                .then(permissions => {
+                    document.querySelectorAll('input[name="permissions"]').forEach(cb => cb.checked = false);
+                    if (Array.isArray(permissions)) {
+                        permissions.forEach(perm => {
+                            const cb = document.querySelector('input[name="permissions"][value="' + perm + '"]');
+                            if (cb) cb.checked = true;
+                        });
+                    }
+                    const count = document.querySelectorAll('input[name="permissions"]:checked').length;
+                    const badge = document.getElementById('userStatusBadge');
+                    badge.textContent = count + ' permissions assigned';
+                    badge.classList.add('filled');
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    document.getElementById('userStatusBadge').textContent = 'Error loading';
+                });
         }
 
-        document.getElementById('userStatusBadge').textContent = 'Saving...';
+        function updateRole() {
+            if (!currentUserId) {
+                alert('Please select a user first.');
+                return;
+            }
+            const newRole = document.getElementById('roleSelect').value;
+            if (!confirm('Changing role to ' + newRole + ' will assign default permissions. Continue?')) {
+                return;
+            }
 
-        fetch('/api/admin/users/' + currentUserId + '/permissions', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(selectedPermissions)
-        })
+            document.getElementById('userStatusBadge').textContent = 'Updating role...';
+
+            fetch('/assetIQ-pro/api/admin/users/' + currentUserId + '/role', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: newRole })
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('userRole').textContent = 'Role: ' + newRole;
+                    alert('Role updated successfully! Default permissions assigned.');
+                    loadUserData(); // Reload permissions
+                } else {
+                    throw new Error('Failed to update role');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating role:', error);
+                alert('Failed to update role: ' + error.message);
+            });
+        }
+
+        function selectAllPermissions(select) {
+            document.querySelectorAll('input[name="permissions"]').forEach(cb => cb.checked = select);
+        }
+
+        function toggleGroup(groupId) {
+            const group = document.getElementById(groupId);
+            const checkboxes = group.querySelectorAll('input[name="permissions"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        }
+
+        function saveChanges() {
+            if (!currentUserId) {
+                alert('Please select a user first.');
+                return;
+            }
+
+            const selectedPermissions = [];
+            document.querySelectorAll('input[name="permissions"]:checked').forEach(cb => {
+                selectedPermissions.push(cb.value);
+            });
+
+            const newRole = document.getElementById('roleSelect').value;
+
+            if (!confirm('Save permissions and role for this user?')) {
+                return;
+            }
+
+            document.getElementById('userStatusBadge').textContent = 'Saving...';
+
+            // Save permissions
+            fetch('/assetIQ-pro/api/admin/users/' + currentUserId + '/permissions', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedPermissions)
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to save permissions');
+                // Update role
+                return fetch('/assetIQ-pro/api/admin/users/' + currentUserId + '/role', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+            })
             .then(response => {
                 if (response.ok) {
                     document.getElementById('userStatusBadge').textContent = selectedPermissions.length + ' permissions saved ✓';
-                    alert('Permissions saved successfully!');
+                    document.getElementById('userRole').textContent = 'Role: ' + newRole;
+                    alert('Changes saved successfully!');
                 } else {
-                    throw new Error('Failed to save permissions');
+                    throw new Error('Failed to update role');
                 }
             })
             .catch(error => {
-                console.error('Error saving permissions:', error);
-                document.getElementById('userStatusBadge').textContent = 'Error saving permissions';
-                alert('Failed to save permissions. Please try again.');
+                console.error('Error saving:', error);
+                document.getElementById('userStatusBadge').textContent = 'Error saving';
+                alert('Failed to save changes: ' + error.message);
             });
-    }
+        }
 
-    // Initialize the page
-    document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('noUserMessage').style.display = 'block';
-        document.getElementById('permissionsContainer').style.display = 'none';
-    });
-</script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('noUserMessage').style.display = 'block';
+            document.getElementById('permissionsContainer').style.display = 'none';
+        });
+    </script>
+</div>
 </body>
 </html>

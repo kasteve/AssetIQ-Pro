@@ -2,7 +2,6 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.UserDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
-import com.stevecodes.AssetIQPro.exception.ResourceNotFoundException;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.AuditService;
 import com.stevecodes.AssetIQPro.service.DepartmentService;
@@ -18,11 +17,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.security.SecureRandom;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -55,6 +51,7 @@ public class UserViewController {
         model.addAttribute("pendingPasswordChange", pendingPasswordChange);
         model.addAttribute("allPermissions", permissionService.getAllPermissions());
         model.addAttribute("departments", departmentService.getAllDepartments());
+        model.addAttribute("roles", List.of("ADMIN", "MANAGER", "EMPLOYEE", "DRIVER", "INFRA", "FINANCE"));
 
         return "admin/users";
     }
@@ -64,6 +61,7 @@ public class UserViewController {
                              @RequestParam String fullName,
                              @RequestParam String email,
                              @RequestParam(required = false) String department,
+                             @RequestParam(defaultValue = "EMPLOYEE") String role,
                              @RequestParam(required = false) List<String> permissions,
                              RedirectAttributes redirectAttributes) {
         try {
@@ -72,6 +70,7 @@ public class UserViewController {
             userDTO.setFullName(fullName);
             userDTO.setEmail(email);
             userDTO.setDepartment(department);
+            userDTO.setRole(role);
             userDTO.setPermissions(permissions != null ? permissions : List.of());
 
             userService.createUser(userDTO);
@@ -88,10 +87,7 @@ public class UserViewController {
     public ResponseEntity<?> resetPassword(@PathVariable Long userId) {
         try {
             log.info("Resetting password for user: {}", userId);
-
-            // Use the resetPassword method in AppUserService
             userService.resetPassword(userId);
-
             log.info("Password reset successful for user: {}", userId);
 
             return ResponseEntity.ok().body(Map.of(

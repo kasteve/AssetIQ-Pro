@@ -1,6 +1,3 @@
-// ============================================
-// DriverRequest Entity
-// ============================================
 package com.stevecodes.AssetIQPro.entity;
 
 import jakarta.persistence.*;
@@ -31,7 +28,7 @@ public class DriverRequest {
     private LocalDateTime requestTime;
 
     @Column(nullable = false)
-    private String status;
+    private String status; // PENDING, ACCEPTED, DECLINED, COMPLETED
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

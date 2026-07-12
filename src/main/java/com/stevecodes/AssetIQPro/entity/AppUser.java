@@ -36,6 +36,9 @@ public class AppUser {
     @Column(length = 255)
     private String department;
 
+    @Column(name = "role", length = 50)
+    private String role = "EMPLOYEE";
+
     @Column(name = "is_active")
     private boolean active = true;
 
@@ -82,5 +85,45 @@ public class AppUser {
     public boolean hasPermission(String permissionName) {
         return permissions.stream()
                 .anyMatch(p -> p.getPermissionName().equals(permissionName));
+    }
+
+    public boolean hasRole(String roleName) {
+        return role != null && role.equals(roleName);
+    }
+
+    // Admin check - uses MANAGE_ROLES permission (since ADMIN is a role, not permission)
+    public boolean isAdmin() {
+        return hasPermission("MANAGE_ROLES") ||
+                hasPermission("ADMIN") ||
+                hasPermission("SUPER_ADMIN") ||
+                hasRole("ADMIN");
+    }
+
+    public boolean canManageUsers() {
+        return hasPermission("CREATE_USERS") || hasPermission("MANAGE_USERS") || isAdmin();
+    }
+
+    public boolean canManageRoles() {
+        return hasPermission("MANAGE_ROLES") || isAdmin();
+    }
+
+    public boolean canViewAudit() {
+        return hasPermission("VIEW_AUDIT") || isAdmin();
+    }
+
+    public boolean canManageBookings() {
+        return hasPermission("MANAGE_BOOKINGS") || isAdmin();
+    }
+
+    public boolean canManageDriverRequests() {
+        return hasPermission("MANAGE_DRIVER_REQUESTS") || isAdmin();
+    }
+
+    public boolean canReviewInfra() {
+        return hasPermission("REVIEW_INFRA") || hasPermission("APPROVE_INFRA") || isAdmin();
+    }
+
+    public boolean canManageResources() {
+        return hasPermission("MANAGE_RESOURCE_REQUESTS") || isAdmin();
     }
 }

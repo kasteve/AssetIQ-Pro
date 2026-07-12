@@ -91,6 +91,17 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get bookings by user ID - returns List<BookingDTO>
+     * This method is used by UserRequestController
+     */
+    public List<BookingDTO> getBookingsByUserId(Long userId) {
+        log.info("Getting bookings for user: {}", userId);
+        return bookingRepository.findByUserId(userId).stream()
+                .map(this::convertToBookingDTO)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public void cancelBooking(Long bookingId) {
         log.info("Cancelling booking: {}", bookingId);
@@ -106,91 +117,90 @@ public class BookingService {
     }
 
     // ============================================
-    // Driver Requests
+    // Driver Requests (Delegated to DriverService)
     // ============================================
 
+    /**
+     * @deprecated Use DriverService instead
+     */
+    @Deprecated
     @Transactional
     public DriverRequestDTO requestDriver(DriverRequestDTO dto) {
-        log.info("Requesting driver for user: {}", dto.getUserId());
-
-        // Create driver request
-        DriverRequest request = new DriverRequest();
-        request.setUserId(dto.getUserId());
-        request.setDriverId(dto.getDriverId());
-        request.setRequestTime(LocalDateTime.now());
-        request.setStatus("PENDING");
-        request.setDestination(dto.getDestination());
-        request.setReason(dto.getReason());
-        request.setRequestedBy(dto.getRequestedBy());
-
-        // Save and return
-        // Placeholder - implement full driver request logic
-
+        log.warn("DEPRECATED: Use DriverService.createDriverRequest() instead");
         auditService.logAction("DRIVER_REQUESTED",
                 "Driver requested by user: " + dto.getUserId(), dto.getUserId());
-
         return dto;
     }
 
+    /**
+     * @deprecated Use DriverService instead
+     */
+    @Deprecated
     public List<DriverRequestDTO> getDriverRequests(Long driverId) {
-        // Placeholder
+        log.warn("DEPRECATED: Use DriverService.getDriverRequestsByDriverId() instead");
         return List.of();
     }
 
+    /**
+     * @deprecated Use DriverService instead
+     */
+    @Deprecated
     @Transactional
     public void acceptDriverRequest(Long requestId) {
-        log.info("Accepting driver request: {}", requestId);
-        // Placeholder
+        log.warn("DEPRECATED: Use DriverService.acceptRequest() instead");
     }
 
+    /**
+     * @deprecated Use DriverService instead
+     */
+    @Deprecated
     @Transactional
     public void declineDriverRequest(Long requestId, String reason) {
-        log.info("Declining driver request: {} - Reason: {}", requestId, reason);
-        // Placeholder
+        log.warn("DEPRECATED: Use DriverService.declineRequest() instead");
     }
 
     // ============================================
-    // Resource Requests (Stationery, Apparel, etc.)
+    // Resource Requests (Delegated to ResourceRequestService)
     // ============================================
 
+    /**
+     * @deprecated Use ResourceRequestService instead
+     */
+    @Deprecated
     @Transactional
     public ResourceRequestDTO requestResource(ResourceRequestDTO dto) {
-        log.info("Requesting resource for user: {}", dto.getUserId());
-
-        // Create resource request
-        ResourceRequest request = new ResourceRequest();
-        request.setUserId(dto.getUserId());
-        request.setDescription(dto.getDescription());
-        request.setRequestTime(LocalDateTime.now());
-        request.setResourceType(dto.getResourceType());
-        request.setStatus("PENDING");
-        request.setRequestedBy(dto.getRequestedBy());
-
-        // Save and return
-        // Placeholder - implement full resource request logic
-
+        log.warn("DEPRECATED: Use ResourceRequestService.createResourceRequest() instead");
         auditService.logAction("RESOURCE_REQUESTED",
                 "Resource requested by user: " + dto.getUserId() + ", type: " + dto.getResourceType(),
                 dto.getUserId());
-
         return dto;
     }
 
+    /**
+     * @deprecated Use ResourceRequestService instead
+     */
+    @Deprecated
     public List<ResourceRequestDTO> getUserResourceRequests(Long userId) {
-        // Placeholder
+        log.warn("DEPRECATED: Use ResourceRequestService.getResourceRequestsByUserId() instead");
         return List.of();
     }
 
+    /**
+     * @deprecated Use ResourceRequestService instead
+     */
+    @Deprecated
     @Transactional
     public void approveResourceRequest(Long requestId, String comment) {
-        log.info("Approving resource request: {} - Comment: {}", requestId, comment);
-        // Placeholder
+        log.warn("DEPRECATED: Use ResourceRequestService.acceptResourceRequest() instead");
     }
 
+    /**
+     * @deprecated Use ResourceRequestService instead
+     */
+    @Deprecated
     @Transactional
     public void rejectResourceRequest(Long requestId, String reason) {
-        log.info("Rejecting resource request: {} - Reason: {}", requestId, reason);
-        // Placeholder
+        log.warn("DEPRECATED: Use ResourceRequestService.declineResourceRequest() instead");
     }
 
     // ============================================
@@ -218,7 +228,7 @@ public class BookingService {
     }
 
     private String getEmailForUser(Long userId) {
-        // Get email from user service
-        return "user@company.com"; // Placeholder
+        // TODO: Implement user email lookup from AppUserService
+        return "user@company.com";
     }
 }
