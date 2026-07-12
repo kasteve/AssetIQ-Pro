@@ -24,6 +24,7 @@ public class CategoryService {
                 .orElseThrow(() -> new RuntimeException("Category not found: " + id));
     }
 
+
     public Category createCategory(Category category) {
         return categoryRepository.save(category);
     }
