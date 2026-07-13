@@ -4,6 +4,7 @@ import com.stevecodes.AssetIQPro.entity.Booking;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.BookingRepository;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
+import com.stevecodes.AssetIQPro.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -22,11 +23,13 @@ public class BookingController {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final BookingService bookingService;
 
     @GetMapping("/rooms")
     public String roomBookings(Model model) {
         model.addAttribute("rooms", roomRepository.findAll());
         model.addAttribute("bookings", bookingRepository.findTop5ByOrderByStartTimeDesc());
+        model.addAttribute("availableRooms", roomRepository.findAvailableRooms(LocalDateTime.now()));
         return "bookings/rooms";
     }
 

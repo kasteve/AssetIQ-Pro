@@ -447,7 +447,7 @@
         <!-- Infra Dashboard - INFRA role or REVIEW_INFRA/APPROVE_INFRA permission -->
         <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'REVIEW_INFRA', 'APPROVE_INFRA')">
             <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests/dashboard">
+                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
                     <i class="fas fa-tachometer-alt"></i> Infra Dashboard
                 </a>
             </div>

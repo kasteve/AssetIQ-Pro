@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.DriverAvailability;
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
 import com.stevecodes.AssetIQPro.repository.DriverAvailabilityRepository;
@@ -165,6 +166,10 @@ public class DriverService {
         return availabilityRepository.findByDriverId(driverId);
     }
 
+    // Add this method after getDriverAvailability()
+    public List<AppUser> getAvailableDrivers(AppUserService userService) {
+        return userService.getUsersWithPermission("MANAGE_DRIVER_REQUESTS");
+    }
     @Transactional
     public void updateDriverAvailability(Long driverId, String status) {
         log.info("Updating driver {} availability to: {}", driverId, status);

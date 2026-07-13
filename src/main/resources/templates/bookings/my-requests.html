@@ -45,9 +45,9 @@
                     <td th:text="${req.destination}">N/A</td>
                     <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                            <span class="status-badge"
-                                  th:classappend="${req.status} == 'PENDING' ? 'pending' : (${req.status} == 'ACCEPTED' ? 'accepted' : 'rejected')"
-                                  th:text="${req.status}">PENDING</span>
+                        <span class="status-badge"
+                              th:classappend="${req.status} == 'PENDING' ? 'pending' : (${req.status} == 'ACCEPTED' ? 'accepted' : 'rejected')"
+                              th:text="${req.status}">PENDING</span>
                     </td>
                     <td th:text="${req.driverId}">N/A</td>
                     <td>
@@ -83,12 +83,12 @@
                 </thead>
                 <tbody>
                 <tr th:each="booking : ${roomBookings}">
-                    <td th:text="${booking.roomId}">N/A</td>
+                    <td th:text="${booking.roomName}">N/A</td>
                     <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                            <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
-                                  th:text="${booking.status}">BOOKED</span>
+                        <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
+                              th:text="${booking.status}">BOOKED</span>
                     </td>
                     <td>
                         <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
@@ -102,6 +102,130 @@
         <div class="empty-state" th:if="${roomBookings == null or roomBookings.isEmpty()}">
             <i class="fas fa-calendar-check"></i>
             No room bookings found
+        </div>
+    </div>
+
+    <!-- ========== MODALS ==========
+         Moved inside layout:fragment="content" so the layout-dialect actually
+         merges them into the final page. Previously they sat as plain siblings
+         outside any layout:fragment, so they were silently dropped and the
+         data-bs-target IDs pointed at nothing in the rendered DOM. -->
+
+    <!-- Request Driver Modal -->
+    <div class="modal fade" id="requestDriverModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-car me-2" style="color: #0d6efd;"></i>Request Driver</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/bookings/driver-request}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="userId" th:value="${session.userId}">
+                        <div class="mb-3">
+                            <label class="form-label">Destination *</label>
+                            <input type="text" name="destination" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Specific Driver (Optional)</label>
+                            <select name="driverId" class="form-select">
+                                <option value="">Any Available Driver</option>
+                                <option th:each="driver : ${availableDrivers}" th:value="${driver.userId}" th:text="${driver.fullName}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reason</label>
+                            <textarea name="reason" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Request Driver</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Book Room Modal -->
+    <div class="modal fade" id="bookRoomModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-calendar-plus me-2" style="color: #28a745;"></i>Book Room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/bookings/room}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="userId" th:value="${session.userId}">
+                        <div class="mb-3">
+                            <label class="form-label">Room *</label>
+                            <select name="roomId" class="form-select" required>
+                                <option value="">Select Room</option>
+                                <option th:each="room : ${availableRooms}" th:value="${room.roomId}" th:text="${room.roomName}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Start Time *</label>
+                            <input type="datetime-local" name="startTime" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">End Time *</label>
+                            <input type="datetime-local" name="endTime" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Purpose</label>
+                            <textarea name="purpose" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Book Room</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Request Resource Modal -->
+    <div class="modal fade" id="resourceRequestModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-boxes me-2" style="color: #fd7e14;"></i>Request Resource</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/resources/request}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="userId" th:value="${session.userId}">
+                        <div class="mb-3">
+                            <label class="form-label">Resource Type *</label>
+                            <select name="resourceType" class="form-select" required>
+                                <option value="">Select Resource Type</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Desktop">Desktop</option>
+                                <option value="Monitor">Monitor</option>
+                                <option value="Printer">Printer</option>
+                                <option value="Stationery">Stationery</option>
+                                <option value="Apparel">Apparel</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description *</label>
+                            <input type="text" name="description" class="form-control" placeholder="Describe what you need" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" name="quantity" class="form-control" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">Submit Request</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -142,6 +266,14 @@
 
         .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
         .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
+
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
+        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
     </style>
 </div>
 

@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.service.DriverService;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import jakarta.servlet.http.HttpSession;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -26,6 +28,11 @@ public class DriverController {
     @GetMapping("/driver-requests")
     public String driverRequests(Model model) {
         model.addAttribute("requests", driverService.getDriverRequests());
+
+        // Add available drivers for the modal
+        List<AppUser> availableDrivers = userService.getUsersWithPermission("MANAGE_DRIVER_REQUESTS");
+        model.addAttribute("availableDrivers", availableDrivers);
+
         return "bookings/driver-requests";
     }
 

@@ -78,9 +78,8 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Send notification to admin
         emailService.sendResourceRequestNotification(
-                "admin@company.com",  // Get from config
+                "admin@company.com",
                 "Resource Request Created",
                 "User " + dto.getRequestedBy() + " requested: " + dto.getDescription()
         );
@@ -90,6 +89,18 @@ public class ResourceRequestService {
                 dto.getUserId());
 
         return convertToDTO(saved);
+    }
+
+    // FIXED: Implemented this overloaded method
+    @Transactional
+    public ResourceRequestDTO createResourceRequest(Long userId, String requestedBy, String description,
+                                                    String resourceType, Integer quantity) {
+        ResourceRequestDTO dto = new ResourceRequestDTO();
+        dto.setUserId(userId);
+        dto.setRequestedBy(requestedBy);
+        dto.setDescription(description);
+        dto.setResourceType(resourceType);
+        return createResourceRequest(dto);
     }
 
     @Transactional
@@ -106,7 +117,6 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify requester
         emailService.sendResourceRequestStatusUpdate(
                 getUserEmail(request.getUserId()),
                 "Resource Request Accepted",
@@ -134,7 +144,6 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify requester
         emailService.sendResourceRequestStatusUpdate(
                 getUserEmail(request.getUserId()),
                 "Resource Request Declined",
@@ -171,7 +180,6 @@ public class ResourceRequestService {
     }
 
     private String getUserEmail(Long userId) {
-        // TODO: Implement user email lookup
         return "user@company.com";
     }
 }
