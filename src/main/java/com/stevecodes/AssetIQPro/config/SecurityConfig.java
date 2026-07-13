@@ -1,20 +1,17 @@
 package com.stevecodes.AssetIQPro.config;
 
-import com.stevecodes.AssetIQPro.filter.EdgeCompatibilityFilter;
-import com.stevecodes.AssetIQPro.filter.FirstLoginFilter;
-import com.stevecodes.AssetIQPro.filter.JwtAuthenticationFilter;
 import com.stevecodes.AssetIQPro.security.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -22,12 +19,18 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final FirstLoginFilter firstLoginFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
     @Bean
@@ -38,52 +41,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(
-                                "/api/**",
-                                "/transfers/**",
-                                "/assets/**",
-                                "/infra-requests/**",
-                                "/bookings/**",
-                                "/vouchers/**",
-                                "/admin/**"
-                        )
-                )
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/login",
-                                "/register",
                                 "/css/**",
                                 "/js/**",
                                 "/images/**",
                                 "/webjars/**",
                                 "/error",
-                                "/assets/create",
-                                "/change-password",
                                 "/api/auth/**",
                                 "/api/public/**",
                                 "/transfer/sign/**",
                                 "/transfers/sign/**",
-                                "/transfers/create",
-                                "/transfers/debug-transfer/**",
-                                "/transfers/test-signing/**",
-                                "/transfers/thankyou",
-                                "/transfers/sign-error",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/actuator/**",
-                                "/admin/categories",
-                                "/admin/companies",
-                                "/admin/departments",
-                                "/admin/employees",
-                                "/admin/locations",
-                                "/admin/suppliers",
-                                "/admin/rooms",
-                                "/admin/permissions",
-                                "/admin/users",
-                                "/bookings/rooms",
-                                "/bookings/driver-requests",
-                                "/bookings/**"
+                                "/actuator/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -100,10 +73,7 @@ public class SecurityConfig {
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
                         .permitAll()
-                )
-                .addFilterBefore(new EdgeCompatibilityFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(firstLoginFilter, UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
     }

@@ -51,6 +51,7 @@
             transition: all 0.3s ease;
             z-index: 1050;
             overflow-y: auto;
+            overflow-x: hidden;
             box-shadow: 4px 0 24px rgba(0,0,0,0.12);
             border-right: 1px solid rgba(255,255,255,0.04);
         }
@@ -136,26 +137,23 @@
             border-top-color: rgba(255,255,255,0.4);
         }
 
-        /*
-          Fixed width (not a % of the offset parent) because the menu is
-          repositioned with Popper's "fixed" strategy below (see script),
-          which takes it out of the sidebar's normal flow. A percentage
-          width here would otherwise resolve against the viewport and
-          blow up in size.
-        */
         .sidebar .dropdown-menu {
             background: #1a1a2e;
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 10px;
             padding: 6px 0;
             backdrop-filter: blur(8px);
-            width: 220px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            width: 100%;
+            position: relative;
+            box-shadow: none;
+            margin: 4px 0 8px 0;
+            max-height: 240px;
+            overflow-y: auto;
         }
 
         .sidebar .dropdown-item {
             color: rgba(255,255,255,0.7);
-            padding: 8px 16px 8px 20px;
+            padding: 8px 16px 8px 44px;
             font-size: 13px;
             border-radius: 6px;
             transition: all 0.2s ease;
@@ -386,14 +384,14 @@
         <small>Interswitch Asset Management</small>
     </div>
     <nav class="nav flex-column">
-        <!-- Dashboard -->
+        <!-- Dashboard - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
                 <i class="fas fa-chart-pie"></i> Dashboard
             </a>
         </div>
 
-        <!-- Assets -->
+        <!-- Assets - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
                 <i class="fas fa-laptop"></i> Assets
@@ -401,14 +399,14 @@
             </a>
         </div>
 
-        <!-- Transfers -->
+        <!-- Transfers - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
                 <i class="fas fa-exchange-alt"></i> Transfers
             </a>
         </div>
 
-        <!-- Infrastructure -->
+        <!-- Infrastructure - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'infra-requests'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
                 <i class="fas fa-tools"></i> Infrastructure
@@ -416,11 +414,13 @@
             </a>
         </div>
 
-        <!-- Resources -->
-        <div class="nav-item" sec:authorize="hasAnyAuthority('ADMIN', 'MANAGE_RESOURCE_REQUESTS')">
-            <a class="nav-link" th:classappend="${currentPage == 'resources'} ? 'active' : ''" href="/assetIQ-pro/resources">
-                <i class="fas fa-boxes"></i> Resources
-            </a>
+        <!-- Resources - ADMIN or MANAGE_RESOURCE_REQUESTS -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'MANAGE_RESOURCE_REQUESTS')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'resources'} ? 'active' : ''" href="/assetIQ-pro/resources">
+                    <i class="fas fa-boxes"></i> Resources
+                </a>
+            </div>
         </div>
 
         <!-- ========== BOOKINGS DROPDOWN ========== -->
@@ -432,16 +432,28 @@
                 <li><a class="dropdown-item" href="/assetIQ-pro/bookings/my-requests"><i class="fas fa-list"></i> My Requests</a></li>
                 <li><a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a></li>
                 <li><a class="dropdown-item" href="/assetIQ-pro/bookings/driver-requests"><i class="fas fa-car"></i> Drivers</a></li>
-                <li sec:authorize="hasAuthority('MANAGE_DRIVER_REQUESTS')">
-                    <a class="dropdown-item" href="/assetIQ-pro/bookings/driver-dashboard"><i class="fas fa-tachometer-alt"></i> Driver Dashboard</a>
-                </li>
-                <li sec:authorize="hasAuthority('REVIEW_INFRA')">
-                    <a class="dropdown-item" href="/assetIQ-pro/infra-requests/dashboard"><i class="fas fa-tachometer-alt"></i> Infra Dashboard</a>
-                </li>
             </ul>
         </div>
 
-        <!-- Vouchers -->
+        <!-- Driver Dashboard - DRIVER role or MANAGE_DRIVER_REQUESTS permission -->
+        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'MANAGE_DRIVER_REQUESTS')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Driver Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Infra Dashboard - INFRA role or REVIEW_INFRA/APPROVE_INFRA permission -->
+        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'REVIEW_INFRA', 'APPROVE_INFRA')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Infra Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Vouchers - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
                 <i class="fas fa-ticket-alt"></i> Vouchers
@@ -451,7 +463,9 @@
         <div class="nav-divider"></div>
 
         <!-- ========== ADMIN SECTION ========== -->
-        <div sec:authorize="hasAnyAuthority('ADMIN', 'MANAGE_USERS', 'CREATE_USERS')">
+
+        <!-- User Management - ADMIN role or CREATE_USERS/MANAGE_USERS permission -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'CREATE_USERS', 'MANAGE_USERS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'admin'} ? 'active' : ''" href="/assetIQ-pro/admin/users">
                     <i class="fas fa-users-cog"></i> User Management
@@ -459,7 +473,8 @@
             </div>
         </div>
 
-        <div sec:authorize="hasAuthority('VIEW_AUDIT')">
+        <!-- Audit Logs - ADMIN role or VIEW_AUDIT permission -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'VIEW_AUDIT')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'audit'} ? 'active' : ''" href="/assetIQ-pro/admin/audit">
                     <i class="fas fa-history"></i> Audit Logs
@@ -467,7 +482,8 @@
             </div>
         </div>
 
-        <div sec:authorize="hasAuthority('MANAGE_ROLES')">
+        <!-- Permissions - ADMIN role or MANAGE_ROLES permission -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'MANAGE_ROLES')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'permissions'} ? 'active' : ''" href="/assetIQ-pro/admin/permissions">
                     <i class="fas fa-lock"></i> Permissions
@@ -475,7 +491,8 @@
             </div>
         </div>
 
-        <div sec:authorize="hasAuthority('ADMIN')">
+        <!-- Admin Modules - Only ADMIN role -->
+        <div sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'categories'} ? 'active' : ''" href="/assetIQ-pro/admin/categories">
                     <i class="fas fa-tags"></i> Categories
@@ -515,7 +532,7 @@
 
         <div class="nav-divider"></div>
 
-        <!-- Reports -->
+        <!-- Reports - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
                 <i class="fas fa-file-alt"></i> Reports
@@ -625,37 +642,22 @@
         }
     });
 
-    // ========== FIX: sidebar dropdowns (e.g. Bookings) getting clipped ==========
-    // The sidebar scrolls with overflow-y:auto and a fixed height, so a
-    // dropdown-menu positioned normally inside it can get cut off if it
-    // extends past the sidebar's visible/scroll boundary -- only the
-    // items that fit before the clip show up. Re-initializing each
-    // sidebar dropdown with Popper's "fixed" strategy positions the menu
-    // relative to the viewport instead, so it always renders in full,
-    // on top of everything, regardless of the sidebar's scroll state.
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.sidebar [data-bs-toggle="dropdown"]').forEach(function (toggleEl) {
-            bootstrap.Dropdown.getOrCreateInstance(toggleEl, {
-                popperConfig: function (defaultConfig) {
-                    return Object.assign({}, defaultConfig, { strategy: 'fixed' });
-                }
-            });
-        });
+    // Fix: bring an opened sidebar dropdown fully into view
+    document.addEventListener('shown.bs.dropdown', function (event) {
+        const toggle = event.target;
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.contains(toggle)) {
+            const menu = toggle.nextElementSibling;
+            if (menu) {
+                setTimeout(() => {
+                    menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }, 50);
+            }
+        }
     });
 </script>
 
-<!--
-  IMPORTANT: this fragment placeholder must stay OUTSIDE any <script> tag.
-  Child pages (e.g. driver-requests.html) wrap their own JS in
-  <div layout:fragment="scripts"><script>...</script></div>. If this
-  placeholder were nested inside the layout's own <script> tag, the
-  child's <script>/</script> tags would land inside it too, and the
-  browser would close the outer script early at the child's first
-  </script> -- leaving a stray "</div></script>" as raw HTML on the page
-  and throwing "Unexpected token '<'" in the console. Keeping it here,
-  outside any <script>, lets each child page's own script tag stand on
-  its own instead of nesting.
--->
+<!-- Child page scripts placeholder -->
 <th:block layout:fragment="scripts"></th:block>
 
 </body>
