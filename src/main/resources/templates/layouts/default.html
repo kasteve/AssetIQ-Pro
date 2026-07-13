@@ -642,11 +642,21 @@
             });
         });
     });
-
-    // Child page scripts
-    <th:block layout:fragment="scripts"></th:block>
 </script>
 
+<!--
+  IMPORTANT: this fragment placeholder must stay OUTSIDE any <script> tag.
+  Child pages (e.g. driver-requests.html) wrap their own JS in
+  <div layout:fragment="scripts"><script>...</script></div>. If this
+  placeholder were nested inside the layout's own <script> tag, the
+  child's <script>/</script> tags would land inside it too, and the
+  browser would close the outer script early at the child's first
+  </script> -- leaving a stray "</div></script>" as raw HTML on the page
+  and throwing "Unexpected token '<'" in the console. Keeping it here,
+  outside any <script>, lets each child page's own script tag stand on
+  its own instead of nesting.
+-->
+<th:block layout:fragment="scripts"></th:block>
+
 </body>
-</html>
 </html>

@@ -147,6 +147,74 @@
             </li>
         </ul>
     </nav>
+
+    <!--
+      Add Asset Modal -- this was missing entirely before, which is why the
+      "Add Asset" button (data-bs-target="#createAssetModal") had nothing
+      to open. Placed inside layout:fragment="content" so Thymeleaf Layout
+      Dialect actually carries it into the decorated page (anything outside
+      this fragment gets silently dropped, same issue we hit on the
+      User Management page).
+    -->
+    <div class="modal fade" id="createAssetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-laptop me-2" style="color: #0d6efd;"></i>Add New Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/assets/create}" method="post">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Asset Tag *</label>
+                                <input type="text" name="tag" class="form-control" placeholder="e.g. AST-001" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Serial Number *</label>
+                                <input type="text" name="serialNumber" class="form-control" required>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Asset Name *</label>
+                                <input type="text" name="name" class="form-control" placeholder="e.g. MacBook Pro 14&quot;" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Category</label>
+                                <select name="categoryId" class="form-select">
+                                    <option value="">Select Category</option>
+                                    <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}">Category</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="AVAILABLE">Available</option>
+                                    <option value="ASSIGNED">Assigned</option>
+                                    <option value="MAINTENANCE">Maintenance</option>
+                                    <option value="TRANSFERRED">Transferred</option>
+                                    <option value="RETIRED">Retired</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty End Date</label>
+                                <input type="date" name="warrantyEndDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">End-of-Life Date</label>
+                                <input type="date" name="eolDate" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Add Asset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div layout:fragment="styles">
