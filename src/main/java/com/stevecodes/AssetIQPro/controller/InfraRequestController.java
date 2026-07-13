@@ -26,15 +26,15 @@ public class InfraRequestController {
     @PostMapping
     @Operation(summary = "Create a new infrastructure request")
     @PreAuthorize("hasAnyAuthority('CREATE_REQUESTS', 'ADMIN')")
-    public ResponseEntity<InfraRequest> createRequest(@Valid @RequestBody InfraRequestDTO dto, Principal principal) {
+    public ResponseEntity<InfraRequestDTO> createRequest(@Valid @RequestBody InfraRequestDTO dto, Principal principal) {
         Long userId = getUserId(principal);
-        InfraRequest request = requestService.createRequest(dto, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(request);
+        InfraRequestDTO created = requestService.createRequest(dto, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/my-requests")
     @Operation(summary = "Get current user's requests")
-    public ResponseEntity<List<InfraRequest>> getMyRequests(Principal principal) {
+    public ResponseEntity<List<InfraRequestDTO>> getMyRequests(Principal principal) {
         Long userId = getUserId(principal);
         return ResponseEntity.ok(requestService.getRequestsForUser(userId));
     }
@@ -42,22 +42,22 @@ public class InfraRequestController {
     @GetMapping("/pending")
     @Operation(summary = "Get pending requests for approval")
     @PreAuthorize("hasAnyAuthority('APPROVE_INFRA_REQUESTS', 'ADMIN')")
-    public ResponseEntity<List<InfraRequest>> getPendingRequests() {
+    public ResponseEntity<List<InfraRequestDTO>> getPendingRequests() {
         return ResponseEntity.ok(requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW));
     }
 
     @GetMapping("/{requestId}")
     @Operation(summary = "Get request details")
-    public ResponseEntity<InfraRequest> getRequest(@PathVariable Long requestId) {
+    public ResponseEntity<InfraRequestDTO> getRequest(@PathVariable Long requestId) {
         return ResponseEntity.ok(requestService.getRequestById(requestId));
     }
 
     @PostMapping("/{requestId}/approve-lm")
     @Operation(summary = "Approve by Line Manager")
     @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<InfraRequest> approveByLM(@PathVariable Long requestId,
-                                                    @RequestParam String comment,
-                                                    Principal principal) {
+    public ResponseEntity<InfraRequestDTO> approveByLM(@PathVariable Long requestId,
+                                                       @RequestParam String comment,
+                                                       Principal principal) {
         Long managerId = getUserId(principal);
         return ResponseEntity.ok(requestService.approveByLineManager(requestId, managerId, comment));
     }
@@ -65,9 +65,9 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/reject-lm")
     @Operation(summary = "Reject by Line Manager")
     @PreAuthorize("hasAnyAuthority('APPROVE_LM', 'ADMIN')")
-    public ResponseEntity<InfraRequest> rejectByLM(@PathVariable Long requestId,
-                                                   @RequestParam String reason,
-                                                   Principal principal) {
+    public ResponseEntity<InfraRequestDTO> rejectByLM(@PathVariable Long requestId,
+                                                      @RequestParam String reason,
+                                                      Principal principal) {
         Long managerId = getUserId(principal);
         return ResponseEntity.ok(requestService.rejectByLineManager(requestId, managerId, reason));
     }
@@ -75,10 +75,10 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/review-infra")
     @Operation(summary = "Review by Infrastructure")
     @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'ADMIN')")
-    public ResponseEntity<InfraRequest> reviewByInfra(@PathVariable Long requestId,
-                                                      @RequestParam String comment,
-                                                      @RequestParam boolean approved,
-                                                      Principal principal) {
+    public ResponseEntity<InfraRequestDTO> reviewByInfra(@PathVariable Long requestId,
+                                                         @RequestParam String comment,
+                                                         @RequestParam boolean approved,
+                                                         Principal principal) {
         Long infraId = getUserId(principal);
         return ResponseEntity.ok(requestService.reviewByInfra(requestId, infraId, comment, approved));
     }
@@ -86,9 +86,9 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/approve-finance")
     @Operation(summary = "Approve by Finance")
     @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN')")
-    public ResponseEntity<InfraRequest> approveByFinance(@PathVariable Long requestId,
-                                                         @RequestParam String comment,
-                                                         Principal principal) {
+    public ResponseEntity<InfraRequestDTO> approveByFinance(@PathVariable Long requestId,
+                                                            @RequestParam String comment,
+                                                            Principal principal) {
         Long financeId = getUserId(principal);
         return ResponseEntity.ok(requestService.approveByFinance(requestId, financeId, comment));
     }
@@ -96,9 +96,9 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/reject-finance")
     @Operation(summary = "Reject by Finance")
     @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN')")
-    public ResponseEntity<InfraRequest> rejectByFinance(@PathVariable Long requestId,
-                                                        @RequestParam String reason,
-                                                        Principal principal) {
+    public ResponseEntity<InfraRequestDTO> rejectByFinance(@PathVariable Long requestId,
+                                                           @RequestParam String reason,
+                                                           Principal principal) {
         Long financeId = getUserId(principal);
         return ResponseEntity.ok(requestService.rejectByFinance(requestId, financeId, reason));
     }
@@ -106,9 +106,9 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/deliver")
     @Operation(summary = "Mark request as delivered")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'INFRA')")
-    public ResponseEntity<InfraRequest> markDelivered(@PathVariable Long requestId,
-                                                      @RequestParam String notes,
-                                                      Principal principal) {
+    public ResponseEntity<InfraRequestDTO> markDelivered(@PathVariable Long requestId,
+                                                         @RequestParam String notes,
+                                                         Principal principal) {
         Long deliveredBy = getUserId(principal);
         return ResponseEntity.ok(requestService.markDelivered(requestId, deliveredBy, notes));
     }
@@ -116,14 +116,14 @@ public class InfraRequestController {
     @PostMapping("/{requestId}/acknowledge")
     @Operation(summary = "Acknowledge receipt of delivered items")
     @PreAuthorize("hasAnyAuthority('CREATE_REQUESTS', 'ADMIN')")
-    public ResponseEntity<InfraRequest> acknowledgeReceipt(@PathVariable Long requestId,
-                                                           Principal principal) {
+    public ResponseEntity<InfraRequestDTO> acknowledgeReceipt(@PathVariable Long requestId,
+                                                              Principal principal) {
         Long userId = getUserId(principal);
         return ResponseEntity.ok(requestService.acknowledgeReceipt(requestId, userId));
     }
 
     private Long getUserId(Principal principal) {
-        // Extract user ID from principal
-        return 1L; // Placeholder
+        // TODO: Extract user ID from principal
+        return 1L;
     }
 }

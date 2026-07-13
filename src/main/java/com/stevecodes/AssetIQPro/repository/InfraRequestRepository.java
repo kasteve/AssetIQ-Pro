@@ -20,6 +20,8 @@ public interface InfraRequestRepository extends JpaRepository<InfraRequest, Long
 
     List<InfraRequest> findByStatus(RequestStatus status);
 
+    List<InfraRequest> findAllByOrderByCreatedAtDesc();
+
     @Query("SELECT ir FROM InfraRequest ir WHERE ir.requesterId = :userId OR ir.lineManagerId = :userId")
     List<InfraRequest> findRequestsForUser(@Param("userId") Long userId);
 

@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -34,9 +33,9 @@ public class InfraRequestDTO {
     private String requesterName;
     private String requesterDepartment;
     private String status;
-    private String statusDisplay;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer assetId;
 
     // For procurement
     private Integer supplierId;
@@ -68,6 +67,11 @@ public class InfraRequestDTO {
     private LocalDateTime infraReviewedAt;
     private LocalDateTime financeApprovedAt;
     private LocalDateTime completedAt;
+
+    // Approval by IDs
+    private Long lmApprovedBy;
+    private Long infraReviewedBy;
+    private Long financeApprovedBy;
 
     // Approval names
     private String lmApprovedByName;

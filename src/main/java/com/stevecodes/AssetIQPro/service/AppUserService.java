@@ -457,6 +457,7 @@ public class AppUserService {
         return userRepository.countByActiveTrue();
     }
 
+
     @Transactional
     public void toggleUserStatus(Long userId) {
         log.info("Toggling user status: {}", userId);
