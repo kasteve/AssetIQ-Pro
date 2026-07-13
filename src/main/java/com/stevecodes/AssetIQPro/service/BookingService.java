@@ -5,8 +5,6 @@ import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
 import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
 import com.stevecodes.AssetIQPro.entity.Booking;
 import com.stevecodes.AssetIQPro.entity.Booking.BookingStatus;
-import com.stevecodes.AssetIQPro.entity.DriverRequest;
-import com.stevecodes.AssetIQPro.entity.ResourceRequest;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.BookingRepository;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
@@ -28,6 +26,7 @@ public class BookingService {
     private final RoomRepository roomRepository;
     private final EmailService emailService;
     private final AuditService auditService;
+    private final AppUserService appUserService;
 
     // ============================================
     // Room Bookings
@@ -37,7 +36,6 @@ public class BookingService {
     public BookingDTO createRoomBooking(BookingDTO dto) {
         log.info("Creating room booking for user: {}, room: {}", dto.getUserId(), dto.getRoomId());
 
-        // Check availability
         if (!isRoomAvailable(dto.getRoomId(), dto.getStartTime(), dto.getEndTime())) {
             throw new IllegalStateException("Room is not available at the requested time");
         }
@@ -49,10 +47,10 @@ public class BookingService {
         booking.setEndTime(dto.getEndTime());
         booking.setStatus(BookingStatus.BOOKED);
         booking.setCreatedAt(LocalDateTime.now());
+        booking.setPurpose(dto.getPurpose());
 
         Booking saved = bookingRepository.save(booking);
 
-        // Send confirmation email
         emailService.sendBookingConfirmation(
                 getEmailForUser(dto.getUserId()),
                 dto.getUserName(),
@@ -67,22 +65,50 @@ public class BookingService {
         return convertToBookingDTO(saved);
     }
 
+    public boolean isRoomAvailable(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        List<Booking> bookings = bookingRepository.findByRoomId(roomId);
+        for (Booking booking : bookings) {
+            if (booking.getStatus() == BookingStatus.BOOKED ||
+                    booking.getStatus() == BookingStatus.CONFIRMED) {
+                boolean overlaps = !endTime.isBefore(booking.getStartTime()) &&
+                        !startTime.isAfter(booking.getEndTime());
+                if (overlaps) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     public List<Room> getAvailableRooms() {
         LocalDateTime now = LocalDateTime.now();
         return roomRepository.findAvailableRooms(now);
     }
 
-    public boolean isRoomAvailable(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
-        List<Booking> conflicting = bookingRepository.findActiveBookingsForRoom(roomId, LocalDateTime.now());
+    public List<BookingDTO> getBookingsWithUserNames(Long userId) {
+        List<Booking> bookings = bookingRepository.findByUserId(userId);
+        return bookings.stream().map(booking -> {
+            BookingDTO dto = new BookingDTO();
+            dto.setBookingId(booking.getBookingId());
+            dto.setRoomId(booking.getRoomId());
+            dto.setStartTime(booking.getStartTime());
+            dto.setEndTime(booking.getEndTime());
+            dto.setStatus(booking.getStatus().name());
+            dto.setPurpose(booking.getPurpose());
+            dto.setUserId(booking.getUserId());
 
-        for (Booking booking : conflicting) {
-            boolean overlaps = !endTime.isBefore(booking.getStartTime()) &&
-                    !startTime.isAfter(booking.getEndTime());
-            if (overlaps && booking.getStatus() == BookingStatus.BOOKED) {
-                return false;
-            }
-        }
-        return true;
+            roomRepository.findById(booking.getRoomId()).ifPresent(room -> {
+                dto.setRoomName(room.getRoomName());
+                dto.setRoomType(room.getRoomType());
+            });
+
+            appUserService.getUserById(booking.getUserId()).ifPresent(user -> {
+                dto.setBookedBy(user.getFullName());
+                dto.setBookedByUsername(user.getUsername());
+            });
+
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     public List<BookingDTO> getUserBookings(Long userId) {
@@ -91,10 +117,6 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get bookings by user ID - returns List<BookingDTO>
-     * This method is used by UserRequestController
-     */
     public List<BookingDTO> getBookingsByUserId(Long userId) {
         log.info("Getting bookings for user: {}", userId);
         return bookingRepository.findByUserId(userId).stream()
@@ -117,93 +139,6 @@ public class BookingService {
     }
 
     // ============================================
-    // Driver Requests (Delegated to DriverService)
-    // ============================================
-
-    /**
-     * @deprecated Use DriverService instead
-     */
-    @Deprecated
-    @Transactional
-    public DriverRequestDTO requestDriver(DriverRequestDTO dto) {
-        log.warn("DEPRECATED: Use DriverService.createDriverRequest() instead");
-        auditService.logAction("DRIVER_REQUESTED",
-                "Driver requested by user: " + dto.getUserId(), dto.getUserId());
-        return dto;
-    }
-
-    /**
-     * @deprecated Use DriverService instead
-     */
-    @Deprecated
-    public List<DriverRequestDTO> getDriverRequests(Long driverId) {
-        log.warn("DEPRECATED: Use DriverService.getDriverRequestsByDriverId() instead");
-        return List.of();
-    }
-
-    /**
-     * @deprecated Use DriverService instead
-     */
-    @Deprecated
-    @Transactional
-    public void acceptDriverRequest(Long requestId) {
-        log.warn("DEPRECATED: Use DriverService.acceptRequest() instead");
-    }
-
-    /**
-     * @deprecated Use DriverService instead
-     */
-    @Deprecated
-    @Transactional
-    public void declineDriverRequest(Long requestId, String reason) {
-        log.warn("DEPRECATED: Use DriverService.declineRequest() instead");
-    }
-
-    // ============================================
-    // Resource Requests (Delegated to ResourceRequestService)
-    // ============================================
-
-    /**
-     * @deprecated Use ResourceRequestService instead
-     */
-    @Deprecated
-    @Transactional
-    public ResourceRequestDTO requestResource(ResourceRequestDTO dto) {
-        log.warn("DEPRECATED: Use ResourceRequestService.createResourceRequest() instead");
-        auditService.logAction("RESOURCE_REQUESTED",
-                "Resource requested by user: " + dto.getUserId() + ", type: " + dto.getResourceType(),
-                dto.getUserId());
-        return dto;
-    }
-
-    /**
-     * @deprecated Use ResourceRequestService instead
-     */
-    @Deprecated
-    public List<ResourceRequestDTO> getUserResourceRequests(Long userId) {
-        log.warn("DEPRECATED: Use ResourceRequestService.getResourceRequestsByUserId() instead");
-        return List.of();
-    }
-
-    /**
-     * @deprecated Use ResourceRequestService instead
-     */
-    @Deprecated
-    @Transactional
-    public void approveResourceRequest(Long requestId, String comment) {
-        log.warn("DEPRECATED: Use ResourceRequestService.acceptResourceRequest() instead");
-    }
-
-    /**
-     * @deprecated Use ResourceRequestService instead
-     */
-    @Deprecated
-    @Transactional
-    public void rejectResourceRequest(Long requestId, String reason) {
-        log.warn("DEPRECATED: Use ResourceRequestService.declineResourceRequest() instead");
-    }
-
-    // ============================================
     // Helper Methods
     // ============================================
 
@@ -216,8 +151,8 @@ public class BookingService {
         dto.setEndTime(booking.getEndTime());
         dto.setStatus(booking.getStatus().name());
         dto.setCreatedAt(booking.getCreatedAt());
+        dto.setPurpose(booking.getPurpose());
 
-        // Get room name
         roomRepository.findById(booking.getRoomId())
                 .ifPresent(room -> {
                     dto.setRoomName(room.getRoomName());
@@ -228,7 +163,8 @@ public class BookingService {
     }
 
     private String getEmailForUser(Long userId) {
-        // TODO: Implement user email lookup from AppUserService
-        return "user@company.com";
+        return appUserService.getUserById(userId)
+                .map(user -> user.getEmail())
+                .orElse("user@company.com");
     }
 }

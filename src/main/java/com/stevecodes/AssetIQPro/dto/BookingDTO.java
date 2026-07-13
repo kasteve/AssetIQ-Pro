@@ -28,4 +28,8 @@ public class BookingDTO {
     // For creation
     private String purpose;
     private String notes;
+
+    // Who booked the room
+    private String bookedBy;
+    private String bookedByUsername;
 }

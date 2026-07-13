@@ -1,7 +1,8 @@
 package com.stevecodes.AssetIQPro.controller;
 
-import com.stevecodes.AssetIQPro.entity.Room;
+import com.stevecodes.AssetIQPro.dto.BookingDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.BookingService;
@@ -15,6 +16,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Controller
@@ -37,18 +39,26 @@ public class UserRequestController {
             return "redirect:/login";
         }
 
+        // Driver requests
         model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
-        model.addAttribute("roomBookings", bookingService.getBookingsByUserId(userId));
-        model.addAttribute("resourceRequests", resourceRequestService.getResourceRequestsByUserId(userId));
-        model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
 
-        // Add available rooms for dropdown
-        List<Room> availableRooms = roomRepository.findAvailableRooms(java.time.LocalDateTime.now());
+        // Get drivers (users with DRIVER role)
+        List<AppUser> drivers = userService.getUsersByRole("DRIVER");
+        model.addAttribute("availableDrivers", drivers);
+
+        // Room bookings with user names
+        List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
+        model.addAttribute("roomBookings", roomBookings);
+
+        // Available rooms
+        List<Room> availableRooms = roomRepository.findAvailableRooms(LocalDateTime.now());
         model.addAttribute("availableRooms", availableRooms);
 
-        // Add available drivers (users with DRIVER role or MANAGE_DRIVER_REQUESTS permission)
-        List<AppUser> availableDrivers = userService.getUsersWithPermission("MANAGE_DRIVER_REQUESTS");
-        model.addAttribute("availableDrivers", availableDrivers);
+        // Resource requests
+        model.addAttribute("resourceRequests", resourceRequestService.getResourceRequestsByUserId(userId));
+
+        // Infrastructure requests
+        model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
 
         return "bookings/my-requests";
     }

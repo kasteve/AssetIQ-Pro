@@ -40,5 +40,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
             "OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<AppUser> searchUsers(@Param("searchTerm") String searchTerm);
 
+    List<AppUser> findByRole(String role);
+
     Optional<AppUser> findByPasswordResetToken(String token);
 }

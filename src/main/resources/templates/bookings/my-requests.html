@@ -75,6 +75,7 @@
                 <thead>
                 <tr>
                     <th>Room</th>
+                    <th>Booked By</th>
                     <th>Start</th>
                     <th>End</th>
                     <th>Status</th>
@@ -84,11 +85,12 @@
                 <tbody>
                 <tr th:each="booking : ${roomBookings}">
                     <td th:text="${booking.roomName}">N/A</td>
+                    <td th:text="${booking.bookedBy}">N/A</td>
                     <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                        <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
-                              th:text="${booking.status}">BOOKED</span>
+                    <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
+                          th:text="${booking.status}">BOOKED</span>
                     </td>
                     <td>
                         <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
@@ -102,6 +104,40 @@
         <div class="empty-state" th:if="${roomBookings == null or roomBookings.isEmpty()}">
             <i class="fas fa-calendar-check"></i>
             No room bookings found
+        </div>
+    </div>
+
+    <!-- Resource Requests -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <h6><i class="fas fa-boxes me-2"></i>Resource Requests</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th>Resource Type</th>
+                    <th>Description</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="req : ${resourceRequests}">
+                    <td th:text="${req.resourceType}">N/A</td>
+                    <td th:text="${req.description}">N/A</td>
+                    <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                    <td>
+                    <span class="status-badge" th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'rejected' : 'pending')"
+                          th:text="${req.status}">PENDING</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" th:if="${resourceRequests == null or resourceRequests.isEmpty()}">
+            <i class="fas fa-boxes"></i>
+            No resource requests found
         </div>
     </div>
 

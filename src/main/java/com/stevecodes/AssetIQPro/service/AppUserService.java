@@ -453,6 +453,10 @@ public class AppUserService {
         return userRepository.count();
     }
 
+    public List<AppUser> getUsersByRole(String role) {
+        return userRepository.findByRole(role);
+    }
+
     public long getActiveUsersCount() {
         return userRepository.countByActiveTrue();
     }

@@ -41,6 +41,13 @@ public class BookingController {
                                     @RequestParam(required = false) String purpose,
                                     RedirectAttributes redirectAttributes) {
         try {
+            // Check if room is available
+            if (!bookingService.isRoomAvailable(roomId, startTime, endTime)) {
+                redirectAttributes.addFlashAttribute("error",
+                        "Room is not available at the requested time. Please choose a different time.");
+                return "redirect:/bookings/my-requests";
+            }
+
             Booking booking = new Booking();
             booking.setUserId(userId);
             booking.setRoomId(roomId);
