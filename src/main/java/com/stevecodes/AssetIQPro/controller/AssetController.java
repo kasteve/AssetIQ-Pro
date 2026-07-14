@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.AssetDTO;
+import com.stevecodes.AssetIQPro.dto.TransferDTO;
 import com.stevecodes.AssetIQPro.entity.Asset;
 import com.stevecodes.AssetIQPro.entity.AssetHistory;
 import com.stevecodes.AssetIQPro.service.AssetService;
@@ -95,6 +96,27 @@ public class AssetController {
         return ResponseEntity.ok(assetService.getAssetsByCategory(categoryId));
     }
 
+    @GetMapping("/{assetId}/history")
+    @Operation(summary = "Get asset history")
+    public ResponseEntity<List<AssetHistory>> getAssetHistory(@PathVariable Integer assetId) {
+        return ResponseEntity.ok(assetService.getAssetHistory(assetId));
+    }
+
+    @GetMapping("/{assetId}/transfers")
+    @Operation(summary = "Get asset transfer history")
+    public ResponseEntity<List<TransferDTO>> getAssetTransfers(@PathVariable Integer assetId) {
+        return ResponseEntity.ok(assetService.getAssetTransfers(assetId));
+    }
+
+    @PostMapping("/{assetId}/invoice")
+    @Operation(summary = "Upload purchase invoice")
+    @PreAuthorize("hasAnyAuthority('EDIT_ASSETS', 'ADMIN')")
+    public ResponseEntity<Void> uploadInvoice(@PathVariable Integer assetId,
+                                              @RequestParam("file") MultipartFile file) {
+        assetService.uploadInvoice(assetId, file);
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/{assetId}/lifecycle")
     @Operation(summary = "Update asset lifecycle (warranty, EOL)")
     @PreAuthorize("hasAnyAuthority('MANAGE_WARRANTY', 'MANAGE_EOL', 'ADMIN')")
@@ -123,21 +145,6 @@ public class AssetController {
     @Operation(summary = "Get assets with EOL approaching")
     public ResponseEntity<List<AssetDTO>> getEOLSoon() {
         return ResponseEntity.ok(assetService.getAssetsWithEOLSoon());
-    }
-
-    @GetMapping("/{assetId}/history")
-    @Operation(summary = "Get asset history")
-    public ResponseEntity<List<AssetHistory>> getAssetHistory(@PathVariable Integer assetId) {
-        return ResponseEntity.ok(assetService.getAssetHistory(assetId));
-    }
-
-    @PostMapping("/{assetId}/invoice")
-    @Operation(summary = "Upload purchase invoice")
-    @PreAuthorize("hasAnyAuthority('EDIT_ASSETS', 'ADMIN')")
-    public ResponseEntity<Void> uploadInvoice(@PathVariable Integer assetId,
-                                              @RequestParam("file") MultipartFile file) {
-        assetService.uploadInvoice(assetId, file);
-        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/bulk")

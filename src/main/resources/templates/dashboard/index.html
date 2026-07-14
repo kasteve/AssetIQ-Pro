@@ -136,7 +136,7 @@
                         </div>
                         <div class="flex-grow-1">
                             <div class="fw-semibold" th:text="${request.resourceType}">Laptop</div>
-                            <small class="text-muted" th:text="${request.requestedBy}">User Name</small>
+                            <small class="text-muted" th:text="${request.requesterId}">User ID</small>
                         </div>
                         <span class="status-badge" th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'bg-warning text-dark' : 'bg-info text-white'"
                               th:text="${request.status}">Pending</span>

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       layout:decorate="~{layouts/default}">
 
 <head>
@@ -12,9 +13,11 @@
     <div class="page-header-row">
         <h4><i class="fas fa-list me-2"></i>My Requests</h4>
         <div class="header-actions">
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestDriverModal">
-                <i class="fas fa-car me-2"></i>Request Driver
-            </button>
+            <div sec:authorize="!hasAuthority('ROLE_DRIVER')">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestDriverModal">
+                    <i class="fas fa-car me-2"></i>Request Driver
+                </button>
+            </div>
             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
                 <i class="fas fa-calendar-plus me-2"></i>Book Room
             </button>
@@ -89,8 +92,8 @@
                     <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                    <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
-                          th:text="${booking.status}">BOOKED</span>
+                        <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
+                              th:text="${booking.status}">BOOKED</span>
                     </td>
                     <td>
                         <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
@@ -128,8 +131,8 @@
                     <td th:text="${req.description}">N/A</td>
                     <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                    <span class="status-badge" th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'rejected' : 'pending')"
-                          th:text="${req.status}">PENDING</span>
+                        <span class="status-badge" th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'rejected' : 'pending')"
+                              th:text="${req.status}">PENDING</span>
                     </td>
                 </tr>
                 </tbody>
@@ -141,11 +144,7 @@
         </div>
     </div>
 
-    <!-- ========== MODALS ==========
-         Moved inside layout:fragment="content" so the layout-dialect actually
-         merges them into the final page. Previously they sat as plain siblings
-         outside any layout:fragment, so they were silently dropped and the
-         data-bs-target IDs pointed at nothing in the rendered DOM. -->
+    <!-- ========== MODALS ========== -->
 
     <!-- Request Driver Modal -->
     <div class="modal fade" id="requestDriverModal" tabindex="-1" aria-hidden="true">

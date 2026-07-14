@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.controller;
 
+import com.stevecodes.AssetIQPro.dto.AssetDTO;
 import com.stevecodes.AssetIQPro.entity.Asset;
 import com.stevecodes.AssetIQPro.entity.Category;
 import com.stevecodes.AssetIQPro.entity.Location;
@@ -68,16 +69,13 @@ public class AssetViewController {
             asset.setEolNotificationDays(eolNotificationDays != null ? eolNotificationDays : 30);
 
             if (categoryId != null) {
-                Category category = categoryService.getCategoryById(categoryId);
-                asset.setCategory(category);
+                asset.setCategory(categoryService.getCategoryById(categoryId));
             }
             if (supplierId != null) {
-                Supplier supplier = supplierService.getSupplierById(supplierId);
-                asset.setSupplier(supplier);
+                asset.setSupplier(supplierService.getSupplierById(supplierId));
             }
             if (locationId != null) {
-                Location location = locationService.getLocationById(locationId);
-                asset.setLocation(location);
+                asset.setLocation(locationService.getLocationById(locationId));
             }
             if (purchaseDate != null && !purchaseDate.isEmpty()) {
                 asset.setPurchaseDate(LocalDate.parse(purchaseDate));
@@ -102,11 +100,86 @@ public class AssetViewController {
             }
 
             redirectAttributes.addFlashAttribute("success", "Asset created successfully!");
-            return "redirect:/assets?success=true";
+            return "redirect:/assets";
         } catch (Exception e) {
             log.error("Error creating asset: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to create asset: " + e.getMessage());
-            return "redirect:/assets?error=true";
+            return "redirect:/assets";
         }
+    }
+
+    @PostMapping("/{id}/update")
+    public String updateAsset(
+            @PathVariable Integer id,
+            @RequestParam String tag,
+            @RequestParam String name,
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) String purchaseDate,
+            @RequestParam(required = false) Double purchaseCost,
+            @RequestParam(required = false) Integer supplierId,
+            @RequestParam(required = false) Integer locationId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer warrantyYears,
+            @RequestParam(required = false) String warrantyEndDate,
+            @RequestParam(required = false) String eolDate,
+            @RequestParam(required = false) Integer warrantyNotificationDays,
+            @RequestParam(required = false) Integer eolNotificationDays,
+            RedirectAttributes redirectAttributes) {
+        try {
+            Asset asset = new Asset();
+            asset.setAssetId(id);
+            asset.setTag(tag);
+            asset.setName(name);
+            asset.setSerialNumber(serialNumber);
+            asset.setWarrantyYears(warrantyYears != null ? warrantyYears : 1);
+            asset.setWarrantyNotificationDays(warrantyNotificationDays != null ? warrantyNotificationDays : 30);
+            asset.setEolNotificationDays(eolNotificationDays != null ? eolNotificationDays : 30);
+
+            if (categoryId != null) {
+                asset.setCategory(categoryService.getCategoryById(categoryId));
+            }
+            if (supplierId != null) {
+                asset.setSupplier(supplierService.getSupplierById(supplierId));
+            }
+            if (locationId != null) {
+                asset.setLocation(locationService.getLocationById(locationId));
+            }
+            if (purchaseDate != null && !purchaseDate.isEmpty()) {
+                asset.setPurchaseDate(LocalDate.parse(purchaseDate));
+            }
+            if (purchaseCost != null) {
+                asset.setPurchaseCost(BigDecimal.valueOf(purchaseCost));
+            }
+            if (status != null && !status.isEmpty()) {
+                asset.setStatus(Asset.AssetStatus.valueOf(status));
+            }
+            if (warrantyEndDate != null && !warrantyEndDate.isEmpty()) {
+                asset.setWarrantyEndDate(LocalDate.parse(warrantyEndDate));
+            }
+            if (eolDate != null && !eolDate.isEmpty()) {
+                asset.setEolDate(LocalDate.parse(eolDate));
+            }
+
+            assetService.updateAsset(id, asset);
+            redirectAttributes.addFlashAttribute("success", "Asset updated successfully!");
+            return "redirect:/assets";
+        } catch (Exception e) {
+            log.error("Error updating asset: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to update asset: " + e.getMessage());
+            return "redirect:/assets";
+        }
+    }
+
+    @PostMapping("/{id}/delete")
+    public String deleteAsset(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
+        try {
+            assetService.deleteAsset(id);
+            redirectAttributes.addFlashAttribute("success", "Asset deleted successfully!");
+        } catch (Exception e) {
+            log.error("Error deleting asset: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to delete asset: " + e.getMessage());
+        }
+        return "redirect:/assets";
     }
 }

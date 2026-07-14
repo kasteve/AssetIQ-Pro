@@ -77,4 +77,8 @@ public class TransferDTO {
 
     private boolean isFullySigned;
     private String fullySignedPdfUrl;
+
+    public void setIsFullySigned(Boolean isFullySigned) {
+        this.isFullySigned = isFullySigned;
+    }
 }

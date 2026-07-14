@@ -2,6 +2,9 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.repository.AppUserRepository;
+import com.stevecodes.AssetIQPro.repository.DriverRequestRepository;
+import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import com.stevecodes.AssetIQPro.service.DriverService;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import jakarta.servlet.http.HttpSession;
@@ -24,12 +27,14 @@ public class DriverController {
 
     private final DriverService driverService;
     private final AppUserService userService;
+    private final DriverRequestRepository driverRequestRepository;
+    private final AppUserRepository userRepository;
+    private final NotificationRepository notificationRepository;
 
     @GetMapping("/driver-requests")
     public String driverRequests(Model model) {
         model.addAttribute("requests", driverService.getDriverRequests());
 
-        // Add available drivers for the modal
         List<AppUser> availableDrivers = userService.getUsersWithPermission("MANAGE_DRIVER_REQUESTS");
         model.addAttribute("availableDrivers", availableDrivers);
 
@@ -63,9 +68,16 @@ public class DriverController {
             return "redirect:/login";
         }
 
-        model.addAttribute("pendingRequests", driverService.getPendingRequestsForDriver(driverId));
+        // Get pending requests for this driver (where status is PENDING)
+        List<DriverRequest> pendingRequests = driverService.getPendingRequestsForDriver(driverId);
+
+        // Get assigned requests (all requests where driverId matches)
+        List<DriverRequest> assignedRequests = driverService.getDriverRequestsByDriverId(driverId);
+
+        model.addAttribute("pendingRequests", pendingRequests);
+        model.addAttribute("assignedRequests", assignedRequests);
         model.addAttribute("completedRequests", driverService.getCompletedRequestsForDriver(driverId));
-        model.addAttribute("totalPending", driverService.getPendingRequestsForDriver(driverId).size());
+        model.addAttribute("totalPending", pendingRequests.size());
         model.addAttribute("totalCompleted", driverService.getCompletedRequestsForDriver(driverId).size());
         model.addAttribute("driverAvailability", driverService.getDriverAvailability(driverId).orElse(null));
 

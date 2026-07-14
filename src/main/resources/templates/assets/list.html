@@ -84,12 +84,12 @@
                         <span class="pill pill-category" th:text="${asset.category != null ? asset.category.name : 'Uncategorized'}">Laptop</span>
                     </td>
                     <td>
-                            <span class="pill"
-                                  th:class="${asset.status == 'AVAILABLE' ? 'pill-available' :
-                                             asset.status == 'ASSIGNED' ? 'pill-assigned' :
-                                             asset.status == 'MAINTENANCE' ? 'pill-maintenance' :
-                                             asset.status == 'TRANSFERRED' ? 'pill-transferred' : 'pill-retired'}"
-                                  th:text="${asset.status}">Available</span>
+                        <span class="pill"
+                              th:class="${asset.status == 'AVAILABLE' ? 'pill-available' :
+                                         asset.status == 'ASSIGNED' ? 'pill-assigned' :
+                                         asset.status == 'MAINTENANCE' ? 'pill-maintenance' :
+                                         asset.status == 'TRANSFERRED' ? 'pill-transferred' : 'pill-retired'}"
+                              th:text="${asset.status}">Available</span>
                     </td>
                     <td>
                         <div th:if="${asset.warrantyEndDate}">
@@ -111,12 +111,14 @@
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
-                            <a th:href="@{/assets/{id}/edit(id=${asset.assetId})}" class="btn btn-outline-primary" title="Edit">
+                            <button type="button" class="btn btn-outline-primary" title="Edit"
+                                    th:onclick="'editAsset(' + ${asset.assetId} + ')'">
                                 <i class="fas fa-edit"></i>
-                            </a>
-                            <a th:href="@{/assets/{id}(id=${asset.assetId})}" class="btn btn-outline-info" title="View">
+                            </button>
+                            <button type="button" class="btn btn-outline-info" title="View"
+                                    th:onclick="'viewAsset(' + ${asset.assetId} + ')'">
                                 <i class="fas fa-eye"></i>
-                            </a>
+                            </button>
                             <a th:href="@{/transfers/create?assetTag={tag}(tag=${asset.tag})}" class="btn btn-outline-success" title="Transfer">
                                 <i class="fas fa-exchange-alt"></i>
                             </a>
@@ -148,14 +150,7 @@
         </ul>
     </nav>
 
-    <!--
-      Add Asset Modal -- this was missing entirely before, which is why the
-      "Add Asset" button (data-bs-target="#createAssetModal") had nothing
-      to open. Placed inside layout:fragment="content" so Thymeleaf Layout
-      Dialect actually carries it into the decorated page (anything outside
-      this fragment gets silently dropped, same issue we hit on the
-      User Management page).
-    -->
+    <!-- Create Asset Modal -->
     <div class="modal fade" id="createAssetModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -163,7 +158,7 @@
                     <h5 class="modal-title"><i class="fas fa-laptop me-2" style="color: #0d6efd;"></i>Add New Asset</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/assets/create}" method="post">
+                <form th:action="@{/assets/create}" method="post" enctype="multipart/form-data">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -186,6 +181,20 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label">Supplier</label>
+                                <select name="supplierId" class="form-select">
+                                    <option value="">Select Supplier</option>
+                                    <option th:each="sup : ${suppliers}" th:value="${sup.supplierId}" th:text="${sup.name}">Supplier</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Location</label>
+                                <select name="locationId" class="form-select">
+                                    <option value="">Select Location</option>
+                                    <option th:each="loc : ${locations}" th:value="${loc.locationId}" th:text="${loc.name}">Location</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Status</label>
                                 <select name="status" class="form-select">
                                     <option value="AVAILABLE">Available</option>
@@ -196,12 +205,36 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label">Purchase Date</label>
+                                <input type="date" name="purchaseDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Purchase Cost</label>
+                                <input type="number" step="0.01" name="purchaseCost" class="form-control" placeholder="0.00">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty Years</label>
+                                <input type="number" name="warrantyYears" class="form-control" value="1" min="0">
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Warranty End Date</label>
                                 <input type="date" name="warrantyEndDate" class="form-control">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">End-of-Life Date</label>
+                                <label class="form-label">EOL Date</label>
                                 <input type="date" name="eolDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty Notification Days</label>
+                                <input type="number" name="warrantyNotificationDays" class="form-control" value="30" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">EOL Notification Days</label>
+                                <input type="number" name="eolNotificationDays" class="form-control" value="30" min="0">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Purchase Invoice</label>
+                                <input type="file" name="invoice" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -209,6 +242,131 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-plus me-2"></i>Add Asset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Asset Modal -->
+    <div class="modal fade" id="viewAssetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-laptop me-2" style="color: #0d6efd;"></i>Asset Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="assetDetailBody">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="openEditFromView()">
+                        <i class="fas fa-edit me-2"></i>Edit Asset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Asset Modal -->
+    <div class="modal fade" id="editAssetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2" style="color: #ffc107;"></i>Edit Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editAssetForm" th:action="@{/assets}" method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Asset Tag *</label>
+                                <input type="text" id="editTag" name="tag" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Serial Number *</label>
+                                <input type="text" id="editSerialNumber" name="serialNumber" class="form-control" required>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Asset Name *</label>
+                                <input type="text" id="editName" name="name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Category</label>
+                                <select id="editCategoryId" name="categoryId" class="form-select">
+                                    <option value="">Select Category</option>
+                                    <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}">Category</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Supplier</label>
+                                <select id="editSupplierId" name="supplierId" class="form-select">
+                                    <option value="">Select Supplier</option>
+                                    <option th:each="sup : ${suppliers}" th:value="${sup.supplierId}" th:text="${sup.name}">Supplier</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Location</label>
+                                <select id="editLocationId" name="locationId" class="form-select">
+                                    <option value="">Select Location</option>
+                                    <option th:each="loc : ${locations}" th:value="${loc.locationId}" th:text="${loc.name}">Location</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select id="editStatus" name="status" class="form-select">
+                                    <option value="AVAILABLE">Available</option>
+                                    <option value="ASSIGNED">Assigned</option>
+                                    <option value="MAINTENANCE">Maintenance</option>
+                                    <option value="TRANSFERRED">Transferred</option>
+                                    <option value="RETIRED">Retired</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Purchase Date</label>
+                                <input type="date" id="editPurchaseDate" name="purchaseDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Purchase Cost</label>
+                                <input type="number" step="0.01" id="editPurchaseCost" name="purchaseCost" class="form-control" placeholder="0.00">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty Years</label>
+                                <input type="number" id="editWarrantyYears" name="warrantyYears" class="form-control" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty End Date</label>
+                                <input type="date" id="editWarrantyEndDate" name="warrantyEndDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">EOL Date</label>
+                                <input type="date" id="editEolDate" name="eolDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Warranty Notification Days</label>
+                                <input type="number" id="editWarrantyNotificationDays" name="warrantyNotificationDays" class="form-control" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">EOL Notification Days</label>
+                                <input type="number" id="editEolNotificationDays" name="eolNotificationDays" class="form-control" min="0">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Purchase Invoice</label>
+                                <input type="file" name="invoice" class="form-control">
+                                <small class="text-muted d-block mt-1" id="editInvoiceNote"></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Update Asset
                         </button>
                     </div>
                 </form>
@@ -270,15 +428,225 @@
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
+
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
+        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; }
+        .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
     </style>
 </div>
 
 <div layout:fragment="scripts">
     <script>
+        let currentAssetId = null;
+
         function deleteAsset(id) {
             if (confirm('Are you sure you want to delete this asset?')) {
-                window.location.href = '/assets/' + id + '/delete';
+                window.location.href = '/assetIQ-pro/assets/' + id + '/delete';
             }
+        }
+
+        function viewAsset(id) {
+            currentAssetId = id;
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewAssetModal'));
+            const body = document.getElementById('assetDetailBody');
+
+            body.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            modal.show();
+
+            fetch('/assetIQ-pro/api/assets/' + id)
+                .then(response => response.json())
+                .then(asset => {
+                    return fetch('/assetIQ-pro/api/assets/' + id + '/transfers')
+                        .then(response => response.json())
+                        .then(transfers => ({ asset, transfers }));
+                })
+                .then(data => {
+                    const asset = data.asset;
+                    const transfers = data.transfers || [];
+
+                    let transferHtml = '';
+                    if (transfers.length > 0) {
+                        transfers.forEach(t => {
+                            transferHtml += `
+                                <tr>
+                                    <td>#${t.transferId}</td>
+                                    <td>${t.assetTag || 'N/A'}</td>
+                                    <td>${t.oldDepartmentName || 'N/A'}</td>
+                                    <td>${t.newDepartmentName || 'N/A'}</td>
+                                    <td>${t.transferDate || 'N/A'}</td>
+                                    <td>
+                                        <span class="badge ${t.isFullySigned ? 'bg-success' : 'bg-warning'}">
+                                            ${t.isFullySigned ? 'Completed' : 'Pending'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        transferHtml = `
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No transfers found</td>
+                            </tr>
+                        `;
+                    }
+
+                    body.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="detail-item mb-3">
+                                    <span class="label">Tag</span>
+                                    <span class="value fw-bold">${asset.tag || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Name</span>
+                                    <span class="value">${asset.name || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Serial Number</span>
+                                    <span class="value">${asset.serialNumber || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Category</span>
+                                    <span class="value">${asset.category?.name || 'Uncategorized'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Location</span>
+                                    <span class="value">${asset.location?.name || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Supplier</span>
+                                    <span class="value">${asset.supplier?.name || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item mb-3">
+                                    <span class="label">Status</span>
+                                    <span class="value">
+                                        <span class="pill pill-${(asset.status || 'AVAILABLE').toLowerCase()}">
+                                            ${asset.status || 'AVAILABLE'}
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Purchase Date</span>
+                                    <span class="value">${asset.purchaseDate || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Purchase Cost</span>
+                                    <span class="value">${asset.purchaseCost || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Warranty End Date</span>
+                                    <span class="value">${asset.warrantyEndDate || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">EOL Date</span>
+                                    <span class="value">${asset.eolDate || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item mb-3">
+                                    <span class="label">Warranty Years</span>
+                                    <span class="value">${asset.warrantyYears || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="fw-bold mt-3"><i class="fas fa-exchange-alt me-2"></i>Transfer History</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Transfer ID</th>
+                                        <th>Asset Tag</th>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${transferHtml}</tbody>
+                            </table>
+                        </div>
+                    `;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    body.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Failed to load asset details.
+                        </div>
+                    `;
+                });
+        }
+
+        function openEditFromView() {
+            if (!currentAssetId) return;
+
+            const viewModalEl = document.getElementById('viewAssetModal');
+            const viewModal = bootstrap.Modal.getOrCreateInstance(viewModalEl);
+
+            viewModalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                viewModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                editAsset(currentAssetId);
+            }, { once: true });
+
+            viewModal.hide();
+        }
+
+        function editAsset(id) {
+            currentAssetId = id;
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editAssetModal'));
+            const form = document.getElementById('editAssetForm');
+
+            form.action = '/assetIQ-pro/assets/' + id + '/update';
+
+            form.reset();
+            document.getElementById('editInvoiceNote').textContent = '';
+
+            modal.show();
+
+            fetch('/assetIQ-pro/api/assets/' + id)
+                .then(response => response.json())
+                .then(asset => {
+                    document.getElementById('editTag').value = asset.tag || '';
+                    document.getElementById('editSerialNumber').value = asset.serialNumber || '';
+                    document.getElementById('editName').value = asset.name || '';
+                    document.getElementById('editCategoryId').value = asset.category ? asset.category.categoryId : '';
+                    document.getElementById('editSupplierId').value = asset.supplier ? asset.supplier.supplierId : '';
+                    document.getElementById('editLocationId').value = asset.location ? asset.location.locationId : '';
+                    document.getElementById('editStatus').value = asset.status || 'AVAILABLE';
+                    document.getElementById('editPurchaseDate').value = asset.purchaseDate || '';
+                    document.getElementById('editPurchaseCost').value = asset.purchaseCost || '';
+                    document.getElementById('editWarrantyYears').value = asset.warrantyYears != null ? asset.warrantyYears : 1;
+                    document.getElementById('editWarrantyEndDate').value = asset.warrantyEndDate || '';
+                    document.getElementById('editEolDate').value = asset.eolDate || '';
+                    document.getElementById('editWarrantyNotificationDays').value = asset.warrantyNotificationDays != null ? asset.warrantyNotificationDays : 30;
+                    document.getElementById('editEolNotificationDays').value = asset.eolNotificationDays != null ? asset.eolNotificationDays : 30;
+
+                    if (asset.purchaseInvoicePath) {
+                        document.getElementById('editInvoiceNote').textContent = 'Current invoice: ' + asset.purchaseInvoicePath;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading asset for edit:', error);
+                    alert('Failed to load asset details for editing.');
+                });
         }
     </script>
 </div>

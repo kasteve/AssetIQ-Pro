@@ -1,12 +1,15 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.AssetDTO;
+import com.stevecodes.AssetIQPro.dto.TransferDTO;
 import com.stevecodes.AssetIQPro.entity.Asset;
 import com.stevecodes.AssetIQPro.entity.AssetHistory;
 import com.stevecodes.AssetIQPro.entity.Category;
+import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.repository.AssetHistoryRepository;
 import com.stevecodes.AssetIQPro.repository.AssetRepository;
 import com.stevecodes.AssetIQPro.repository.CategoryRepository;
+import com.stevecodes.AssetIQPro.repository.TransferRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +35,7 @@ public class AssetService {
     private final AssetRepository assetRepository;
     private final AssetHistoryRepository historyRepository;
     private final CategoryRepository categoryRepository;
+    private final TransferRepository transferRepository;  // ADD THIS
     private final AuditService auditService;
 
     private static final String UPLOAD_DIR = "./uploads/invoices/";
@@ -48,12 +52,10 @@ public class AssetService {
             throw new IllegalArgumentException("Asset tag already exists: " + asset.getTag());
         }
 
-        // Set warranty end date based on purchase date and warranty years
         if (asset.getPurchaseDate() != null && asset.getWarrantyYears() != null) {
             asset.setWarrantyEndDate(asset.getPurchaseDate().plusYears(asset.getWarrantyYears()));
         }
 
-        // Set EOL notification days default
         if (asset.getEolNotificationDays() == null) {
             asset.setEolNotificationDays(30);
         }
@@ -63,7 +65,6 @@ public class AssetService {
 
         Asset saved = assetRepository.save(asset);
 
-        // Create history entry
         createHistory(saved.getAssetId(), AssetHistory.EVENT_PROCUREMENT,
                 "Asset created with tag: " + saved.getTag(), null);
 
@@ -100,7 +101,6 @@ public class AssetService {
         Asset existing = assetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
 
-        // Update fields
         existing.setName(updatedAsset.getName());
         existing.setSerialNumber(updatedAsset.getSerialNumber());
         existing.setCategory(updatedAsset.getCategory());
@@ -110,7 +110,6 @@ public class AssetService {
         existing.setPurchaseCost(updatedAsset.getPurchaseCost());
         existing.setStatus(updatedAsset.getStatus());
 
-        // Update lifecycle fields
         if (updatedAsset.getWarrantyYears() != null) {
             existing.setWarrantyYears(updatedAsset.getWarrantyYears());
             if (existing.getPurchaseDate() != null) {
@@ -171,6 +170,32 @@ public class AssetService {
     }
 
     // ============================================
+    // Transfer History
+    // ============================================
+
+    public List<TransferDTO> getAssetTransfers(Integer assetId) {
+        Asset asset = assetRepository.findById(assetId)
+                .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
+
+        List<Transfer> transfers = transferRepository.findByAssetTag(asset.getTag());
+        return transfers.stream().map(this::convertToTransferDTO).collect(Collectors.toList());
+    }
+
+    private TransferDTO convertToTransferDTO(Transfer transfer) {
+        TransferDTO dto = new TransferDTO();
+        dto.setTransferId(transfer.getTransferId());
+        dto.setAssetTag(transfer.getAssetTag());
+        dto.setSerialNumber(transfer.getSerialNumber());
+        dto.setTransferDate(transfer.getTransferDate());
+        dto.setOldDepartmentName(transfer.getOldDepartmentName());
+        dto.setNewDepartmentName(transfer.getNewDepartmentName());
+        dto.setIsFullySigned(transfer.getIsFullySigned());
+        dto.setOldDepartmentId(transfer.getOldDepartmentId());
+        dto.setNewDepartmentId(transfer.getNewDepartmentId());
+        return dto;
+    }
+
+    // ============================================
     // Lifecycle Queries
     // ============================================
 
@@ -213,20 +238,16 @@ public class AssetService {
             Asset asset = assetRepository.findById(assetId)
                     .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
 
-            // Create upload directory if it doesn't exist
             Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
             String filename = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
             Path filePath = uploadPath.resolve(filename);
 
-            // Save file
             Files.write(filePath, file.getBytes());
 
-            // Update asset
             asset.setPurchaseInvoicePath(filePath.toString());
             assetRepository.save(asset);
 

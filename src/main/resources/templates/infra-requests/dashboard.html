@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Infra Dashboard - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-tachometer-alt me-2"></i>Infrastructure Dashboard</h4>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card" style="border-left-color: #fd7e14;">
+                <div class="stat-number" th:text="${pendingRequests != null ? pendingRequests.size() : 0}">0</div>
+                <div class="stat-label">Pending Infra Review</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="border-left-color: #0d6efd;">
+                <div class="stat-number" th:text="${pendingLMRequests != null ? pendingLMRequests.size() : 0}">0</div>
+                <div class="stat-label">Pending LM Approval</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="border-left-color: #198754;">
+                <div class="stat-number" th:text="${pendingFinanceRequests != null ? pendingFinanceRequests.size() : 0}">0</div>
+                <div class="stat-label">Pending Finance Approval</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Infra Review -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <h6><i class="fas fa-tools me-2" style="color: #fd7e14;"></i>Pending Infrastructure Review</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th>Resource Type</th>
+                    <th>Requester ID</th>
+                    <th>Quantity</th>
+                    <th>Status</th>
+                    <th>Requested</th>
+                    <th>Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="req : ${pendingRequests}">
+                    <td th:text="${req.resourceType}">N/A</td>
+                    <td th:text="${req.requesterId}">N/A</td>
+                    <td th:text="${req.quantity}">N/A</td>
+                    <td>
+                        <span class="status-badge pending" th:text="${req.status}">PENDING</span>
+                    </td>
+                    <td th:text="${#temporals.format(req.createdAt, 'dd/MM/yyyy HH:mm')}">N/A</td>
+                    <td>
+                        <a th:href="@{/infra-requests/{id}(id=${req.requestId})}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-eye"></i> Review
+                        </a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" th:if="${pendingRequests == null or pendingRequests.isEmpty()}">
+            <i class="fas fa-tools"></i>
+            No pending infrastructure review requests
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .panel-card { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; border: none; margin-bottom: 24px; }
+        .panel-card .panel-header { padding: 16px 22px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; justify-content: space-between; }
+        .panel-card .panel-header h6 { font-weight: 700; font-size: 14.5px; color: var(--ink); margin: 0; }
+        .status-badge.pending { background: #fff4e0; color: #fd7e14; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
+        .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
+        .stat-card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #0d6efd; height: 100%; }
+        .stat-number { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+        .stat-label { font-size: 12.5px; color: #6c757d; font-weight: 600; margin-top: 4px; }
+    </style>
+</div>
+</body>
+</html>

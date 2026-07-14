@@ -95,7 +95,10 @@ public class SecurityConfig {
                                 "/transfers/sign/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/actuator/**"
+                                "/actuator/**",
+                                "/bookings/driver-dashboard",
+                                "/bookings/driver/**",
+                                "/bookings/driver-requests"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

@@ -435,8 +435,8 @@
             </ul>
         </div>
 
-        <!-- Driver Dashboard - DRIVER role or MANAGE_DRIVER_REQUESTS permission -->
-        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'MANAGE_DRIVER_REQUESTS')">
+        <!-- Driver Dashboard - ADMIN or DRIVER role or MANAGE_DRIVER_REQUESTS -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ROLE_DRIVER', 'MANAGE_DRIVER_REQUESTS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
                     <i class="fas fa-tachometer-alt"></i> Driver Dashboard
@@ -444,8 +444,8 @@
             </div>
         </div>
 
-        <!-- Infra Dashboard - INFRA role or REVIEW_INFRA/APPROVE_INFRA permission -->
-        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'REVIEW_INFRA', 'APPROVE_INFRA')">
+        <!-- Infra Dashboard - ADMIN or INFRA role or REVIEW_INFRA/APPROVE_INFRA -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'ROLE_INFRA', 'REVIEW_INFRA', 'APPROVE_INFRA')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
                     <i class="fas fa-tachometer-alt"></i> Infra Dashboard
@@ -464,7 +464,7 @@
 
         <!-- ========== ADMIN SECTION ========== -->
 
-        <!-- User Management - ADMIN role or CREATE_USERS/MANAGE_USERS permission -->
+        <!-- User Management -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'CREATE_USERS', 'MANAGE_USERS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'admin'} ? 'active' : ''" href="/assetIQ-pro/admin/users">
@@ -473,7 +473,7 @@
             </div>
         </div>
 
-        <!-- Audit Logs - ADMIN role or VIEW_AUDIT permission -->
+        <!-- Audit Logs -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'VIEW_AUDIT')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'audit'} ? 'active' : ''" href="/assetIQ-pro/admin/audit">
@@ -482,7 +482,7 @@
             </div>
         </div>
 
-        <!-- Permissions - ADMIN role or MANAGE_ROLES permission -->
+        <!-- Permissions -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'MANAGE_ROLES')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'permissions'} ? 'active' : ''" href="/assetIQ-pro/admin/permissions">
@@ -491,8 +491,8 @@
             </div>
         </div>
 
-        <!-- Admin Modules - Only ADMIN role -->
-        <div sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
+        <!-- Admin Modules -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'MANAGE_ROLES')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'categories'} ? 'active' : ''" href="/assetIQ-pro/admin/categories">
                     <i class="fas fa-tags"></i> Categories

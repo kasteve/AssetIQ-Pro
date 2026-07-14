@@ -4,8 +4,11 @@ import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.DriverAvailability;
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
+import com.stevecodes.AssetIQPro.entity.Notification;
+import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import com.stevecodes.AssetIQPro.repository.DriverAvailabilityRepository;
 import com.stevecodes.AssetIQPro.repository.DriverRequestRepository;
+import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -23,6 +25,8 @@ public class DriverService {
 
     private final DriverRequestRepository driverRequestRepository;
     private final DriverAvailabilityRepository availabilityRepository;
+    private final AppUserRepository userRepository;
+    private final NotificationRepository notificationRepository;
     private final EmailService emailService;
     private final AuditService auditService;
 
@@ -46,7 +50,6 @@ public class DriverService {
 
         DriverRequest saved = driverRequestRepository.save(request);
 
-        // Notify available drivers
         notifyAvailableDrivers(saved);
 
         auditService.logAction("DRIVER_REQUEST_CREATED",
@@ -98,14 +101,24 @@ public class DriverService {
 
         DriverRequest saved = driverRequestRepository.save(request);
 
-        // Update driver availability
         updateDriverAvailability(driverId, "BUSY");
 
-        // Notify requester
+        String driverName = getDriverName(driverId);
+
+        // Notify requester via email
         emailService.sendDriverRequestStatusUpdate(
                 getUserEmail(request.getUserId()),
                 "Driver Request Accepted",
-                "Your driver request has been accepted by driver #" + driverId
+                "Your driver request has been accepted by " + driverName
+        );
+
+        // Create notification for requester
+        createNotification(
+                request.getUserId(),
+                "DRIVER_REQUEST_ACCEPTED",
+                "Driver Request Accepted",
+                "Your driver request has been accepted by " + driverName,
+                "/bookings/my-requests"
         );
 
         auditService.logAction("DRIVER_REQUEST_ACCEPTED",
@@ -127,6 +140,22 @@ public class DriverService {
         request.setDriverDecisionTime(LocalDateTime.now());
 
         DriverRequest saved = driverRequestRepository.save(request);
+
+        // Notify requester via email
+        emailService.sendDriverRequestStatusUpdate(
+                getUserEmail(request.getUserId()),
+                "Driver Request Declined",
+                "Your driver request has been declined. Reason: " + reason
+        );
+
+        // Create notification for requester
+        createNotification(
+                request.getUserId(),
+                "DRIVER_REQUEST_DECLINED",
+                "Driver Request Declined",
+                "Your driver request has been declined. Reason: " + reason,
+                "/bookings/my-requests"
+        );
 
         auditService.logAction("DRIVER_REQUEST_DECLINED",
                 "Driver request declined: " + requestId + " - Reason: " + reason,
@@ -166,10 +195,6 @@ public class DriverService {
         return availabilityRepository.findByDriverId(driverId);
     }
 
-    // Add this method after getDriverAvailability()
-    public List<AppUser> getAvailableDrivers(AppUserService userService) {
-        return userService.getUsersWithPermission("MANAGE_DRIVER_REQUESTS");
-    }
     @Transactional
     public void updateDriverAvailability(Long driverId, String status) {
         log.info("Updating driver {} availability to: {}", driverId, status);
@@ -191,14 +216,55 @@ public class DriverService {
     // ============================================
 
     private void notifyAvailableDrivers(DriverRequest request) {
-        // Get all available drivers and notify them
-        // Placeholder implementation
-        log.info("Notifying available drivers about request: {}", request.getRequestId());
+        List<AppUser> drivers = userRepository.findByRole("DRIVER");
+
+        for (AppUser driver : drivers) {
+            String approvalLink = "http://localhost:8091/assetIQ-pro/bookings/driver-dashboard";
+
+            // Send email
+            emailService.sendDriverRequestStatusUpdate(
+                    driver.getEmail(),
+                    "New Driver Request",
+                    "A new driver request has been created by " + request.getRequestedBy() +
+                            " for " + request.getDestination() + ". Please review and respond."
+            );
+
+            // Create notification
+            createNotification(
+                    driver.getUserId(),
+                    "DRIVER_REQUEST_NEW",
+                    "New Driver Request",
+                    "A new driver request has been created by " + request.getRequestedBy() +
+                            " for " + request.getDestination(),
+                    "/bookings/driver-dashboard"
+            );
+        }
+
+        log.info("Notified {} drivers about request: {}", drivers.size(), request.getRequestId());
+    }
+
+    private void createNotification(Long userId, String type, String title, String message, String link) {
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setMessage(message);
+        notification.setLink(link);
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        notificationRepository.save(notification);
     }
 
     private String getUserEmail(Long userId) {
-        // TODO: Implement user email lookup
-        return "user@company.com";
+        return userRepository.findById(userId)
+                .map(AppUser::getEmail)
+                .orElse("user@company.com");
+    }
+
+    private String getDriverName(Long driverId) {
+        return userRepository.findById(driverId)
+                .map(AppUser::getFullName)
+                .orElse("Driver #" + driverId);
     }
 
     public DriverRequestDTO convertToDTO(DriverRequest request) {
