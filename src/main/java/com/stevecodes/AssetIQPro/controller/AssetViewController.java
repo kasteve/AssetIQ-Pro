@@ -1,10 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.Asset;
-import com.stevecodes.AssetIQPro.service.AssetService;
-import com.stevecodes.AssetIQPro.service.CategoryService;
-import com.stevecodes.AssetIQPro.service.LocationService;
-import com.stevecodes.AssetIQPro.service.SupplierService;
+import com.stevecodes.AssetIQPro.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -26,6 +23,9 @@ public class AssetViewController {
     private final CategoryService categoryService;
     private final LocationService locationService;
     private final SupplierService supplierService;
+    private final CompanyService companyService;
+    private final DepartmentService departmentService;
+    private final EmployeeService employeeService;
 
     @GetMapping
     public String assets(Model model) {
@@ -34,6 +34,9 @@ public class AssetViewController {
         model.addAttribute("categories", categoryService.getAllCategories());
         model.addAttribute("locations", locationService.getAllLocations());
         model.addAttribute("suppliers", supplierService.getAllSuppliers());
+        model.addAttribute("companies", companyService.getAllCompanies());
+        model.addAttribute("employees", employeeService.getAllEmployees());
+        model.addAttribute("departments", departmentService.getAllDepartments());
         return "assets/list";
     }
 

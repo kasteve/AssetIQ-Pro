@@ -56,11 +56,6 @@
         </div>
     </div>
 
-    <!-- DEBUG: Show asset count -->
-    <div th:if="${assets != null}" class="alert alert-info">
-        Found <strong th:text="${assets.size()}">0</strong> assets in database
-    </div>
-
     <!-- Asset Table -->
     <div class="table-card">
         <div class="table-responsive">
@@ -460,11 +455,11 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Asset Tag *</label>
-                                    <input type="text" id="transferAssetTag" name="assetTag" class="form-control" required>
+                                    <input type="text" id="transferAssetTag" name="assetTag" class="form-control" readonly required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Serial Number</label>
-                                    <input type="text" id="transferSerialNumber" name="serialNumber" class="form-control">
+                                    <input type="text" id="transferSerialNumber" name="serialNumber" class="form-control" readonly>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Version / Make</label>
