@@ -38,7 +38,6 @@ public class TransferSigningService {
 
         tokenService.createTokensAndSendEmails(transfer);
 
-        // Log all generated tokens for manual retrieval
         List<TransferToken> tokens = tokenRepository.findByTransferId(transferId);
         log.info("📋 ALL SIGNING LINKS FOR TRANSFER {}:", transferId);
         for (TransferToken token : tokens) {
@@ -89,9 +88,9 @@ public class TransferSigningService {
         if (transfer.getConfiguredById() != null && transfer.getConfiguredById().equals(employeeId))
             return "CONFIGURED_BY";
         if (transfer.getInfraRepresentativeId() != null && transfer.getInfraRepresentativeId().equals(employeeId))
-            return "INFRA_REP";  // Match the case in saveSignature
+            return "INFRA_REP";
         if (transfer.getFinanceRepresentativeId() != null && transfer.getFinanceRepresentativeId().equals(employeeId))
-            return "FINANCE_REP";  // Match the case in saveSignature
+            return "FINANCE_REP";
 
         throw new IllegalArgumentException("Employee " + employeeId + " is not a signer for transfer " + transferId);
     }
@@ -307,7 +306,6 @@ public class TransferSigningService {
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
         LocalDateTime now = LocalDateTime.now();
 
-        // Trim if too long (just in case)
         String signature = base64Signature;
         if (signature != null && signature.length() > 1000000) {
             signature = signature.substring(0, 1000000);
@@ -335,11 +333,11 @@ public class TransferSigningService {
                 transfer.setConfiguredBySignature(signature);
                 transfer.setConfiguredBySignedAt(now);
                 break;
-            case "INFRA_REP":  // Changed from INFRA_REPRESENTATIVE
+            case "INFRA_REP":
                 transfer.setInfraRepSignature(signature);
                 transfer.setInfraRepSignedAt(now);
                 break;
-            case "FINANCE_REP":  // Changed from FINANCE_REPRESENTATIVE
+            case "FINANCE_REP":
                 transfer.setFinanceRepSignature(signature);
                 transfer.setFinanceRepSignedAt(now);
                 break;
@@ -375,7 +373,6 @@ public class TransferSigningService {
 
         List<String> signerEmails = new ArrayList<>();
 
-        // Get emails from employee IDs
         if (transfer.getOldHandoverById() != null) {
             String email = getEmployeeEmail(transfer.getOldHandoverById());
             if (email != null) signerEmails.add(email);
@@ -405,7 +402,6 @@ public class TransferSigningService {
             if (email != null) signerEmails.add(email);
         }
 
-        // Also add requester (admin) - you can get from session or hardcode
         signerEmails.add("admin@company.com");
 
         if (!signerEmails.isEmpty()) {

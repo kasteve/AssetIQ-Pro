@@ -44,6 +44,15 @@ public class TransferDTO {
     private String infraRepresentativeName;
     private Long financeRepresentativeId;
     private String financeRepresentativeName;
+    private String oldEmployeeStaffId;
+    private String newEmployeeStaffId;
+    private String oldHandoverByStaffId;
+    private String oldReceivedByStaffId;
+    private String newHandoverByStaffId;
+    private String newReceivedByStaffId;
+    private String configuredByStaffId;
+    private String infraRepresentativeStaffId;
+    private String financeRepresentativeStaffId;
 
     // Asset Info
     private Integer categoryId;

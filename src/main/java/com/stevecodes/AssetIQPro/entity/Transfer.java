@@ -78,6 +78,33 @@ public class Transfer {
     @Column(name = "FinanceRepresentativeId")
     private Long financeRepresentativeId;
 
+    @Column(name = "oldEmployeeStaffId")
+    private String oldEmployeeStaffId;
+
+    @Column(name = "newEmployeeStaffId")
+    private String newEmployeeStaffId;
+
+    @Column(name = "oldHandoverByStaffId")
+    private String oldHandoverByStaffId;
+
+    @Column(name = "oldReceivedByStaffId")
+    private String oldReceivedByStaffId;
+
+    @Column(name = "newHandoverByStaffId")
+    private String newHandoverByStaffId;
+
+    @Column(name = "newReceivedByStaffId")
+    private String newReceivedByStaffId;
+
+    @Column(name = "configuredByStaffId")
+    private String configuredByStaffId;
+
+    @Column(name = "infraRepresentativeStaffId")
+    private String infraRepresentativeStaffId;
+
+    @Column(name = "financeRepresentativeStaffId")
+    private String financeRepresentativeStaffId;
+
     // ============================================
     // Signer Names (populated from Employee table)
     // ============================================

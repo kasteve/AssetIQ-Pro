@@ -37,8 +37,11 @@ public class TransferViewController {
 
         List<Transfer> transfers = transferService.getAllTransfers();
 
-        // Populate department names
+        // Populate employee names and staff IDs
         for (Transfer transfer : transfers) {
+            populateEmployeeDetails(transfer);
+
+            // Populate department names
             if (transfer.getOldDepartmentId() != null) {
                 departmentService.getDepartmentById(transfer.getOldDepartmentId())
                         .ifPresent(dept -> transfer.setOldDepartmentName(dept.getName()));
@@ -57,6 +60,107 @@ public class TransferViewController {
         return "transfers/list";
     }
 
+    private void populateEmployeeDetails(Transfer transfer) {
+        // From Employee
+        if (transfer.getOldEmployeeId() != null) {
+            employeeService.getEmployeeById(transfer.getOldEmployeeId())
+                    .ifPresent(emp -> {
+                        transfer.setOldEmployeeName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setOldEmployeeStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // To Employee
+        if (transfer.getNewEmployeeId() != null) {
+            employeeService.getEmployeeById(transfer.getNewEmployeeId())
+                    .ifPresent(emp -> {
+                        transfer.setNewEmployeeName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setNewEmployeeStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // Configured By
+        if (transfer.getConfiguredById() != null) {
+            employeeService.getEmployeeById(transfer.getConfiguredById())
+                    .ifPresent(emp -> {
+                        transfer.setConfiguredByName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setConfiguredByStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // Old Handover
+        if (transfer.getOldHandoverById() != null) {
+            employeeService.getEmployeeById(transfer.getOldHandoverById())
+                    .ifPresent(emp -> {
+                        transfer.setOldHandoverByName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setOldHandoverByStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // Old Received
+        if (transfer.getOldReceivedById() != null) {
+            employeeService.getEmployeeById(transfer.getOldReceivedById())
+                    .ifPresent(emp -> {
+                        transfer.setOldReceivedByName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setOldReceivedByStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // New Handover
+        if (transfer.getNewHandoverById() != null) {
+            employeeService.getEmployeeById(transfer.getNewHandoverById())
+                    .ifPresent(emp -> {
+                        transfer.setNewHandoverByName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setNewHandoverByStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // New Received
+        if (transfer.getNewReceivedById() != null) {
+            employeeService.getEmployeeById(transfer.getNewReceivedById())
+                    .ifPresent(emp -> {
+                        transfer.setNewReceivedByName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setNewReceivedByStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // Infrastructure Representative
+        if (transfer.getInfraRepresentativeId() != null) {
+            employeeService.getEmployeeById(transfer.getInfraRepresentativeId())
+                    .ifPresent(emp -> {
+                        transfer.setInfraRepresentativeName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setInfraRepresentativeStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+
+        // Finance Representative
+        if (transfer.getFinanceRepresentativeId() != null) {
+            employeeService.getEmployeeById(transfer.getFinanceRepresentativeId())
+                    .ifPresent(emp -> {
+                        transfer.setFinanceRepresentativeName(emp.getFullName());
+                        if (emp.getUser() != null) {
+                            transfer.setFinanceRepresentativeStaffId(emp.getUser().getStaffId());
+                        }
+                    });
+        }
+    }
+
     @GetMapping("/create")
     public String createTransfer(@RequestParam(required = false) String assetTag, Model model) {
         log.info("Create transfer page accessed with assetTag: {}", assetTag);
@@ -67,7 +171,6 @@ public class TransferViewController {
         model.addAttribute("departments", departmentService.getAllDepartments());
         model.addAttribute("employees", employeeService.getAllEmployees());
 
-        // If assetTag is provided, try to fetch asset details
         if (assetTag != null && !assetTag.isEmpty()) {
             try {
                 var asset = assetService.getAssetByTag(assetTag);
@@ -88,6 +191,9 @@ public class TransferViewController {
             TransferToken transferToken = transferSigningService.validateToken(token);
             Transfer transfer = transferService.getTransferById(transferToken.getTransferId());
 
+            // Populate employee details
+            populateEmployeeDetails(transfer);
+
             // Populate department names
             if (transfer.getOldDepartmentId() != null) {
                 departmentService.getDepartmentById(transfer.getOldDepartmentId())
@@ -98,17 +204,6 @@ public class TransferViewController {
                         .ifPresent(dept -> transfer.setNewDepartmentName(dept.getName()));
             }
 
-            // Populate employee names
-            if (transfer.getOldEmployeeId() != null) {
-                employeeService.getEmployeeById(transfer.getOldEmployeeId())
-                        .ifPresent(emp -> transfer.setOldEmployeeName(emp.getFullName()));
-            }
-            if (transfer.getNewEmployeeId() != null) {
-                employeeService.getEmployeeById(transfer.getNewEmployeeId())
-                        .ifPresent(emp -> transfer.setNewEmployeeName(emp.getFullName()));
-            }
-
-            // Get role display name
             String roleDisplay = getRoleDisplayName(transferToken.getSignerRole());
 
             model.addAttribute("transfer", transfer);

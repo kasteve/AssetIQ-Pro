@@ -36,8 +36,8 @@ public class TransferService {
         }
         transfer.setIsFullySigned(false);
 
-        // Populate employee names from IDs
-        populateEmployeeNames(transfer);
+        // Populate employee names and staff IDs from IDs
+        populateEmployeeDetails(transfer);
 
         Transfer saved = transferRepository.save(transfer);
         createAssetHistory(saved);
@@ -48,41 +48,87 @@ public class TransferService {
         return saved;
     }
 
-    private void populateEmployeeNames(Transfer transfer) {
+    private void populateEmployeeDetails(Transfer transfer) {
         // Old Handover
         if (transfer.getOldHandoverById() != null) {
-            employeeRepository.findById(transfer.getOldHandoverById())
-                    .ifPresent(emp -> transfer.setOldHandoverByName(emp.getFullName()));
+            employeeRepository.findById(transfer.getOldHandoverById()).ifPresent(emp -> {
+                transfer.setOldHandoverByName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setOldHandoverByStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // Old Received
         if (transfer.getOldReceivedById() != null) {
-            employeeRepository.findById(transfer.getOldReceivedById())
-                    .ifPresent(emp -> transfer.setOldReceivedByName(emp.getFullName()));
+            employeeRepository.findById(transfer.getOldReceivedById()).ifPresent(emp -> {
+                transfer.setOldReceivedByName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setOldReceivedByStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // New Handover
         if (transfer.getNewHandoverById() != null) {
-            employeeRepository.findById(transfer.getNewHandoverById())
-                    .ifPresent(emp -> transfer.setNewHandoverByName(emp.getFullName()));
+            employeeRepository.findById(transfer.getNewHandoverById()).ifPresent(emp -> {
+                transfer.setNewHandoverByName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setNewHandoverByStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // New Received
         if (transfer.getNewReceivedById() != null) {
-            employeeRepository.findById(transfer.getNewReceivedById())
-                    .ifPresent(emp -> transfer.setNewReceivedByName(emp.getFullName()));
+            employeeRepository.findById(transfer.getNewReceivedById()).ifPresent(emp -> {
+                transfer.setNewReceivedByName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setNewReceivedByStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // Configured By
         if (transfer.getConfiguredById() != null) {
-            employeeRepository.findById(transfer.getConfiguredById())
-                    .ifPresent(emp -> transfer.setConfiguredByName(emp.getFullName()));
+            employeeRepository.findById(transfer.getConfiguredById()).ifPresent(emp -> {
+                transfer.setConfiguredByName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setConfiguredByStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // Infrastructure Representative
         if (transfer.getInfraRepresentativeId() != null) {
-            employeeRepository.findById(transfer.getInfraRepresentativeId())
-                    .ifPresent(emp -> transfer.setInfraRepresentativeName(emp.getFullName()));
+            employeeRepository.findById(transfer.getInfraRepresentativeId()).ifPresent(emp -> {
+                transfer.setInfraRepresentativeName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setInfraRepresentativeStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
         // Finance Representative
         if (transfer.getFinanceRepresentativeId() != null) {
-            employeeRepository.findById(transfer.getFinanceRepresentativeId())
-                    .ifPresent(emp -> transfer.setFinanceRepresentativeName(emp.getFullName()));
+            employeeRepository.findById(transfer.getFinanceRepresentativeId()).ifPresent(emp -> {
+                transfer.setFinanceRepresentativeName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setFinanceRepresentativeStaffId(emp.getUser().getStaffId());
+                }
+            });
+        }
+        // From Employee
+        if (transfer.getOldEmployeeId() != null) {
+            employeeRepository.findById(transfer.getOldEmployeeId()).ifPresent(emp -> {
+                transfer.setOldEmployeeName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setOldEmployeeStaffId(emp.getUser().getStaffId());
+                }
+            });
+        }
+        // To Employee
+        if (transfer.getNewEmployeeId() != null) {
+            employeeRepository.findById(transfer.getNewEmployeeId()).ifPresent(emp -> {
+                transfer.setNewEmployeeName(emp.getFullName());
+                if (emp.getUser() != null) {
+                    transfer.setNewEmployeeStaffId(emp.getUser().getStaffId());
+                }
+            });
         }
     }
 
@@ -129,7 +175,6 @@ public class TransferService {
     }
 
     private void createAssetHistory(Transfer transfer) {
-        // Only create history if asset exists
         if (transfer.getAssetTag() != null && !transfer.getAssetTag().isEmpty()) {
             assetRepository.findByTag(transfer.getAssetTag())
                     .ifPresent(asset -> {
@@ -151,7 +196,6 @@ public class TransferService {
     }
 
     private void createCompletionHistory(Transfer transfer) {
-        // Only create history if asset exists
         if (transfer.getAssetTag() != null && !transfer.getAssetTag().isEmpty()) {
             assetRepository.findByTag(transfer.getAssetTag())
                     .ifPresent(asset -> {

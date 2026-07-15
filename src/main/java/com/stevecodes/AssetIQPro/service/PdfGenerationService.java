@@ -221,15 +221,17 @@ public class PdfGenerationService {
         String newDept = transfer.getNewDepartmentId() != null ? "Dept ID: " + transfer.getNewDepartmentId() : "N/A";
         String oldEmp = transfer.getOldEmployeeId() != null ? "Emp ID: " + transfer.getOldEmployeeId() : "N/A";
         String newEmp = transfer.getNewEmployeeId() != null ? "Emp ID: " + transfer.getNewEmployeeId() : "N/A";
+        String oldStaffId = transfer.getOldEmployeeStaffId() != null ? "Staff ID: " + transfer.getOldEmployeeStaffId() : "N/A";
+        String newStaffId = transfer.getNewEmployeeStaffId() != null ? "Staff ID: " + transfer.getNewEmployeeStaffId() : "N/A";
 
-        parties.addCell(partyCard("From (Outgoing)", NAVY_2, oldDept, oldEmp, boldFont, regularFont));
-        parties.addCell(partyCard("To (Incoming)", ACCENT, newDept, newEmp, boldFont, regularFont));
+        parties.addCell(partyCardWithStaffId("From (Outgoing)", NAVY_2, oldDept, oldEmp, oldStaffId, boldFont, regularFont));
+        parties.addCell(partyCardWithStaffId("To (Incoming)", ACCENT, newDept, newEmp, newStaffId, boldFont, regularFont));
 
         document.add(parties);
     }
 
-    private Cell partyCard(String headLabel, DeviceRgb accentColor, String dept, String emp,
-                           PdfFont boldFont, PdfFont regularFont) {
+    private Cell partyCardWithStaffId(String headLabel, DeviceRgb accentColor, String dept, String emp, String staffId,
+                                      PdfFont boldFont, PdfFont regularFont) {
         Cell card = new Cell().setBorder(new SolidBorder(LINE_SOFT, 0.75f)).setPadding(0);
 
         Paragraph head = new Paragraph(headLabel.toUpperCase())
@@ -249,6 +251,12 @@ public class PdfGenerationService {
                 .add(new Text(val(emp)).setFont(regularFont).setFontSize(10.5f).setFontColor(INK))
                 .setPadding(7).setMarginBottom(0);
         card.add(empP);
+
+        Paragraph staffP = new Paragraph()
+                .add(new Text("STAFF ID\n").setFont(boldFont).setFontSize(7.5f).setFontColor(INK_SOFT).setCharacterSpacing(0.4f))
+                .add(new Text(val(staffId)).setFont(regularFont).setFontSize(10.5f).setFontColor(INK))
+                .setPadding(7).setMarginBottom(0);
+        card.add(staffP);
 
         return card;
     }
@@ -366,44 +374,66 @@ public class PdfGenerationService {
         grid.setWidth(UnitValue.createPercentValue(100));
         grid.setMarginBottom(4);
 
-        // REMOVED: From Employee and To Employee
-        grid.addCell(buildSignatureBox("Configured By",
-                transfer.getConfiguredByName(),  // name
+        // From Employee with Staff ID
+        grid.addCell(buildSignatureBoxWithStaffId("From Employee",
+                transfer.getOldEmployeeName(),
+                transfer.getOldEmployeeStaffId(),
+                null, null, boldFont, regularFont));
+
+        // To Employee with Staff ID
+        grid.addCell(buildSignatureBoxWithStaffId("To Employee",
+                transfer.getNewEmployeeName(),
+                transfer.getNewEmployeeStaffId(),
+                null, null, boldFont, regularFont));
+
+        grid.addCell(buildSignatureBoxWithStaffId("Configured By",
+                transfer.getConfiguredByName(),
+                transfer.getConfiguredByStaffId(),
                 transfer.getConfiguredBySignature(),
                 transfer.getConfiguredBySignedAt(), boldFont, regularFont));
 
-        grid.addCell(buildSignatureBox("Old Handover",
-                transfer.getOldHandoverByName(),  // name
+        grid.addCell(buildSignatureBoxWithStaffId("Old Handover",
+                transfer.getOldHandoverByName(),
+                transfer.getOldHandoverByStaffId(),
                 transfer.getOldHandoverBySignature(),
                 transfer.getOldHandoverBySignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Old Received",
-                transfer.getOldReceivedByName(),  // name
+
+        grid.addCell(buildSignatureBoxWithStaffId("Old Received",
+                transfer.getOldReceivedByName(),
+                transfer.getOldReceivedByStaffId(),
                 transfer.getOldReceivedBySignature(),
                 transfer.getOldReceivedBySignedAt(), boldFont, regularFont));
 
-        grid.addCell(buildSignatureBox("New Handover",
-                transfer.getNewHandoverByName(),  // name
+        grid.addCell(buildSignatureBoxWithStaffId("New Handover",
+                transfer.getNewHandoverByName(),
+                transfer.getNewHandoverByStaffId(),
                 transfer.getNewHandoverBySignature(),
                 transfer.getNewHandoverBySignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("New Received",
-                transfer.getNewReceivedByName(),  // name
+
+        grid.addCell(buildSignatureBoxWithStaffId("New Received",
+                transfer.getNewReceivedByName(),
+                transfer.getNewReceivedByStaffId(),
                 transfer.getNewReceivedBySignature(),
                 transfer.getNewReceivedBySignedAt(), boldFont, regularFont));
 
-        grid.addCell(buildSignatureBox("Infrastructure Rep",
-                transfer.getInfraRepresentativeName(),  // name
+        grid.addCell(buildSignatureBoxWithStaffId("Infrastructure Rep",
+                transfer.getInfraRepresentativeName(),
+                transfer.getInfraRepresentativeStaffId(),
                 transfer.getInfraRepSignature(),
                 transfer.getInfraRepSignedAt(), boldFont, regularFont));
-        grid.addCell(buildSignatureBox("Finance Rep",
-                transfer.getFinanceRepresentativeName(),  // name
+
+        grid.addCell(buildSignatureBoxWithStaffId("Finance Rep",
+                transfer.getFinanceRepresentativeName(),
+                transfer.getFinanceRepresentativeStaffId(),
                 transfer.getFinanceRepSignature(),
                 transfer.getFinanceRepSignedAt(), boldFont, regularFont));
 
         document.add(grid);
     }
 
-    private Cell buildSignatureBox(String role, String name, String signature, LocalDateTime signedAt,
-                                   PdfFont boldFont, PdfFont regularFont) {
+    private Cell buildSignatureBoxWithStaffId(String role, String name, String staffId,
+                                              String signature, LocalDateTime signedAt,
+                                              PdfFont boldFont, PdfFont regularFont) {
         Cell box = new Cell().setBorder(new SolidBorder(LINE_SOFT, 0.75f)).setPadding(9);
 
         box.add(new Paragraph(role.toUpperCase())
@@ -438,6 +468,10 @@ public class PdfGenerationService {
         // Show signer name
         box.add(new Paragraph(val(name))
                 .setFont(boldFont).setFontSize(9.5f).setFontColor(isSigned ? INK : MUTED).setMarginBottom(1));
+
+        // Show Staff ID
+        box.add(new Paragraph("Staff ID: " + val(staffId))
+                .setFont(regularFont).setFontSize(8f).setFontColor(INK_SOFT).setMarginBottom(1));
 
         String metaText = (isSigned && signedAt != null)
                 ? "Signed " + signedAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"))

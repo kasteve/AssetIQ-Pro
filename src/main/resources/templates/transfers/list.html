@@ -23,8 +23,10 @@
                 <tr>
                     <th>Transfer ID</th>
                     <th>Asset Tag</th>
-                    <th>From</th>
-                    <th>To</th>
+                    <th>Serial Number</th>
+                    <th>From Employee</th>
+                    <th>To Employee</th>
+                    <th>Configured By</th>
                     <th>Date</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -36,12 +38,29 @@
                         <span class="transfer-id" th:text="'#' + ${transfer.transferId}">#1</span>
                     </td>
                     <td th:text="${transfer.assetTag}">AST-001</td>
-                    <td th:text="${transfer.oldDepartmentName}">IT Department</td>
-                    <td th:text="${transfer.newDepartmentName}">Finance</td>
+                    <td th:text="${transfer.serialNumber}">SN123456</td>
+                    <td>
+                        <span th:text="${transfer.oldEmployeeName}">John Doe</span>
+                        <span th:if="${transfer.oldEmployeeStaffId != null}" class="staff-id">
+                            (<span th:text="${transfer.oldEmployeeStaffId}">STAFF001</span>)
+                        </span>
+                    </td>
+                    <td>
+                        <span th:text="${transfer.newEmployeeName}">Jane Smith</span>
+                        <span th:if="${transfer.newEmployeeStaffId != null}" class="staff-id">
+                            (<span th:text="${transfer.newEmployeeStaffId}">STAFF002</span>)
+                        </span>
+                    </td>
+                    <td>
+                        <span th:text="${transfer.configuredByName}">Configured By</span>
+                        <span th:if="${transfer.configuredByStaffId != null}" class="staff-id">
+                            (<span th:text="${transfer.configuredByStaffId}">STAFF003</span>)
+                        </span>
+                    </td>
                     <td th:text="${#temporals.format(transfer.transferDate, 'dd/MM/yyyy')}">2024-01-01</td>
                     <td>
-                            <span class="pill" th:classappend="${transfer.fullySigned} ? 'pill-completed' : 'pill-pending'"
-                                  th:text="${transfer.fullySigned} ? 'Completed' : 'Pending Signatures'">Pending</span>
+                        <span class="pill" th:classappend="${transfer.fullySigned} ? 'pill-completed' : 'pill-pending'"
+                              th:text="${transfer.fullySigned} ? 'Completed' : 'Pending Signatures'">Pending</span>
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
@@ -68,17 +87,7 @@
         </div>
     </div>
 
-    <!--
-      Create Transfer Modal -- now a 3-step wizard carrying the full field
-      set from the standalone create-transfer page:
-        Step 1: Company & Asset Info
-        Step 2: Departments, Employees & Representatives
-        Step 3: Condition, Accessories & Signatures (submit here)
-      Placed inside layout:fragment="content" so it survives layout
-      decoration. Assumes the controller passes ${companies}, ${categories},
-      ${departments}, ${employees} into the model -- same attributes used
-      by the standalone create-transfer page.
-    -->
+    <!-- Create Transfer Modal -->
     <div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -87,7 +96,6 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
-                <!-- Step indicator -->
                 <div class="wizard-steps">
                     <div class="wizard-step-dot active" data-step="1">
                         <span class="dot-num">1</span>
@@ -108,7 +116,7 @@
                 <form id="createTransferForm" th:action="@{/transfers/create}" method="post" enctype="multipart/form-data">
                     <div class="modal-body">
 
-                        <!-- ===== STEP 1: Company & Asset Info ===== -->
+                        <!-- STEP 1: Company & Asset Info -->
                         <div class="wizard-pane" data-step="1">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -148,7 +156,7 @@
                             </div>
                         </div>
 
-                        <!-- ===== STEP 2: Departments, Employees & Representatives ===== -->
+                        <!-- STEP 2: Departments, Employees & Representatives -->
                         <div class="wizard-pane" data-step="2" style="display:none;">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -169,34 +177,34 @@
                                     <label class="form-label fw-semibold">From Employee</label>
                                     <select name="oldEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">To Employee</label>
                                     <select name="newEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Infrastructure Representative</label>
                                     <select name="infraRepresentativeId" class="form-select">
                                         <option value="">Select Infrastructure Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Finance Representative</label>
                                     <select name="financeRepresentativeId" class="form-select">
                                         <option value="">Select Finance Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- ===== STEP 3: Condition, Accessories & Signatures ===== -->
+                        <!-- STEP 3: Condition, Accessories & Signatures -->
                         <div class="wizard-pane" data-step="3" style="display:none;">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -230,35 +238,35 @@
                                     <label class="form-label fw-semibold">Old Handover By</label>
                                     <select name="oldHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Old Received By</label>
                                     <select name="oldReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Handover By</label>
                                     <select name="newHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Received By</label>
                                     <select name="newReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Configured By</label>
                                     <select name="configuredById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                             </div>
@@ -306,6 +314,7 @@
         .transfers-table tbody tr:hover { background: #f8f9fc; }
         .transfers-table tbody tr:last-child td { border-bottom: none; }
         .transfer-id { font-weight: 700; color: var(--ink); }
+        .staff-id { font-size: 11px; color: #6c757d; }
 
         .pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
         .pill-completed { background: #d4edda; color: #157a34; }
@@ -320,7 +329,7 @@
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
 
-        /* ===== Transfer wizard modal ===== */
+        /* Wizard modal */
         .modal-lg { max-width: 720px; }
         .wizard-steps { display: flex; align-items: center; justify-content: center; padding: 18px 24px 4px; gap: 6px; }
         .wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #adb5bd; flex-shrink: 0; }
@@ -363,7 +372,6 @@
         }
 
         function wizardNextStep() {
-            // Validate only the fields visible in the current step before advancing
             const currentPane = document.querySelector('#createTransferForm .wizard-pane[data-step="' + transferWizardStep + '"]');
             const fields = currentPane.querySelectorAll('input, select, textarea');
             for (const field of fields) {
@@ -385,7 +393,6 @@
             }
         }
 
-        // Reset the wizard to step 1 every time the modal is opened
         document.addEventListener('DOMContentLoaded', function () {
             const modalEl = document.getElementById('createTransferModal');
             if (modalEl) {
