@@ -1,10 +1,6 @@
 package com.stevecodes.AssetIQPro.controller;
 
-import com.stevecodes.AssetIQPro.dto.AssetDTO;
 import com.stevecodes.AssetIQPro.entity.Asset;
-import com.stevecodes.AssetIQPro.entity.Category;
-import com.stevecodes.AssetIQPro.entity.Location;
-import com.stevecodes.AssetIQPro.entity.Supplier;
 import com.stevecodes.AssetIQPro.service.AssetService;
 import com.stevecodes.AssetIQPro.service.CategoryService;
 import com.stevecodes.AssetIQPro.service.LocationService;
@@ -34,7 +30,7 @@ public class AssetViewController {
     @GetMapping
     public String assets(Model model) {
         log.info("Loading assets page");
-        model.addAttribute("assets", assetService.getAllAssets());
+        model.addAttribute("assets", assetService.getAllAssets()); // Should return List<Asset>
         model.addAttribute("categories", categoryService.getAllCategories());
         model.addAttribute("locations", locationService.getAllLocations());
         model.addAttribute("suppliers", supplierService.getAllSuppliers());

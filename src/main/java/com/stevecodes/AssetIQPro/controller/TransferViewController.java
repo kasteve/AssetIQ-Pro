@@ -29,6 +29,7 @@ public class TransferViewController {
     private final CategoryService categoryService;
     private final DepartmentService departmentService;
     private final EmployeeService employeeService;
+    private final AssetService assetService;
 
     @GetMapping
     public String transfers(Model model) {
@@ -54,6 +55,29 @@ public class TransferViewController {
         model.addAttribute("departments", departmentService.getAllDepartments());
         model.addAttribute("employees", employeeService.getAllEmployees());
         return "transfers/list";
+    }
+
+    @GetMapping("/create")
+    public String createTransfer(@RequestParam(required = false) String assetTag, Model model) {
+        log.info("Create transfer page accessed with assetTag: {}", assetTag);
+
+        model.addAttribute("assetTag", assetTag);
+        model.addAttribute("companies", companyService.getAllCompanies());
+        model.addAttribute("categories", categoryService.getAllCategories());
+        model.addAttribute("departments", departmentService.getAllDepartments());
+        model.addAttribute("employees", employeeService.getAllEmployees());
+
+        // If assetTag is provided, try to fetch asset details
+        if (assetTag != null && !assetTag.isEmpty()) {
+            try {
+                var asset = assetService.getAssetByTag(assetTag);
+                model.addAttribute("asset", asset);
+            } catch (Exception e) {
+                log.warn("Asset not found with tag: {}", assetTag);
+            }
+        }
+
+        return "transfers/create";
     }
 
     @GetMapping("/sign")
@@ -120,7 +144,6 @@ public class TransferViewController {
         }
     }
 
-    // POST endpoint - Submit signature
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Integer transferId,
                                   @RequestParam String token,
@@ -129,23 +152,16 @@ public class TransferViewController {
         try {
             log.info("Submitting signature for transfer: {}, token: {}", transferId, token);
 
-            // Validate token
             TransferToken transferToken = transferSigningService.validateToken(token);
-
-            // Save signature
             transferSigningService.saveSignature(transferId, transferToken.getSignerRole(), signature);
 
-            // Mark token as used
             transferToken.setIsUsed(true);
             transferTokenRepository.save(transferToken);
 
-            // Check if fully signed
             boolean fullySigned = transferSigningService.isTransferFullySigned(transferId);
 
             if (fullySigned) {
-                // Generate and send PDF to all signers
                 transferSigningService.generateFullySignedPdf(transferId);
-
                 redirectAttributes.addFlashAttribute("message", "Transfer fully signed! PDF certificate emailed to all parties.");
                 redirectAttributes.addFlashAttribute("fullySigned", true);
             } else {
@@ -182,8 +198,6 @@ public class TransferViewController {
             transfer.setIsFullySigned(false);
 
             Transfer saved = transferService.createTransfer(transfer);
-
-            // Auto-initiate signing
             transferSigningService.initiateTransferSigning(saved.getTransferId());
 
             redirectAttributes.addFlashAttribute("success", "Transfer created successfully! Signing emails sent to all signers.");

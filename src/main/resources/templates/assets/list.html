@@ -112,17 +112,40 @@
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
                             <button type="button" class="btn btn-outline-primary" title="Edit"
-                                    th:onclick="'editAsset(' + ${asset.assetId} + ')'">
+                                    data-bs-toggle="modal" data-bs-target="#editAssetModal"
+                                    th:data-assetid="${asset.assetId}"
+                                    th:data-tag="${asset.tag}"
+                                    th:data-name="${asset.name}"
+                                    th:data-serial="${asset.serialNumber}"
+                                    th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
+                                    th:data-supplierid="${asset.supplier != null ? asset.supplier.supplierId : ''}"
+                                    th:data-locationid="${asset.location != null ? asset.location.locationId : ''}"
+                                    th:data-status="${asset.status}"
+                                    th:data-purchasedate="${asset.purchaseDate}"
+                                    th:data-purchasecost="${asset.purchaseCost}"
+                                    th:data-warrantyyears="${asset.warrantyYears}"
+                                    th:data-warrantyenddate="${asset.warrantyEndDate}"
+                                    th:data-eoldate="${asset.eolDate}"
+                                    th:data-warrantynotificationdays="${asset.warrantyNotificationDays}"
+                                    th:data-eolnotificationdays="${asset.eolNotificationDays}"
+                                    th:data-invoicepath="${asset.purchaseInvoicePath}"
+                                    onclick="editAsset(this)">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button type="button" class="btn btn-outline-info" title="View"
-                                    th:onclick="'viewAsset(' + ${asset.assetId} + ')'">
+                                    th:data-assetid="${asset.assetId}"
+                                    onclick="viewAsset(this)">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <a th:href="@{/transfers/create?assetTag={tag}(tag=${asset.tag})}" class="btn btn-outline-success" title="Transfer">
+                            <button type="button" class="btn btn-outline-success" title="Transfer"
+                                    th:data-assetid="${asset.assetId}"
+                                    th:data-tag="${asset.tag}"
+                                    onclick="transferAsset(this)">
                                 <i class="fas fa-exchange-alt"></i>
-                            </a>
-                            <button type="button" class="btn btn-outline-danger" th:onclick="'deleteAsset(' + ${asset.assetId} + ')'" title="Delete">
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" title="Delete"
+                                    th:data-assetid="${asset.assetId}"
+                                    onclick="deleteAsset(this)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -283,6 +306,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="editAssetForm" th:action="@{/assets}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" id="editAssetId" name="assetId">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -446,13 +470,24 @@
     <script>
         let currentAssetId = null;
 
-        function deleteAsset(id) {
+        function deleteAsset(button) {
+            const id = button.getAttribute('data-assetid');
             if (confirm('Are you sure you want to delete this asset?')) {
-                window.location.href = '/assetIQ-pro/assets/' + id + '/delete';
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/assetIQ-pro/assets/' + id + '/delete';
+                document.body.appendChild(form);
+                form.submit();
             }
         }
 
-        function viewAsset(id) {
+        function transferAsset(button) {
+            const tag = button.getAttribute('data-tag');
+            window.location.href = '/assetIQ-pro/transfers/create?assetTag=' + encodeURIComponent(tag);
+        }
+
+        function viewAsset(button) {
+            const id = button.getAttribute('data-assetid');
             currentAssetId = id;
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewAssetModal'));
             const body = document.getElementById('assetDetailBody');
@@ -525,11 +560,11 @@
                                 </div>
                                 <div class="detail-item mb-3">
                                     <span class="label">Location</span>
-                                    <span class="value">${asset.location?.name || 'N/A'}</span>
+                                    <span class="value">${asset.locationName || asset.location?.name || 'N/A'}</span>
                                 </div>
                                 <div class="detail-item mb-3">
                                     <span class="label">Supplier</span>
-                                    <span class="value">${asset.supplier?.name || 'N/A'}</span>
+                                    <span class="value">${asset.supplierName || asset.supplier?.name || 'N/A'}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -609,7 +644,8 @@
             viewModal.hide();
         }
 
-        function editAsset(id) {
+        function editAsset(button) {
+            const id = button.getAttribute('data-assetid');
             currentAssetId = id;
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editAssetModal'));
             const form = document.getElementById('editAssetForm');
@@ -624,6 +660,7 @@
             fetch('/assetIQ-pro/api/assets/' + id)
                 .then(response => response.json())
                 .then(asset => {
+                    document.getElementById('editAssetId').value = asset.assetId || '';
                     document.getElementById('editTag').value = asset.tag || '';
                     document.getElementById('editSerialNumber').value = asset.serialNumber || '';
                     document.getElementById('editName').value = asset.name || '';
