@@ -102,9 +102,6 @@
                                     th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <a th:href="@{/admin/permissions?userId=${user.userId}}" class="btn btn-outline-info" title="Permissions">
-                                <i class="fas fa-lock"></i>
-                            </a>
                             <button type="button" class="btn btn-outline-warning" title="Reset Password"
                                     data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
                                     th:data-userid="${user.userId}" th:data-username="${user.username}">
