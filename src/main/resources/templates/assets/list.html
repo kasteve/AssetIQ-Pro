@@ -56,6 +56,11 @@
         </div>
     </div>
 
+    <!-- DEBUG: Show asset count -->
+    <div th:if="${assets != null}" class="alert alert-info">
+        Found <strong th:text="${assets.size()}">0</strong> assets in database
+    </div>
+
     <!-- Asset Table -->
     <div class="table-card">
         <div class="table-responsive">
@@ -138,9 +143,13 @@
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button type="button" class="btn btn-outline-success" title="Transfer"
+                                    data-bs-toggle="modal" data-bs-target="#createTransferModal"
                                     th:data-assetid="${asset.assetId}"
                                     th:data-tag="${asset.tag}"
-                                    onclick="transferAsset(this)">
+                                    th:data-serial="${asset.serialNumber}"
+                                    th:data-name="${asset.name}"
+                                    th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
+                                    onclick="openTransferModal(this)">
                                 <i class="fas fa-exchange-alt"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger" title="Delete"
@@ -397,6 +406,212 @@
             </div>
         </div>
     </div>
+
+    <!-- Create Transfer Modal -->
+    <div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-exchange-alt me-2" style="color: #0d6efd;"></i>Create Transfer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- Step indicator -->
+                <div class="wizard-steps">
+                    <div class="wizard-step-dot active" data-step="1">
+                        <span class="dot-num">1</span>
+                        <span class="dot-label">Asset Info</span>
+                    </div>
+                    <div class="wizard-step-line"></div>
+                    <div class="wizard-step-dot" data-step="2">
+                        <span class="dot-num">2</span>
+                        <span class="dot-label">People</span>
+                    </div>
+                    <div class="wizard-step-line"></div>
+                    <div class="wizard-step-dot" data-step="3">
+                        <span class="dot-num">3</span>
+                        <span class="dot-label">Condition &amp; Signoff</span>
+                    </div>
+                </div>
+
+                <form id="createTransferForm" th:action="@{/transfers/create}" method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+
+                        <!-- ===== STEP 1: Company & Asset Info ===== -->
+                        <div class="wizard-pane" data-step="1">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Company *</label>
+                                    <select name="companyId" class="form-select" required>
+                                        <option value="">Select Company</option>
+                                        <option th:each="c : ${companies}" th:value="${c.companyId}" th:text="${c.name}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Transfer Date</label>
+                                    <input type="date" name="transferDate" class="form-control" th:value="${#dates.format(#dates.createNow(), 'yyyy-MM-dd')}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Category</label>
+                                    <select id="transferCategoryId" name="categoryId" class="form-select">
+                                        <option value="">Select Category</option>
+                                        <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Asset Tag *</label>
+                                    <input type="text" id="transferAssetTag" name="assetTag" class="form-control" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Serial Number</label>
+                                    <input type="text" id="transferSerialNumber" name="serialNumber" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Version / Make</label>
+                                    <input type="text" id="transferVersionMake" name="versionMake" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Model / Build</label>
+                                    <input type="text" id="transferModelBuild" name="modelBuild" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== STEP 2: Departments, Employees & Representatives ===== -->
+                        <div class="wizard-pane" data-step="2" style="display:none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">From Department</label>
+                                    <select name="oldDepartmentId" class="form-select">
+                                        <option value="">Select Department</option>
+                                        <option th:each="d : ${departments}" th:value="${d.departmentId}" th:text="${d.name}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">To Department</label>
+                                    <select name="newDepartmentId" class="form-select">
+                                        <option value="">Select Department</option>
+                                        <option th:each="d : ${departments}" th:value="${d.departmentId}" th:text="${d.name}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">From Employee</label>
+                                    <select name="oldEmployeeId" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">To Employee</label>
+                                    <select name="newEmployeeId" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Infrastructure Representative</label>
+                                    <select name="infraRepresentativeId" class="form-select">
+                                        <option value="">Select Infrastructure Rep</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Finance Representative</label>
+                                    <select name="financeRepresentativeId" class="form-select">
+                                        <option value="">Select Finance Rep</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== STEP 3: Condition, Accessories & Signatures ===== -->
+                        <div class="wizard-pane" data-step="3" style="display:none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Previous Condition</label>
+                                    <textarea name="conditionOld" class="form-control" rows="2" placeholder="Describe previous condition..."></textarea>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Current Condition</label>
+                                    <textarea name="conditionNew" class="form-control" rows="2" placeholder="Describe current condition..."></textarea>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Previous Accessories</label>
+                                    <textarea name="accessoriesOld" class="form-control" rows="2" placeholder="List previous accessories..."></textarea>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Current Accessories</label>
+                                    <textarea name="accessoriesNew" class="form-control" rows="2" placeholder="List current accessories..."></textarea>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label fw-semibold">Software Installed</label>
+                                    <textarea name="softwareInstalled" class="form-control" rows="2" placeholder="List installed software..."></textarea>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label fw-semibold">Comments</label>
+                                    <textarea name="comments" class="form-control" rows="2" placeholder="Additional comments..."></textarea>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Old Handover By</label>
+                                    <select name="oldHandoverById" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Old Received By</label>
+                                    <select name="oldReceivedById" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">New Handover By</label>
+                                    <select name="newHandoverById" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">New Received By</label>
+                                    <select name="newReceivedById" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Configured By</label>
+                                    <select name="configuredById" class="form-select">
+                                        <option value="">Select Employee</option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer wizard-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <div class="wizard-nav-btns">
+                            <button type="button" id="wizardPrevBtn" class="btn btn-outline-secondary" onclick="wizardPrevStep()" style="display:none;">
+                                <i class="fas fa-arrow-left me-2"></i>Previous
+                            </button>
+                            <button type="button" id="wizardNextBtn" class="btn btn-primary" onclick="wizardNextStep()">
+                                Next<i class="fas fa-arrow-right ms-2"></i>
+                            </button>
+                            <button type="submit" id="wizardSubmitBtn" class="btn btn-success" style="display:none;">
+                                <i class="fas fa-save me-2"></i>Create Transfer
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div layout:fragment="styles">
@@ -463,6 +678,26 @@
 
         .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; }
         .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
+
+        /* ===== Transfer wizard modal ===== */
+        .modal-lg { max-width: 720px; }
+        .wizard-steps { display: flex; align-items: center; justify-content: center; padding: 18px 24px 4px; gap: 6px; }
+        .wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #adb5bd; flex-shrink: 0; }
+        .wizard-step-dot .dot-num {
+            width: 30px; height: 30px; border-radius: 50%; background: #eef0f3; color: #9aa0a6;
+            display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+            transition: all 0.2s ease; border: 2px solid transparent;
+        }
+        .wizard-step-dot .dot-label { font-size: 11px; font-weight: 600; text-align: center; max-width: 90px; color: #9aa0a6; }
+        .wizard-step-dot.active .dot-num { background: var(--primary-color); color: white; box-shadow: 0 4px 12px rgba(13,110,253,0.3); }
+        .wizard-step-dot.active .dot-label { color: var(--ink); }
+        .wizard-step-dot.completed .dot-num { background: #198754; color: white; }
+        .wizard-step-dot.completed .dot-label { color: #198754; }
+        .wizard-step-line { flex: 1; height: 2px; background: #eef0f3; max-width: 60px; margin-top: -18px; }
+
+        .wizard-pane { min-height: 120px; }
+        .wizard-footer { justify-content: space-between !important; }
+        .wizard-nav-btns { display: flex; gap: 8px; }
     </style>
 </div>
 
@@ -470,6 +705,7 @@
     <script>
         let currentAssetId = null;
 
+        // ===== Asset Actions =====
         function deleteAsset(button) {
             const id = button.getAttribute('data-assetid');
             if (confirm('Are you sure you want to delete this asset?')) {
@@ -479,11 +715,6 @@
                 document.body.appendChild(form);
                 form.submit();
             }
-        }
-
-        function transferAsset(button) {
-            const tag = button.getAttribute('data-tag');
-            window.location.href = '/assetIQ-pro/transfers/create?assetTag=' + encodeURIComponent(tag);
         }
 
         function viewAsset(button) {
@@ -638,7 +869,8 @@
 
             viewModalEl.addEventListener('hidden.bs.modal', function onHidden() {
                 viewModalEl.removeEventListener('hidden.bs.modal', onHidden);
-                editAsset(currentAssetId);
+                const btn = document.querySelector(`button[data-assetid="${currentAssetId}"]`);
+                if (btn) editAsset(btn);
             }, { once: true });
 
             viewModal.hide();
@@ -685,6 +917,73 @@
                     alert('Failed to load asset details for editing.');
                 });
         }
+
+        // ===== Transfer Modal Functions =====
+        function openTransferModal(button) {
+            const tag = button.getAttribute('data-tag') || '';
+            const serial = button.getAttribute('data-serial') || '';
+            const categoryId = button.getAttribute('data-categoryid') || '';
+
+            document.getElementById('transferAssetTag').value = tag;
+            document.getElementById('transferSerialNumber').value = serial;
+            document.getElementById('transferCategoryId').value = categoryId;
+
+            // Reset wizard to step 1
+            transferWizardStep = 1;
+            showTransferWizardStep(1);
+        }
+
+        // ===== Wizard Functions =====
+        const TRANSFER_WIZARD_TOTAL_STEPS = 3;
+        let transferWizardStep = 1;
+
+        function showTransferWizardStep(step) {
+            document.querySelectorAll('#createTransferForm .wizard-pane').forEach(function (pane) {
+                pane.style.display = (parseInt(pane.getAttribute('data-step'), 10) === step) ? 'block' : 'none';
+            });
+            document.querySelectorAll('.wizard-step-dot').forEach(function (dot) {
+                const dotStep = parseInt(dot.getAttribute('data-step'), 10);
+                dot.classList.remove('active', 'completed');
+                if (dotStep < step) dot.classList.add('completed');
+                if (dotStep === step) dot.classList.add('active');
+            });
+            document.getElementById('wizardPrevBtn').style.display = (step === 1) ? 'none' : 'inline-block';
+            document.getElementById('wizardNextBtn').style.display = (step === TRANSFER_WIZARD_TOTAL_STEPS) ? 'none' : 'inline-block';
+            document.getElementById('wizardSubmitBtn').style.display = (step === TRANSFER_WIZARD_TOTAL_STEPS) ? 'inline-block' : 'none';
+        }
+
+        function wizardNextStep() {
+            const currentPane = document.querySelector('#createTransferForm .wizard-pane[data-step="' + transferWizardStep + '"]');
+            const fields = currentPane.querySelectorAll('input, select, textarea');
+            for (const field of fields) {
+                if (field.hasAttribute('required') && !field.checkValidity()) {
+                    field.reportValidity();
+                    return;
+                }
+            }
+            if (transferWizardStep < TRANSFER_WIZARD_TOTAL_STEPS) {
+                transferWizardStep++;
+                showTransferWizardStep(transferWizardStep);
+            }
+        }
+
+        function wizardPrevStep() {
+            if (transferWizardStep > 1) {
+                transferWizardStep--;
+                showTransferWizardStep(transferWizardStep);
+            }
+        }
+
+        // Reset wizard when modal opens
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalEl = document.getElementById('createTransferModal');
+            if (modalEl) {
+                modalEl.addEventListener('show.bs.modal', function () {
+                    transferWizardStep = 1;
+                    showTransferWizardStep(1);
+                });
+            }
+        });
     </script>
 </div>
 </body>
