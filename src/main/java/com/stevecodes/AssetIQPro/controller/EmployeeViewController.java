@@ -36,7 +36,6 @@ public class EmployeeViewController {
                                  @RequestParam(required = false) Integer departmentId,
                                  RedirectAttributes redirectAttributes) {
         try {
-            // Check if staff ID already exists
             if (employeeService.getEmployeeByStaffId(staffId).isPresent()) {
                 redirectAttributes.addFlashAttribute("error", "Staff ID '" + staffId + "' already exists!");
                 return "redirect:/admin/employees";
@@ -57,6 +56,25 @@ public class EmployeeViewController {
         } catch (Exception e) {
             log.error("Error creating employee: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to create employee: " + e.getMessage());
+        }
+        return "redirect:/admin/employees";
+    }
+
+    @PostMapping("/update")
+    public String updateEmployee(@RequestParam Long employeeId,
+                                 @RequestParam String staffId,
+                                 @RequestParam String firstName,
+                                 @RequestParam String surName,
+                                 @RequestParam String emailAddress,
+                                 @RequestParam(required = false) String phoneNumber,
+                                 @RequestParam(required = false) Integer departmentId,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            employeeService.updateEmployee(employeeId, staffId, firstName, surName, emailAddress, phoneNumber, departmentId);
+            redirectAttributes.addFlashAttribute("success", "Employee updated successfully!");
+        } catch (Exception e) {
+            log.error("Error updating employee: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to update employee: " + e.getMessage());
         }
         return "redirect:/admin/employees";
     }

@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.service;
 
+import com.stevecodes.AssetIQPro.entity.Department;
 import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,19 @@ public class EmployeeService {
 
     @Transactional
     public Employee createEmployee(Employee employee) {
+        return employeeRepository.save(employee);
+    }
+
+    @Transactional
+    public Employee updateEmployee(Long id, String staffId, String firstName, String surName,
+                                   String emailAddress, String phoneNumber, Integer departmentId) {
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+        employee.setStaffId(staffId);
+        employee.setFirstName(firstName);
+        employee.setSurName(surName);
+        employee.setEmailAddress(emailAddress);
+        employee.setPhoneNumber(phoneNumber);
         return employeeRepository.save(employee);
     }
 
