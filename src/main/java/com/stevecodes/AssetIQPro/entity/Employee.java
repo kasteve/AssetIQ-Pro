@@ -18,6 +18,9 @@ public class Employee {
     @Column(name = "EmployeeId")
     private Long employeeId;
 
+    @Column(name = "staff_id", unique = true, nullable = false, length = 50)
+    private String staffId;
+
     @Column(name = "FirstName")
     private String firstName;
 
@@ -37,16 +40,13 @@ public class Employee {
     @Transient
     private Integer departmentId;
 
-    // New: Link to AppUser (one-to-one)
     @OneToOne(mappedBy = "employee")
     private AppUser user;
 
-    // New: Line Manager (self-reference)
     @ManyToOne
     @JoinColumn(name = "line_manager_id")
     private Employee lineManager;
 
-    // New: Subordinates (employees reporting to this manager)
     @OneToMany(mappedBy = "lineManager")
     private List<Employee> subordinates = new ArrayList<>();
 

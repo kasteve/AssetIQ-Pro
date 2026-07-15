@@ -20,11 +20,19 @@
         <div class="table-responsive">
             <table class="table table-hover emp-table">
                 <thead>
-                <tr><th>ID</th><th>First Name</th><th>Surname</th><th>Email</th><th>Department</th><th>Phone</th><th>Actions</th></tr>
+                <tr>
+                    <th>Staff ID</th>
+                    <th>First Name</th>
+                    <th>Surname</th>
+                    <th>Email</th>
+                    <th>Department</th>
+                    <th>Phone</th>
+                    <th>Actions</th>
+                </tr>
                 </thead>
                 <tbody>
                 <tr th:each="emp : ${employees}">
-                    <td class="emp-id" th:text="${emp.employeeId}">1</td>
+                    <td class="emp-staffid" th:text="${emp.staffId}">EMP001</td>
                     <td class="emp-name" th:text="${emp.firstName}">John</td>
                     <td class="emp-name" th:text="${emp.surName}">Doe</td>
                     <td class="emp-email" th:text="${emp.emailAddress}">john@company.com</td>
@@ -35,10 +43,9 @@
                     <td class="emp-phone" th:text="${emp.phoneNumber}">+256-700-000001</td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit" th:onclick="'editEmployee(' + ${emp.employeeId} + ')'">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete" th:onclick="'deleteEmployee(' + ${emp.employeeId} + ')'">
+                            <button type="button" class="btn btn-outline-danger" title="Delete"
+                                    th:data-id="${emp.employeeId}"
+                                    onclick="deleteEmployee(this)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -63,6 +70,12 @@
                 </div>
                 <form th:action="@{/admin/employees}" method="post">
                     <div class="modal-body">
+                        <!-- Staff ID Field -->
+                        <div class="mb-3">
+                            <label class="form-label">Staff ID *</label>
+                            <input type="text" name="staffId" class="form-control" placeholder="e.g., EMP001" required>
+                            <small class="text-muted">Unique identifier for the employee</small>
+                        </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">First Name *</label>
@@ -122,7 +135,7 @@
         .emp-table tbody tr { transition: background 0.15s ease; }
         .emp-table tbody tr:hover { background: #f8f9fc; }
         .emp-table tbody tr:last-child td { border-bottom: none; }
-        .emp-id { color: #9aa0a6; font-weight: 600; }
+        .emp-staffid { font-weight: 700; color: var(--primary-color); font-family: monospace; }
         .emp-name { font-weight: 700; color: var(--ink); }
         .emp-email { color: #6c757d; }
         .emp-dept { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; }
@@ -131,7 +144,6 @@
 
         .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
         .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
         .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
@@ -149,9 +161,15 @@
 
 <div layout:fragment="scripts">
     <script>
-        function editEmployee(id) { window.location.href = '/admin/employees/' + id + '/edit'; }
-        function deleteEmployee(id) {
-            if (confirm('Delete this employee?')) window.location.href = '/admin/employees/' + id + '/delete';
+        function deleteEmployee(button) {
+            const id = button.getAttribute('data-id');
+            if (confirm('Delete this employee permanently?')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/assetIQ-pro/admin/employees/' + id + '/delete';
+                document.body.appendChild(form);
+                form.submit();
+            }
         }
     </script>
 </div>

@@ -4,6 +4,7 @@ import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,10 +23,16 @@ public class EmployeeService {
         return employeeRepository.findById(id);
     }
 
+    public Optional<Employee> getEmployeeByStaffId(String staffId) {
+        return employeeRepository.findByStaffId(staffId);
+    }
+
+    @Transactional
     public Employee createEmployee(Employee employee) {
         return employeeRepository.save(employee);
     }
 
+    @Transactional
     public void deleteEmployee(Long id) {
         employeeRepository.deleteById(id);
     }

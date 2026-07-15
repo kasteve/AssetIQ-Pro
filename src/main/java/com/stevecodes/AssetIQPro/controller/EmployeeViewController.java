@@ -28,18 +28,27 @@ public class EmployeeViewController {
     }
 
     @PostMapping
-    public String createEmployee(@RequestParam String firstName, @RequestParam String surName,
-                                 @RequestParam String emailAddress, @RequestParam(required = false) String phoneNumber,
+    public String createEmployee(@RequestParam String staffId,
+                                 @RequestParam String firstName,
+                                 @RequestParam String surName,
+                                 @RequestParam String emailAddress,
+                                 @RequestParam(required = false) String phoneNumber,
                                  @RequestParam(required = false) Integer departmentId,
                                  RedirectAttributes redirectAttributes) {
         try {
+            // Check if staff ID already exists
+            if (employeeService.getEmployeeByStaffId(staffId).isPresent()) {
+                redirectAttributes.addFlashAttribute("error", "Staff ID '" + staffId + "' already exists!");
+                return "redirect:/admin/employees";
+            }
+
             Employee employee = new Employee();
+            employee.setStaffId(staffId);
             employee.setFirstName(firstName);
             employee.setSurName(surName);
             employee.setEmailAddress(emailAddress);
             employee.setPhoneNumber(phoneNumber);
             if (departmentId != null) {
-                // Fix: Use orElse(null) to get Department from Optional
                 Department dept = departmentService.getDepartmentById(departmentId).orElse(null);
                 employee.setDepartment(dept);
             }
@@ -52,7 +61,7 @@ public class EmployeeViewController {
         return "redirect:/admin/employees";
     }
 
-    @GetMapping("/{id}/delete")
+    @PostMapping("/{id}/delete")
     public String deleteEmployee(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
             employeeService.deleteEmployee(id);

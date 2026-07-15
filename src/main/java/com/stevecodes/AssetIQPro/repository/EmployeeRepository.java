@@ -12,11 +12,9 @@ import java.util.Optional;
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
-    // FIXED: Use emailAddress instead of email
     Optional<Employee> findByEmailAddress(String emailAddress);
 
-    // Remove this method or change to use emailAddress
-    // Optional<Employee> findByEmail(String email);  // REMOVE THIS
+    Optional<Employee> findByStaffId(String staffId);
 
     List<Employee> findByDepartment_DepartmentId(Integer departmentId);
 
@@ -29,6 +27,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findAllOrderedByName();
 
     boolean existsByEmailAddress(String emailAddress);
+
+    boolean existsByStaffId(String staffId);
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.department.departmentId = :departmentId")
     long countByDepartmentId(@Param("departmentId") Integer departmentId);
