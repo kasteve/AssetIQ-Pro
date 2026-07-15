@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "Employees", schema = "dbo")
 @Data
@@ -28,11 +31,24 @@ public class Employee {
     private String phoneNumber;
 
     @ManyToOne
-    @JoinColumn(name = "DepartmentId", nullable = false)
+    @JoinColumn(name = "DepartmentId")
     private Department department;
 
     @Transient
     private Integer departmentId;
+
+    // New: Link to AppUser (one-to-one)
+    @OneToOne(mappedBy = "employee")
+    private AppUser user;
+
+    // New: Line Manager (self-reference)
+    @ManyToOne
+    @JoinColumn(name = "line_manager_id")
+    private Employee lineManager;
+
+    // New: Subordinates (employees reporting to this manager)
+    @OneToMany(mappedBy = "lineManager")
+    private List<Employee> subordinates = new ArrayList<>();
 
     public String getFullName() {
         if (firstName != null && surName != null) {

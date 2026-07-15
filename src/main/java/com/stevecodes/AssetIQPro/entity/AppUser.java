@@ -21,6 +21,9 @@ public class AppUser {
     @Column(name = "user_id")
     private Long userId;
 
+    @Column(name = "staff_id", unique = true, nullable = false, length = 50)
+    private String staffId;
+
     @Column(unique = true, nullable = false, length = 100)
     private String username;
 
@@ -67,6 +70,16 @@ public class AppUser {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // New: Department relationship
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department departmentEntity;
+
+    // New: Employee relationship (one-to-one)
+    @OneToOne
+    @JoinColumn(name = "employee_id")
+    private Employee employee;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

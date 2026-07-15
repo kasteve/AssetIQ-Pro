@@ -2,10 +2,14 @@ package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.UserDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.Department;
+import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.entity.Permission;
 import com.stevecodes.AssetIQPro.exception.ResourceNotFoundException;
 import com.stevecodes.AssetIQPro.exception.UserAlreadyExistsException;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
+import com.stevecodes.AssetIQPro.repository.DepartmentRepository;
+import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import com.stevecodes.AssetIQPro.repository.PermissionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +32,12 @@ public class AppUserService {
 
     @Autowired
     private AppUserRepository userRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private DepartmentRepository departmentRepository;
 
     @Autowired
     private PermissionRepository permissionRepository;
@@ -78,24 +88,58 @@ public class AppUserService {
     public AppUser createUser(UserDTO userDTO) {
         log.info("Creating new user: {}", userDTO.getUsername());
 
+        // Validate
         if (userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username '" + userDTO.getUsername() + "' is already taken.");
         }
         if (userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
             throw new UserAlreadyExistsException("Email '" + userDTO.getEmail() + "' is already registered.");
         }
+        if (userDTO.getStaffId() != null && userRepository.findByStaffId(userDTO.getStaffId()).isPresent()) {
+            throw new UserAlreadyExistsException("Staff ID '" + userDTO.getStaffId() + "' is already registered.");
+        }
 
         String tempPassword = generateTemporaryPassword();
 
+        // 1. Create Employee first
+        Employee employee = new Employee();
+        employee.setFirstName(getFirstName(userDTO.getFullName()));
+        employee.setSurName(getLastName(userDTO.getFullName()));
+        employee.setEmailAddress(userDTO.getEmail());
+        employee.setPhoneNumber(userDTO.getPhoneNumber());
+
+        // Set department if provided
+        if (userDTO.getDepartmentId() != null) {
+            Department dept = departmentRepository.findById(userDTO.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+            employee.setDepartment(dept);
+        }
+
+        // Set Line Manager if provided
+        if (userDTO.getLineManagerId() != null) {
+            Employee lineManager = employeeRepository.findById(userDTO.getLineManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Line Manager not found"));
+            employee.setLineManager(lineManager);
+        }
+
+        Employee savedEmployee = employeeRepository.save(employee);
+        log.info("Employee created with ID: {}", savedEmployee.getEmployeeId());
+
+        // 2. Create AppUser
         AppUser user = new AppUser();
+        user.setStaffId(userDTO.getStaffId());
         user.setUsername(userDTO.getUsername());
         user.setEmail(userDTO.getEmail());
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setFullName(userDTO.getFullName());
         user.setRole(userDTO.getRole() != null ? userDTO.getRole() : "EMPLOYEE");
 
-        if (userDTO.getDepartment() != null && !userDTO.getDepartment().isEmpty()) {
-            user.setDepartment(userDTO.getDepartment());
+        // Set department entity and department string
+        if (userDTO.getDepartmentId() != null) {
+            Department dept = departmentRepository.findById(userDTO.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+            user.setDepartmentEntity(dept);
+            user.setDepartment(dept.getName());  // FIX: Set department string
         }
 
         user.setActive(true);
@@ -104,7 +148,10 @@ public class AppUserService {
         user.setFirstLogin(true);
         user.setCreatedAt(LocalDateTime.now());
 
-        // Assign permissions from DTO or default based on role
+        // Link employee
+        user.setEmployee(savedEmployee);
+
+        // Assign permissions
         if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
@@ -118,65 +165,116 @@ public class AppUserService {
             }
         }
 
-        AppUser saved = userRepository.save(user);
-        log.info("User created successfully: {}", saved.getUsername());
+        AppUser savedUser = userRepository.save(user);
+        log.info("User created successfully: {}", savedUser.getUsername());
+
+        // 3. Update employee with user reference
+        savedEmployee.setUser(savedUser);
+        employeeRepository.save(savedEmployee);
 
         log.info("=========================================");
         log.info("👤 NEW USER CREATED");
-        log.info("Username: {}", saved.getUsername());
-        log.info("Role: {}", saved.getRole());
+        log.info("Staff ID: {}", savedUser.getStaffId());
+        log.info("Username: {}", savedUser.getUsername());
+        log.info("Role: {}", savedUser.getRole());
+        log.info("Department: {}", savedUser.getDepartment());
         log.info("Temporary Password: {}", tempPassword);
-        log.info("Email: {}", saved.getEmail());
+        log.info("Email: {}", savedUser.getEmail());
         log.info("=========================================");
 
         try {
             emailService.sendWelcomeEmail(
-                    saved.getEmail(),
-                    saved.getFullName(),
-                    saved.getUsername(),
+                    savedUser.getEmail(),
+                    savedUser.getFullName(),
+                    savedUser.getUsername(),
                     tempPassword
             );
-            log.info("Welcome email sent to: {}", saved.getEmail());
+            log.info("Welcome email sent to: {}", savedUser.getEmail());
         } catch (Exception e) {
-            log.error("Failed to send welcome email to {}: {}", saved.getEmail(), e.getMessage());
+            log.error("Failed to send welcome email to {}: {}", savedUser.getEmail(), e.getMessage());
         }
 
         auditService.logAction("USER_CREATED",
-                "User created: " + saved.getUsername() + " with role: " + saved.getRole(),
-                saved.getUserId());
+                "User created: " + savedUser.getUsername() + " with role: " + savedUser.getRole(),
+                savedUser.getUserId());
 
-        return saved;
+        return savedUser;
     }
 
     private List<String> getDefaultPermissions(String role) {
         if (role == null) return List.of();
 
         return switch(role.toUpperCase()) {
+            case "SUPERADMIN" -> List.of(
+                    "VIEW_REPORTS", "DOWNLOAD_REPORTS", "VIEW_ALL_TRANSACTIONS",
+                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "APPROVE_LM", "APPROVE_FINANCE",
+                    "CREATE_USERS", "RESET_PASSWORDS", "MANAGE_ROLES", "MANAGE_CONFIG",
+                    "EDIT_ASSETS", "DELETE_ASSETS", "MANAGE_WARRANTY", "MANAGE_EOL",
+                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS", "MANAGE_BOOKINGS",
+                    "VIEW_AUDIT", "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_MOVE",
+                    "ASSET_ASSIGN", "TRANSFER_CREATE", "TRANSFER_VIEW", "TRANSFER_BULK_EXPORT",
+                    "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
+                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
+                    "ROOM_VIEW_ALL", "DRIVER_VIEW", "DRIVER_APPROVE",
+                    "CAB_REQUEST_APPROVE", "CAB_REQUEST_VIEW",
+                    "EMPLOYEE_VIEW", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT",
+                    "DEPARTMENT_VIEW", "LOCATION_VIEW", "CATEGORY_VIEW", "SUPPLIER_VIEW", "COMPANY_VIEW"
+            );
             case "ADMIN" -> List.of(
                     "VIEW_REPORTS", "DOWNLOAD_REPORTS", "VIEW_ALL_TRANSACTIONS",
                     "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "APPROVE_LM", "APPROVE_FINANCE",
                     "CREATE_USERS", "RESET_PASSWORDS", "MANAGE_ROLES", "MANAGE_CONFIG",
                     "EDIT_ASSETS", "DELETE_ASSETS", "MANAGE_WARRANTY", "MANAGE_EOL",
                     "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS", "MANAGE_BOOKINGS",
-                    "VIEW_AUDIT"
+                    "VIEW_AUDIT", "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_MOVE",
+                    "ASSET_ASSIGN", "TRANSFER_CREATE", "TRANSFER_VIEW", "TRANSFER_BULK_EXPORT",
+                    "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
+                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
+                    "ROOM_VIEW_ALL", "DRIVER_VIEW", "DRIVER_APPROVE",
+                    "CAB_REQUEST_APPROVE", "CAB_REQUEST_VIEW",
+                    "EMPLOYEE_VIEW", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT"
             );
             case "DRIVER" -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS"
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS",
+                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
+                    "DRIVER_APPROVE", "DRIVER_VIEW",
+                    "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_CREATE",
+                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW"
             );
             case "INFRA" -> List.of(
                     "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
                     "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "MANAGE_BOOKINGS",
-                    "VIEW_AUDIT"
+                    "VIEW_AUDIT", "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
+                    "DRIVER_REQUEST", "DRIVER_CANCEL",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
+                    "RESOURCE_REQUEST_CREATE", "RESOURCE_REQUEST_VIEW",
+                    "SUPPLIER_VIEW", "COMPANY_VIEW"
             );
             case "FINANCE" -> List.of(
                     "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
-                    "APPROVE_FINANCE", "VIEW_ALL_TRANSACTIONS"
+                    "APPROVE_FINANCE", "VIEW_ALL_TRANSACTIONS",
+                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
+                    "DRIVER_REQUEST", "DRIVER_CANCEL",
+                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
+                    "SUPPLIER_VIEW", "COMPANY_VIEW"
             );
             case "MANAGER" -> List.of(
                     "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
-                    "APPROVE_LM", "MANAGE_BOOKINGS"
+                    "APPROVE_LM", "MANAGE_BOOKINGS",
+                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
+                    "DRIVER_REQUEST", "DRIVER_CANCEL",
+                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW",
+                    "EMPLOYEE_VIEW"
             );
-            default -> List.of("VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS");
+            default -> List.of(
+                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS",
+                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
+                    "DRIVER_REQUEST", "DRIVER_CANCEL",
+                    "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_CREATE",
+                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW"
+            );
         };
     }
 
@@ -188,13 +286,43 @@ public class AppUserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName());
-        if (userDTO.getDepartment() != null) user.setDepartment(userDTO.getDepartment());
         if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
         if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
         if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
         if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
         if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
         if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
+
+        // Update department
+        if (userDTO.getDepartmentId() != null) {
+            Department dept = departmentRepository.findById(userDTO.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+            user.setDepartmentEntity(dept);
+            user.setDepartment(dept.getName());  // FIX: Update department string
+        }
+
+        // Update employee
+        Employee employee = user.getEmployee();
+        if (employee != null) {
+            employee.setFirstName(getFirstName(userDTO.getFullName()));
+            employee.setSurName(getLastName(userDTO.getFullName()));
+            employee.setEmailAddress(userDTO.getEmail());
+            employee.setPhoneNumber(userDTO.getPhoneNumber());
+
+            if (userDTO.getDepartmentId() != null) {
+                Department dept = departmentRepository.findById(userDTO.getDepartmentId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+                employee.setDepartment(dept);
+            }
+
+            if (userDTO.getLineManagerId() != null) {
+                Employee lineManager = employeeRepository.findById(userDTO.getLineManagerId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Line Manager not found"));
+                employee.setLineManager(lineManager);
+            }
+
+            employeeRepository.save(employee);
+        }
 
         if (userDTO.getPermissions() != null) {
             user.getPermissions().clear();
@@ -433,8 +561,12 @@ public class AppUserService {
         return userRepository.findByEmail(email);
     }
 
-    public List<AppUser> getUsersByDepartment(String department) {
-        return userRepository.findByDepartment(department);
+    public Optional<AppUser> getUserByStaffId(String staffId) {
+        return userRepository.findByStaffId(staffId);
+    }
+
+    public List<AppUser> getUsersByDepartment(Integer departmentId) {
+        return userRepository.findByDepartmentEntity_DepartmentId(departmentId);
     }
 
     public List<AppUser> getActiveUsers() {
@@ -461,6 +593,13 @@ public class AppUserService {
         return userRepository.countByActiveTrue();
     }
 
+    public long getBlockedUsersCount() {
+        return userRepository.countByBlockedTrue();
+    }
+
+    public long getPendingPasswordChangeCount() {
+        return userRepository.countByMustChangePasswordTrue();
+    }
 
     @Transactional
     public void toggleUserStatus(Long userId) {
@@ -515,6 +654,12 @@ public class AppUserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         auditService.logAction("USER_DELETED", "User deleted: " + user.getUsername(), userId);
+
+        // Delete employee if exists
+        if (user.getEmployee() != null) {
+            employeeRepository.delete(user.getEmployee());
+        }
+
         userRepository.deleteById(userId);
         log.info("User deleted: {}", userId);
     }
@@ -522,6 +667,18 @@ public class AppUserService {
     // ============================================
     // Utility Methods
     // ============================================
+
+    private String getFirstName(String fullName) {
+        if (fullName == null) return "";
+        int lastSpace = fullName.lastIndexOf(' ');
+        return lastSpace > 0 ? fullName.substring(0, lastSpace) : fullName;
+    }
+
+    private String getLastName(String fullName) {
+        if (fullName == null) return "";
+        int lastSpace = fullName.lastIndexOf(' ');
+        return lastSpace > 0 ? fullName.substring(lastSpace + 1) : "";
+    }
 
     private String generateTemporaryPassword() {
         SecureRandom random = new SecureRandom();
@@ -554,16 +711,30 @@ public class AppUserService {
     private UserDTO convertToDTO(AppUser user) {
         UserDTO dto = new UserDTO();
         dto.setUserId(user.getUserId());
+        dto.setStaffId(user.getStaffId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
         dto.setFullName(user.getFullName());
-        dto.setDepartment(user.getDepartment());
         dto.setRole(user.getRole());
         dto.setActive(user.isActive());
         dto.setBlocked(user.isBlocked());
         dto.setFirstLogin(user.isFirstLogin());
         dto.setMustChangePassword(user.isMustChangePassword());
         dto.setPasswordHash(user.getPasswordHash());
+
+        if (user.getDepartmentEntity() != null) {
+            dto.setDepartmentId(user.getDepartmentEntity().getDepartmentId());
+            dto.setDepartment(user.getDepartmentEntity().getName());
+        }
+
+        if (user.getEmployee() != null) {
+            dto.setEmployeeId(user.getEmployee().getEmployeeId());
+            if (user.getEmployee().getLineManager() != null) {
+                dto.setLineManagerId(user.getEmployee().getLineManager().getEmployeeId());
+            }
+            dto.setPhoneNumber(user.getEmployee().getPhoneNumber());
+        }
+
         dto.setUserType(user.getPermissions().stream()
                 .map(Permission::getPermissionName)
                 .collect(Collectors.toList())

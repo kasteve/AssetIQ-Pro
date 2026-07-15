@@ -6,6 +6,7 @@ import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.AuditService;
 import com.stevecodes.AssetIQPro.service.DepartmentService;
 import com.stevecodes.AssetIQPro.service.EmailService;
+import com.stevecodes.AssetIQPro.service.EmployeeService;
 import com.stevecodes.AssetIQPro.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class UserViewController {
     private final AppUserService userService;
     private final PermissionService permissionService;
     private final DepartmentService departmentService;
+    private final EmployeeService employeeService;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final AuditService auditService;
@@ -51,33 +53,34 @@ public class UserViewController {
         model.addAttribute("pendingPasswordChange", pendingPasswordChange);
         model.addAttribute("allPermissions", permissionService.getAllPermissions());
         model.addAttribute("departments", departmentService.getAllDepartments());
-        model.addAttribute("roles", List.of("ADMIN", "MANAGER", "EMPLOYEE", "DRIVER", "INFRA", "FINANCE"));
+        model.addAttribute("employees", employeeService.getAllEmployees());
+        model.addAttribute("roles", List.of("EMPLOYEE", "DRIVER", "INFRA", "FINANCE", "MANAGER", "ADMIN", "SUPERADMIN"));
 
         return "admin/users";
     }
 
     @PostMapping("/create")
-    public String createUser(@RequestParam String username,
-                             @RequestParam String fullName,
-                             @RequestParam String email,
-                             @RequestParam(required = false) String department,
-                             @RequestParam(defaultValue = "EMPLOYEE") String role,
-                             @RequestParam(required = false) List<String> permissions,
-                             RedirectAttributes redirectAttributes) {
+    public String createUser(@ModelAttribute UserDTO userDTO, RedirectAttributes redirectAttributes) {
         try {
-            UserDTO userDTO = new UserDTO();
-            userDTO.setUsername(username);
-            userDTO.setFullName(fullName);
-            userDTO.setEmail(email);
-            userDTO.setDepartment(department);
-            userDTO.setRole(role);
-            userDTO.setPermissions(permissions != null ? permissions : List.of());
-
+            log.info("Creating user: {}", userDTO.getUsername());
             userService.createUser(userDTO);
             redirectAttributes.addFlashAttribute("success", "User created successfully! Welcome email sent.");
         } catch (Exception e) {
-            log.error("Error creating user: {}", e.getMessage());
+            log.error("Error creating user: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to create user: " + e.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+
+    @PostMapping("/update")
+    public String updateUser(@ModelAttribute UserDTO userDTO, RedirectAttributes redirectAttributes) {
+        try {
+            log.info("Updating user: {}", userDTO.getUserId());
+            userService.updateUser(userDTO.getUserId(), userDTO);
+            redirectAttributes.addFlashAttribute("success", "User updated successfully!");
+        } catch (Exception e) {
+            log.error("Error updating user: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update user: " + e.getMessage());
         }
         return "redirect:/admin/users";
     }
@@ -88,14 +91,9 @@ public class UserViewController {
         try {
             log.info("Resetting password for user: {}", userId);
             userService.resetPassword(userId);
-            log.info("Password reset successful for user: {}", userId);
-
-            return ResponseEntity.ok().body(Map.of(
-                    "success", true,
-                    "message", "Password reset email sent successfully"
-            ));
+            return ResponseEntity.ok().body(Map.of("success", true, "message", "Password reset email sent"));
         } catch (Exception e) {
-            log.error("Error resetting password for user {}: {}", userId, e.getMessage(), e);
+            log.error("Error resetting password: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("success", false, "message", e.getMessage()));
         }

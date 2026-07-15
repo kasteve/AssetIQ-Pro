@@ -12,13 +12,18 @@ import java.util.List;
 public class UserDTO {
 
     private Long userId;
+    private String staffId;
     private String username;
     private String email;
     private String password;
     private String passwordHash;
     private String fullName;
     private String department;
-    private String role = "EMPLOYEE";  // ADD THIS
+    private Integer departmentId;
+    private Long employeeId;
+    private Long lineManagerId;
+    private String phoneNumber;
+    private String role = "EMPLOYEE";
     private boolean active = true;
     private boolean blocked = false;
     private boolean firstLogin = true;

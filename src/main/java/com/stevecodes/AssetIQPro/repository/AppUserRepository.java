@@ -43,4 +43,13 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     List<AppUser> findByRole(String role);
 
     Optional<AppUser> findByPasswordResetToken(String token);
+
+    Optional<AppUser> findByStaffId(String staffId);
+    boolean existsByStaffId(String staffId);
+
+    List<AppUser> findByDepartmentEntity_DepartmentId(Integer departmentId);
+
+    long countByBlockedTrue();
+
+    long countByMustChangePasswordTrue();
 }

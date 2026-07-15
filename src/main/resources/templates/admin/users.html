@@ -50,6 +50,7 @@
             <table class="table table-hover usr-table">
                 <thead>
                 <tr>
+                    <th>Staff ID</th>
                     <th>Username</th>
                     <th>Full Name</th>
                     <th>Email</th>
@@ -61,6 +62,9 @@
                 </thead>
                 <tbody>
                 <tr th:each="user : ${users}">
+                    <td>
+                        <span class="staff-id-badge" th:text="${user.staffId}">STAFF001</span>
+                    </td>
                     <td class="usr-username" th:text="${user.username}">johndoe</td>
                     <td th:text="${user.fullName}">John Doe</td>
                     <td class="usr-email" th:text="${user.email}">john@company.com</td>
@@ -69,7 +73,8 @@
                         <span th:unless="${user.department != null}" class="usr-dept none">N/A</span>
                     </td>
                     <td>
-                        <span class="role-badge" th:classappend="${user.role == 'ADMIN' ? 'role-admin' :
+                        <span class="role-badge" th:classappend="${user.role == 'SUPERADMIN' ? 'role-superadmin' :
+                                                                   user.role == 'ADMIN' ? 'role-admin' :
                                                                    user.role == 'DRIVER' ? 'role-driver' :
                                                                    user.role == 'INFRA' ? 'role-infra' :
                                                                    user.role == 'FINANCE' ? 'role-finance' :
@@ -84,6 +89,19 @@
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
+                            <button type="button" class="btn btn-outline-primary" title="Edit User"
+                                    data-bs-toggle="modal" data-bs-target="#editUserModal"
+                                    th:data-userid="${user.userId}"
+                                    th:data-staffid="${user.staffId}"
+                                    th:data-username="${user.username}"
+                                    th:data-fullname="${user.fullName}"
+                                    th:data-email="${user.email}"
+                                    th:data-role="${user.role}"
+                                    th:data-departmentid="${user.departmentEntity != null ? user.departmentEntity.departmentId : ''}"
+                                    th:data-linemanagerid="${user.employee != null && user.employee.lineManager != null ? user.employee.lineManager.employeeId : ''}"
+                                    th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <a th:href="@{/admin/permissions?userId=${user.userId}}" class="btn btn-outline-info" title="Permissions">
                                 <i class="fas fa-lock"></i>
                             </a>
@@ -113,16 +131,6 @@
         </div>
     </div>
 
-    <!--
-      NOTE: both modals below now live INSIDE this layout:fragment="content"
-      div. Thymeleaf Layout Dialect only carries elements marked with
-      layout:fragment into the final page -- anything outside that div in
-      this child template (as these modals were before) gets silently
-      dropped when decorated by layouts/default.html. That's why
-      data-bs-target="#createUserModal" had nothing to point to and the
-      modal never opened.
-    -->
-
     <!-- Create User Modal -->
     <div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -133,6 +141,11 @@
                 </div>
                 <form th:action="@{/admin/users/create}" method="post">
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Staff ID *</label>
+                            <input type="text" name="staffId" class="form-control" required placeholder="e.g., STAFF001">
+                            <small class="text-muted">Unique identifier for the employee</small>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">Username *</label>
                             <input type="text" name="username" class="form-control" required>
@@ -146,32 +159,40 @@
                             <input type="email" name="email" class="form-control" required>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" name="phoneNumber" class="form-control" placeholder="+254 712 345 678">
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Department</label>
-                            <select name="department" class="form-select">
+                            <select name="departmentId" class="form-select">
                                 <option value="">Select Department</option>
-                                <option th:each="dept : ${departments}" th:value="${dept.name}" th:text="${dept.name}">IT</option>
+                                <option th:each="dept : ${departments}"
+                                        th:value="${dept.departmentId}"
+                                        th:text="${dept.name}">IT</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Line Manager</label>
+                            <select name="lineManagerId" class="form-select">
+                                <option value="">Select Line Manager</option>
+                                <option th:each="emp : ${employees}"
+                                        th:value="${emp.employeeId}"
+                                        th:text="${emp.fullName + ' (' + emp.emailAddress + ')'}">John Doe</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Role *</label>
                             <select name="role" class="form-select" required>
+                                <option value="">Select Role</option>
                                 <option value="EMPLOYEE">Employee</option>
-                                <option value="MANAGER">Manager</option>
                                 <option value="DRIVER">Driver</option>
-                                <option value="INFRA">Infrastructure</option>
-                                <option value="FINANCE">Finance</option>
-                                <option value="ADMIN">Admin</option>
+                                <option value="INFRA">Infrastructure Approver</option>
+                                <option value="FINANCE">Finance Approver</option>
+                                <option value="MANAGER">Employee Line Manager</option>
+                                <option value="ADMIN">Admin Approver</option>
+                                <option value="SUPERADMIN">Super Admin</option>
                             </select>
                         </div>
-
-                        <!--
-                          Replaced the old <select multiple> with a checkbox
-                          grid. Native <option> elements can't render badges,
-                          colors, or any HTML -- only plain text -- which is
-                          why permission entries looked cramped and unstyled
-                          before. Real HTML checkboxes/labels can be styled
-                          properly, same as the Permissions page.
-                        -->
                         <div class="mb-2">
                             <label class="form-label">Permissions</label>
                             <small class="text-muted d-block mb-2">Leave all unchecked to use default role permissions.</small>
@@ -179,8 +200,8 @@
                                 <div class="perm-picker-item" th:each="perm : ${allPermissions}">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="permissions"
-                                               th:value="${perm.permissionName}" th:id="'newuser-perm-' + ${perm.permissionName}">
-                                        <label class="form-check-label" th:for="'newuser-perm-' + ${perm.permissionName}">
+                                               th:value="${perm.permissionName}" th:id="'perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'perm-' + ${perm.permissionName}">
                                             <span class="perm-name" th:text="${perm.permissionName}">PERM_NAME</span>
                                             <span class="perm-desc" th:text="${perm.description}">Description</span>
                                         </label>
@@ -192,6 +213,92 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Create User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-edit me-2" style="color: #0d6efd;"></i>Edit User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/users/update}" method="post">
+                    <input type="hidden" name="userId" id="editUserId">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Staff ID</label>
+                            <input type="text" name="staffId" id="editStaffId" class="form-control" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="username" id="editUsername" class="form-control" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Full Name *</label>
+                            <input type="text" name="fullName" id="editFullName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" name="email" id="editEmail" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" name="phoneNumber" id="editPhoneNumber" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Department</label>
+                            <select name="departmentId" id="editDepartmentId" class="form-select">
+                                <option value="">Select Department</option>
+                                <option th:each="dept : ${departments}"
+                                        th:value="${dept.departmentId}"
+                                        th:text="${dept.name}">IT</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Line Manager</label>
+                            <select name="lineManagerId" id="editLineManagerId" class="form-select">
+                                <option value="">Select Line Manager</option>
+                                <option th:each="emp : ${employees}"
+                                        th:value="${emp.employeeId}"
+                                        th:text="${emp.fullName + ' (' + emp.emailAddress + ')'}">John Doe</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role *</label>
+                            <select name="role" id="editRole" class="form-select" required>
+                                <option value="EMPLOYEE">Employee</option>
+                                <option value="DRIVER">Driver</option>
+                                <option value="INFRA">Infrastructure Approver</option>
+                                <option value="FINANCE">Finance Approver</option>
+                                <option value="MANAGER">Employee Line Manager</option>
+                                <option value="ADMIN">Admin Approver</option>
+                                <option value="SUPERADMIN">Super Admin</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Permissions</label>
+                            <div class="perm-picker">
+                                <div class="perm-picker-item" th:each="perm : ${allPermissions}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               th:value="${perm.permissionName}" th:id="'edit-perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'edit-perm-' + ${perm.permissionName}">
+                                            <span class="perm-name" th:text="${perm.permissionName}">PERM</span>
+                                            <span class="perm-desc" th:text="${perm.description}">Desc</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update User</button>
                     </div>
                 </form>
             </div>
@@ -236,12 +343,15 @@
         .usr-table thead th { background: #f8f9fb; border-bottom: 1px solid #eef0f3; color: #6c757d; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 13px 16px; white-space: nowrap; }
         .usr-table tbody td { padding: 14px 16px; vertical-align: middle; font-size: 13.5px; border-bottom: 1px solid #f5f6f8; }
         .usr-table tbody tr:hover { background: #f8f9fc; }
+
+        .staff-id-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #e8eefc; color: #0d6efd; font-family: monospace; }
         .usr-username { font-weight: 700; color: var(--ink); }
         .usr-email { color: #6c757d; }
         .usr-dept { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; }
         .usr-dept.none { background: #f0f1f4; color: #b0b5bb; font-style: italic; }
 
         .role-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .role-superadmin { background: #fdeeee; color: #dc3545; font-weight: 700; }
         .role-admin { background: #fdeeee; color: #dc3545; }
         .role-driver { background: #fff4e0; color: #fd7e14; }
         .role-infra { background: #e8eefc; color: #0d6efd; }
@@ -257,10 +367,6 @@
 
         .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
         .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-info:hover { background: #17a2b8; border-color: #17a2b8; }
-        .action-btn-group .btn-outline-warning:hover { background: #ffc107; border-color: #ffc107; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
-        .action-btn-group .btn-outline-success:hover { background: #198754; border-color: #198754; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
@@ -273,7 +379,6 @@
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
 
-        /* Permission checkbox grid (replaces the old cramped <select multiple>) */
         .perm-picker {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -315,6 +420,22 @@
                     const button = event.relatedTarget;
                     resetUserId = button.getAttribute('data-userid');
                     document.getElementById('resetUsername').textContent = button.getAttribute('data-username');
+                });
+            }
+
+            const editModal = document.getElementById('editUserModal');
+            if (editModal) {
+                editModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    document.getElementById('editUserId').value = button.getAttribute('data-userid');
+                    document.getElementById('editStaffId').value = button.getAttribute('data-staffid');
+                    document.getElementById('editUsername').value = button.getAttribute('data-username');
+                    document.getElementById('editFullName').value = button.getAttribute('data-fullname');
+                    document.getElementById('editEmail').value = button.getAttribute('data-email');
+                    document.getElementById('editPhoneNumber').value = button.getAttribute('data-phonenumber');
+                    document.getElementById('editRole').value = button.getAttribute('data-role');
+                    document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid');
+                    document.getElementById('editLineManagerId').value = button.getAttribute('data-linemanagerid');
                 });
             }
         });
