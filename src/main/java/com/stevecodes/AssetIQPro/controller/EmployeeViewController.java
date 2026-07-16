@@ -28,14 +28,23 @@ public class EmployeeViewController {
     }
 
     @PostMapping
-    public String createEmployee(@RequestParam String staffId,
-                                 @RequestParam String firstName,
-                                 @RequestParam String surName,
-                                 @RequestParam String emailAddress,
-                                 @RequestParam(required = false) String phoneNumber,
-                                 @RequestParam(required = false) Integer departmentId,
-                                 RedirectAttributes redirectAttributes) {
+    public String createEmployee(
+            @RequestParam String staffId,
+            @RequestParam String firstName,
+            @RequestParam String surName,
+            @RequestParam String emailAddress,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam(required = false) String lineManagerId,
+            // New Line Manager fields
+            @RequestParam(required = false) String lmStaffId,
+            @RequestParam(required = false) String lmFirstName,
+            @RequestParam(required = false) String lmSurName,
+            @RequestParam(required = false) String lmEmail,
+            @RequestParam(required = false) String lmPhone,
+            RedirectAttributes redirectAttributes) {
         try {
+            // Check if staff ID already exists
             if (employeeService.getEmployeeByStaffId(staffId).isPresent()) {
                 redirectAttributes.addFlashAttribute("error", "Staff ID '" + staffId + "' already exists!");
                 return "redirect:/admin/employees";
@@ -47,10 +56,42 @@ public class EmployeeViewController {
             employee.setSurName(surName);
             employee.setEmailAddress(emailAddress);
             employee.setPhoneNumber(phoneNumber);
+
             if (departmentId != null) {
                 Department dept = departmentService.getDepartmentById(departmentId).orElse(null);
                 employee.setDepartment(dept);
             }
+
+            // Handle Line Manager
+            Long lineManagerIdLong = null;
+            if (lineManagerId != null && !lineManagerId.isEmpty()) {
+                if ("__NEW__".equals(lineManagerId)) {
+                    // Create new line manager
+                    Employee lineManager = new Employee();
+                    lineManager.setStaffId(lmStaffId);
+                    lineManager.setFirstName(lmFirstName);
+                    lineManager.setSurName(lmSurName);
+                    lineManager.setEmailAddress(lmEmail);
+                    lineManager.setPhoneNumber(lmPhone);
+
+                    if (departmentId != null) {
+                        Department dept = departmentService.getDepartmentById(departmentId).orElse(null);
+                        lineManager.setDepartment(dept);
+                    }
+
+                    Employee savedLm = employeeService.createEmployee(lineManager);
+                    lineManagerIdLong = savedLm.getEmployeeId();
+                    log.info("Created new line manager: {} ({})", savedLm.getFullName(), savedLm.getStaffId());
+                } else {
+                    lineManagerIdLong = Long.parseLong(lineManagerId);
+                }
+
+                if (lineManagerIdLong != null) {
+                    Employee lineManager = employeeService.getEmployeeById(lineManagerIdLong).orElse(null);
+                    employee.setLineManager(lineManager);
+                }
+            }
+
             employeeService.createEmployee(employee);
             redirectAttributes.addFlashAttribute("success", "Employee created successfully!");
         } catch (Exception e) {
@@ -61,16 +102,18 @@ public class EmployeeViewController {
     }
 
     @PostMapping("/update")
-    public String updateEmployee(@RequestParam Long employeeId,
-                                 @RequestParam String staffId,
-                                 @RequestParam String firstName,
-                                 @RequestParam String surName,
-                                 @RequestParam String emailAddress,
-                                 @RequestParam(required = false) String phoneNumber,
-                                 @RequestParam(required = false) Integer departmentId,
-                                 RedirectAttributes redirectAttributes) {
+    public String updateEmployee(
+            @RequestParam Long employeeId,
+            @RequestParam String staffId,
+            @RequestParam String firstName,
+            @RequestParam String surName,
+            @RequestParam String emailAddress,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam(required = false) Long lineManagerId,
+            RedirectAttributes redirectAttributes) {
         try {
-            employeeService.updateEmployee(employeeId, staffId, firstName, surName, emailAddress, phoneNumber, departmentId);
+            employeeService.updateEmployee(employeeId, staffId, firstName, surName, emailAddress, phoneNumber, departmentId, lineManagerId);
             redirectAttributes.addFlashAttribute("success", "Employee updated successfully!");
         } catch (Exception e) {
             log.error("Error updating employee: {}", e.getMessage());

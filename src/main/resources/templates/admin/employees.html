@@ -31,6 +31,7 @@
                     <th>Surname</th>
                     <th>Email</th>
                     <th>Department</th>
+                    <th>Line Manager</th>
                     <th>Phone</th>
                     <th>Actions</th>
                 </tr>
@@ -45,6 +46,10 @@
                         <span th:if="${emp.department != null}" class="emp-dept" th:text="${emp.department.name}">IT</span>
                         <span th:unless="${emp.department != null}" class="emp-dept none">N/A</span>
                     </td>
+                    <td>
+                        <span th:if="${emp.lineManager != null}" class="emp-manager" th:text="${emp.lineManager.fullName}">Manager</span>
+                        <span th:unless="${emp.lineManager != null}" class="emp-manager none">None</span>
+                    </td>
                     <td class="emp-phone" th:text="${emp.phoneNumber}">+256-700-000001</td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
@@ -57,6 +62,7 @@
                                     th:data-email="${emp.emailAddress}"
                                     th:data-phone="${emp.phoneNumber}"
                                     th:data-departmentid="${emp.department != null ? emp.department.departmentId : ''}"
+                                    th:data-linemanagerid="${emp.lineManager != null ? emp.lineManager.employeeId : ''}"
                                     onclick="editEmployee(this)">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -113,6 +119,40 @@
                                 <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.name}"></option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Line Manager</label>
+                            <select name="lineManagerId" class="form-select">
+                                <option value="">Select Existing Line Manager</option>
+                                <option th:each="emp : ${employees}" th:value="${emp.employeeId}" th:text="${emp.fullName + ' (' + emp.staffId + ')'}"></option>
+                                <option value="__NEW__">--- Create New Line Manager ---</option>
+                            </select>
+                        </div>
+                        <!-- New Line Manager Fields (hidden initially) -->
+                        <div id="newLineManagerFields" style="display:none; border-top: 1px solid #eef0f3; padding-top: 15px; margin-top: 5px;">
+                            <h6 class="fw-bold mb-3"><i class="fas fa-user-plus me-2" style="color: #198754;"></i>New Line Manager Details</h6>
+                            <div class="mb-3">
+                                <label class="form-label">LM Staff ID *</label>
+                                <input type="text" name="lmStaffId" id="lmStaffId" class="form-control" placeholder="e.g., LM001">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">LM First Name *</label>
+                                    <input type="text" name="lmFirstName" id="lmFirstName" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">LM Surname *</label>
+                                    <input type="text" name="lmSurName" id="lmSurName" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">LM Email *</label>
+                                <input type="email" name="lmEmail" id="lmEmail" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">LM Phone</label>
+                                <input type="text" name="lmPhone" id="lmPhone" class="form-control">
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -163,6 +203,13 @@
                                 <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.name}"></option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Line Manager</label>
+                            <select name="lineManagerId" id="editLineManagerId" class="form-select">
+                                <option value="">Select Line Manager</option>
+                                <option th:each="emp : ${employees}" th:value="${emp.employeeId}" th:text="${emp.fullName + ' (' + emp.staffId + ')'}"></option>
+                            </select>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -198,6 +245,8 @@
         .emp-email { color: #6c757d; }
         .emp-dept { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; }
         .emp-dept.none { background: #f0f1f4; color: #b0b5bb; font-style: italic; }
+        .emp-manager { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e6f7ec; color: #198754; }
+        .emp-manager.none { background: #f0f1f4; color: #b0b5bb; font-style: italic; }
         .emp-phone { color: #6c757d; }
 
         .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
@@ -268,6 +317,55 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
+    <script>
+        // Show/hide new line manager fields
+        document.addEventListener('DOMContentLoaded', function() {
+            const lineManagerSelect = document.querySelector('select[name="lineManagerId"]');
+            const newLmFields = document.getElementById('newLineManagerFields');
+
+            if (lineManagerSelect) {
+                lineManagerSelect.addEventListener('change', function() {
+                    if (this.value === '__NEW__') {
+                        newLmFields.style.display = 'block';
+                        // Make fields required
+                        document.getElementById('lmStaffId').required = true;
+                        document.getElementById('lmFirstName').required = true;
+                        document.getElementById('lmSurName').required = true;
+                        document.getElementById('lmEmail').required = true;
+                    } else {
+                        newLmFields.style.display = 'none';
+                        document.getElementById('lmStaffId').required = false;
+                        document.getElementById('lmFirstName').required = false;
+                        document.getElementById('lmSurName').required = false;
+                        document.getElementById('lmEmail').required = false;
+                    }
+                });
+            }
+        });
+
+        function editEmployee(button) {
+            document.getElementById('editEmployeeId').value = button.getAttribute('data-id');
+            document.getElementById('editStaffId').value = button.getAttribute('data-staffid');
+            document.getElementById('editFirstName').value = button.getAttribute('data-firstname');
+            document.getElementById('editSurName').value = button.getAttribute('data-surname');
+            document.getElementById('editEmail').value = button.getAttribute('data-email');
+            document.getElementById('editPhone').value = button.getAttribute('data-phone') || '';
+            document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid') || '';
+            document.getElementById('editLineManagerId').value = button.getAttribute('data-linemanagerid') || '';
+        }
+
+        function deleteEmployee(button) {
+            const id = button.getAttribute('data-id');
+            if (confirm('Delete this employee permanently?')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/assetIQ-pro/admin/employees/' + id + '/delete';
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+
     <script th:inline="none">
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#employeesTable')) {
@@ -279,7 +377,7 @@
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 order: [[0, 'asc']],
                 columnDefs: [
-                    { orderable: false, targets: 6 }
+                    { orderable: false, targets: 7 }
                 ],
                 dom: 'Bfrtip',
                 buttons: [
@@ -298,27 +396,6 @@
                 }
             });
         });
-
-        function editEmployee(button) {
-            document.getElementById('editEmployeeId').value = button.getAttribute('data-id');
-            document.getElementById('editStaffId').value = button.getAttribute('data-staffid');
-            document.getElementById('editFirstName').value = button.getAttribute('data-firstname');
-            document.getElementById('editSurName').value = button.getAttribute('data-surname');
-            document.getElementById('editEmail').value = button.getAttribute('data-email');
-            document.getElementById('editPhone').value = button.getAttribute('data-phone') || '';
-            document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid') || '';
-        }
-
-        function deleteEmployee(button) {
-            const id = button.getAttribute('data-id');
-            if (confirm('Delete this employee permanently?')) {
-                var form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/assetIQ-pro/admin/employees/' + id + '/delete';
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
     </script>
 </div>
 </body>

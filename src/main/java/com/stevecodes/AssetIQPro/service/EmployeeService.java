@@ -35,7 +35,8 @@ public class EmployeeService {
 
     @Transactional
     public Employee updateEmployee(Long id, String staffId, String firstName, String surName,
-                                   String emailAddress, String phoneNumber, Integer departmentId) {
+                                   String emailAddress, String phoneNumber, Integer departmentId,
+                                   Long lineManagerId) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
         employee.setStaffId(staffId);
@@ -43,6 +44,19 @@ public class EmployeeService {
         employee.setSurName(surName);
         employee.setEmailAddress(emailAddress);
         employee.setPhoneNumber(phoneNumber);
+
+        if (departmentId != null) {
+            Department dept = new Department();
+            dept.setDepartmentId(departmentId);
+            employee.setDepartment(dept);
+        }
+
+        if (lineManagerId != null) {
+            Employee lineManager = employeeRepository.findById(lineManagerId)
+                    .orElseThrow(() -> new RuntimeException("Line Manager not found"));
+            employee.setLineManager(lineManager);
+        }
+
         return employeeRepository.save(employee);
     }
 

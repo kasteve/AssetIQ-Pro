@@ -41,6 +41,26 @@ public class EmailService {
     }
 
     // ============================================
+    // Public Email Method - Does NOT throw exceptions
+    // ============================================
+
+    public void sendSimpleEmail(String toEmail, String subject, String body) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setSubject(subject);
+            message.setText(body);
+            message.setFrom(FROM_EMAIL);
+            mailSender.send(message);
+            log.info("✅ Email sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage());
+            logEmailContent("Simple Email", toEmail, subject, body);
+            // DO NOT re-throw - just log
+        }
+    }
+
+    // ============================================
     // User Management Emails
     // ============================================
 
@@ -68,13 +88,7 @@ public class EmailService {
             AssetIQ-Pro Team
             """, fullName, username, tempPassword);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Welcome email sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send welcome email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Welcome Email", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -97,13 +111,7 @@ public class EmailService {
             AssetIQ-Pro Team
             """, fullName, resetLink);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Password reset email sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send password reset email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Password Reset Email", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -120,13 +128,7 @@ public class EmailService {
             AssetIQ-Pro Team
             """, fullName);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Password change confirmation sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send password change confirmation to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Password Change Confirmation", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -153,13 +155,7 @@ public class EmailService {
             AssetIQ-Pro
             """, requesterName, resourceType, requestId, status, status, comment, requestId);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Infra request status update sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send infra request status update to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Infra Request Status Update", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -183,13 +179,7 @@ public class EmailService {
             AssetIQ-Pro
             """, approverName, requestId, requesterName, resourceType, approvalLink);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Infra request approval email sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send infra request approval to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Infra Request Approval", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -211,13 +201,7 @@ public class EmailService {
             AssetIQ-Pro
             """, message);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Driver request status update sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send driver request status update to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Driver Request Status Update", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -238,13 +222,7 @@ public class EmailService {
             AssetIQ-Pro System
             """, message);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Resource request notification sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send resource request notification to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Resource Request Notification", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -262,13 +240,7 @@ public class EmailService {
             AssetIQ-Pro
             """, message);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Resource request status update sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send resource request status update to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Resource Request Status Update", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -299,13 +271,7 @@ public class EmailService {
             AssetIQ-Pro
             """, fullName, transferId, assetTag, role, signingLink, expiresAt);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Transfer signature request sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send transfer signature request to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Transfer Signature Request", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -363,13 +329,7 @@ public class EmailService {
             AssetIQ-Pro Team
             """, fullName, resourceType, bookingDetails);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Booking confirmation sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send booking confirmation to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Booking Confirmation", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -391,13 +351,7 @@ public class EmailService {
             AssetIQ-Pro System
             """, assetTag, daysLeft, expiryDate);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ Warranty expiry alert sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send warranty expiry alert to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Warranty Expiry Alert", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     @Async
@@ -415,13 +369,7 @@ public class EmailService {
             AssetIQ-Pro System
             """, assetTag, daysLeft, eolDate);
 
-        try {
-            sendSimpleEmail(toEmail, subject, body);
-            log.info("✅ EOL alert sent to: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Failed to send EOL alert to {}: {}", toEmail, e.getMessage());
-            logEmailContent("EOL Alert", toEmail, subject, body);
-        }
+        sendSimpleEmail(toEmail, subject, body);
     }
 
     // ============================================
@@ -508,18 +456,5 @@ public class EmailService {
         } catch (MessagingException e) {
             log.error("❌ Failed to send transfer completion notification: {}", e.getMessage());
         }
-    }
-
-    // ============================================
-    // Helper Methods
-    // ============================================
-
-    public void sendSimpleEmail(String toEmail, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmail);
-        message.setSubject(subject);
-        message.setText(body);
-        message.setFrom(FROM_EMAIL);
-        mailSender.send(message);
     }
 }

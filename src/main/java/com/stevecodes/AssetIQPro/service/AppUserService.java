@@ -103,6 +103,7 @@ public class AppUserService {
 
         // 1. Create Employee first
         Employee employee = new Employee();
+        employee.setStaffId(userDTO.getStaffId());  // FIX: Set staff_id on Employee
         employee.setFirstName(getFirstName(userDTO.getFullName()));
         employee.setSurName(getLastName(userDTO.getFullName()));
         employee.setEmailAddress(userDTO.getEmail());
@@ -139,7 +140,7 @@ public class AppUserService {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             user.setDepartmentEntity(dept);
-            user.setDepartment(dept.getName());  // FIX: Set department string
+            user.setDepartment(dept.getName());
         }
 
         user.setActive(true);
@@ -298,7 +299,7 @@ public class AppUserService {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             user.setDepartmentEntity(dept);
-            user.setDepartment(dept.getName());  // FIX: Update department string
+            user.setDepartment(dept.getName());
         }
 
         // Update employee

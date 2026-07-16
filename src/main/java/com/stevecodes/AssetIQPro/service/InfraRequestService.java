@@ -87,8 +87,13 @@ public class InfraRequestService {
         Employee employee = employeeRepository.findByUserId(requesterId)
                 .orElseThrow(() -> new RuntimeException("Employee not found for user ID: " + requesterId));
 
-        Long lineManagerId = employee.getLineManager() != null ?
-                employee.getLineManager().getEmployeeId() : null;
+        Long lineManagerId = null;
+        if (employee.getLineManager() != null) {
+            Employee lineManager = employee.getLineManager();
+            if (lineManager.getUser() != null) {
+                lineManagerId = lineManager.getUser().getUserId();
+            }
+        }
 
         if (lineManagerId == null) {
             throw new RuntimeException("Employee has no line manager assigned");
@@ -106,11 +111,16 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        // Notify line manager
-        notifyLineManager(saved);
-        sendEmailNotification(lineManagerId,
-                "Infrastructure Request Pending Approval",
-                "Request #" + saved.getRequestId() + " for " + saved.getResourceType() + " requires your approval.");
+        // Notify line manager - catch email errors so request creation doesn't fail
+        try {
+            notifyLineManager(saved);
+            sendEmailNotification(lineManagerId,
+                    "Infrastructure Request Pending Approval",
+                    "Request #" + saved.getRequestId() + " for " + saved.getResourceType() + " requires your approval.");
+        } catch (Exception e) {
+            log.error("Failed to send email notification for request {}: {}", saved.getRequestId(), e.getMessage());
+            // In-app notification is already created in notifyLineManager
+        }
 
         auditService.logAction("INFRA_REQUEST_CREATED",
                 "Request #" + saved.getRequestId() + " created by user " + requesterId,
@@ -134,10 +144,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        notifyRequester(saved, "Your request has been approved by your line manager.");
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Approved by Line Manager",
-                "Your request #" + saved.getRequestId() + " has been approved by your line manager and is now pending infrastructure review.");
+        try {
+            notifyRequester(saved, "Your request has been approved by your line manager.");
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Approved by Line Manager",
+                    "Your request #" + saved.getRequestId() + " has been approved by your line manager and is now pending infrastructure review.");
+        } catch (Exception e) {
+            log.error("Failed to send email for approval: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_LM_APPROVED",
                 "Request #" + requestId + " approved by line manager " + managerId,
@@ -161,10 +175,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        notifyRequester(saved, "Your request has been rejected by your line manager. Reason: " + reason);
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Rejected by Line Manager",
-                "Your request #" + saved.getRequestId() + " has been rejected by your line manager. Reason: " + reason);
+        try {
+            notifyRequester(saved, "Your request has been rejected by your line manager. Reason: " + reason);
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Rejected by Line Manager",
+                    "Your request #" + saved.getRequestId() + " has been rejected by your line manager. Reason: " + reason);
+        } catch (Exception e) {
+            log.error("Failed to send email for rejection: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_LM_REJECTED",
                 "Request #" + requestId + " rejected by line manager " + managerId,
@@ -189,10 +207,14 @@ public class InfraRequestService {
             notifyFinanceTeam(request);
         } else {
             request.setStatus(RequestStatus.INFRA_REJECTED);
-            notifyRequester(request, "Your request has been rejected by Infrastructure. Reason: " + comment);
-            sendEmailNotification(request.getRequesterId(),
-                    "Infrastructure Request Rejected by Infrastructure",
-                    "Your request #" + request.getRequestId() + " has been rejected by Infrastructure. Reason: " + comment);
+            try {
+                notifyRequester(request, "Your request has been rejected by Infrastructure. Reason: " + comment);
+                sendEmailNotification(request.getRequesterId(),
+                        "Infrastructure Request Rejected by Infrastructure",
+                        "Your request #" + request.getRequestId() + " has been rejected by Infrastructure. Reason: " + comment);
+            } catch (Exception e) {
+                log.error("Failed to send email for rejection: {}", e.getMessage());
+            }
         }
 
         InfraRequest saved = requestRepository.save(request);
@@ -220,10 +242,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        notifyRequester(saved, "Your request has been approved by Finance and is now in procurement.");
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Approved by Finance",
-                "Your request #" + saved.getRequestId() + " has been approved by Finance and is now in procurement.");
+        try {
+            notifyRequester(saved, "Your request has been approved by Finance and is now in procurement.");
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Approved by Finance",
+                    "Your request #" + saved.getRequestId() + " has been approved by Finance and is now in procurement.");
+        } catch (Exception e) {
+            log.error("Failed to send email for approval: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_FINANCE_APPROVED",
                 "Request #" + requestId + " approved by finance " + financeId,
@@ -247,10 +273,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        notifyRequester(saved, "Your request has been rejected by Finance. Reason: " + reason);
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Rejected by Finance",
-                "Your request #" + saved.getRequestId() + " has been rejected by Finance. Reason: " + reason);
+        try {
+            notifyRequester(saved, "Your request has been rejected by Finance. Reason: " + reason);
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Rejected by Finance",
+                    "Your request #" + saved.getRequestId() + " has been rejected by Finance. Reason: " + reason);
+        } catch (Exception e) {
+            log.error("Failed to send email for rejection: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_FINANCE_REJECTED",
                 "Request #" + requestId + " rejected by finance " + financeId,
@@ -304,10 +334,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Delivered",
-                "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
+        try {
+            notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Delivered",
+                    "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
+        } catch (Exception e) {
+            log.error("Failed to send email for delivery: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_DELIVERED",
                 "Request #" + requestId + " marked as delivered by " + deliveredBy,
@@ -330,10 +364,14 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        sendCompletionReport(saved);
-        sendEmailNotification(saved.getRequesterId(),
-                "Infrastructure Request Completed",
-                "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
+        try {
+            sendCompletionReport(saved);
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Completed",
+                    "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
+        } catch (Exception e) {
+            log.error("Failed to send email for completion: {}", e.getMessage());
+        }
 
         auditService.logAction("INFRA_REQUEST_COMPLETED",
                 "Request #" + requestId + " completed - acknowledged by " + acknowledgedBy,
