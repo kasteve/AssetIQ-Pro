@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -35,7 +36,6 @@ public class InfraRequestController {
     @PreAuthorize("hasAnyAuthority('CREATE_REQUESTS', 'ADMIN')")
     public ResponseEntity<InfraRequestDTO> createRequest(@Valid @RequestBody InfraRequestDTO dto) {
         Long userId = getCurrentUserId();
-        log.info("Creating request for user ID: {}", userId);
         InfraRequestDTO created = requestService.createRequest(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -115,13 +115,32 @@ public class InfraRequestController {
         return ResponseEntity.ok(requestService.rejectByFinance(requestId, financeId, reason));
     }
 
-    @PostMapping("/{requestId}/deliver")
+    @PostMapping("/{requestId}/mark-procurement")
+    @Operation(summary = "Mark request as in procurement")
+    @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN')")
+    public ResponseEntity<InfraRequestDTO> markProcurement(@PathVariable Long requestId,
+                                                           @RequestParam(required = false) String procurementOrderRef,
+                                                           @RequestParam(required = false) BigDecimal purchaseCost,
+                                                           @RequestParam(required = false) Integer supplierId) {
+        Long financeId = getCurrentUserId();
+        return ResponseEntity.ok(requestService.markProcurement(requestId, financeId, procurementOrderRef, purchaseCost, supplierId));
+    }
+
+    @PostMapping("/{requestId}/mark-delivered")
     @Operation(summary = "Mark request as delivered")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'INFRA')")
+    @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN', 'INFRA')")
     public ResponseEntity<InfraRequestDTO> markDelivered(@PathVariable Long requestId,
                                                          @RequestParam String notes) {
         Long deliveredBy = getCurrentUserId();
         return ResponseEntity.ok(requestService.markDelivered(requestId, deliveredBy, notes));
+    }
+
+    @PostMapping("/{requestId}/complete")
+    @Operation(summary = "Complete the request")
+    @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN')")
+    public ResponseEntity<InfraRequestDTO> completeRequest(@PathVariable Long requestId) {
+        Long userId = getCurrentUserId();
+        return ResponseEntity.ok(requestService.completeRequest(requestId, userId));
     }
 
     @PostMapping("/{requestId}/acknowledge")

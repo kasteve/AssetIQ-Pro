@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -83,7 +84,6 @@ public class InfraRequestService {
     public InfraRequestDTO createRequest(InfraRequestDTO dto, Long requesterId) {
         log.info("Creating infrastructure request for user: {}", requesterId);
 
-        // Get requester's line manager from Employee table
         Employee employee = employeeRepository.findByUserId(requesterId)
                 .orElseThrow(() -> new RuntimeException("Employee not found for user ID: " + requesterId));
 
@@ -111,15 +111,13 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        // Notify line manager - catch email errors so request creation doesn't fail
         try {
             notifyLineManager(saved);
             sendEmailNotification(lineManagerId,
                     "Infrastructure Request Pending Approval",
                     "Request #" + saved.getRequestId() + " for " + saved.getResourceType() + " requires your approval.");
         } catch (Exception e) {
-            log.error("Failed to send email notification for request {}: {}", saved.getRequestId(), e.getMessage());
-            // In-app notification is already created in notifyLineManager
+            log.error("Failed to send email notification: {}", e.getMessage());
         }
 
         auditService.logAction("INFRA_REQUEST_CREATED",
@@ -150,7 +148,7 @@ public class InfraRequestService {
                     "Infrastructure Request Approved by Line Manager",
                     "Your request #" + saved.getRequestId() + " has been approved by your line manager and is now pending infrastructure review.");
         } catch (Exception e) {
-            log.error("Failed to send email for approval: {}", e.getMessage());
+            log.error("Failed to send email: {}", e.getMessage());
         }
 
         auditService.logAction("INFRA_REQUEST_LM_APPROVED",
@@ -181,7 +179,7 @@ public class InfraRequestService {
                     "Infrastructure Request Rejected by Line Manager",
                     "Your request #" + saved.getRequestId() + " has been rejected by your line manager. Reason: " + reason);
         } catch (Exception e) {
-            log.error("Failed to send email for rejection: {}", e.getMessage());
+            log.error("Failed to send email: {}", e.getMessage());
         }
 
         auditService.logAction("INFRA_REQUEST_LM_REJECTED",
@@ -204,7 +202,14 @@ public class InfraRequestService {
 
         if (approved) {
             request.setStatus(RequestStatus.PENDING_FINANCE_APPROVAL);
-            notifyFinanceTeam(request);
+            try {
+                notifyFinanceTeam(request);
+                sendEmailNotification(infraId,
+                        "Infrastructure Request Approved",
+                        "Request #" + requestId + " has been approved and is now pending finance approval.");
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
         } else {
             request.setStatus(RequestStatus.INFRA_REJECTED);
             try {
@@ -213,7 +218,7 @@ public class InfraRequestService {
                         "Infrastructure Request Rejected by Infrastructure",
                         "Your request #" + request.getRequestId() + " has been rejected by Infrastructure. Reason: " + comment);
             } catch (Exception e) {
-                log.error("Failed to send email for rejection: {}", e.getMessage());
+                log.error("Failed to send email: {}", e.getMessage());
             }
         }
 
@@ -248,7 +253,7 @@ public class InfraRequestService {
                     "Infrastructure Request Approved by Finance",
                     "Your request #" + saved.getRequestId() + " has been approved by Finance and is now in procurement.");
         } catch (Exception e) {
-            log.error("Failed to send email for approval: {}", e.getMessage());
+            log.error("Failed to send email: {}", e.getMessage());
         }
 
         auditService.logAction("INFRA_REQUEST_FINANCE_APPROVED",
@@ -279,7 +284,7 @@ public class InfraRequestService {
                     "Infrastructure Request Rejected by Finance",
                     "Your request #" + saved.getRequestId() + " has been rejected by Finance. Reason: " + reason);
         } catch (Exception e) {
-            log.error("Failed to send email for rejection: {}", e.getMessage());
+            log.error("Failed to send email: {}", e.getMessage());
         }
 
         auditService.logAction("INFRA_REQUEST_FINANCE_REJECTED",
@@ -287,6 +292,133 @@ public class InfraRequestService {
                 financeId);
 
         return result;
+    }
+
+    @Transactional
+    public InfraRequestDTO markProcurement(Long requestId, Long financeId, String procurementOrderRef,
+                                           BigDecimal purchaseCost, Integer supplierId) {
+        log.info("Finance {} marking request {} for procurement", financeId, requestId);
+
+        InfraRequest request = validateRequest(requestId);
+        validateStatus(request, RequestStatus.PENDING_FINANCE_APPROVAL);
+
+        request.setStatus(RequestStatus.PROCUREMENT);
+        request.setFinanceApprovedAt(LocalDateTime.now());
+        request.setFinanceApprovedBy(financeId);
+        request.setProcurementOrderRef(procurementOrderRef);
+        request.setPurchaseCost(purchaseCost);
+        request.setSupplierId(supplierId);
+
+        InfraRequest saved = requestRepository.save(request);
+        InfraRequestDTO result = convertToDTO(saved);
+
+        try {
+            notifyRequester(saved, "Your request has been moved to procurement.");
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request - Procurement",
+                    "Your request #" + saved.getRequestId() + " is now in procurement.");
+        } catch (Exception e) {
+            log.error("Failed to send email: {}", e.getMessage());
+        }
+
+        auditService.logAction("INFRA_REQUEST_PROCUREMENT",
+                "Request #" + requestId + " moved to procurement by " + financeId,
+                financeId);
+
+        return result;
+    }
+
+    @Transactional
+    public InfraRequestDTO markDelivered(Long requestId, Long deliveredBy, String deliveryNotes) {
+        log.info("Marking request {} as delivered by: {}", requestId, deliveredBy);
+
+        InfraRequest request = validateRequest(requestId);
+        validateStatus(request, RequestStatus.PROCUREMENT);
+
+        request.setStatus(RequestStatus.DELIVERED);
+        request.setDeliveredAt(LocalDateTime.now());
+        request.setDeliveredBy(deliveredBy);
+
+        InfraRequest saved = requestRepository.save(request);
+        InfraRequestDTO result = convertToDTO(saved);
+
+        try {
+            notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Delivered",
+                    "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
+        } catch (Exception e) {
+            log.error("Failed to send email: {}", e.getMessage());
+        }
+
+        auditService.logAction("INFRA_REQUEST_DELIVERED",
+                "Request #" + requestId + " marked as delivered by " + deliveredBy,
+                deliveredBy);
+
+        return result;
+    }
+
+    @Transactional
+    public InfraRequestDTO completeRequest(Long requestId, Long completedBy) {
+        log.info("User {} completing request: {}", completedBy, requestId);
+
+        InfraRequest request = validateRequest(requestId);
+        validateStatus(request, RequestStatus.DELIVERED);
+
+        request.setStatus(RequestStatus.COMPLETED);
+        request.setCompletedAt(LocalDateTime.now());
+
+        InfraRequest saved = requestRepository.save(request);
+        InfraRequestDTO result = convertToDTO(saved);
+
+        try {
+            sendCompletionReport(saved);
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Completed",
+                    "Your request #" + saved.getRequestId() + " has been completed.");
+        } catch (Exception e) {
+            log.error("Failed to send email: {}", e.getMessage());
+        }
+
+        auditService.logAction("INFRA_REQUEST_COMPLETED",
+                "Request #" + requestId + " completed by " + completedBy,
+                completedBy);
+
+        return result;
+    }
+
+    @Transactional
+    public InfraRequestDTO acknowledgeReceipt(Long requestId, Long acknowledgedBy) {
+        log.info("User {} acknowledging receipt for request: {}", acknowledgedBy, requestId);
+
+        InfraRequest request = validateRequest(requestId);
+        validateStatus(request, RequestStatus.DELIVERED);
+
+        request.setStatus(RequestStatus.COMPLETED);
+        request.setAcknowledgedAt(LocalDateTime.now());
+        request.setAcknowledgedBy(acknowledgedBy);
+
+        InfraRequest saved = requestRepository.save(request);
+        InfraRequestDTO result = convertToDTO(saved);
+
+        try {
+            sendCompletionReport(saved);
+            sendEmailNotification(saved.getRequesterId(),
+                    "Infrastructure Request Completed",
+                    "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
+        } catch (Exception e) {
+            log.error("Failed to send email: {}", e.getMessage());
+        }
+
+        auditService.logAction("INFRA_REQUEST_COMPLETED",
+                "Request #" + requestId + " completed - acknowledged by " + acknowledgedBy,
+                acknowledgedBy);
+
+        return result;
+    }
+
+    public List<AppUser> getUsersWithPermission(String permissionName) {
+        return userRepository.findUsersWithPermission(permissionName);
     }
 
     @Transactional
@@ -318,70 +450,6 @@ public class InfraRequestService {
             log.error("Failed to upload quotation: {}", e.getMessage());
             throw new RuntimeException("Failed to upload quotation", e);
         }
-    }
-
-    @Transactional
-    public InfraRequestDTO markDelivered(Long requestId, Long deliveredBy, String deliveryNotes) {
-        log.info("Marking request {} as delivered by: {}", requestId, deliveredBy);
-
-        InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.PROCUREMENT);
-
-        request.setStatus(RequestStatus.DELIVERED);
-        request.setDeliveredAt(LocalDateTime.now());
-        request.setDeliveredBy(deliveredBy);
-
-        InfraRequest saved = requestRepository.save(request);
-        InfraRequestDTO result = convertToDTO(saved);
-
-        try {
-            notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Delivered",
-                    "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
-        } catch (Exception e) {
-            log.error("Failed to send email for delivery: {}", e.getMessage());
-        }
-
-        auditService.logAction("INFRA_REQUEST_DELIVERED",
-                "Request #" + requestId + " marked as delivered by " + deliveredBy,
-                deliveredBy);
-
-        return result;
-    }
-
-    @Transactional
-    public InfraRequestDTO acknowledgeReceipt(Long requestId, Long acknowledgedBy) {
-        log.info("User {} acknowledging receipt for request: {}", acknowledgedBy, requestId);
-
-        InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.DELIVERED);
-
-        request.setStatus(RequestStatus.COMPLETED);
-        request.setAcknowledgedAt(LocalDateTime.now());
-        request.setAcknowledgedBy(acknowledgedBy);
-
-        InfraRequest saved = requestRepository.save(request);
-        InfraRequestDTO result = convertToDTO(saved);
-
-        try {
-            sendCompletionReport(saved);
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Completed",
-                    "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
-        } catch (Exception e) {
-            log.error("Failed to send email for completion: {}", e.getMessage());
-        }
-
-        auditService.logAction("INFRA_REQUEST_COMPLETED",
-                "Request #" + requestId + " completed - acknowledged by " + acknowledgedBy,
-                acknowledgedBy);
-
-        return result;
-    }
-
-    public List<AppUser> getUsersWithPermission(String permissionName) {
-        return userRepository.findUsersWithPermission(permissionName);
     }
 
     // ============================================
@@ -424,10 +492,6 @@ public class InfraRequestService {
         );
     }
 
-    private void notifyInfraTeam(InfraRequest request) {
-        log.info("Notifying infra team about request: {}", request.getRequestId());
-    }
-
     private void notifyFinanceTeam(InfraRequest request) {
         log.info("Notifying finance team about request: {}", request.getRequestId());
     }
@@ -440,10 +504,6 @@ public class InfraRequestService {
         userRepository.findById(userId).ifPresent(user -> {
             emailService.sendSimpleEmail(user.getEmail(), subject, body);
         });
-    }
-
-    private void notifyFinanceTeamDelivery(InfraRequest request) {
-        log.info("Notifying finance team about delivery: {}", request.getRequestId());
     }
 
     private void sendCompletionReport(InfraRequest request) {
