@@ -40,6 +40,7 @@ public class InfraRequestService {
     private final PdfGenerationService pdfGenerationService;
 
     private static final String UPLOAD_DIR = "./uploads/infra/quotations/";
+    private static final String REPORT_DIR = "./uploads/infra/reports/";
 
     // ============================================
     // Query Methods
@@ -49,6 +50,11 @@ public class InfraRequestService {
         InfraRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found: " + requestId));
         return convertToDTO(request);
+    }
+
+    public InfraRequest getRequestEntityById(Long requestId) {
+        return requestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found: " + requestId));
     }
 
     public List<InfraRequestDTO> getRequestsForUser(Long userId) {
@@ -72,6 +78,16 @@ public class InfraRequestService {
     public List<InfraRequestDTO> getRequestsByRequesterId(Long userId) {
         log.info("Getting infrastructure requests for requester: {}", userId);
         return requestRepository.findByRequesterId(userId).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<InfraRequestDTO> getFinanceRequests() {
+        return requestRepository.findByStatusIn(List.of(
+                        RequestStatus.PENDING_FINANCE_APPROVAL,
+                        RequestStatus.PROCUREMENT,
+                        RequestStatus.DELIVERED
+                )).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -305,7 +321,6 @@ public class InfraRequestService {
 
         InfraRequest request = validateRequest(requestId);
 
-        // Allow from PENDING_FINANCE_APPROVAL or PROCUREMENT
         if (request.getStatus() != RequestStatus.PENDING_FINANCE_APPROVAL &&
                 request.getStatus() != RequestStatus.PROCUREMENT) {
             throw new IllegalStateException("Request must be in PENDING_FINANCE_APPROVAL or PROCUREMENT status. Current: " + request.getStatus());
@@ -357,7 +372,7 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         try {
-            notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
+            notifyRequester(saved, "Your requested items have been delivered.");
             sendEmailNotification(saved.getRequesterId(),
                     "Infrastructure Request Delivered",
                     "Your request #" + saved.getRequestId() + " has been delivered.");
@@ -384,6 +399,16 @@ public class InfraRequestService {
 
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
+
+        // Generate PDF on completion
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            request.setPdfReportPath(pdfPath);
+            log.info("PDF generated for request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for request {}: {}", requestId, e.getMessage());
+        }
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
@@ -418,6 +443,16 @@ public class InfraRequestService {
         request.setAcknowledgedAt(LocalDateTime.now());
         request.setAcknowledgedBy(acknowledgedBy);
 
+        // Generate PDF on completion
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            request.setPdfReportPath(pdfPath);
+            log.info("PDF generated for request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for request {}: {}", requestId, e.getMessage());
+        }
+
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
@@ -435,10 +470,6 @@ public class InfraRequestService {
                 acknowledgedBy);
 
         return result;
-    }
-
-    public List<AppUser> getUsersWithPermission(String permissionName) {
-        return userRepository.findUsersWithPermission(permissionName);
     }
 
     @Transactional
@@ -472,6 +503,10 @@ public class InfraRequestService {
         }
     }
 
+    public List<AppUser> getUsersWithPermission(String permissionName) {
+        return userRepository.findUsersWithPermission(permissionName);
+    }
+
     // ============================================
     // Helper Methods
     // ============================================
@@ -487,6 +522,18 @@ public class InfraRequestService {
                     "Invalid status. Expected: " + expectedStatus + ", Actual: " + request.getStatus()
             );
         }
+    }
+
+    private String savePdfToFile(byte[] pdfBytes, Long requestId) throws IOException {
+        Path uploadPath = Paths.get(REPORT_DIR);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        String filename = "infra_request_" + requestId + "_" + System.currentTimeMillis() + ".pdf";
+        Path filePath = uploadPath.resolve(filename);
+        Files.write(filePath, pdfBytes);
+        return filePath.toString();
     }
 
     private void notifyLineManager(InfraRequest request) {
@@ -514,10 +561,6 @@ public class InfraRequestService {
 
     private void notifyFinanceTeam(InfraRequest request) {
         log.info("Notifying finance team about request: {}", request.getRequestId());
-    }
-
-    private void notifyProcurementTeam(InfraRequest request) {
-        log.info("Notifying procurement team about request: {}", request.getRequestId());
     }
 
     private void sendEmailNotification(Long userId, String subject, String body) {

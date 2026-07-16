@@ -41,7 +41,7 @@
     <div class="col-md-3">
       <div class="stat-card" style="border-left-color: #198754;">
         <div class="stat-number" th:text="${pendingFinanceRequests != null ? pendingFinanceRequests.size() : 0}">0</div>
-        <div class="stat-label">Pending Finance Approval</div>
+        <div class="stat-label">Pending Finance</div>
       </div>
     </div>
     <div class="col-md-3">
@@ -220,7 +220,7 @@
       </div>
     </div>
 
-    <!-- PENDING FINANCE APPROVAL -->
+    <!-- FINANCE (All Finance Statuses) -->
     <div class="tab-pane fade" id="finance" role="tabpanel">
       <div class="table-card">
         <div class="table-responsive">
@@ -291,6 +291,10 @@
             </tbody>
           </table>
         </div>
+      </div>
+      <div class="empty-state" th:if="${pendingFinanceRequests == null or pendingFinanceRequests.isEmpty()}">
+        <i class="fas fa-coins"></i>
+        No finance requests
       </div>
     </div>
   </div>
@@ -652,9 +656,6 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
   <script th:inline="none">
-    // ============================================
-    // DataTables Initialization
-    // ============================================
     $(document).ready(function() {
       if ($.fn.DataTable.isDataTable('#allRequestsTable')) {
         $('#allRequestsTable').DataTable().destroy();
@@ -719,7 +720,7 @@
           search: "Search:",
           lengthMenu: "Show _MENU_ entries",
           info: "Showing _START_ to _END_ of _TOTAL_ requests",
-          infoEmpty: "No pending finance approvals",
+          infoEmpty: "No pending finance requests",
           infoFiltered: "(filtered from _MAX_ total requests)"
         }
       });

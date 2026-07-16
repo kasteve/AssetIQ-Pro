@@ -63,6 +63,13 @@ public class InfraRequestController {
         return ResponseEntity.ok(requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW));
     }
 
+    @GetMapping("/finance")
+    @Operation(summary = "Get finance requests")
+    @PreAuthorize("hasAnyAuthority('APPROVE_FINANCE', 'ADMIN')")
+    public ResponseEntity<List<InfraRequestDTO>> getFinanceRequests() {
+        return ResponseEntity.ok(requestService.getFinanceRequests());
+    }
+
     @GetMapping("/{requestId}")
     @Operation(summary = "Get request details")
     public ResponseEntity<InfraRequestDTO> getRequest(@PathVariable Long requestId) {
