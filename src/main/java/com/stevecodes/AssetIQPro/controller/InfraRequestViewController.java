@@ -29,8 +29,18 @@ public class InfraRequestViewController {
     public String infraRequests(Model model) {
         log.info("Loading infrastructure requests page");
 
+        // All requests
         List<InfraRequestDTO> requests = requestService.getAllRequests();
         model.addAttribute("requests", requests);
+
+        // Pending by status
+        List<InfraRequestDTO> pendingLMRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_LM_APPROVAL);
+        List<InfraRequestDTO> pendingRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW);
+        List<InfraRequestDTO> pendingFinanceRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL);
+
+        model.addAttribute("pendingLMRequests", pendingLMRequests);
+        model.addAttribute("pendingRequests", pendingRequests);
+        model.addAttribute("pendingFinanceRequests", pendingFinanceRequests);
 
         return "infra-requests/list";
     }
@@ -40,20 +50,5 @@ public class InfraRequestViewController {
     public InfraRequestDTO viewRequest(@PathVariable Long id) {
         log.info("Fetching infrastructure request: {}", id);
         return requestService.getRequestById(id);
-    }
-
-    @GetMapping("/dashboard")
-    public String infraDashboard(Model model) {
-        log.info("Loading infrastructure dashboard");
-
-        List<InfraRequestDTO> pendingRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW);
-        List<InfraRequestDTO> pendingLMRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_LM_APPROVAL);
-        List<InfraRequestDTO> pendingFinanceRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL);
-
-        model.addAttribute("pendingRequests", pendingRequests);
-        model.addAttribute("pendingLMRequests", pendingLMRequests);
-        model.addAttribute("pendingFinanceRequests", pendingFinanceRequests);
-
-        return "infra-requests/dashboard";
     }
 }

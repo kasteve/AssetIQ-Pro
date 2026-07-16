@@ -16,71 +16,299 @@
     </button>
   </div>
 
-  <!-- Status Filter -->
-  <div class="filter-card">
-    <a href="/infra-requests?status=ALL" class="filter-pill active-all">All</a>
-    <a href="/infra-requests?status=PENDING" class="filter-pill active-pending">Pending</a>
-    <a href="/infra-requests?status=PROCUREMENT" class="filter-pill active-procurement">Procurement</a>
-    <a href="/infra-requests?status=COMPLETED" class="filter-pill active-completed">Completed</a>
-    <a href="/infra-requests?status=REJECTED" class="filter-pill active-rejected">Rejected</a>
-  </div>
-
-  <div class="req-grid">
-    <div th:each="request : ${requests}">
-      <div class="req-card">
-        <div class="req-header">
-          <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
-          <span class="status-badge"
-                th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'pending' :
-                                          (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
-                                          (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
-                                          (${request.status} == 'PROCUREMENT' ? 'procurement' :
-                                          (${request.status} == 'DELIVERED' ? 'completed' :
-                                          (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
-                th:text="${request.statusDisplay}">Pending</span>
-        </div>
-        <div class="req-body">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="req-label">Requested By</div>
-              <div class="req-value" th:text="${request.requesterName}">John Doe</div>
-              <div class="req-label">Staff ID</div>
-              <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
-              <div class="req-label">Department</div>
-              <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
-            </div>
-            <div class="col-md-6">
-              <div class="req-label">Quantity</div>
-              <div class="req-value" th:text="${request.quantity}">1</div>
-              <div class="req-label">Request Date</div>
-              <div class="req-value" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</div>
-            </div>
-          </div>
-          <div th:if="${request.specification != null and !request.specification.isEmpty()}">
-            <div class="req-label">Specification</div>
-            <div class="req-value" th:text="${request.specification}">16GB RAM, 512GB SSD</div>
-          </div>
-          <div>
-            <div class="req-label">Justification</div>
-            <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
-          </div>
-          <div class="req-actions mt-3 d-flex gap-2">
-            <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
-              <i class="fas fa-eye me-1"></i>View
-            </button>
-            <a th:if="${request.status} == 'COMPLETED'"
-               th:href="@{/infra-requests/{id}/pdf(id=${request.requestId})}"
-               class="btn btn-sm btn-secondary">
-              <i class="fas fa-file-pdf me-1"></i>PDF
-            </a>
-          </div>
-        </div>
+  <!-- Stats -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="stat-card" style="border-left-color: #0d6efd;">
+        <div class="stat-number" th:text="${pendingLMRequests != null ? pendingLMRequests.size() : 0}">0</div>
+        <div class="stat-label">Pending LM Approval</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="border-left-color: #fd7e14;">
+        <div class="stat-number" th:text="${pendingRequests != null ? pendingRequests.size() : 0}">0</div>
+        <div class="stat-label">Pending Infra Review</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="border-left-color: #198754;">
+        <div class="stat-number" th:text="${pendingFinanceRequests != null ? pendingFinanceRequests.size() : 0}">0</div>
+        <div class="stat-label">Pending Finance Approval</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="border-left-color: #6c757d;">
+        <div class="stat-number" th:text="${requests != null ? requests.size() : 0}">0</div>
+        <div class="stat-label">Total Requests</div>
       </div>
     </div>
   </div>
-  <div class="empty-state" th:if="${requests == null or requests.isEmpty()}">
-    <i class="fas fa-tools"></i>
-    No infrastructure requests found
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="requestTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">
+        <i class="fas fa-list me-1"></i>All Requests
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="lm-tab" data-bs-toggle="tab" data-bs-target="#lm" type="button" role="tab">
+        <i class="fas fa-user-check me-1"></i>LM Approval
+        <span th:if="${pendingLMRequests != null and pendingLMRequests.size() > 0}"
+              class="badge bg-warning ms-1" th:text="${pendingLMRequests.size()}">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="infra-tab" data-bs-toggle="tab" data-bs-target="#infra" type="button" role="tab">
+        <i class="fas fa-tools me-1"></i>Infra Review
+        <span th:if="${pendingRequests != null and pendingRequests.size() > 0}"
+              class="badge bg-warning ms-1" th:text="${pendingRequests.size()}">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance" type="button" role="tab">
+        <i class="fas fa-coins me-1"></i>Finance Approval
+        <span th:if="${pendingFinanceRequests != null and pendingFinanceRequests.size() > 0}"
+              class="badge bg-warning ms-1" th:text="${pendingFinanceRequests.size()}">0</span>
+      </button>
+    </li>
+  </ul>
+
+  <!-- Tab Content -->
+  <div class="tab-content">
+    <!-- ALL REQUESTS -->
+    <div class="tab-pane fade show active" id="all" role="tabpanel">
+      <div th:if="${requests != null and !requests.isEmpty()}">
+        <div class="req-grid">
+          <div th:each="request : ${requests}">
+            <div class="req-card">
+              <div class="req-header">
+                <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
+                <span class="status-badge"
+                      th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'pending' :
+                                                      (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
+                                                      (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                                      (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                                      (${request.status} == 'DELIVERED' ? 'completed' :
+                                                      (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
+                      th:text="${request.status}">Pending</span>
+              </div>
+              <div class="req-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="req-label">Requested By</div>
+                    <div class="req-value" th:text="${request.requesterName}">John Doe</div>
+                    <div class="req-label">Staff ID</div>
+                    <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
+                    <div class="req-label">Department</div>
+                    <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="req-label">Quantity</div>
+                    <div class="req-value" th:text="${request.quantity}">1</div>
+                    <div class="req-label">Request Date</div>
+                    <div class="req-value" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</div>
+                  </div>
+                </div>
+                <div th:if="${request.specification != null and !request.specification.isEmpty()}">
+                  <div class="req-label">Specification</div>
+                  <div class="req-value" th:text="${request.specification}">16GB RAM, 512GB SSD</div>
+                </div>
+                <div>
+                  <div class="req-label">Justification</div>
+                  <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
+                </div>
+                <div class="req-actions mt-3 d-flex gap-2">
+                  <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye me-1"></i>View
+                  </button>
+                  <a th:if="${request.status} == 'COMPLETED'"
+                     th:href="@{/infra-requests/{id}/pdf(id=${request.requestId})}"
+                     class="btn btn-sm btn-secondary">
+                    <i class="fas fa-file-pdf me-1"></i>PDF
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" th:if="${requests == null or requests.isEmpty()}">
+        <i class="fas fa-tools"></i>
+        No infrastructure requests found
+      </div>
+    </div>
+
+    <!-- PENDING LM APPROVAL -->
+    <div class="tab-pane fade" id="lm" role="tabpanel">
+      <div th:if="${pendingLMRequests != null and !pendingLMRequests.isEmpty()}">
+        <div class="req-grid">
+          <div th:each="request : ${pendingLMRequests}">
+            <div class="req-card">
+              <div class="req-header">
+                <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
+                <span class="status-badge pending" th:text="${request.status}">Pending</span>
+              </div>
+              <div class="req-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="req-label">Requested By</div>
+                    <div class="req-value" th:text="${request.requesterName}">John Doe</div>
+                    <div class="req-label">Staff ID</div>
+                    <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
+                    <div class="req-label">Department</div>
+                    <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="req-label">Quantity</div>
+                    <div class="req-value" th:text="${request.quantity}">1</div>
+                    <div class="req-label">Request Date</div>
+                    <div class="req-value" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</div>
+                  </div>
+                </div>
+                <div th:if="${request.specification != null and !request.specification.isEmpty()}">
+                  <div class="req-label">Specification</div>
+                  <div class="req-value" th:text="${request.specification}">16GB RAM, 512GB SSD</div>
+                </div>
+                <div>
+                  <div class="req-label">Justification</div>
+                  <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
+                </div>
+                <div class="req-actions mt-3 d-flex gap-2">
+                  <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye me-1"></i>View
+                  </button>
+                  <button th:onclick="'approveLM(' + ${request.requestId} + ')'" class="btn btn-sm btn-success">
+                    <i class="fas fa-check me-1"></i>Approve
+                  </button>
+                  <button th:onclick="'rejectLM(' + ${request.requestId} + ')'" class="btn btn-sm btn-danger">
+                    <i class="fas fa-times me-1"></i>Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" th:if="${pendingLMRequests == null or pendingLMRequests.isEmpty()}">
+        <i class="fas fa-user-check"></i>
+        No pending line manager approvals
+      </div>
+    </div>
+
+    <!-- PENDING INFRA REVIEW -->
+    <div class="tab-pane fade" id="infra" role="tabpanel">
+      <div th:if="${pendingRequests != null and !pendingRequests.isEmpty()}">
+        <div class="req-grid">
+          <div th:each="request : ${pendingRequests}">
+            <div class="req-card">
+              <div class="req-header">
+                <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
+                <span class="status-badge review" th:text="${request.status}">Pending</span>
+              </div>
+              <div class="req-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="req-label">Requested By</div>
+                    <div class="req-value" th:text="${request.requesterName}">John Doe</div>
+                    <div class="req-label">Staff ID</div>
+                    <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
+                    <div class="req-label">Department</div>
+                    <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="req-label">Quantity</div>
+                    <div class="req-value" th:text="${request.quantity}">1</div>
+                    <div class="req-label">Request Date</div>
+                    <div class="req-value" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</div>
+                  </div>
+                </div>
+                <div th:if="${request.specification != null and !request.specification.isEmpty()}">
+                  <div class="req-label">Specification</div>
+                  <div class="req-value" th:text="${request.specification}">16GB RAM, 512GB SSD</div>
+                </div>
+                <div>
+                  <div class="req-label">Justification</div>
+                  <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
+                </div>
+                <div class="req-actions mt-3 d-flex gap-2">
+                  <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye me-1"></i>View
+                  </button>
+                  <button th:onclick="'reviewInfra(' + ${request.requestId} + ')'" class="btn btn-sm btn-success">
+                    <i class="fas fa-check me-1"></i>Review
+                  </button>
+                  <button th:onclick="'rejectInfra(' + ${request.requestId} + ')'" class="btn btn-sm btn-danger">
+                    <i class="fas fa-times me-1"></i>Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" th:if="${pendingRequests == null or pendingRequests.isEmpty()}">
+        <i class="fas fa-tools"></i>
+        No pending infrastructure review requests
+      </div>
+    </div>
+
+    <!-- PENDING FINANCE APPROVAL -->
+    <div class="tab-pane fade" id="finance" role="tabpanel">
+      <div th:if="${pendingFinanceRequests != null and !pendingFinanceRequests.isEmpty()}">
+        <div class="req-grid">
+          <div th:each="request : ${pendingFinanceRequests}">
+            <div class="req-card">
+              <div class="req-header">
+                <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
+                <span class="status-badge finance" th:text="${request.status}">Pending</span>
+              </div>
+              <div class="req-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="req-label">Requested By</div>
+                    <div class="req-value" th:text="${request.requesterName}">John Doe</div>
+                    <div class="req-label">Staff ID</div>
+                    <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
+                    <div class="req-label">Department</div>
+                    <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="req-label">Quantity</div>
+                    <div class="req-value" th:text="${request.quantity}">1</div>
+                    <div class="req-label">Request Date</div>
+                    <div class="req-value" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</div>
+                  </div>
+                </div>
+                <div th:if="${request.specification != null and !request.specification.isEmpty()}">
+                  <div class="req-label">Specification</div>
+                  <div class="req-value" th:text="${request.specification}">16GB RAM, 512GB SSD</div>
+                </div>
+                <div>
+                  <div class="req-label">Justification</div>
+                  <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
+                </div>
+                <div class="req-actions mt-3 d-flex gap-2">
+                  <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye me-1"></i>View
+                  </button>
+                  <button th:onclick="'approveFinance(' + ${request.requestId} + ')'" class="btn btn-sm btn-success">
+                    <i class="fas fa-check me-1"></i>Approve
+                  </button>
+                  <button th:onclick="'rejectFinance(' + ${request.requestId} + ')'" class="btn btn-sm btn-danger">
+                    <i class="fas fa-times me-1"></i>Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" th:if="${pendingFinanceRequests == null or pendingFinanceRequests.isEmpty()}">
+        <i class="fas fa-coins"></i>
+        No pending finance approvals
+      </div>
+    </div>
   </div>
 
   <!-- Create Request Modal -->
@@ -124,13 +352,6 @@
             <div class="mb-3">
               <label class="form-label">Justification *</label>
               <textarea name="justification" class="form-control" rows="3" placeholder="Why do you need this resource?" required></textarea>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Line Manager</label>
-              <select name="lineManagerId" class="form-select">
-                <option value="">Auto-assigned from your employee record</option>
-              </select>
             </div>
           </div>
           <div class="modal-footer">
@@ -178,15 +399,16 @@
     .btn-secondary { background: #eef0f3 !important; border: none !important; color: var(--ink) !important; }
     .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
     .btn-sm { padding: 7px 14px !important; font-size: 12.5px !important; }
+    .btn-success { background: #198754 !important; border: none !important; }
+    .btn-danger { background: #dc3545 !important; border: none !important; }
 
-    .filter-card { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 16px 20px; margin-bottom: 24px; }
-    .filter-pill { display: inline-block; padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 8px; border: 1px solid #e2e8f0; color: #6c757d; transition: all 0.15s ease; }
-    .filter-pill:hover { background: #f0f2f5; color: var(--ink); }
-    .filter-pill.active-all { background: #eef0f3; color: var(--ink); border-color: transparent; }
-    .filter-pill.active-pending { background: #fff4e0; color: #fd7e14; border-color: transparent; }
-    .filter-pill.active-procurement { background: #e8eefc; color: #0d6efd; border-color: transparent; }
-    .filter-pill.active-completed { background: #e6f7ec; color: #198754; border-color: transparent; }
-    .filter-pill.active-rejected { background: #fdeeee; color: #dc3545; border-color: transparent; }
+    .stat-card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #0d6efd; height: 100%; }
+    .stat-number { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+    .stat-label { font-size: 12.5px; color: #6c757d; font-weight: 600; margin-top: 4px; }
+
+    .nav-tabs .nav-link { border-radius: 10px 10px 0 0 !important; font-weight: 600; color: #6c757d; }
+    .nav-tabs .nav-link.active { color: var(--primary-color); font-weight: 700; border-bottom: 3px solid var(--primary-color); }
+    .nav-tabs .nav-link .badge { font-size: 10px; padding: 3px 7px; }
 
     .req-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
     .req-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; height: 100%; display: flex; flex-direction: column; }
@@ -238,7 +460,9 @@
 
 <div layout:fragment="scripts">
   <script>
+    // ============================================
     // Create Request
+    // ============================================
     document.getElementById('infraRequestForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
@@ -269,7 +493,9 @@
         });
     });
 
+    // ============================================
     // View Request
+    // ============================================
     function viewRequest(id) {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewRequestModal'));
         const body = document.getElementById('viewRequestBody');
@@ -331,7 +557,7 @@
                         <div class="col-md-6">
                             <div class="detail-item">
                                 <span class="label">Status</span>
-                                <span class="badge bg-${statusColor}">${request.statusDisplay || request.status}</span>
+                                <span class="badge bg-${statusColor}">${request.status}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="label">Created At</span>
@@ -423,6 +649,115 @@
                     </div>
                 `;
             });
+    }
+
+    // ============================================
+    // Approval Actions
+    // ============================================
+    function approveLM(id) {
+        const comment = prompt('Enter approval comment (optional):');
+        if (comment === null) return;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-lm?comment=' + encodeURIComponent(comment || ''), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Request approved successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to approve request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    function rejectLM(id) {
+        const reason = prompt('Enter rejection reason:');
+        if (reason === null) return;
+        if (!reason.trim()) { alert('Reason is required!'); return; }
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-lm?reason=' + encodeURIComponent(reason), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Request rejected successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to reject request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    function reviewInfra(id) {
+        const comment = prompt('Enter review comment:');
+        if (comment === null) return;
+        const approved = confirm('Approve this request? Click OK for Approve, Cancel for Reject.');
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/review-infra?comment=' + encodeURIComponent(comment || '') + '&approved=' + approved, {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert(approved ? 'Request approved successfully!' : 'Request rejected successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to review request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    function rejectInfra(id) {
+        const reason = prompt('Enter rejection reason:');
+        if (reason === null) return;
+        if (!reason.trim()) { alert('Reason is required!'); return; }
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/review-infra?comment=' + encodeURIComponent(reason) + '&approved=false', {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Request rejected successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to reject request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    function approveFinance(id) {
+        const comment = prompt('Enter approval comment (optional):');
+        if (comment === null) return;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-finance?comment=' + encodeURIComponent(comment || ''), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Request approved successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to approve request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    function rejectFinance(id) {
+        const reason = prompt('Enter rejection reason:');
+        if (reason === null) return;
+        if (!reason.trim()) { alert('Reason is required!'); return; }
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-finance?reason=' + encodeURIComponent(reason), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Request rejected successfully!');
+                window.location.reload();
+            } else {
+                alert('Failed to reject request.');
+            }
+        })
+        .catch(error => alert('Error: ' + error.message));
     }
   </script>
 </div>

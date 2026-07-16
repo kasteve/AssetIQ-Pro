@@ -410,7 +410,7 @@
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'infra-requests'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
                 <i class="fas fa-tools"></i> Infrastructure
-                <span class="badge" th:if="${pendingRequests != null and pendingRequests > 0}" th:text="${pendingRequests}">0</span>
+                <span class="badge" th:if="${pendingRequests != null and pendingRequests.size() > 0}" th:text="${pendingRequests.size()}">0</span>
             </a>
         </div>
 
