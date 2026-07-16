@@ -232,6 +232,10 @@ public class InfraRequestService {
         return result;
     }
 
+    // ============================================
+    // Finance Sequential Workflow
+    // ============================================
+
     @Transactional
     public InfraRequestDTO approveByFinance(Long requestId, Long financeId, String comment) {
         log.info("Finance {} approving request: {}", financeId, requestId);
@@ -300,11 +304,18 @@ public class InfraRequestService {
         log.info("Finance {} marking request {} for procurement", financeId, requestId);
 
         InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.PENDING_FINANCE_APPROVAL);
+
+        // Allow from PENDING_FINANCE_APPROVAL or PROCUREMENT
+        if (request.getStatus() != RequestStatus.PENDING_FINANCE_APPROVAL &&
+                request.getStatus() != RequestStatus.PROCUREMENT) {
+            throw new IllegalStateException("Request must be in PENDING_FINANCE_APPROVAL or PROCUREMENT status. Current: " + request.getStatus());
+        }
 
         request.setStatus(RequestStatus.PROCUREMENT);
-        request.setFinanceApprovedAt(LocalDateTime.now());
-        request.setFinanceApprovedBy(financeId);
+        if (request.getFinanceApprovedAt() == null) {
+            request.setFinanceApprovedAt(LocalDateTime.now());
+            request.setFinanceApprovedBy(financeId);
+        }
         request.setProcurementOrderRef(procurementOrderRef);
         request.setPurchaseCost(purchaseCost);
         request.setSupplierId(supplierId);
@@ -333,7 +344,10 @@ public class InfraRequestService {
         log.info("Marking request {} as delivered by: {}", requestId, deliveredBy);
 
         InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.PROCUREMENT);
+
+        if (request.getStatus() != RequestStatus.PROCUREMENT) {
+            throw new IllegalStateException("Request must be in PROCUREMENT status. Current: " + request.getStatus());
+        }
 
         request.setStatus(RequestStatus.DELIVERED);
         request.setDeliveredAt(LocalDateTime.now());
@@ -346,7 +360,7 @@ public class InfraRequestService {
             notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
             sendEmailNotification(saved.getRequesterId(),
                     "Infrastructure Request Delivered",
-                    "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
+                    "Your request #" + saved.getRequestId() + " has been delivered.");
         } catch (Exception e) {
             log.error("Failed to send email: {}", e.getMessage());
         }
@@ -363,7 +377,10 @@ public class InfraRequestService {
         log.info("User {} completing request: {}", completedBy, requestId);
 
         InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.DELIVERED);
+
+        if (request.getStatus() != RequestStatus.DELIVERED) {
+            throw new IllegalStateException("Request must be in DELIVERED status. Current: " + request.getStatus());
+        }
 
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
@@ -392,7 +409,10 @@ public class InfraRequestService {
         log.info("User {} acknowledging receipt for request: {}", acknowledgedBy, requestId);
 
         InfraRequest request = validateRequest(requestId);
-        validateStatus(request, RequestStatus.DELIVERED);
+
+        if (request.getStatus() != RequestStatus.DELIVERED) {
+            throw new IllegalStateException("Request must be in DELIVERED status. Current: " + request.getStatus());
+        }
 
         request.setStatus(RequestStatus.COMPLETED);
         request.setAcknowledgedAt(LocalDateTime.now());

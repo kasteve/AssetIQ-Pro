@@ -8,7 +8,6 @@
   <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
 </head>
 
 <body>
@@ -76,7 +75,7 @@
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance" type="button" role="tab">
-        <i class="fas fa-coins me-1"></i>Finance Approval
+        <i class="fas fa-coins me-1"></i>Finance
         <span th:if="${pendingFinanceRequests != null and pendingFinanceRequests.size() > 0}"
               class="badge bg-warning ms-1" th:text="${pendingFinanceRequests.size()}">0</span>
       </button>
@@ -233,6 +232,7 @@
               <th>Requester</th>
               <th>Staff ID</th>
               <th>Quantity</th>
+              <th>Status</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
@@ -244,24 +244,46 @@
               <td th:text="${request.requesterName}">John Doe</td>
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
+              <td>
+                <span class="status-badge"
+                      th:classappend="${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                      (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                      (${request.status} == 'DELIVERED' ? 'completed' : ''))"
+                      th:text="${request.status}">Pending</span>
+              </td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
               <td>
                 <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                   <i class="fas fa-eye"></i>
                 </button>
-                <button class="btn btn-sm btn-success" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'">
+
+                <!-- Approve - Only when PENDING_FINANCE_APPROVAL -->
+                <button class="btn btn-sm btn-success" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'"
+                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
                   <i class="fas fa-check"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'">
+
+                <!-- Reject - Only when PENDING_FINANCE_APPROVAL -->
+                <button class="btn btn-sm btn-danger" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'"
+                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
                   <i class="fas fa-times"></i>
                 </button>
-                <button class="btn btn-sm btn-info" th:onclick="'showProcurement(' + ${request.requestId} + ')'">
+
+                <!-- Procurement - When PENDING_FINANCE_APPROVAL or PROCUREMENT -->
+                <button class="btn btn-sm btn-info" th:onclick="'showProcurement(' + ${request.requestId} + ')'"
+                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL' or ${request.status} == 'PROCUREMENT'">
                   <i class="fas fa-shopping-cart"></i>
                 </button>
-                <button class="btn btn-sm btn-warning" th:onclick="'showDelivered(' + ${request.requestId} + ')'">
+
+                <!-- Delivered - Only when PROCUREMENT -->
+                <button class="btn btn-sm btn-warning" th:onclick="'showDelivered(' + ${request.requestId} + ')'"
+                        th:if="${request.status} == 'PROCUREMENT'">
                   <i class="fas fa-truck"></i>
                 </button>
-                <button class="btn btn-sm btn-secondary" th:onclick="'showComplete(' + ${request.requestId} + ')'">
+
+                <!-- Complete - Only when DELIVERED -->
+                <button class="btn btn-sm btn-secondary" th:onclick="'showComplete(' + ${request.requestId} + ')'"
+                        th:if="${request.status} == 'DELIVERED'">
                   <i class="fas fa-check-double"></i>
                 </button>
               </td>
@@ -402,7 +424,6 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="reviewInfraId">
-          <input type="hidden" id="reviewInfraApproved">
           <div class="mb-3">
             <label class="form-label">Comment</label>
             <textarea id="reviewInfraComment" class="form-control" rows="3" placeholder="Enter review comment"></textarea>
@@ -640,7 +661,7 @@
       }
       $('#allRequestsTable').DataTable({
         pageLength: 10,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
         order: [[0, 'desc']],
         columnDefs: [{ orderable: false, targets: 7 }],
         language: {
@@ -652,9 +673,12 @@
         }
       });
 
+      if ($.fn.DataTable.isDataTable('#lmTable')) {
+        $('#lmTable').DataTable().destroy();
+      }
       $('#lmTable').DataTable({
         pageLength: 10,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
         order: [[0, 'desc']],
         columnDefs: [{ orderable: false, targets: 6 }],
         language: {
@@ -666,9 +690,12 @@
         }
       });
 
+      if ($.fn.DataTable.isDataTable('#infraTable')) {
+        $('#infraTable').DataTable().destroy();
+      }
       $('#infraTable').DataTable({
         pageLength: 10,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
         order: [[0, 'desc']],
         columnDefs: [{ orderable: false, targets: 6 }],
         language: {
@@ -680,11 +707,14 @@
         }
       });
 
+      if ($.fn.DataTable.isDataTable('#financeTable')) {
+        $('#financeTable').DataTable().destroy();
+      }
       $('#financeTable').DataTable({
         pageLength: 10,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
         order: [[0, 'desc']],
-        columnDefs: [{ orderable: false, targets: 6 }],
+        columnDefs: [{ orderable: false, targets: 7 }],
         language: {
           search: "Search:",
           lengthMenu: "Show _MENU_ entries",
@@ -694,7 +724,9 @@
         }
       });
     });
+  </script>
 
+  <script th:inline="none">
     // ============================================
     // View Request
     // ============================================
@@ -985,8 +1017,10 @@
     }
 
     // ============================================
-    // Finance Actions
+    // Finance Actions (Sequential)
     // ============================================
+
+    // Step 1: Approve Finance
     function showApproveFinance(id) {
       document.getElementById('approveFinanceId').value = id;
       document.getElementById('approveFinanceComment').value = '';
@@ -1011,6 +1045,7 @@
       .catch(error => alert('Error: ' + error.message));
     }
 
+    // Reject Finance
     function showRejectFinance(id) {
       document.getElementById('rejectFinanceId').value = id;
       document.getElementById('rejectFinanceReason').value = '';
@@ -1036,6 +1071,7 @@
       .catch(error => alert('Error: ' + error.message));
     }
 
+    // Step 2: Mark Procurement
     function showProcurement(id) {
       document.getElementById('procurementId').value = id;
       document.getElementById('procurementOrderRef').value = '';
@@ -1080,6 +1116,7 @@
       .catch(error => alert('Error: ' + error.message));
     }
 
+    // Step 3: Mark Delivered
     function showDelivered(id) {
       document.getElementById('deliveredId').value = id;
       document.getElementById('deliveredNotes').value = '';
@@ -1104,6 +1141,7 @@
       .catch(error => alert('Error: ' + error.message));
     }
 
+    // Step 4: Complete
     function showComplete(id) {
       document.getElementById('completeId').value = id;
       new bootstrap.Modal(document.getElementById('completeModal')).show();
