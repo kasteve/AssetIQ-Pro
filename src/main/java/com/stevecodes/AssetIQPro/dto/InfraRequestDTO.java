@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 public class InfraRequestDTO {
 
     // For creation
-    @NotNull(message = "Line manager ID is required")
     private Long lineManagerId;
 
     @NotBlank(message = "Resource type is required")
@@ -32,6 +31,8 @@ public class InfraRequestDTO {
     private Long requesterId;
     private String requesterName;
     private String requesterDepartment;
+    private String requesterStaffId;
+    private String lineManagerStaffId;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -43,10 +44,15 @@ public class InfraRequestDTO {
     private BigDecimal purchaseCost;
     private String procurementOrderRef;
 
-    // For approval
+    // For approval comments
     private String lmComment;
     private String infraComment;
     private String financeComment;
+
+    // Staff IDs for approvers
+    private String lmApprovedByStaffId;
+    private String infraReviewedByStaffId;
+    private String financeApprovedByStaffId;
 
     // For delivery
     private String deliveryNotes;
@@ -77,6 +83,9 @@ public class InfraRequestDTO {
     private String lmApprovedByName;
     private String infraReviewedByName;
     private String financeApprovedByName;
+
+    // Quotation
+    private String quotationPath;
 
     // ============================================
     // Status Display

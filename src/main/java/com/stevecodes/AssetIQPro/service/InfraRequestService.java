@@ -2,9 +2,11 @@ package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.InfraRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.entity.InfraRequest;
 import com.stevecodes.AssetIQPro.entity.InfraRequest.RequestStatus;
 import com.stevecodes.AssetIQPro.entity.Notification;
+import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import com.stevecodes.AssetIQPro.repository.InfraRequestRepository;
 import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
@@ -12,9 +14,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,10 +32,13 @@ public class InfraRequestService {
 
     private final InfraRequestRepository requestRepository;
     private final NotificationRepository notificationRepository;
-    private final AppUserRepository userRepository;  // ADD THIS
+    private final AppUserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
     private final EmailService emailService;
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
+
+    private static final String UPLOAD_DIR = "./uploads/infra/quotations/";
 
     // ============================================
     // Query Methods
@@ -72,19 +83,35 @@ public class InfraRequestService {
     public InfraRequestDTO createRequest(InfraRequestDTO dto, Long requesterId) {
         log.info("Creating infrastructure request for user: {}", requesterId);
 
+        // Get requester's line manager from Employee table
+        Employee employee = employeeRepository.findByUserId(requesterId)
+                .orElseThrow(() -> new RuntimeException("Employee not found for user ID: " + requesterId));
+
+        Long lineManagerId = employee.getLineManager() != null ?
+                employee.getLineManager().getEmployeeId() : null;
+
+        if (lineManagerId == null) {
+            throw new RuntimeException("Employee has no line manager assigned");
+        }
+
         InfraRequest request = new InfraRequest();
         request.setRequesterId(requesterId);
-        request.setLineManagerId(dto.getLineManagerId());
+        request.setLineManagerId(lineManagerId);
         request.setResourceType(dto.getResourceType());
         request.setSpecification(dto.getSpecification());
-        request.setQuantity(dto.getQuantity());
+        request.setQuantity(dto.getQuantity() != null ? dto.getQuantity() : 1);
         request.setJustification(dto.getJustification());
         request.setStatus(RequestStatus.PENDING_LM_APPROVAL);
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
+        // Notify line manager
         notifyLineManager(saved);
+        sendEmailNotification(lineManagerId,
+                "Infrastructure Request Pending Approval",
+                "Request #" + saved.getRequestId() + " for " + saved.getResourceType() + " requires your approval.");
+
         auditService.logAction("INFRA_REQUEST_CREATED",
                 "Request #" + saved.getRequestId() + " created by user " + requesterId,
                 requesterId);
@@ -108,7 +135,9 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         notifyRequester(saved, "Your request has been approved by your line manager.");
-        notifyInfraTeam(saved);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Approved by Line Manager",
+                "Your request #" + saved.getRequestId() + " has been approved by your line manager and is now pending infrastructure review.");
 
         auditService.logAction("INFRA_REQUEST_LM_APPROVED",
                 "Request #" + requestId + " approved by line manager " + managerId,
@@ -133,6 +162,9 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         notifyRequester(saved, "Your request has been rejected by your line manager. Reason: " + reason);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Rejected by Line Manager",
+                "Your request #" + saved.getRequestId() + " has been rejected by your line manager. Reason: " + reason);
 
         auditService.logAction("INFRA_REQUEST_LM_REJECTED",
                 "Request #" + requestId + " rejected by line manager " + managerId,
@@ -158,6 +190,9 @@ public class InfraRequestService {
         } else {
             request.setStatus(RequestStatus.INFRA_REJECTED);
             notifyRequester(request, "Your request has been rejected by Infrastructure. Reason: " + comment);
+            sendEmailNotification(request.getRequesterId(),
+                    "Infrastructure Request Rejected by Infrastructure",
+                    "Your request #" + request.getRequestId() + " has been rejected by Infrastructure. Reason: " + comment);
         }
 
         InfraRequest saved = requestRepository.save(request);
@@ -186,7 +221,9 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         notifyRequester(saved, "Your request has been approved by Finance and is now in procurement.");
-        notifyProcurementTeam(saved);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Approved by Finance",
+                "Your request #" + saved.getRequestId() + " has been approved by Finance and is now in procurement.");
 
         auditService.logAction("INFRA_REQUEST_FINANCE_APPROVED",
                 "Request #" + requestId + " approved by finance " + financeId,
@@ -211,12 +248,46 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         notifyRequester(saved, "Your request has been rejected by Finance. Reason: " + reason);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Rejected by Finance",
+                "Your request #" + saved.getRequestId() + " has been rejected by Finance. Reason: " + reason);
 
         auditService.logAction("INFRA_REQUEST_FINANCE_REJECTED",
                 "Request #" + requestId + " rejected by finance " + financeId,
                 financeId);
 
         return result;
+    }
+
+    @Transactional
+    public String uploadQuotation(Long requestId, MultipartFile file) {
+        log.info("Uploading quotation for request: {}", requestId);
+
+        InfraRequest request = validateRequest(requestId);
+
+        try {
+            Path uploadPath = Paths.get(UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            String filename = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+            Path filePath = uploadPath.resolve(filename);
+            Files.write(filePath, file.getBytes());
+
+            request.setQuotationPath(filePath.toString());
+            requestRepository.save(request);
+
+            auditService.logAction("QUOTATION_UPLOADED",
+                    "Quotation uploaded for request #" + requestId,
+                    null);
+
+            return filePath.toString();
+
+        } catch (IOException e) {
+            log.error("Failed to upload quotation: {}", e.getMessage());
+            throw new RuntimeException("Failed to upload quotation", e);
+        }
     }
 
     @Transactional
@@ -234,7 +305,9 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         notifyRequester(saved, "Your requested items have been delivered. Please acknowledge receipt.");
-        notifyFinanceTeamDelivery(saved);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Delivered",
+                "Your request #" + saved.getRequestId() + " has been delivered. Please acknowledge receipt.");
 
         auditService.logAction("INFRA_REQUEST_DELIVERED",
                 "Request #" + requestId + " marked as delivered by " + deliveredBy,
@@ -258,6 +331,9 @@ public class InfraRequestService {
         InfraRequestDTO result = convertToDTO(saved);
 
         sendCompletionReport(saved);
+        sendEmailNotification(saved.getRequesterId(),
+                "Infrastructure Request Completed",
+                "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
 
         auditService.logAction("INFRA_REQUEST_COMPLETED",
                 "Request #" + requestId + " completed - acknowledged by " + acknowledgedBy,
@@ -322,6 +398,12 @@ public class InfraRequestService {
         log.info("Notifying procurement team about request: {}", request.getRequestId());
     }
 
+    private void sendEmailNotification(Long userId, String subject, String body) {
+        userRepository.findById(userId).ifPresent(user -> {
+            emailService.sendSimpleEmail(user.getEmail(), subject, body);
+        });
+    }
+
     private void notifyFinanceTeamDelivery(InfraRequest request) {
         log.info("Notifying finance team about delivery: {}", request.getRequestId());
     }
@@ -376,12 +458,41 @@ public class InfraRequestService {
         dto.setCompletedAt(request.getCompletedAt());
         dto.setPdfReportPath(request.getPdfReportPath());
         dto.setAssetId(request.getAssetId());
+        dto.setQuotationPath(request.getQuotationPath());
 
-        // Get requester name
+        // Get requester details with staff ID
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
             dto.setRequesterName(user.getFullName());
             dto.setRequesterDepartment(user.getDepartment());
+            dto.setRequesterStaffId(user.getStaffId());
         });
+
+        // Get line manager staff ID
+        userRepository.findById(request.getLineManagerId()).ifPresent(user -> {
+            dto.setLineManagerStaffId(user.getStaffId());
+        });
+
+        // Get approver staff IDs
+        if (request.getLmApprovedBy() != null) {
+            userRepository.findById(request.getLmApprovedBy()).ifPresent(user -> {
+                dto.setLmApprovedByName(user.getFullName());
+                dto.setLmApprovedByStaffId(user.getStaffId());
+            });
+        }
+
+        if (request.getInfraReviewedBy() != null) {
+            userRepository.findById(request.getInfraReviewedBy()).ifPresent(user -> {
+                dto.setInfraReviewedByName(user.getFullName());
+                dto.setInfraReviewedByStaffId(user.getStaffId());
+            });
+        }
+
+        if (request.getFinanceApprovedBy() != null) {
+            userRepository.findById(request.getFinanceApprovedBy()).ifPresent(user -> {
+                dto.setFinanceApprovedByName(user.getFullName());
+                dto.setFinanceApprovedByStaffId(user.getStaffId());
+            });
+        }
 
         return dto;
     }

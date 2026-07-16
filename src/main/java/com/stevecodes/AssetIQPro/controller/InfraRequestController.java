@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
 import java.util.List;
@@ -30,6 +31,16 @@ public class InfraRequestController {
         Long userId = getUserId(principal);
         InfraRequestDTO created = requestService.createRequest(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/{requestId}/upload-quotation")
+    @Operation(summary = "Upload quotation for a request")
+    @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'ADMIN')")
+    public ResponseEntity<String> uploadQuotation(@PathVariable Long requestId,
+                                                  @RequestParam("file") MultipartFile file,
+                                                  Principal principal) {
+        String path = requestService.uploadQuotation(requestId, file);
+        return ResponseEntity.ok(path);
     }
 
     @GetMapping("/my-requests")

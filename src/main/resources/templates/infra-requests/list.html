@@ -32,18 +32,20 @@
           <span class="req-title" th:text="'#' + ${request.requestId} + ' - ' + ${request.resourceType}">#1 - Laptop</span>
           <span class="status-badge"
                 th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'pending' :
-                                              (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
-                                              (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
-                                              (${request.status} == 'PROCUREMENT' ? 'procurement' :
-                                              (${request.status} == 'DELIVERED' ? 'completed' :
-                                              (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
-                th:text="${request.status}">Pending</span>
+                                          (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
+                                          (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                          (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                          (${request.status} == 'DELIVERED' ? 'completed' :
+                                          (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
+                th:text="${request.statusDisplay}">Pending</span>
         </div>
         <div class="req-body">
           <div class="row">
             <div class="col-md-6">
               <div class="req-label">Requested By</div>
               <div class="req-value" th:text="${request.requesterName}">John Doe</div>
+              <div class="req-label">Staff ID</div>
+              <div class="req-value" th:text="${request.requesterStaffId}">STAFF001</div>
               <div class="req-label">Department</div>
               <div class="req-value" th:text="${request.requesterDepartment}">IT</div>
             </div>
@@ -63,9 +65,9 @@
             <div class="req-value mb-0" th:text="${request.justification}">Reason for request</div>
           </div>
           <div class="req-actions mt-3 d-flex gap-2">
-            <a th:href="@{/infra-requests/{id}(id=${request.requestId})}" class="btn btn-sm btn-primary">
+            <button th:onclick="'viewRequest(' + ${request.requestId} + ')'" class="btn btn-sm btn-primary">
               <i class="fas fa-eye me-1"></i>View
-            </a>
+            </button>
             <a th:if="${request.status} == 'COMPLETED'"
                th:href="@{/infra-requests/{id}/pdf(id=${request.requestId})}"
                class="btn btn-sm btn-secondary">
@@ -81,13 +83,7 @@
     No infrastructure requests found
   </div>
 
-  <!--
-    Create Request Modal -- was previously a sibling of this content
-    fragment div instead of being nested inside it. Thymeleaf Layout
-    Dialect only carries layout:fragment="content" into the decorated
-    page, so anything outside it (like this modal used to be) gets
-    silently dropped -- that's why the button had nothing to open.
-  -->
+  <!-- Create Request Modal -->
   <div class="modal fade" id="createRequestModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -131,10 +127,9 @@
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Line Manager *</label>
-              <select name="lineManagerId" class="form-select" required>
-                <option value="">Select Line Manager</option>
-                <option th:each="manager : ${lineManagers}" th:value="${manager.userId}" th:text="${manager.fullName}"></option>
+              <label class="form-label">Line Manager</label>
+              <select name="lineManagerId" class="form-select">
+                <option value="">Auto-assigned from your employee record</option>
               </select>
             </div>
           </div>
@@ -143,6 +138,28 @@
             <button type="submit" class="btn btn-primary">Submit Request</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Request Modal -->
+  <div class="modal fade" id="viewRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-tools me-2" style="color: #0d6efd;"></i>Request #<span id="viewRequestId"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="viewRequestBody">
+          <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>
@@ -198,18 +215,35 @@
     .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
     .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
     .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+    /* View Modal Styles */
+    .detail-item { margin-bottom: 10px; }
+    .detail-item .label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa0a6; display: block; }
+    .detail-item .value { font-size: 14px; color: var(--ink); font-weight: 500; }
+    .detail-item .staff-id { font-size: 12px; color: #6c757d; }
+
+    .timeline { position: relative; padding-left: 30px; }
+    .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #eef0f3; }
+    .timeline-item { position: relative; padding-bottom: 16px; display: flex; align-items: flex-start; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-item .timeline-icon { position: absolute; left: -22px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #eef0f3; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #9aa0a6; }
+    .timeline-item.approved .timeline-icon { background: #e6f7ec; color: #198754; }
+    .timeline-item.pending .timeline-icon { background: #fff4e0; color: #fd7e14; }
+    .timeline-item .timeline-content { flex: 1; padding-left: 8px; }
+    .timeline-item .timeline-title { font-weight: 700; font-size: 13px; color: var(--ink); }
+    .timeline-item .timeline-detail { font-size: 12.5px; color: #6c757d; }
+    .timeline-item .timeline-detail .comment { display: block; margin-top: 4px; font-style: italic; color: #9aa0a6; }
   </style>
 </div>
 
 <div layout:fragment="scripts">
   <script>
+    // Create Request
     document.getElementById('infraRequestForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
         const formData = new FormData(this);
         const data = Object.fromEntries(formData.entries());
-
-        // Convert quantity to number
         data.quantity = parseInt(data.quantity);
 
         fetch('/assetIQ-pro/api/infra-requests', {
@@ -234,6 +268,162 @@
             alert('Error: ' + error.message);
         });
     });
+
+    // View Request
+    function viewRequest(id) {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewRequestModal'));
+        const body = document.getElementById('viewRequestBody');
+
+        body.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+
+        modal.show();
+
+        fetch('/assetIQ-pro/infra-requests/' + id)
+            .then(response => response.json())
+            .then(request => {
+                document.getElementById('viewRequestId').textContent = request.requestId;
+
+                const statusColors = {
+                    'PENDING_LM_APPROVAL': 'warning',
+                    'PENDING_INFRA_REVIEW': 'warning',
+                    'PENDING_FINANCE_APPROVAL': 'warning',
+                    'PROCUREMENT': 'primary',
+                    'DELIVERED': 'success',
+                    'COMPLETED': 'success',
+                    'LM_REJECTED': 'danger',
+                    'INFRA_REJECTED': 'danger',
+                    'FINANCE_REJECTED': 'danger',
+                    'CANCELLED': 'danger'
+                };
+                const statusColor = statusColors[request.status] || 'secondary';
+
+                body.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Resource Type</span>
+                                <span class="value">${request.resourceType || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Quantity</span>
+                                <span class="value">${request.quantity || 1}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Requester</span>
+                                <span class="value">${request.requesterName || 'N/A'}</span>
+                                <span class="staff-id">${request.requesterStaffId ? '(' + request.requesterStaffId + ')' : ''}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Department</span>
+                                <span class="value">${request.requesterDepartment || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Line Manager</span>
+                                <span class="value">${request.lineManagerStaffId || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Status</span>
+                                <span class="badge bg-${statusColor}">${request.statusDisplay || request.status}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Created At</span>
+                                <span class="value">${request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Last Updated</span>
+                                <span class="value">${request.updatedAt ? new Date(request.updatedAt).toLocaleString() : 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${request.specification ? `
+                    <div class="detail-item">
+                        <span class="label">Specification</span>
+                        <span class="value">${request.specification}</span>
+                    </div>` : ''}
+
+                    ${request.justification ? `
+                    <div class="detail-item">
+                        <span class="label">Justification</span>
+                        <span class="value">${request.justification}</span>
+                    </div>` : ''}
+
+                    ${request.quotationPath ? `
+                    <div class="mt-3">
+                        <a href="/uploads/${request.quotationPath.replace(/\\/g, '/')}" class="btn btn-primary btn-sm" target="_blank">
+                            <i class="fas fa-file-pdf me-2"></i>View Quotation
+                        </a>
+                    </div>` : ''}
+
+                    <hr>
+
+                    <h6 class="fw-bold mt-2">Approval Timeline</h6>
+                    <div class="timeline">
+                        <div class="timeline-item ${request.lmApprovedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.lmApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Line Manager</div>
+                                <div class="timeline-detail">${request.lmApprovedAt ?
+                                    'Approved by ' + (request.lmApprovedByName || 'N/A') + ' on ' + new Date(request.lmApprovedAt).toLocaleString() +
+                                    (request.lmComment ? '<span class="comment">Comment: ' + request.lmComment + '</span>' : '') :
+                                    'Pending Approval'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.infraReviewedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.infraReviewedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Infrastructure</div>
+                                <div class="timeline-detail">${request.infraReviewedAt ?
+                                    'Reviewed by ' + (request.infraReviewedByName || 'N/A') + ' on ' + new Date(request.infraReviewedAt).toLocaleString() +
+                                    (request.infraComment ? '<span class="comment">Comment: ' + request.infraComment + '</span>' : '') :
+                                    'Pending Review'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.financeApprovedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.financeApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Finance</div>
+                                <div class="timeline-detail">${request.financeApprovedAt ?
+                                    'Approved by ' + (request.financeApprovedByName || 'N/A') + ' on ' + new Date(request.financeApprovedAt).toLocaleString() +
+                                    (request.financeComment ? '<span class="comment">Comment: ' + request.financeComment + '</span>' : '') :
+                                    'Pending Approval'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.deliveredAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.deliveredAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Delivery</div>
+                                <div class="timeline-detail">${request.deliveredAt ? 'Delivered on ' + new Date(request.deliveredAt).toLocaleString() : 'Not yet delivered'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.completedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.completedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Completion</div>
+                                <div class="timeline-detail">${request.completedAt ? 'Completed on ' + new Date(request.completedAt).toLocaleString() : 'Not yet completed'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load request details.
+                    </div>
+                `;
+            });
+    }
   </script>
 </div>
 </body>

@@ -16,6 +16,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findByStaffId(String staffId);
 
+    @Query("SELECT e FROM Employee e WHERE e.user.userId = :userId")
+    Optional<Employee> findByUserId(@Param("userId") Long userId);
+
     List<Employee> findByDepartment_DepartmentId(Integer departmentId);
 
     @Query("SELECT e FROM Employee e WHERE LOWER(e.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
