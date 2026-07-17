@@ -1,12 +1,12 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.BookingDTO;
-import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
-import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
 import com.stevecodes.AssetIQPro.entity.Booking;
 import com.stevecodes.AssetIQPro.entity.Booking.BookingStatus;
+import com.stevecodes.AssetIQPro.entity.Notification;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.BookingRepository;
+import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ public class BookingService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final AppUserService appUserService;
+    private final NotificationRepository notificationRepository;
 
     // ============================================
     // Room Bookings
@@ -36,8 +38,10 @@ public class BookingService {
     public BookingDTO createRoomBooking(BookingDTO dto) {
         log.info("Creating room booking for user: {}, room: {}", dto.getUserId(), dto.getRoomId());
 
-        if (!isRoomAvailable(dto.getRoomId(), dto.getStartTime(), dto.getEndTime())) {
-            throw new IllegalStateException("Room is not available at the requested time");
+        // Check if room is available
+        String booker = getRoomBooker(dto.getRoomId(), dto.getStartTime(), dto.getEndTime());
+        if (booker != null) {
+            throw new IllegalStateException("Room is already booked by " + booker + " at the requested time");
         }
 
         Booking booking = new Booking();
@@ -51,11 +55,14 @@ public class BookingService {
 
         Booking saved = bookingRepository.save(booking);
 
+        Room room = roomRepository.findById(dto.getRoomId()).orElse(null);
+        String roomName = room != null ? room.getRoomName() : "Room #" + dto.getRoomId();
+
         emailService.sendBookingConfirmation(
                 getEmailForUser(dto.getUserId()),
                 dto.getUserName(),
                 "Room Booking",
-                "Room: " + dto.getRoomName() + " from " + dto.getStartTime() + " to " + dto.getEndTime()
+                "Room: " + roomName + " from " + dto.getStartTime() + " to " + dto.getEndTime()
         );
 
         auditService.logAction("ROOM_BOOKING_CREATED",
@@ -78,6 +85,82 @@ public class BookingService {
             }
         }
         return true;
+    }
+
+    public String getRoomBooker(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        List<Booking> bookings = bookingRepository.findByRoomId(roomId);
+        for (Booking booking : bookings) {
+            if (booking.getStatus() == BookingStatus.BOOKED &&
+                    !endTime.isBefore(booking.getStartTime()) &&
+                    !startTime.isAfter(booking.getEndTime())) {
+                // Get user name
+                return appUserService.getUserById(booking.getUserId())
+                        .map(user -> user.getFullName())
+                        .orElse("User #" + booking.getUserId());
+            }
+        }
+        return null;
+    }
+
+    @Transactional
+    public void requestSlot(Long bookingId, Long requesterId) {
+        log.info("Requesting slot for booking: {} by user: {}", bookingId, requesterId);
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        String requesterName = appUserService.getUserById(requesterId)
+                .map(user -> user.getFullName())
+                .orElse("User #" + requesterId);
+
+        Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
+        String roomName = room != null ? room.getRoomName() : "Room #" + booking.getRoomId();
+
+        String timeSlot = booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                " to " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        // Notify current booker via email
+        String currentBookerEmail = getEmailForUser(booking.getUserId());
+        emailService.sendRoomSlotRequest(
+                currentBookerEmail,
+                requesterName,
+                roomName,
+                timeSlot
+        );
+
+        // Create notification for current booker
+        createNotification(
+                booking.getUserId(),
+                "ROOM_SLOT_REQUEST",
+                "Room Slot Request",
+                requesterName + " has requested to use " + roomName + " during your booking (" + timeSlot + ")",
+                "/bookings/bookings-dashboard"
+        );
+
+        // Create notification for requester
+        createNotification(
+                requesterId,
+                "ROOM_SLOT_REQUESTED",
+                "Room Slot Requested",
+                "You have requested to use " + roomName + " from " + timeSlot,
+                "/bookings/bookings-dashboard"
+        );
+
+        auditService.logAction("ROOM_SLOT_REQUESTED",
+                "Room slot requested for booking: " + bookingId + " by user: " + requesterId,
+                requesterId);
+    }
+
+    @Transactional
+    public void approveSlotRequest(Long bookingId, Long approverId) {
+        log.info("Approving slot request for booking: {} by user: {}", bookingId, approverId);
+
+        // Logic to swap or share the slot
+        // Implementation depends on your business rules
+
+        auditService.logAction("ROOM_SLOT_APPROVED",
+                "Room slot request approved for booking: " + bookingId + " by user: " + approverId,
+                approverId);
     }
 
     public List<Room> getAvailableRooms() {
@@ -138,9 +221,40 @@ public class BookingService {
                 "Booking cancelled: " + bookingId, booking.getUserId());
     }
 
+    @Transactional
+    public void recallRoomBooking(Long bookingId) {
+        log.info("Recalling room booking: {}", bookingId);
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        if (booking.getStatus() != BookingStatus.BOOKED) {
+            throw new IllegalStateException("Cannot recall - booking already processed");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+
+        auditService.logAction("ROOM_BOOKING_RECALLED",
+                "Room booking recalled: " + bookingId,
+                booking.getUserId());
+    }
+
     // ============================================
     // Helper Methods
     // ============================================
+
+    private void createNotification(Long userId, String type, String title, String message, String link) {
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setMessage(message);
+        notification.setLink(link);
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        notificationRepository.save(notification);
+    }
 
     private BookingDTO convertToBookingDTO(Booking booking) {
         BookingDTO dto = new BookingDTO();

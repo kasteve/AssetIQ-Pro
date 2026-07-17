@@ -49,14 +49,17 @@
                     <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
                         <span class="status-badge"
-                              th:classappend="${req.status} == 'PENDING' ? 'pending' : (${req.status} == 'ACCEPTED' ? 'accepted' : 'rejected')"
+                              th:classappend="${req.status} == 'PENDING' ? 'pending' :
+                                              (${req.status} == 'ACCEPTED' ? 'accepted' :
+                                              (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
                               th:text="${req.status}">PENDING</span>
                     </td>
-                    <td th:text="${req.driverId}">N/A</td>
+                    <td th:text="${req.driverId != null ? req.driverId : 'Unassigned'}">N/A</td>
                     <td>
-                        <button th:if="${req.status} == 'PENDING'" class="btn btn-sm btn-danger" th:onclick="'cancelRequest(' + ${req.requestId} + ')'">
-                            Cancel
+                        <button th:if="${req.status} == 'PENDING'" class="btn btn-sm btn-warning" th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
+                            <i class="fas fa-undo"></i> Recall
                         </button>
+                        <span th:if="${req.status} == 'RECALLED'" class="text-muted" style="font-size: 12px;">Recalled</span>
                     </td>
                 </tr>
                 </tbody>
@@ -92,13 +95,21 @@
                     <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td th:text="${#temporals.format(booking.endTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                        <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : 'cancelled'"
+                        <span class="status-badge" th:classappend="${booking.status} == 'BOOKED' ? 'booked' : (${booking.status} == 'CANCELLED' ? 'cancelled' : 'pending')"
                               th:text="${booking.status}">BOOKED</span>
                     </td>
                     <td>
-                        <button th:if="${booking.status} == 'BOOKED'" class="btn btn-sm btn-danger" th:onclick="'cancelBooking(' + ${booking.bookingId} + ')'">
-                            Cancel
+                        <button th:if="${booking.status} == 'BOOKED' and booking.userId == session.userId"
+                                class="btn btn-sm btn-warning"
+                                th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
+                            <i class="fas fa-undo"></i> Recall
                         </button>
+                        <button th:if="${booking.status} == 'BOOKED' and booking.userId != session.userId"
+                                class="btn btn-sm btn-info"
+                                th:onclick="'requestSlot(' + ${booking.bookingId} + ')'">
+                            <i class="fas fa-handshake"></i> Request Slot
+                        </button>
+                        <span th:if="${booking.status} == 'CANCELLED'" class="text-muted" style="font-size: 12px;">Cancelled</span>
                     </td>
                 </tr>
                 </tbody>
@@ -123,6 +134,7 @@
                     <th>Description</th>
                     <th>Requested</th>
                     <th>Status</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -131,8 +143,25 @@
                     <td th:text="${req.description}">N/A</td>
                     <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">N/A</td>
                     <td>
-                        <span class="status-badge" th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' : (${req.status} == 'DECLINED' ? 'rejected' : 'pending')"
+                        <span class="status-badge" th:classappend="${req.status} == 'ACCEPTED' ? 'accepted' :
+                                                                  (${req.status} == 'REJECTED' ? 'rejected' :
+                                                                  (${req.status} == 'RECALLED' ? 'recalled' :
+                                                                  (${req.status} == 'COMPLETED' ? 'completed' : 'pending')))"
                               th:text="${req.status}">PENDING</span>
+                    </td>
+                    <td>
+                        <button th:if="${req.status == 'PENDING_LM_APPROVAL' or req.status == 'PENDING_ADMIN_APPROVAL'}"
+                                class="btn btn-sm btn-warning"
+                                th:onclick="'recallResourceRequest(' + ${req.requestId} + ')'">
+                            <i class="fas fa-undo"></i> Recall
+                        </button>
+                        <button th:if="${req.status == 'ACCEPTED' and req.acknowledgedAt == null}"
+                                class="btn btn-sm btn-success"
+                                th:onclick="'showAcknowledgeModal(' + ${req.requestId} + ')'">
+                            <i class="fas fa-check"></i> Acknowledge
+                        </button>
+                        <span th:if="${req.status == 'RECALLED'}" class="text-muted" style="font-size: 12px;">Recalled</span>
+                        <span th:if="${req.status == 'COMPLETED'}" class="text-muted" style="font-size: 12px;">Completed</span>
                     </td>
                 </tr>
                 </tbody>
@@ -263,6 +292,37 @@
             </div>
         </div>
     </div>
+
+    <!-- Acknowledge Resource Modal -->
+    <div class="modal fade" id="acknowledgeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-check me-2" style="color: #198754;"></i>Acknowledge Resource Receipt</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="acknowledgeForm" th:action="@{/bookings/resource-request}" method="post">
+                    <input type="hidden" name="requestId" id="acknowledgeRequestId">
+                    <div class="modal-body">
+                        <p>Please sign below to acknowledge receipt of the requested resources.</p>
+                        <div class="signature-pad">
+                            <canvas id="signatureCanvas" width="500" height="150"></canvas>
+                            <div class="signature-tools">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearSignature()">
+                                    <i class="fas fa-eraser me-1"></i>Clear
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="signature" id="signatureData">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="submitAcknowledge()">Confirm Receipt</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div layout:fragment="styles">
@@ -281,6 +341,7 @@
         .btn-success { background: #198754 !important; }
         .btn-warning { background: #fd7e14 !important; color: white !important; }
         .btn-danger { background: #dc3545 !important; }
+        .btn-info { background: #0dcaf0 !important; color: white !important; }
         .btn-sm { padding: 7px 14px !important; font-size: 12.5px !important; }
 
         .panel-card { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; border: none; }
@@ -298,6 +359,8 @@
         .status-badge.pending { background: #fff4e0; color: #fd7e14; }
         .status-badge.accepted, .status-badge.booked { background: #e6f7ec; color: #198754; }
         .status-badge.rejected, .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
+        .status-badge.recalled { background: #eef0f3; color: #6c757d; }
+        .status-badge.completed { background: #eef0fd; color: #6610f2; }
 
         .empty-state { text-align: center; padding: 40px 20px; color: #adb5bd; }
         .empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
@@ -309,19 +372,132 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        .signature-pad { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px; background: white; }
+        .signature-pad canvas { width: 100%; height: 150px; border-radius: 6px; cursor: crosshair; background: white; }
+        .signature-tools { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
     </style>
 </div>
 
 <div layout:fragment="scripts">
+    <!-- Signature Pad Script -->
     <script>
-        function cancelRequest(id) {
-            if (confirm('Cancel this driver request?')) {
-                window.location.href = '/bookings/driver-request/' + id + '/cancel';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let canvas = document.getElementById('signatureCanvas');
+        let ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = 150;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            return {
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = getPosition(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const pos = getPosition(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing(e) {
+            e.preventDefault();
+            isDrawing = false;
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signatureData').value = '';
+        }
+
+        function showAcknowledgeModal(id) {
+            document.getElementById('acknowledgeRequestId').value = id;
+            clearSignature();
+            new bootstrap.Modal(document.getElementById('acknowledgeModal')).show();
+        }
+
+        function submitAcknowledge() {
+            const dataUrl = canvas.toDataURL('image/png');
+            if (dataUrl === 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') {
+                alert('Please draw your signature first.');
+                return;
+            }
+
+            document.getElementById('signatureData').value = dataUrl;
+            const form = document.getElementById('acknowledgeForm');
+            form.action = '/assetIQ-pro/bookings/resource-request/' + document.getElementById('acknowledgeRequestId').value + '/acknowledge';
+            form.submit();
+        }
+    </script>
+
+    <!-- Recall Functions -->
+    <script>
+        function recallDriverRequest(id) {
+            if (confirm('Recall this driver request?')) {
+                fetch('/assetIQ-pro/bookings/driver-request/' + id + '/recall', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => alert('Failed: ' + err.message));
             }
         }
-        function cancelBooking(id) {
-            if (confirm('Cancel this room booking?')) {
-                window.location.href = '/bookings/room/' + id + '/cancel';
+
+        function recallRoomBooking(id) {
+            if (confirm('Recall this room booking?')) {
+                fetch('/assetIQ-pro/bookings/room/' + id + '/recall', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => alert('Failed: ' + err.message));
+            }
+        }
+
+        function requestSlot(id) {
+            if (confirm('Request this time slot from the current booker?')) {
+                fetch('/assetIQ-pro/bookings/room/' + id + '/request-slot', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => alert('Failed: ' + err.message));
+            }
+        }
+
+        function recallResourceRequest(id) {
+            if (confirm('Recall this resource request?')) {
+                fetch('/assetIQ-pro/bookings/resource-request/' + id + '/recall', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => alert('Failed: ' + err.message));
             }
         }
     </script>

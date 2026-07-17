@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ResourceRequestRepository extends JpaRepository<ResourceRequest, Long> {
@@ -43,6 +44,10 @@ public interface ResourceRequestRepository extends JpaRepository<ResourceRequest
      * Find all resource requests of a specific type
      */
     List<ResourceRequest> findByResourceType(String resourceType);
+
+    List<ResourceRequest> findByLineManagerId(Long lineManagerId);
+
+    Optional<ResourceRequest> findByRequestIdAndUserId(Long requestId, Long userId);
 
     /**
      * Find all resource requests with a specific final status

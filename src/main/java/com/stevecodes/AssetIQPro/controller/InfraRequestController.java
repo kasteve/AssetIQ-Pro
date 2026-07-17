@@ -49,7 +49,7 @@ public class InfraRequestController {
         return ResponseEntity.ok(path);
     }
 
-    @GetMapping("/my-requests")
+    @GetMapping("/bookings-dashboard")
     @Operation(summary = "Get current user's requests")
     public ResponseEntity<List<InfraRequestDTO>> getMyRequests() {
         Long userId = getCurrentUserId();

@@ -467,6 +467,45 @@ public class EmailService {
         }
     }
 
+    // Add these methods to EmailService.java
+
+    @Async
+    public void sendRoomSlotRequest(String toEmail, String requesterName,
+                                    String roomName, String timeSlot) {
+        String subject = "Room Slot Request - " + roomName;
+        String body = String.format("""
+        Dear User,
+        
+        %s has requested to use the room '%s' during your booked time slot (%s).
+        
+        Please login to approve or decline this request.
+        
+        Best regards,
+        AssetIQ-Pro Team
+        """, requesterName, roomName, timeSlot);
+
+        sendSimpleEmail(toEmail, subject, body);
+    }
+
+    @Async
+    public void sendResourceRequestAcknowledgment(String toEmail, String requesterName,
+                                                  String resourceType, String requestId) {
+        String subject = "Resource Request Acknowledged - #" + requestId;
+        String body = String.format("""
+        Dear %s,
+        
+        Thank you for acknowledging receipt of your resource request.
+        
+        Resource: %s
+        Request #: %s
+        
+        Best regards,
+        AssetIQ-Pro Team
+        """, requesterName, resourceType, requestId);
+
+        sendSimpleEmail(toEmail, subject, body);
+    }
+
     // ============================================
     // Completed Transfer Report (with PDF attachment)
     // ============================================

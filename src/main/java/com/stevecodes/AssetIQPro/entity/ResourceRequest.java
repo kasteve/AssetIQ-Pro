@@ -58,6 +58,29 @@ public class ResourceRequest {
     @Column(name = "admin_comment")
     private String adminComment;
 
+    // Add these fields to ResourceRequest.java
+
+    @Column(name = "line_manager_id")
+    private Long lineManagerId;
+
+    @Column(name = "lm_approved_by")
+    private Long lmApprovedBy;
+
+    @Column(name = "lm_approved_at")
+    private LocalDateTime lmApprovedAt;
+
+    @Column(name = "lm_comment", length = 500)
+    private String lmComment;
+
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+
+    @Column(name = "acknowledged_by")
+    private Long acknowledgedBy;
+
+    @Column(name = "requester_signature", columnDefinition = "NVARCHAR(MAX)")
+    private String requesterSignature;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

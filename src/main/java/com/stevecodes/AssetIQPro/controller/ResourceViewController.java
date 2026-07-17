@@ -45,7 +45,7 @@ public class ResourceViewController {
             log.error("Error requesting resource: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to request resource.");
         }
-        return "redirect:/bookings/my-requests";
+        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/{requestId}/accept")

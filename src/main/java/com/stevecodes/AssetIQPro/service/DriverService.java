@@ -39,6 +39,14 @@ public class DriverService {
                                              String reason, String requestedBy) {
         log.info("Creating driver request for user: {}", userId);
 
+        // Check if specific driver is available
+        if (driverId != null) {
+            Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
+            if (availability.isPresent() && "BUSY".equals(availability.get().getStatus())) {
+                throw new IllegalStateException("Driver is currently busy. Please choose another driver.");
+            }
+        }
+
         DriverRequest request = new DriverRequest();
         request.setUserId(userId);
         request.setDestination(destination);
@@ -57,6 +65,18 @@ public class DriverService {
                 userId);
 
         return saved;
+    }
+
+    public boolean isDriverAvailable(Long driverId, LocalDateTime requestTime) {
+        // Check if driver already has an accepted request at that time
+        List<DriverRequest> existing = driverRequestRepository.findByDriverIdAndStatus(driverId, "ACCEPTED");
+        for (DriverRequest req : existing) {
+            if (req.getRequestTime().isEqual(requestTime) ||
+                    req.getRequestTime().plusHours(2).isAfter(requestTime)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public List<DriverRequest> getDriverRequests() {
@@ -94,6 +114,16 @@ public class DriverService {
         DriverRequest request = driverRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
 
+        // Check if already accepted by another driver
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Request is no longer pending");
+        }
+
+        // Check if driver is available
+        if (!isDriverAvailable(driverId, request.getRequestTime())) {
+            throw new IllegalStateException("Driver is not available at the requested time");
+        }
+
         request.setStatus("ACCEPTED");
         request.setDriverId(driverId);
         request.setAcceptedAt(LocalDateTime.now());
@@ -118,7 +148,7 @@ public class DriverService {
                 "DRIVER_REQUEST_ACCEPTED",
                 "Driver Request Accepted",
                 "Your driver request has been accepted by " + driverName,
-                "/bookings/my-requests"
+                "/bookings/bookings-dashboard"
         );
 
         auditService.logAction("DRIVER_REQUEST_ACCEPTED",
@@ -154,7 +184,7 @@ public class DriverService {
                 "DRIVER_REQUEST_DECLINED",
                 "Driver Request Declined",
                 "Your driver request has been declined. Reason: " + reason,
-                "/bookings/my-requests"
+                "/bookings/bookings-dashboard"
         );
 
         auditService.logAction("DRIVER_REQUEST_DECLINED",
@@ -162,6 +192,25 @@ public class DriverService {
                 request.getDriverId());
 
         return saved;
+    }
+
+    @Transactional
+    public void recallRequest(Long requestId) {
+        log.info("Recalling driver request: {}", requestId);
+
+        DriverRequest request = driverRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
+
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Cannot recall - request already processed");
+        }
+
+        request.setStatus("RECALLED");
+        driverRequestRepository.save(request);
+
+        auditService.logAction("DRIVER_REQUEST_RECALLED",
+                "Driver request recalled: " + requestId,
+                request.getUserId());
     }
 
     // ============================================
@@ -221,7 +270,6 @@ public class DriverService {
         for (AppUser driver : drivers) {
             String approvalLink = "http://localhost:8091/assetIQ-pro/bookings/driver-dashboard";
 
-            // Send email
             emailService.sendDriverRequestStatusUpdate(
                     driver.getEmail(),
                     "New Driver Request",
@@ -229,7 +277,6 @@ public class DriverService {
                             " for " + request.getDestination() + ". Please review and respond."
             );
 
-            // Create notification
             createNotification(
                     driver.getUserId(),
                     "DRIVER_REQUEST_NEW",
