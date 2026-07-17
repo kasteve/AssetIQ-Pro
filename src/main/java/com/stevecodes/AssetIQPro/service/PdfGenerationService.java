@@ -24,6 +24,8 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
 import com.stevecodes.AssetIQPro.entity.InfraRequest;
 import com.stevecodes.AssetIQPro.entity.Transfer;
+import com.stevecodes.AssetIQPro.repository.AppUserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +39,7 @@ import java.util.List;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PdfGenerationService {
 
     // Premium color palette
@@ -55,6 +58,301 @@ public class PdfGenerationService {
     private static final DeviceRgb WHITE = new DeviceRgb(255, 255, 255);
     private static final DeviceRgb WATERMARK = new DeviceRgb(197, 205, 212);
     private static final DeviceRgb PRIMARY_BLUE = new DeviceRgb(0, 102, 204);
+
+    private final AppUserRepository userRepository;
+
+    // ============================================
+    // Infrastructure Request PDF
+    // ============================================
+
+    public byte[] generateInfraRequestReport(InfraRequest request) throws Exception {
+        log.info("Generating infrastructure request report for request {}", request.getRequestId());
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(outputStream);
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc, PageSize.A4);
+        document.setMargins(28, 28, 24, 28);
+
+        PdfFont regularFont = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+        PdfFont boldFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+
+        // Header
+        addInfraHeader(document, request, boldFont, regularFont);
+
+        // Request Details
+        addSectionHeading(document, "Request Details", boldFont);
+        Table detailsTable = createInfraDetailsTable(request, boldFont, regularFont);
+        document.add(detailsTable);
+
+        // Approval Timeline
+        addSectionHeading(document, "Approval Timeline", boldFont);
+        Table timelineTable = createInfraTimelineTable(request, boldFont, regularFont);
+        document.add(timelineTable);
+
+        // Signatures - Only Requester
+        addSectionHeading(document, "Signatures", boldFont);
+        Table signatureTable = createInfraSignatureTable(request, boldFont, regularFont);
+        document.add(signatureTable);
+
+        addInfraFooter(document, request, regularFont);
+
+        document.close();
+        log.info("Generated infrastructure request report for request {}", request.getRequestId());
+        return outputStream.toByteArray();
+    }
+
+    private void addInfraHeader(Document document, InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table header = new Table(UnitValue.createPercentArray(new float[]{1.2f, 4.4f, 2.4f, 1.3f}));
+        header.setWidth(UnitValue.createPercentValue(100));
+
+        Cell brandCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+        brandCell.add(new Paragraph("IQ")
+                .setFont(boldFont).setFontSize(13).setFontColor(WHITE)
+                .setBackgroundColor(NAVY).setPadding(6)
+                .setTextAlignment(TextAlignment.CENTER));
+        header.addCell(brandCell);
+
+        Cell titleCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+        titleCell.add(new Paragraph("INFRASTRUCTURE REQUEST REPORT")
+                .setFont(boldFont).setFontSize(15).setFontColor(NAVY).setCharacterSpacing(0.8f));
+        titleCell.add(new Paragraph("AssetIQ-Pro — Asset Management System")
+                .setFont(regularFont).setFontSize(8.5f).setFontColor(INK_SOFT));
+        header.addCell(titleCell);
+
+        Cell refCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        String statusText = request.getStatus() != null ? request.getStatus().name() : "PENDING";
+        refCell.add(new Paragraph("Request #: " + request.getRequestId()).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        refCell.add(new Paragraph("Status: " + statusText).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        refCell.add(new Paragraph("Date: " + formatDateTime(request.getCreatedAt())).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        header.addCell(refCell);
+
+        Cell qrCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setTextAlignment(TextAlignment.CENTER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        try {
+            Image qrImage = generateInfraQRCode(request);
+            if (qrImage != null) {
+                qrImage.setWidth(46);
+                qrImage.setHeight(46);
+                qrCell.add(qrImage);
+            }
+        } catch (Exception e) {
+            log.warn("QR generation failed: {}", e.getMessage());
+        }
+        header.addCell(qrCell);
+
+        document.add(header);
+
+        LineSeparator line = new LineSeparator(new SolidLine(2f));
+        line.setStrokeColor(NAVY);
+        line.setMarginTop(4);
+        line.setMarginBottom(6);
+        document.add(line);
+    }
+
+    private Table createInfraDetailsTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 70}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addCell(fieldCell("Request ID", String.valueOf(request.getRequestId()), boldFont, regularFont));
+        table.addCell(fieldCell("Resource Type", request.getResourceType(), boldFont, regularFont));
+        table.addCell(fieldCell("Quantity", String.valueOf(request.getQuantity()), boldFont, regularFont));
+        table.addCell(fieldCell("Status", request.getStatus() != null ? request.getStatus().name() : "N/A", boldFont, regularFont));
+        table.addCell(fieldCell("Created At", formatDateTime(request.getCreatedAt()), boldFont, regularFont));
+
+        // Get requester name
+        String requesterName = userRepository.findById(request.getRequesterId())
+                .map(user -> user.getFullName())
+                .orElse("Unknown");
+        table.addCell(fieldCell("Requested By", requesterName, boldFont, regularFont));
+
+        table.addCell(fieldCell("Specification", val(request.getSpecification()), boldFont, regularFont));
+        table.addCell(fieldCell("Justification", val(request.getJustification()), boldFont, regularFont));
+
+        if (request.getPurchaseCost() != null) {
+            table.addCell(fieldCell("Purchase Cost", "Ugx " + request.getPurchaseCost().toString(), boldFont, regularFont));
+        }
+
+        if (request.getProcurementOrderRef() != null) {
+            table.addCell(fieldCell("Procurement Order Ref", request.getProcurementOrderRef(), boldFont, regularFont));
+        }
+
+        return table;
+    }
+
+    private Table createInfraTimelineTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 40, 30}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addHeaderCell(compareHeaderCell("Stage", boldFont));
+        table.addHeaderCell(compareHeaderCell("Approved By", boldFont));
+        table.addHeaderCell(compareHeaderCell("Timestamp", boldFont));
+
+        // Line Manager
+        String lmName = "Pending";
+        if (request.getLmApprovedBy() != null) {
+            lmName = userRepository.findById(request.getLmApprovedBy())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+        }
+        table.addCell(compareValueCell("Line Manager", regularFont));
+        table.addCell(compareValueCell(lmName, regularFont));
+        table.addCell(compareValueCell(request.getLmApprovedAt() != null ? formatDateTime(request.getLmApprovedAt()) : "-", regularFont));
+
+        // Infrastructure
+        String infraName = "Pending";
+        if (request.getInfraReviewedBy() != null) {
+            infraName = userRepository.findById(request.getInfraReviewedBy())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+        }
+        table.addCell(compareValueCell("Infrastructure", regularFont));
+        table.addCell(compareValueCell(infraName, regularFont));
+        table.addCell(compareValueCell(request.getInfraReviewedAt() != null ? formatDateTime(request.getInfraReviewedAt()) : "-", regularFont));
+
+        // Finance
+        String financeName = "Pending";
+        if (request.getFinanceApprovedBy() != null) {
+            financeName = userRepository.findById(request.getFinanceApprovedBy())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+        }
+        table.addCell(compareValueCell("Finance", regularFont));
+        table.addCell(compareValueCell(financeName, regularFont));
+        table.addCell(compareValueCell(request.getFinanceApprovedAt() != null ? formatDateTime(request.getFinanceApprovedAt()) : "-", regularFont));
+
+        // Comments
+        if (request.getLmComment() != null) {
+            table.addCell(compareValueCell("LM Comment", regularFont));
+            table.addCell(compareValueCell(request.getLmComment(), regularFont));
+            table.addCell(compareValueCell("", regularFont));
+        }
+        if (request.getInfraComment() != null) {
+            table.addCell(compareValueCell("Infra Comment", regularFont));
+            table.addCell(compareValueCell(request.getInfraComment(), regularFont));
+            table.addCell(compareValueCell("", regularFont));
+        }
+        if (request.getFinanceComment() != null) {
+            table.addCell(compareValueCell("Finance Comment", regularFont));
+            table.addCell(compareValueCell(request.getFinanceComment(), regularFont));
+            table.addCell(compareValueCell("", regularFont));
+        }
+
+        return table;
+    }
+
+    private Table createInfraSignatureTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{40, 60}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addHeaderCell(compareHeaderCell("Role", boldFont));
+        table.addHeaderCell(compareHeaderCell("Signature", boldFont));
+
+        // Requester Signature
+        String requesterName = userRepository.findById(request.getRequesterId())
+                .map(user -> user.getFullName())
+                .orElse("Unknown");
+
+        boolean isSigned = request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty();
+
+        Cell nameCell = new Cell().setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f));
+        nameCell.add(new Paragraph("Requester: " + requesterName)
+                .setFont(regularFont).setFontSize(10).setFontColor(INK));
+        table.addCell(nameCell);
+
+        Cell sigCell = new Cell().setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f));
+
+        Div sigDiv = new Div().setHeight(40)
+                .setBorderBottom(new SolidBorder(INK, 0.75f));
+
+        if (isSigned) {
+            try {
+                String clean = request.getRequesterSignature().startsWith("data:image")
+                        ? request.getRequesterSignature().substring(request.getRequesterSignature().indexOf(",") + 1)
+                        : request.getRequesterSignature();
+                byte[] sigBytes = Base64.getDecoder().decode(clean);
+                ImageData sigData = ImageDataFactory.create(sigBytes);
+                Image sigImage = new Image(sigData);
+                sigImage.setMaxHeight(36);
+                sigImage.setMaxWidth(200);
+                sigDiv.add(sigImage);
+            } catch (Exception e) {
+                log.warn("Could not decode signature: {}", e.getMessage());
+                sigDiv.add(new Paragraph("✓ Signed").setFont(boldFont).setFontSize(12).setFontColor(GOOD));
+            }
+        } else {
+            sigDiv.add(new Paragraph("________________________")
+                    .setFont(regularFont).setFontSize(10).setFontColor(MUTED));
+        }
+        sigCell.add(sigDiv);
+
+        if (isSigned && request.getRequesterSignedAt() != null) {
+            sigCell.add(new Paragraph("Signed on: " + formatDateTime(request.getRequesterSignedAt()))
+                    .setFont(regularFont).setFontSize(8).setFontColor(INK_SOFT));
+        } else {
+            sigCell.add(new Paragraph("Not yet signed")
+                    .setFont(regularFont).setFontSize(8).setFontColor(MUTED));
+        }
+
+        table.addCell(sigCell);
+
+        return table;
+    }
+
+    private void addInfraFooter(Document document, InfraRequest request, PdfFont regularFont) {
+        LineSeparator line = new LineSeparator(new SolidLine(0.75f));
+        line.setStrokeColor(LINE_SOFT);
+        line.setMarginTop(10);
+        line.setMarginBottom(4);
+        document.add(line);
+
+        Table footer = new Table(UnitValue.createPercentArray(new float[]{1, 1}));
+        footer.setWidth(UnitValue.createPercentValue(100));
+
+        Cell left = new Cell().setBorder(Border.NO_BORDER).setPadding(2);
+        left.add(new Paragraph("Request #" + request.getRequestId() + "  ·  Generated " +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")))
+                .setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
+        footer.addCell(left);
+
+        Cell right = new Cell().setBorder(Border.NO_BORDER).setPadding(2).setTextAlignment(TextAlignment.RIGHT);
+        right.add(new Paragraph("AssetIQ-Pro").setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
+        footer.addCell(right);
+
+        document.add(footer);
+    }
+
+    private Image generateInfraQRCode(InfraRequest request) {
+        try {
+            StringBuilder content = new StringBuilder();
+            content.append("Request: ").append(request.getRequestId())
+                    .append("\nType: ").append(request.getResourceType())
+                    .append("\nStatus: ").append(request.getStatus() != null ? request.getStatus().name() : "PENDING");
+
+            QRCodeWriter qrWriter = new QRCodeWriter();
+            BitMatrix matrix = qrWriter.encode(content.toString(), BarcodeFormat.QR_CODE, 150, 150);
+            BufferedImage image = MatrixToImageWriter.toBufferedImage(matrix);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "PNG", baos);
+
+            ImageData imgData = ImageDataFactory.create(baos.toByteArray());
+            return new Image(imgData);
+
+        } catch (WriterException | java.io.IOException e) {
+            log.warn("QR generation failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // ============================================
+    // Transfer Certificate PDF
+    // ============================================
 
     public byte[] generateTransferCertificatePdf(Transfer transfer, List<Transfer> relatedTransfers) throws Exception {
         log.info("Generating premium asset transfer certificate for transfer {}", transfer.getTransferId());
@@ -85,11 +383,14 @@ public class PdfGenerationService {
         return outputStream.toByteArray();
     }
 
+    // ============================================
+    // Transfer Helper Methods
+    // ============================================
+
     private void addLetterhead(Document document, Transfer transfer, PdfFont boldFont, PdfFont regularFont) {
         Table header = new Table(UnitValue.createPercentArray(new float[]{1.2f, 4.4f, 2.4f, 1.3f}));
         header.setWidth(UnitValue.createPercentValue(100));
 
-        // Brand mark
         Cell brandCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
         brandCell.add(new Paragraph("IQ")
@@ -98,7 +399,6 @@ public class PdfGenerationService {
                 .setTextAlignment(TextAlignment.CENTER));
         header.addCell(brandCell);
 
-        // Title
         Cell titleCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
         titleCell.add(new Paragraph("ASSET TRANSFER CERTIFICATE")
@@ -107,7 +407,6 @@ public class PdfGenerationService {
                 .setFont(regularFont).setFontSize(8.5f).setFontColor(INK_SOFT));
         header.addCell(titleCell);
 
-        // Transfer ID
         Cell refCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
                 .setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
         String transferIdText = transfer.getTransferId() != null ? String.valueOf(transfer.getTransferId()) : "N/A";
@@ -118,7 +417,6 @@ public class PdfGenerationService {
         refCell.add(new Paragraph("Date: " + dateText).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
         header.addCell(refCell);
 
-        // QR Code
         Cell qrCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
                 .setTextAlignment(TextAlignment.CENTER).setVerticalAlignment(VerticalAlignment.MIDDLE);
         try {
@@ -170,15 +468,6 @@ public class PdfGenerationService {
         document.add(strip);
     }
 
-    private void addSectionHeading(Document document, String title, PdfFont boldFont) {
-        Paragraph heading = new Paragraph(title.toUpperCase())
-                .setFont(boldFont).setFontSize(10.5f).setFontColor(NAVY)
-                .setCharacterSpacing(0.6f)
-                .setBorderBottom(new SolidBorder(NAVY, 1))
-                .setPaddingBottom(3).setMarginTop(12).setMarginBottom(7);
-        document.add(heading);
-    }
-
     private void addAssetInformationSection(Document document, Transfer transfer, PdfFont boldFont,
                                             PdfFont regularFont, PdfFont monoFont) {
         addSectionHeading(document, "Asset Information", boldFont);
@@ -198,16 +487,6 @@ public class PdfGenerationService {
                 boldFont, regularFont));
 
         document.add(grid);
-    }
-
-    private Cell fieldCell(String label, String value, PdfFont boldFont, PdfFont valueFont) {
-        Cell cell = new Cell().setBorder(new SolidBorder(LINE_SOFT, 0.75f)).setPadding(7);
-        cell.add(new Paragraph(label.toUpperCase())
-                .setFont(boldFont).setFontSize(7.5f).setFontColor(INK_SOFT).setCharacterSpacing(0.4f)
-                .setMarginBottom(2));
-        cell.add(new Paragraph(value)
-                .setFont(valueFont).setFontSize(10.5f).setFontColor(INK).setMultipliedLeading(1.1f));
-        return cell;
     }
 
     private void addTransferPartiesSection(Document document, Transfer transfer, PdfFont boldFont, PdfFont regularFont) {
@@ -283,26 +562,6 @@ public class PdfGenerationService {
         document.add(table);
     }
 
-    private Cell compareHeaderCell(String text, PdfFont boldFont) {
-        return new Cell().setBackgroundColor(NAVY).setPadding(6)
-                .setBorder(new SolidBorder(NAVY, 0.5f))
-                .add(new Paragraph(text.toUpperCase())
-                        .setFont(boldFont).setFontSize(8).setFontColor(WHITE).setCharacterSpacing(0.4f));
-    }
-
-    private Cell compareLabelCell(String text, PdfFont boldFont) {
-        return new Cell().setBackgroundColor(WASH).setPadding(7)
-                .setBorder(new SolidBorder(LINE_SOFT, 0.75f))
-                .add(new Paragraph(text.toUpperCase())
-                        .setFont(boldFont).setFontSize(8.5f).setFontColor(INK_SOFT).setCharacterSpacing(0.4f));
-    }
-
-    private Cell compareValueCell(String text, PdfFont regularFont) {
-        return new Cell().setPadding(7)
-                .setBorder(new SolidBorder(LINE_SOFT, 0.75f))
-                .add(new Paragraph(text).setFont(regularFont).setFontSize(10).setFontColor(INK));
-    }
-
     private void addTransactionHistorySection(Document document, Transfer currentTransfer,
                                               List<Transfer> relatedTransfers,
                                               PdfFont boldFont, PdfFont regularFont) {
@@ -374,13 +633,11 @@ public class PdfGenerationService {
         grid.setWidth(UnitValue.createPercentValue(100));
         grid.setMarginBottom(4);
 
-        // From Employee with Staff ID
         grid.addCell(buildSignatureBoxWithStaffId("From Employee",
                 transfer.getOldEmployeeName(),
                 transfer.getOldEmployeeStaffId(),
                 null, null, boldFont, regularFont));
 
-        // To Employee with Staff ID
         grid.addCell(buildSignatureBoxWithStaffId("To Employee",
                 transfer.getNewEmployeeName(),
                 transfer.getNewEmployeeStaffId(),
@@ -465,11 +722,9 @@ public class PdfGenerationService {
         }
         box.add(sigLine);
 
-        // Show signer name
         box.add(new Paragraph(val(name))
                 .setFont(boldFont).setFontSize(9.5f).setFontColor(isSigned ? INK : MUTED).setMarginBottom(1));
 
-        // Show Staff ID
         box.add(new Paragraph("Staff ID: " + val(staffId))
                 .setFont(regularFont).setFontSize(8f).setFontColor(INK_SOFT).setMarginBottom(1));
 
@@ -537,6 +792,49 @@ public class PdfGenerationService {
         }
     }
 
+    // ============================================
+    // Common Helper Methods
+    // ============================================
+
+    private void addSectionHeading(Document document, String title, PdfFont boldFont) {
+        Paragraph heading = new Paragraph(title.toUpperCase())
+                .setFont(boldFont).setFontSize(10.5f).setFontColor(NAVY)
+                .setCharacterSpacing(0.6f)
+                .setBorderBottom(new SolidBorder(NAVY, 1))
+                .setPaddingBottom(3).setMarginTop(12).setMarginBottom(7);
+        document.add(heading);
+    }
+
+    private Cell fieldCell(String label, String value, PdfFont boldFont, PdfFont valueFont) {
+        Cell cell = new Cell().setBorder(new SolidBorder(LINE_SOFT, 0.75f)).setPadding(7);
+        cell.add(new Paragraph(label.toUpperCase())
+                .setFont(boldFont).setFontSize(7.5f).setFontColor(INK_SOFT).setCharacterSpacing(0.4f)
+                .setMarginBottom(2));
+        cell.add(new Paragraph(value)
+                .setFont(valueFont).setFontSize(10.5f).setFontColor(INK).setMultipliedLeading(1.1f));
+        return cell;
+    }
+
+    private Cell compareHeaderCell(String text, PdfFont boldFont) {
+        return new Cell().setBackgroundColor(NAVY).setPadding(6)
+                .setBorder(new SolidBorder(NAVY, 0.5f))
+                .add(new Paragraph(text.toUpperCase())
+                        .setFont(boldFont).setFontSize(8).setFontColor(WHITE).setCharacterSpacing(0.4f));
+    }
+
+    private Cell compareLabelCell(String text, PdfFont boldFont) {
+        return new Cell().setBackgroundColor(WASH).setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f))
+                .add(new Paragraph(text.toUpperCase())
+                        .setFont(boldFont).setFontSize(8.5f).setFontColor(INK_SOFT).setCharacterSpacing(0.4f));
+    }
+
+    private Cell compareValueCell(String text, PdfFont regularFont) {
+        return new Cell().setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f))
+                .add(new Paragraph(text).setFont(regularFont).setFontSize(10).setFontColor(INK));
+    }
+
     private String val(String s) {
         return (s == null || s.isBlank()) ? "N/A" : s;
     }
@@ -544,197 +842,5 @@ public class PdfGenerationService {
     private String formatDateTime(LocalDateTime dateTime) {
         if (dateTime == null) return "-";
         return dateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"));
-    }
-
-    public byte[] generateInfraRequestReport(InfraRequest request) throws Exception {
-        log.info("Generating infrastructure request report for request {}", request.getRequestId());
-
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PdfWriter writer = new PdfWriter(outputStream);
-        PdfDocument pdfDoc = new PdfDocument(writer);
-        Document document = new Document(pdfDoc, PageSize.A4);
-        document.setMargins(28, 28, 24, 28);
-
-        PdfFont regularFont = PdfFontFactory.createFont(StandardFonts.HELVETICA);
-        PdfFont boldFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
-
-        // Header
-        addInfraHeader(document, request, boldFont, regularFont);
-
-        // Request Details
-        addSectionHeading(document, "Request Details", boldFont);
-        Table detailsTable = createInfraDetailsTable(request, boldFont, regularFont);
-        document.add(detailsTable);
-
-        // Approval Timeline
-        addSectionHeading(document, "Approval Timeline", boldFont);
-        Table timelineTable = createInfraTimelineTable(request, boldFont, regularFont);
-        document.add(timelineTable);
-
-        // Signatures
-        addSectionHeading(document, "Signatures", boldFont);
-        Table signatureTable = createInfraSignatureTable(request, boldFont, regularFont);
-        document.add(signatureTable);
-
-        addInfraFooter(document, request, regularFont);
-
-        document.close();
-        log.info("Generated infrastructure request report for request {}", request.getRequestId());
-        return outputStream.toByteArray();
-    }
-
-    private void addInfraHeader(Document document, InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
-        Table header = new Table(UnitValue.createPercentArray(new float[]{1.2f, 4.4f, 2.4f, 1.3f}));
-        header.setWidth(UnitValue.createPercentValue(100));
-
-        Cell brandCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
-                .setVerticalAlignment(VerticalAlignment.MIDDLE);
-        brandCell.add(new Paragraph("IQ")
-                .setFont(boldFont).setFontSize(13).setFontColor(WHITE)
-                .setBackgroundColor(NAVY).setPadding(6)
-                .setTextAlignment(TextAlignment.CENTER));
-        header.addCell(brandCell);
-
-        Cell titleCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
-                .setVerticalAlignment(VerticalAlignment.MIDDLE);
-        titleCell.add(new Paragraph("INFRASTRUCTURE REQUEST REPORT")
-                .setFont(boldFont).setFontSize(15).setFontColor(NAVY).setCharacterSpacing(0.8f));
-        titleCell.add(new Paragraph("AssetIQ-Pro — Asset Management System")
-                .setFont(regularFont).setFontSize(8.5f).setFontColor(INK_SOFT));
-        header.addCell(titleCell);
-
-        Cell refCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
-                .setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        refCell.add(new Paragraph("Request #: " + request.getRequestId()).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
-        refCell.add(new Paragraph("Date: " + formatDateTime(request.getCreatedAt())).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
-        header.addCell(refCell);
-
-        Cell qrCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
-                .setTextAlignment(TextAlignment.CENTER).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        try {
-            Image qrImage = generateInfraQRCode(request);
-            if (qrImage != null) {
-                qrImage.setWidth(46);
-                qrImage.setHeight(46);
-                qrCell.add(qrImage);
-            }
-        } catch (Exception e) {
-            log.warn("QR generation failed: {}", e.getMessage());
-        }
-        header.addCell(qrCell);
-
-        document.add(header);
-
-        LineSeparator line = new LineSeparator(new SolidLine(2f));
-        line.setStrokeColor(NAVY);
-        line.setMarginTop(4);
-        line.setMarginBottom(6);
-        document.add(line);
-    }
-
-    private Table createInfraDetailsTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
-        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 70}));
-        table.setWidth(UnitValue.createPercentValue(100));
-
-        table.addCell(fieldCell("Request ID", String.valueOf(request.getRequestId()), boldFont, regularFont));
-        table.addCell(fieldCell("Resource Type", request.getResourceType(), boldFont, regularFont));
-        table.addCell(fieldCell("Quantity", String.valueOf(request.getQuantity()), boldFont, regularFont));
-        table.addCell(fieldCell("Status", request.getStatus().name(), boldFont, regularFont));
-        table.addCell(fieldCell("Created At", formatDateTime(request.getCreatedAt()), boldFont, regularFont));
-        table.addCell(fieldCell("Specification", val(request.getSpecification()), boldFont, regularFont));
-        table.addCell(fieldCell("Justification", val(request.getJustification()), boldFont, regularFont));
-
-        if (request.getPurchaseCost() != null) {
-            table.addCell(fieldCell("Purchase Cost", "Ugx" + request.getPurchaseCost().toString(), boldFont, regularFont));
-        }
-
-        return table;
-    }
-
-    private Table createInfraTimelineTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
-        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 40, 30}));
-        table.setWidth(UnitValue.createPercentValue(100));
-
-        table.addHeaderCell(compareHeaderCell("Stage", boldFont));
-        table.addHeaderCell(compareHeaderCell("Approved By", boldFont));
-        table.addHeaderCell(compareHeaderCell("Timestamp", boldFont));
-
-        table.addCell(compareValueCell("Line Manager", regularFont));
-        table.addCell(compareValueCell(request.getLmApprovedBy() != null ? String.valueOf(request.getLmApprovedBy()) : "Pending", regularFont));
-        table.addCell(compareValueCell(request.getLmApprovedAt() != null ? formatDateTime(request.getLmApprovedAt()) : "-", regularFont));
-
-        table.addCell(compareValueCell("Infrastructure", regularFont));
-        table.addCell(compareValueCell(request.getInfraReviewedBy() != null ? String.valueOf(request.getInfraReviewedBy()) : "Pending", regularFont));
-        table.addCell(compareValueCell(request.getInfraReviewedAt() != null ? formatDateTime(request.getInfraReviewedAt()) : "-", regularFont));
-
-        table.addCell(compareValueCell("Finance", regularFont));
-        table.addCell(compareValueCell(request.getFinanceApprovedBy() != null ? String.valueOf(request.getFinanceApprovedBy()) : "Pending", regularFont));
-        table.addCell(compareValueCell(request.getFinanceApprovedAt() != null ? formatDateTime(request.getFinanceApprovedAt()) : "-", regularFont));
-
-        return table;
-    }
-
-    private Table createInfraSignatureTable(InfraRequest request, PdfFont boldFont, PdfFont regularFont) {
-        Table table = new Table(UnitValue.createPercentArray(new float[]{50, 50}));
-        table.setWidth(UnitValue.createPercentValue(100));
-        table.addHeaderCell(compareHeaderCell("Role", boldFont));
-        table.addHeaderCell(compareHeaderCell("Signature", boldFont));
-
-        table.addCell(compareValueCell("Requester", regularFont));
-        table.addCell(compareValueCell("________________________", regularFont));
-        table.addCell(compareValueCell("Line Manager", regularFont));
-        table.addCell(compareValueCell("________________________", regularFont));
-        table.addCell(compareValueCell("Infrastructure", regularFont));
-        table.addCell(compareValueCell("________________________", regularFont));
-        table.addCell(compareValueCell("Finance", regularFont));
-        table.addCell(compareValueCell("________________________", regularFont));
-
-        return table;
-    }
-
-    private void addInfraFooter(Document document, InfraRequest request, PdfFont regularFont) {
-        LineSeparator line = new LineSeparator(new SolidLine(0.75f));
-        line.setStrokeColor(LINE_SOFT);
-        line.setMarginTop(10);
-        line.setMarginBottom(4);
-        document.add(line);
-
-        Table footer = new Table(UnitValue.createPercentArray(new float[]{1, 1}));
-        footer.setWidth(UnitValue.createPercentValue(100));
-
-        Cell left = new Cell().setBorder(Border.NO_BORDER).setPadding(2);
-        left.add(new Paragraph("Request #" + request.getRequestId() + "  ·  Generated " +
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")))
-                .setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
-        footer.addCell(left);
-
-        Cell right = new Cell().setBorder(Border.NO_BORDER).setPadding(2).setTextAlignment(TextAlignment.RIGHT);
-        right.add(new Paragraph("AssetIQ-Pro").setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
-        footer.addCell(right);
-
-        document.add(footer);
-    }
-
-    private Image generateInfraQRCode(InfraRequest request) {
-        try {
-            StringBuilder content = new StringBuilder();
-            content.append("Request: ").append(request.getRequestId())
-                    .append("\nType: ").append(request.getResourceType())
-                    .append("\nStatus: ").append(request.getStatus().name());
-
-            QRCodeWriter qrWriter = new QRCodeWriter();
-            BitMatrix matrix = qrWriter.encode(content.toString(), BarcodeFormat.QR_CODE, 150, 150);
-            BufferedImage image = MatrixToImageWriter.toBufferedImage(matrix);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "PNG", baos);
-
-            ImageData imgData = ImageDataFactory.create(baos.toByteArray());
-            return new Image(imgData);
-
-        } catch (WriterException | java.io.IOException e) {
-            log.warn("QR generation failed: {}", e.getMessage());
-            return null;
-        }
     }
 }
