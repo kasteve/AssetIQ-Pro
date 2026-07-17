@@ -111,6 +111,19 @@ public class InfraRequest {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // New: Requester Signature fields
+    @Column(name = "requester_signature", columnDefinition = "NVARCHAR(MAX)")
+    private String requesterSignature;
+
+    @Column(name = "requester_signed_at")
+    private LocalDateTime requesterSignedAt;
+
+    @Column(name = "signing_token", length = 100)
+    private String signingToken;
+
+    @Column(name = "signing_token_expiry")
+    private LocalDateTime signingTokenExpiry;
+
     public enum RequestStatus {
         DRAFT,
         PENDING_LM_APPROVAL,
@@ -138,5 +151,9 @@ public class InfraRequest {
         return status == RequestStatus.PENDING_LM_APPROVAL ||
                 status == RequestStatus.PENDING_INFRA_REVIEW ||
                 status == RequestStatus.PENDING_FINANCE_APPROVAL;
+    }
+
+    public boolean isSigned() {
+        return requesterSignature != null && !requesterSignature.isEmpty();
     }
 }

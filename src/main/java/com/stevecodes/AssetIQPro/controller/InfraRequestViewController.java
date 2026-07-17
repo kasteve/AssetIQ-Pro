@@ -11,10 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,6 +77,57 @@ public class InfraRequestViewController {
             log.error("Error downloading PDF for request {}: {}", id, e.getMessage());
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/sign")
+    public String showSignPage(@RequestParam String token, Model model) {
+        try {
+            log.info("Sign page accessed with token: {}", token);
+            InfraRequest request = requestService.getRequestBySigningToken(token);
+
+            // Get requester name
+            String requesterName = userService.getUserById(request.getRequesterId())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+
+            model.addAttribute("request", request);
+            model.addAttribute("requesterName", requesterName);
+            model.addAttribute("token", token);
+            model.addAttribute("alreadySigned", request.isSigned());
+
+            return "infra-requests/sign";
+        } catch (Exception e) {
+            log.error("Error validating token: {}", e.getMessage(), e);
+            model.addAttribute("error", "Invalid or expired signing link: " + e.getMessage());
+            return "infra-requests/sign-error";
+        }
+    }
+
+    @PostMapping("/sign")
+    public String submitSignature(@RequestParam Long requestId,
+                                  @RequestParam String token,
+                                  @RequestParam String signature,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            log.info("Submitting signature for request: {}, token: {}", requestId, token);
+            requestService.saveRequesterSignature(requestId, token, signature);
+            redirectAttributes.addFlashAttribute("message", "Thank you! Request completed successfully.");
+            return "redirect:/infra-requests/sign-thankyou";
+        } catch (Exception e) {
+            log.error("Error submitting signature: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to submit signature: " + e.getMessage());
+            return "redirect:/infra-requests/sign-error";
+        }
+    }
+
+    @GetMapping("/sign-thankyou")
+    public String signThankyou() {
+        return "infra-requests/sign-thankyou";
+    }
+
+    @GetMapping("/sign-error")
+    public String signError() {
+        return "infra-requests/sign-error";
     }
 
     @GetMapping("/dashboard")

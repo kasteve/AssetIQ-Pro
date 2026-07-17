@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Sign Error - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fas fa-exclamation-circle" style="font-size: 80px; color: #dc3545;"></i>
+        </div>
+        <h2 class="fw-bold mb-3" style="color: #dc3545;">Signing Link Error</h2>
+        <p class="text-muted fs-5" th:text="${error}">Invalid or expired signing link.</p>
+        <p class="text-muted">Please contact the administrator for assistance.</p>
+        <a href="/assetIQ-pro/dashboard" class="btn btn-primary mt-3">
+            <i class="fas fa-home me-2"></i>Go to Dashboard
+        </a>
+    </div>
+</div>
+</body>
+</html>

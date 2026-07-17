@@ -645,7 +645,7 @@ public class PdfGenerationService {
         table.addCell(fieldCell("Justification", val(request.getJustification()), boldFont, regularFont));
 
         if (request.getPurchaseCost() != null) {
-            table.addCell(fieldCell("Purchase Cost", "$" + request.getPurchaseCost().toString(), boldFont, regularFont));
+            table.addCell(fieldCell("Purchase Cost", "Ugx" + request.getPurchaseCost().toString(), boldFont, regularFont));
         }
 
         return table;

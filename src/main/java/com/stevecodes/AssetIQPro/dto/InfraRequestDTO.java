@@ -2,7 +2,6 @@ package com.stevecodes.AssetIQPro.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -87,6 +86,12 @@ public class InfraRequestDTO {
     // Quotation
     private String quotationPath;
 
+    // Requester Signature
+    private String requesterSignature;
+    private LocalDateTime requesterSignedAt;
+    private String signingToken;
+    private LocalDateTime signingTokenExpiry;
+
     // ============================================
     // Status Display
     // ============================================
@@ -104,7 +109,7 @@ public class InfraRequestDTO {
             case "FINANCE_APPROVED": return "Approved by Finance";
             case "FINANCE_REJECTED": return "Rejected by Finance";
             case "PROCUREMENT": return "In Procurement";
-            case "DELIVERED": return "Delivered - Pending Acknowledgment";
+            case "DELIVERED": return "Delivered - Pending Signature";
             case "COMPLETED": return "Completed";
             case "CANCELLED": return "Cancelled";
             default: return status;

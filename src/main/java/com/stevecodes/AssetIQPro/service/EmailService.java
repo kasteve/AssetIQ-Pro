@@ -30,7 +30,7 @@ public class EmailService {
 
     private void logEmailContent(String emailType, String toEmail, String subject, String body) {
         log.info("=========================================");
-        log.info("📧 EMAIL CONTENT (Send Failed)");
+        log.info("📧 EMAIL CONTENT");
         log.info("Type: {}", emailType);
         log.info("To: {}", toEmail);
         log.info("Subject: {}", subject);
@@ -40,22 +40,35 @@ public class EmailService {
         log.info("=========================================");
     }
 
+    private void logEmailSent(String emailType, String toEmail, String subject) {
+        log.info("=========================================");
+        log.info("✅ EMAIL SENT SUCCESSFULLY");
+        log.info("Type: {}", emailType);
+        log.info("To: {}", toEmail);
+        log.info("Subject: {}", subject);
+        log.info("=========================================");
+    }
+
     // ============================================
     // Public Email Method - Does NOT throw exceptions
     // ============================================
 
     public void sendSimpleEmail(String toEmail, String subject, String body) {
         try {
+            // Log email content before sending
+            logEmailContent("Simple Email", toEmail, subject, body);
+
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(toEmail);
             message.setSubject(subject);
             message.setText(body);
             message.setFrom(FROM_EMAIL);
             mailSender.send(message);
-            log.info("✅ Email sent to: {}", toEmail);
+
+            logEmailSent("Simple Email", toEmail, subject);
         } catch (Exception e) {
             log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Simple Email", toEmail, subject, body);
+            logEmailContent("Simple Email (FAILED)", toEmail, subject, body);
             // DO NOT re-throw - just log
         }
     }
@@ -183,6 +196,36 @@ public class EmailService {
     }
 
     // ============================================
+    // Infrastructure Request Signing Email
+    // ============================================
+
+    @Async
+    public void sendInfraRequestSigningLink(String toEmail, String requesterName,
+                                            Long requestId, String signingLink,
+                                            String expiryDate) {
+        String subject = "Infrastructure Request - Sign to Complete #" + requestId;
+        String body = String.format("""
+            Dear %s,
+            
+            Your infrastructure request (#%s) has been delivered.
+            
+            Please click the link below to sign and acknowledge receipt:
+            
+            %s
+            
+            This link will expire on: %s
+            
+            If you have any questions, please contact the Infrastructure Team.
+            
+            Best regards,
+            Infrastructure Team
+            AssetIQ-Pro
+            """, requesterName, requestId, signingLink, expiryDate);
+
+        sendSimpleEmail(toEmail, subject, body);
+    }
+
+    // ============================================
     // Driver Request Emails
     // ============================================
 
@@ -278,12 +321,8 @@ public class EmailService {
     public void sendTransferCompletionNotification(List<String> toEmails, String assetTag,
                                                    String transferId, byte[] pdfBytes) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(toEmails.toArray(new String[0]));
-            helper.setSubject("Transfer Complete: " + assetTag + " - #" + transferId);
-            helper.setText(String.format("""
+            String subject = "Transfer Complete: " + assetTag + " - #" + transferId;
+            String body = String.format("""
                 Dear Team,
                 
                 The asset transfer for %s has been completed successfully.
@@ -295,13 +334,23 @@ public class EmailService {
                 Best regards,
                 Asset Management Team
                 AssetIQ-Pro
-                """, assetTag, transferId));
+                """, assetTag, transferId);
+
+            // Log email content before sending
+            logEmailContent("Transfer Completion", String.join(", ", toEmails), subject, body);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(toEmails.toArray(new String[0]));
+            helper.setSubject(subject);
+            helper.setText(body);
 
             helper.addAttachment("Transfer_" + assetTag + ".pdf",
                     new ByteArrayResource(pdfBytes));
 
             mailSender.send(message);
-            log.info("✅ Transfer completion notification sent to {} recipients", toEmails.size());
+            logEmailSent("Transfer Completion", String.join(", ", toEmails), subject);
         } catch (MessagingException e) {
             log.error("❌ Failed to send transfer completion notification: {}", e.getMessage());
         }
@@ -396,6 +445,8 @@ public class EmailService {
             """, fullName, voucherCode, mealType);
 
         try {
+            logEmailContent("Voucher Generated", toEmail, subject, body);
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
@@ -409,10 +460,10 @@ public class EmailService {
             }
 
             mailSender.send(message);
-            log.info("✅ Voucher email sent to: {}", toEmail);
+            logEmailSent("Voucher Generated", toEmail, subject);
         } catch (Exception e) {
             log.error("❌ Failed to send voucher email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Voucher Generated", toEmail, subject, body);
+            logEmailContent("Voucher Generated (FAILED)", toEmail, subject, body);
         }
     }
 
@@ -423,12 +474,8 @@ public class EmailService {
     @Async
     public void sendCompletedTransferReport(List<String> signerEmails, Transfer transfer, byte[] pdfBytes) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(signerEmails.toArray(new String[0]));
-            helper.setSubject("Transfer Complete: " + transfer.getAssetTag() + " - #" + transfer.getTransferId());
-            helper.setText(String.format("""
+            String subject = "Transfer Complete: " + transfer.getAssetTag() + " - #" + transfer.getTransferId();
+            String body = String.format("""
                 Dear Team,
                 
                 The asset transfer for %s has been completed successfully.
@@ -446,15 +493,24 @@ public class EmailService {
                     transfer.getAssetTag(),
                     transfer.getTransferId(),
                     transfer.getAssetTag(),
-                    transfer.getTransferDate() != null ? transfer.getTransferDate().toString() : "N/A"));
+                    transfer.getTransferDate() != null ? transfer.getTransferDate().toString() : "N/A");
+
+            logEmailContent("Transfer Completion Report", String.join(", ", signerEmails), subject, body);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(signerEmails.toArray(new String[0]));
+            helper.setSubject(subject);
+            helper.setText(body);
 
             helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
                     new ByteArrayResource(pdfBytes));
 
             mailSender.send(message);
-            log.info("✅ Transfer completion notification sent to {} recipients", signerEmails.size());
+            logEmailSent("Transfer Completion Report", String.join(", ", signerEmails), subject);
         } catch (MessagingException e) {
-            log.error("❌ Failed to send transfer completion notification: {}", e.getMessage());
+            log.error("❌ Failed to send transfer completion report: {}", e.getMessage());
         }
     }
 }

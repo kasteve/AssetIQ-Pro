@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Thank You - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fas fa-check-circle" style="font-size: 80px; color: #198754;"></i>
+        </div>
+        <h2 class="fw-bold mb-3">Thank You!</h2>
+        <p class="text-muted fs-5">Your signature has been submitted successfully.</p>
+        <p class="text-muted">The request is now complete. You will receive a confirmation email with the PDF report.</p>
+        <a href="/assetIQ-pro/dashboard" class="btn btn-primary mt-3">
+            <i class="fas fa-home me-2"></i>Go to Dashboard
+        </a>
+    </div>
+</div>
+</body>
+</html>

@@ -57,6 +57,11 @@ public class InfraRequestService {
                 .orElseThrow(() -> new RuntimeException("Request not found: " + requestId));
     }
 
+    public InfraRequest getRequestBySigningToken(String token) {
+        return requestRepository.findBySigningToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+    }
+
     public List<InfraRequestDTO> getRequestsForUser(Long userId) {
         return requestRepository.findRequestsForUser(userId).stream()
                 .map(this::convertToDTO)
@@ -367,15 +372,21 @@ public class InfraRequestService {
         request.setStatus(RequestStatus.DELIVERED);
         request.setDeliveredAt(LocalDateTime.now());
         request.setDeliveredBy(deliveredBy);
+        requestRepository.save(request);
 
-        InfraRequest saved = requestRepository.save(request);
-        InfraRequestDTO result = convertToDTO(saved);
+        // Generate signing link for requester
+        try {
+            String signingLink = generateSigningLink(requestId);
+            log.info("Signing link generated for request {}: {}", requestId, signingLink);
+        } catch (Exception e) {
+            log.error("Failed to generate signing link: {}", e.getMessage());
+        }
 
         try {
-            notifyRequester(saved, "Your requested items have been delivered.");
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Delivered",
-                    "Your request #" + saved.getRequestId() + " has been delivered.");
+            notifyRequester(request, "Your requested items have been delivered. Please sign to complete.");
+            sendEmailNotification(request.getRequesterId(),
+                    "Infrastructure Request Delivered - Please Sign",
+                    "Your request #" + request.getRequestId() + " has been delivered. Please sign to complete.");
         } catch (Exception e) {
             log.error("Failed to send email: {}", e.getMessage());
         }
@@ -384,7 +395,65 @@ public class InfraRequestService {
                 "Request #" + requestId + " marked as delivered by " + deliveredBy,
                 deliveredBy);
 
-        return result;
+        return convertToDTO(request);
+    }
+
+    @Transactional
+    public String generateSigningLink(Long requestId) {
+        InfraRequest request = validateRequest(requestId);
+
+        if (request.getStatus() != RequestStatus.DELIVERED) {
+            throw new IllegalStateException("Request must be in DELIVERED status to sign. Current: " + request.getStatus());
+        }
+
+        String token = UUID.randomUUID().toString();
+        request.setSigningToken(token);
+        request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
+        requestRepository.save(request);
+
+        // Send email with signing link
+        String signingLink = "http://localhost:8091/assetIQ-pro/infra-requests/sign?token=" + token;
+        userRepository.findById(request.getRequesterId()).ifPresent(user -> {
+            emailService.sendSimpleEmail(
+                    user.getEmail(),
+                    "Infrastructure Request - Sign to Complete",
+                    "Please sign to acknowledge receipt of your request #" + requestId + ":\n\n" + signingLink
+            );
+        });
+
+        return signingLink;
+    }
+
+    @Transactional
+    public void saveRequesterSignature(Long requestId, String token, String signature) {
+        InfraRequest request = validateRequest(requestId);
+
+        if (!token.equals(request.getSigningToken())) {
+            throw new RuntimeException("Invalid token");
+        }
+        if (request.getSigningTokenExpiry() == null ||
+                request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Token has expired");
+        }
+
+        request.setRequesterSignature(signature);
+        request.setRequesterSignedAt(LocalDateTime.now());
+        request.setSigningToken(null);
+        request.setSigningTokenExpiry(null);
+        request.setStatus(RequestStatus.COMPLETED);
+        request.setCompletedAt(LocalDateTime.now());
+
+        // Generate PDF with signature
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            request.setPdfReportPath(pdfPath);
+            log.info("PDF generated for request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for request {}: {}", requestId, e.getMessage());
+        }
+
+        requestRepository.save(request);
     }
 
     @Transactional
@@ -620,6 +689,10 @@ public class InfraRequestService {
         dto.setPdfReportPath(request.getPdfReportPath());
         dto.setAssetId(request.getAssetId());
         dto.setQuotationPath(request.getQuotationPath());
+        dto.setRequesterSignature(request.getRequesterSignature());
+        dto.setRequesterSignedAt(request.getRequesterSignedAt());
+        dto.setSigningToken(request.getSigningToken());
+        dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
 
         // Get requester details with staff ID
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {

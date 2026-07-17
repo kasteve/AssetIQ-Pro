@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Sign Request - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-file-signature me-2"></i>Sign Request #<span th:text="${request.requestId}"></span></h4>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="panel-card">
+                <div class="panel-header">
+                    <h6><i class="fas fa-info-circle me-2"></i>Request Details</h6>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Resource Type</span>
+                                <span class="value" th:text="${request.resourceType}">Laptop</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Quantity</span>
+                                <span class="value" th:text="${request.quantity}">1</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Requester</span>
+                                <span class="value" th:text="${requesterName}">John Doe</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Status</span>
+                                <span class="status-badge completed" th:text="${request.status}">DELIVERED</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Delivered At</span>
+                                <span class="value" th:text="${#temporals.format(request.deliveredAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</span>
+                            </div>
+                            <div th:if="${request.specification != null}">
+                                <div class="detail-item">
+                                    <span class="label">Specification</span>
+                                    <span class="value" th:text="${request.specification}">16GB RAM</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div th:if="${alreadySigned}">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            You have already signed this request.
+                        </div>
+                    </div>
+
+                    <div th:unless="${alreadySigned}">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-pen me-2"></i>Please sign below to acknowledge receipt</h6>
+
+                        <div class="signature-pad">
+                            <canvas id="signatureCanvas" width="600" height="200"></canvas>
+                            <div class="signature-tools">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearSignature()">
+                                    <i class="fas fa-eraser me-1"></i>Clear
+                                </button>
+                                <button type="button" class="btn btn-sm btn-success" onclick="submitSignature()">
+                                    <i class="fas fa-check me-1"></i>Submit Signature
+                                </button>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="signatureData" name="signatureData">
+                        <input type="hidden" id="requestId" th:value="${request.requestId}">
+                        <input type="hidden" id="token" th:value="${token}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .panel-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; }
+        .panel-header { padding: 16px 22px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; justify-content: space-between; }
+        .panel-header h6 { font-weight: 700; font-size: 14.5px; color: var(--ink); margin: 0; }
+        .panel-body { padding: 20px 22px; }
+        .detail-item { margin-bottom: 12px; }
+        .detail-item .label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa0a6; display: block; }
+        .detail-item .value { font-size: 14.5px; color: var(--ink); font-weight: 500; }
+        .status-badge { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+        .status-badge.completed { background: #e6f7ec; color: #198754; }
+        .signature-pad { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px; background: white; }
+        .signature-pad canvas { width: 100%; height: 200px; border-radius: 6px; cursor: crosshair; background: white; }
+        .signature-tools { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        .alert-success { background: #e6f7ec; color: #198754; padding: 15px 20px; border-radius: 10px; border: 1px solid #c3e6cb; }
+        .alert-danger { background: #fdeeee; color: #dc3545; padding: 15px 20px; border-radius: 10px; border: 1px solid #f5c6cb; }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script>
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let canvas = document.getElementById('signatureCanvas');
+        let ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = 200;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            return {
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = getPosition(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const pos = getPosition(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing(e) {
+            e.preventDefault();
+            isDrawing = false;
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signatureData').value = '';
+        }
+
+        function submitSignature() {
+            const dataUrl = canvas.toDataURL('image/png');
+            if (dataUrl === 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') {
+                alert('Please draw your signature first.');
+                return;
+            }
+
+            const requestId = document.getElementById('requestId').value;
+            const token = document.getElementById('token').value;
+
+            // Show loading
+            const btn = document.querySelector('.btn-success');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting...';
+
+            fetch('/assetIQ-pro/infra-requests/sign', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'requestId=' + encodeURIComponent(requestId) +
+                      '&token=' + encodeURIComponent(token) +
+                      '&signature=' + encodeURIComponent(dataUrl)
+            })
+            .then(response => {
+                if (response.status === 302 || response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    return response.text();
+                }
+            })
+            .then(text => {
+                if (text && text.includes('redirect')) {
+                    // If we got a redirect, follow it
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                alert('Error submitting signature: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Submit Signature';
+            });
+        }
+    </script>
+</div>
+</body>
+</html>
