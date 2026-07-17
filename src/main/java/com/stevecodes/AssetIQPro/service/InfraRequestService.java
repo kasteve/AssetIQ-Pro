@@ -39,8 +39,8 @@ public class InfraRequestService {
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
 
-    private static final String UPLOAD_DIR = "./uploads/infra/quotations/";
-    private static final String REPORT_DIR = "./uploads/infra/reports/";
+    private static final String UPLOAD_DIR = "uploads/infra/quotations/";
+    private static final String REPORT_DIR = "uploads/infra/reports/";
 
     // ============================================
     // Query Methods

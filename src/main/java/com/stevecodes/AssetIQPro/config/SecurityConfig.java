@@ -19,11 +19,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class SecurityConfig {
+public class SecurityConfig implements WebMvcConfigurer {
 
     private final CustomUserDetailsService userDetailsService;
     private final AppUserRepository userRepository;
@@ -46,6 +48,13 @@ public class SecurityConfig {
         return authConfig.getAuthenticationManager();
     }
 
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Serve files from the uploads directory with context path
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations("file:./uploads/");
+    }
+
     @Bean
     public AuthenticationSuccessHandler authenticationSuccessHandler() {
         return new AuthenticationSuccessHandler() {
@@ -65,7 +74,6 @@ public class SecurityConfig {
                     session.setAttribute("isFirstLogin", user.isFirstLogin());
                     session.setAttribute("mustChangePassword", user.isMustChangePassword());
 
-                    // Get permissions as list of strings
                     java.util.List<String> permissionNames = user.getPermissions().stream()
                             .map(p -> p.getPermissionName())
                             .collect(java.util.stream.Collectors.toList());
@@ -98,7 +106,8 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/bookings/driver-dashboard",
                                 "/bookings/driver/**",
-                                "/bookings/driver-requests"
+                                "/bookings/driver-requests",
+                                "/uploads/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
