@@ -236,11 +236,12 @@ public class UserRequestController {
     @PostMapping("/resource-request/{requestId}/acknowledge")
     public String acknowledgeResourceRequest(@PathVariable Long requestId,
                                              @RequestParam String signature,
+                                             @RequestParam String signatoryName,
                                              HttpSession session,
                                              RedirectAttributes redirectAttributes) {
         try {
             Long userId = (Long) session.getAttribute("userId");
-            resourceRequestService.acknowledgeReceipt(requestId, userId, signature);
+            resourceRequestService.acknowledgeReceipt(requestId, userId, signature, signatoryName);
             redirectAttributes.addFlashAttribute("success", "Resource request acknowledged successfully!");
         } catch (Exception e) {
             log.error("Error acknowledging resource request: {}", e.getMessage());
@@ -250,40 +251,8 @@ public class UserRequestController {
     }
 
     // ============================================
-    // Admin Resource Request Endpoints
+    // Admin Resource Request Endpoints (Direct Admin Approval)
     // ============================================
-
-    @PostMapping("/resource-request/{requestId}/lm-approve")
-    public String approveByLineManager(@PathVariable Long requestId,
-                                       @RequestParam String comment,
-                                       HttpSession session,
-                                       RedirectAttributes redirectAttributes) {
-        try {
-            Long lmId = (Long) session.getAttribute("userId");
-            resourceRequestService.approveByLineManager(requestId, lmId, comment);
-            redirectAttributes.addFlashAttribute("success", "Resource request approved successfully!");
-        } catch (Exception e) {
-            log.error("Error approving resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to approve resource request.");
-        }
-        return "redirect:/bookings/bookings-dashboard";
-    }
-
-    @PostMapping("/resource-request/{requestId}/lm-reject")
-    public String rejectByLineManager(@PathVariable Long requestId,
-                                      @RequestParam String reason,
-                                      HttpSession session,
-                                      RedirectAttributes redirectAttributes) {
-        try {
-            Long lmId = (Long) session.getAttribute("userId");
-            resourceRequestService.rejectByLineManager(requestId, lmId, reason);
-            redirectAttributes.addFlashAttribute("success", "Resource request rejected successfully!");
-        } catch (Exception e) {
-            log.error("Error rejecting resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to reject resource request.");
-        }
-        return "redirect:/bookings/bookings-dashboard";
-    }
 
     @PostMapping("/resource-request/{requestId}/admin-accept")
     public String acceptResourceRequest(@PathVariable Long requestId,
@@ -309,6 +278,20 @@ public class UserRequestController {
         } catch (Exception e) {
             log.error("Error declining resource request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to decline resource request.");
+        }
+        return "redirect:/bookings/bookings-dashboard";
+    }
+
+    @PostMapping("/resource-request/{requestId}/admin-complete")
+    public String completeResourceRequest(@PathVariable Long requestId,
+                                          @RequestParam(required = false) String deliveryNotes,
+                                          RedirectAttributes redirectAttributes) {
+        try {
+            resourceRequestService.completeResourceRequest(requestId, deliveryNotes);
+            redirectAttributes.addFlashAttribute("success", "Resource request marked as completed successfully!");
+        } catch (Exception e) {
+            log.error("Error completing resource request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to complete resource request.");
         }
         return "redirect:/bookings/bookings-dashboard";
     }

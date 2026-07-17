@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -21,6 +22,9 @@ public class ResourceRequestService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final AppUserService appUserService;
+    private final PdfGenerationService pdfGenerationService;
+
+    private static final String REPORT_DIR = "uploads/resources/reports/";
 
     // ============================================
     // Query Methods
@@ -50,9 +54,25 @@ public class ResourceRequestService {
                 .collect(Collectors.toList());
     }
 
-    public List<ResourceRequestDTO> getResourceRequestsByLineManager(Long lmId) {
-        log.info("Getting resource requests for line manager: {}", lmId);
-        return resourceRequestRepository.findByLineManagerId(lmId)
+    public List<ResourceRequestDTO> getAcceptedResourceRequests() {
+        log.info("Getting accepted resource requests");
+        return resourceRequestRepository.findByStatus("ACCEPTED")
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ResourceRequestDTO> getCompletedResourceRequests() {
+        log.info("Getting completed resource requests");
+        return resourceRequestRepository.findByStatus("COMPLETED")
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ResourceRequestDTO> getDeclinedResourceRequests() {
+        log.info("Getting declined resource requests");
+        return resourceRequestRepository.findByStatus("REJECTED")
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -60,43 +80,61 @@ public class ResourceRequestService {
 
     public ResourceRequestDTO getResourceRequestById(Long requestId) {
         log.info("Getting resource request by id: {}", requestId);
-        ResourceRequest request = resourceRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Resource request not found: " + requestId));
+        ResourceRequest request = validateRequest(requestId);
         return convertToDTO(request);
+    }
+
+    public ResourceRequest getResourceRequestEntityById(Long requestId) {
+        return validateRequest(requestId);
+    }
+
+    public ResourceRequest getResourceRequestBySigningToken(String token) {
+        return resourceRequestRepository.findBySigningToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
     }
 
     public long countPendingRequests() {
         return resourceRequestRepository.countByStatus("PENDING");
     }
 
+    public long countAcceptedRequests() {
+        return resourceRequestRepository.countByStatus("ACCEPTED");
+    }
+
+    public long countCompletedRequests() {
+        return resourceRequestRepository.countByStatus("COMPLETED");
+    }
+
+    public long countDeclinedRequests() {
+        return resourceRequestRepository.countByStatus("REJECTED");
+    }
+
     // ============================================
-    // Request Management
+    // Request Management - Direct Admin Approval
     // ============================================
 
     @Transactional
     public ResourceRequestDTO createResourceRequest(ResourceRequestDTO dto) {
         log.info("Creating resource request for user: {}", dto.getUserId());
 
-        // Get requester's line manager
-        Long lineManagerId = getLineManagerId(dto.getUserId());
-
         ResourceRequest request = new ResourceRequest();
         request.setUserId(dto.getUserId());
         request.setRequestedBy(dto.getRequestedBy());
         request.setDescription(dto.getDescription());
         request.setResourceType(dto.getResourceType());
+        request.setQuantity(dto.getQuantity() != null ? dto.getQuantity() : 1);
+        request.setJustification(dto.getJustification());
         request.setRequestTime(LocalDateTime.now());
-        request.setStatus("PENDING_LM_APPROVAL");
-        request.setLineManagerId(lineManagerId);
+        request.setStatus("PENDING");
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify line manager
-        String lmEmail = getEmailForUser(lineManagerId);
+        // Notify admin
         emailService.sendResourceRequestNotification(
-                lmEmail,
-                "Resource Request Pending Approval",
-                "User " + dto.getRequestedBy() + " requested: " + dto.getDescription()
+                "admin@company.com",
+                "New Resource Request Pending Approval",
+                "User " + dto.getRequestedBy() + " requested: " + dto.getResourceType() +
+                        " - " + dto.getDescription()
         );
 
         auditService.logAction("RESOURCE_REQUEST_CREATED",
@@ -108,87 +146,27 @@ public class ResourceRequestService {
 
     @Transactional
     public ResourceRequestDTO createResourceRequest(Long userId, String requestedBy, String description,
-                                                    String resourceType, Integer quantity) {
+                                                    String resourceType, Integer quantity, String justification) {
         ResourceRequestDTO dto = new ResourceRequestDTO();
         dto.setUserId(userId);
         dto.setRequestedBy(requestedBy);
         dto.setDescription(description);
         dto.setResourceType(resourceType);
+        dto.setQuantity(quantity != null ? quantity : 1);
+        dto.setJustification(justification);
         return createResourceRequest(dto);
     }
 
     @Transactional
-    public ResourceRequestDTO approveByLineManager(Long requestId, Long lmId, String comment) {
-        log.info("Line manager {} approving resource request: {}", lmId, requestId);
-
-        ResourceRequest request = validateRequest(requestId);
-        if (!"PENDING_LM_APPROVAL".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is not pending LM approval");
-        }
-
-        request.setStatus("PENDING_ADMIN_APPROVAL");
-        request.setLmApprovedBy(lmId);
-        request.setLmApprovedAt(LocalDateTime.now());
-        request.setLmComment(comment);
-
-        ResourceRequest saved = resourceRequestRepository.save(request);
-
-        // Notify admin
-        emailService.sendResourceRequestNotification(
-                "admin@company.com",
-                "Resource Request Pending Admin Approval",
-                "Request from " + request.getRequestedBy() + " for " + request.getResourceType()
-        );
-
-        auditService.logAction("RESOURCE_REQUEST_LM_APPROVED",
-                "Resource request approved by LM: " + requestId,
-                lmId);
-
-        return convertToDTO(saved);
-    }
-
-    @Transactional
-    public ResourceRequestDTO rejectByLineManager(Long requestId, Long lmId, String reason) {
-        log.info("Line manager {} rejecting resource request: {}", lmId, requestId);
-
-        ResourceRequest request = validateRequest(requestId);
-        if (!"PENDING_LM_APPROVAL".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is not pending LM approval");
-        }
-
-        request.setStatus("REJECTED");
-        request.setLmApprovedBy(lmId);
-        request.setLmApprovedAt(LocalDateTime.now());
-        request.setDeclinedReason(reason);
-
-        ResourceRequest saved = resourceRequestRepository.save(request);
-
-        // Notify requester
-        String requesterEmail = getEmailForUser(request.getUserId());
-        emailService.sendResourceRequestStatusUpdate(
-                requesterEmail,
-                "Resource Request Rejected by Line Manager",
-                "Your request for " + request.getResourceType() + " has been rejected. Reason: " + reason
-        );
-
-        auditService.logAction("RESOURCE_REQUEST_LM_REJECTED",
-                "Resource request rejected by LM: " + requestId,
-                lmId);
-
-        return convertToDTO(saved);
-    }
-
-    @Transactional
     public ResourceRequestDTO acceptResourceRequest(Long requestId, String adminComment) {
-        log.info("Accepting resource request: {}", requestId);
+        log.info("Admin accepting resource request: {}", requestId);
 
         ResourceRequest request = validateRequest(requestId);
-        if (!"PENDING_ADMIN_APPROVAL".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is not pending admin approval");
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Request is not pending approval. Current status: " + request.getStatus());
         }
 
         request.setStatus("ACCEPTED");
-        request.setFinalStatus("ACCEPTED");
         request.setAcceptedAt(LocalDateTime.now());
         request.setAdminComment(adminComment);
 
@@ -199,7 +177,7 @@ public class ResourceRequestService {
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Accepted",
-                "Your request for " + request.getResourceType() + " has been accepted."
+                "Your request for " + request.getResourceType() + " has been accepted by the administrator."
         );
 
         auditService.logAction("RESOURCE_REQUEST_ACCEPTED",
@@ -211,15 +189,14 @@ public class ResourceRequestService {
 
     @Transactional
     public ResourceRequestDTO declineResourceRequest(Long requestId, String reason) {
-        log.info("Declining resource request: {} - Reason: {}", requestId, reason);
+        log.info("Admin declining resource request: {} - Reason: {}", requestId, reason);
 
         ResourceRequest request = validateRequest(requestId);
-        if (!"PENDING_ADMIN_APPROVAL".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is not pending admin approval");
+        if (!"PENDING".equals(request.getStatus())) {
+            throw new IllegalStateException("Request is not pending approval. Current status: " + request.getStatus());
         }
 
         request.setStatus("REJECTED");
-        request.setFinalStatus("REJECTED");
         request.setDeclinedAt(LocalDateTime.now());
         request.setDeclinedReason(reason);
 
@@ -241,23 +218,136 @@ public class ResourceRequestService {
     }
 
     @Transactional
-    public void acknowledgeReceipt(Long requestId, Long userId, String signature) {
-        log.info("User {} acknowledging receipt for resource request: {}", userId, requestId);
+    public ResourceRequestDTO completeResourceRequest(Long requestId, String deliveryNotes) {
+        log.info("Admin completing resource request: {}", requestId);
 
         ResourceRequest request = validateRequest(requestId);
         if (!"ACCEPTED".equals(request.getStatus())) {
-            throw new IllegalStateException("Request must be accepted to acknowledge");
+            throw new IllegalStateException("Request must be ACCEPTED to complete. Current status: " + request.getStatus());
         }
 
-        request.setAcknowledgedAt(LocalDateTime.now());
-        request.setAcknowledgedBy(userId);
-        request.setRequesterSignature(signature);
         request.setStatus("COMPLETED");
+        request.setCompletedAt(LocalDateTime.now());
+        request.setDeliveryNotes(deliveryNotes);
+
+        // Generate signing token
+        String token = UUID.randomUUID().toString();
+        request.setSigningToken(token);
+        request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
+
+        ResourceRequest saved = resourceRequestRepository.save(request);
+
+        // Generate PDF
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(saved);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            saved.setPdfReportPath(pdfPath);
+            resourceRequestRepository.save(saved);
+            log.info("PDF generated for resource request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for resource request {}: {}", requestId, e.getMessage());
+        }
+
+        // Notify requester with signature link
+        String requesterEmail = getEmailForUser(request.getUserId());
+        String signatureLink = "http://localhost:8091/assetIQ-pro/resources/sign?token=" + token;
+        emailService.sendResourceRequestStatusUpdate(
+                requesterEmail,
+                "Resource Request Completed - Please Sign",
+                "Your request for " + request.getResourceType() + " has been completed.\n\n" +
+                        "Please sign to acknowledge receipt: " + signatureLink
+        );
+
+        auditService.logAction("RESOURCE_REQUEST_COMPLETED",
+                "Resource request completed: " + requestId + " by admin",
+                request.getUserId());
+
+        return convertToDTO(saved);
+    }
+
+    @Transactional
+    public void saveRequesterSignature(Long requestId, String token, String signature, String signatoryName) {
+        log.info("Saving signature for resource request: {}", requestId);
+
+        ResourceRequest request = validateRequest(requestId);
+
+        if (!token.equals(request.getSigningToken())) {
+            throw new RuntimeException("Invalid token");
+        }
+        if (request.getSigningTokenExpiry() == null ||
+                request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Token has expired");
+        }
+
+        request.setRequesterSignature(signature);
+        request.setSignatoryName(signatoryName);
+        request.setAcknowledgedAt(LocalDateTime.now());
+        request.setSigningToken(null);
+        request.setSigningTokenExpiry(null);
+
+        // Regenerate PDF with signature
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(request);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            request.setPdfReportPath(pdfPath);
+            log.info("PDF regenerated with signature for request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
+        }
 
         resourceRequestRepository.save(request);
 
+        auditService.logAction("RESOURCE_REQUEST_SIGNED",
+                "Resource request signed by: " + signatoryName,
+                request.getUserId());
+    }
+
+    @Transactional
+    public void acknowledgeReceipt(Long requestId, Long userId, String signature, String signatoryName) {
+        log.info("User {} acknowledging receipt for resource request: {}", userId, requestId);
+
+        ResourceRequest request = validateRequest(requestId);
+
+        if (!"COMPLETED".equals(request.getStatus())) {
+            throw new IllegalStateException("Request must be COMPLETED to acknowledge. Current status: " + request.getStatus());
+        }
+
+        if (request.getRequesterSignature() != null) {
+            throw new IllegalStateException("Request has already been acknowledged");
+        }
+
+        if (!request.getUserId().equals(userId)) {
+            throw new IllegalStateException("You are not authorized to sign this request");
+        }
+
+        request.setRequesterSignature(signature);
+        request.setSignatoryName(signatoryName);
+        request.setAcknowledgedAt(LocalDateTime.now());
+        request.setAcknowledgedBy(userId);
+        request.setSigningToken(null);
+        request.setSigningTokenExpiry(null);
+
+        try {
+            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(request);
+            String pdfPath = savePdfToFile(pdfBytes, requestId);
+            request.setPdfReportPath(pdfPath);
+            log.info("PDF regenerated with signature for request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
+        }
+
+        resourceRequestRepository.save(request);
+
+        String requesterEmail = getEmailForUser(userId);
+        emailService.sendResourceRequestStatusUpdate(
+                requesterEmail,
+                "Resource Request Signed - Completed",
+                "Thank you for signing the receipt for your resource request #" + requestId +
+                        ".\n\nA PDF report has been generated and is available for download."
+        );
+
         auditService.logAction("RESOURCE_REQUEST_ACKNOWLEDGED",
-                "Resource request acknowledged: " + requestId + " by user: " + userId,
+                "Resource request acknowledged by user: " + userId + ", signatory: " + signatoryName,
                 userId);
     }
 
@@ -268,7 +358,7 @@ public class ResourceRequestService {
         ResourceRequest request = validateRequest(requestId);
         String status = request.getStatus();
 
-        if (!"PENDING_LM_APPROVAL".equals(status) && !"PENDING_ADMIN_APPROVAL".equals(status)) {
+        if (!"PENDING".equals(status) && !"ACCEPTED".equals(status)) {
             throw new IllegalStateException("Cannot recall - request already processed");
         }
 
@@ -281,18 +371,28 @@ public class ResourceRequestService {
     }
 
     // ============================================
+    // PDF Generation Methods
+    // ============================================
+
+    private String savePdfToFile(byte[] pdfBytes, Long requestId) throws java.io.IOException {
+        java.nio.file.Path uploadPath = java.nio.file.Paths.get(REPORT_DIR);
+        if (!java.nio.file.Files.exists(uploadPath)) {
+            java.nio.file.Files.createDirectories(uploadPath);
+        }
+
+        String filename = "resource_request_" + requestId + "_" + System.currentTimeMillis() + ".pdf";
+        java.nio.file.Path filePath = uploadPath.resolve(filename);
+        java.nio.file.Files.write(filePath, pdfBytes);
+        return filePath.toString();
+    }
+
+    // ============================================
     // Helper Methods
     // ============================================
 
     private ResourceRequest validateRequest(Long requestId) {
         return resourceRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Resource request not found: " + requestId));
-    }
-
-    private Long getLineManagerId(Long userId) {
-        // Get employee for user, then get their line manager
-        // This is a placeholder - implement based on your Employee-LineManager relationship
-        return 1L; // Placeholder
     }
 
     private String getEmailForUser(Long userId) {
@@ -308,20 +408,23 @@ public class ResourceRequestService {
         dto.setRequestedBy(request.getRequestedBy());
         dto.setDescription(request.getDescription());
         dto.setResourceType(request.getResourceType());
+        dto.setQuantity(request.getQuantity());
+        dto.setJustification(request.getJustification());
         dto.setRequestTime(request.getRequestTime());
         dto.setStatus(request.getStatus());
-        dto.setFinalStatus(request.getFinalStatus());
-        dto.setCreatedAt(request.getCreatedAt());
         dto.setAcceptedAt(request.getAcceptedAt());
         dto.setDeclinedAt(request.getDeclinedAt());
         dto.setDeclinedReason(request.getDeclinedReason());
         dto.setAdminComment(request.getAdminComment());
-        dto.setLmComment(request.getLmComment());
-        dto.setLmApprovedAt(request.getLmApprovedAt());
-        dto.setLmApprovedBy(request.getLmApprovedBy());
         dto.setAcknowledgedAt(request.getAcknowledgedAt());
         dto.setAcknowledgedBy(request.getAcknowledgedBy());
         dto.setRequesterSignature(request.getRequesterSignature());
+        dto.setSignatoryName(request.getSignatoryName());
+        dto.setDeliveryNotes(request.getDeliveryNotes());
+        dto.setCompletedAt(request.getCompletedAt());
+        dto.setSigningToken(request.getSigningToken());
+        dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
+        dto.setPdfReportPath(request.getPdfReportPath());
         return dto;
     }
 }

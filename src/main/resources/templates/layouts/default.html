@@ -398,7 +398,7 @@
             </a>
             <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a></li>
-                <li><a class="dropdown-item" href="/assetIQ-pro/resources"><i class="fas fa-clipboard-list"></i> Administration</a></li>
+                <li><a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a></li>
             </ul>
         </div>
 
@@ -414,8 +414,8 @@
             </ul>
         </div>
 
-        <!-- ========== ADMIN DROPDOWN ========== -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN')">
+        <!-- ========== ADMIN DROPDOWN - Updated with proper authorities ========== -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG')">
             <div class="nav-item">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-cog"></i> Admin
@@ -452,7 +452,7 @@
         <div class="nav-divider"></div>
 
         <!-- Driver Dashboard - DRIVER role -->
-        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER')">
+        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
                     <i class="fas fa-tachometer-alt"></i> Driver Dashboard
@@ -461,7 +461,7 @@
         </div>
 
         <!-- Infra Dashboard - INFRA role -->
-        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'REVIEW_INFRA', 'APPROVE_INFRA')">
+        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'INFRA', 'APPROVE_INFRA', 'APPROVE_INFRA_REQUESTS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
                     <i class="fas fa-tachometer-alt"></i> Infra Dashboard
@@ -469,8 +469,8 @@
             </div>
         </div>
 
-        <!-- Assets & Transfers - ADMIN only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN')">
+        <!-- Assets & Transfers - Admin only -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'EDIT_ASSETS', 'VIEW_ALL_TRANSACTIONS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
                     <i class="fas fa-laptop"></i> Assets

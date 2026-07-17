@@ -1,96 +1,110 @@
-// ============================================
-// ResourceRequest Entity
-// ============================================
 package com.stevecodes.AssetIQPro.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "tbl_resource_requests")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "resource_requests")
 public class ResourceRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "request_id")
+    @Column(name = "requestId")
     private Long requestId;
 
-    @Column(name = "user_id")
+    @Column(name = "userId", nullable = false)
     private Long userId;
 
-    @Column(name = "requested_by")
+    @Column(name = "requestedBy")
     private String requestedBy;
 
-    @Column(nullable = false)
-    private String description;
-
-    @Column(name = "request_time", nullable = false)
-    private LocalDateTime requestTime;
-
-    @Column(name = "resource_type")
+    @Column(name = "resourceType", nullable = false)
     private String resourceType;
 
-    @Column(nullable = false)
-    private String status;
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
+    private String description;
 
-    @Column(name = "final_status")
-    private String finalStatus;
+    @Column(name = "quantity")
+    private Integer quantity = 1;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "justification", columnDefinition = "TEXT")
+    private String justification;
 
-    @Column(name = "accepted_at")
+    @Column(name = "requestTime", nullable = false)
+    private LocalDateTime requestTime;
+
+    @Column(name = "status", nullable = false)
+    private String status; // PENDING, ACCEPTED, REJECTED, COMPLETED, RECALLED
+
+    // Admin fields
+    @Column(name = "acceptedAt")
     private LocalDateTime acceptedAt;
 
-    @Column(name = "declined_at")
+    @Column(name = "declinedAt")
     private LocalDateTime declinedAt;
 
-    @Column(name = "declined_reason")
+    @Column(name = "declinedReason")
     private String declinedReason;
 
-    @Column(name = "admin_comment")
+    @Column(name = "adminComment", columnDefinition = "TEXT")
     private String adminComment;
 
-    // Add these fields to ResourceRequest.java
+    // Completion fields
+    @Column(name = "completedAt")
+    private LocalDateTime completedAt;
 
-    @Column(name = "line_manager_id")
-    private Long lineManagerId;
+    @Column(name = "deliveryNotes", columnDefinition = "TEXT")
+    private String deliveryNotes;
 
-    @Column(name = "lm_approved_by")
-    private Long lmApprovedBy;
-
-    @Column(name = "lm_approved_at")
-    private LocalDateTime lmApprovedAt;
-
-    @Column(name = "lm_comment", length = 500)
-    private String lmComment;
-
-    @Column(name = "acknowledged_at")
+    // Acknowledgment fields
+    @Column(name = "acknowledgedAt")
     private LocalDateTime acknowledgedAt;
 
-    @Column(name = "acknowledged_by")
+    @Column(name = "acknowledgedBy")
     private Long acknowledgedBy;
 
-    @Column(name = "requester_signature", columnDefinition = "NVARCHAR(MAX)")
-    private String requesterSignature;
+    @Column(name = "requesterSignature", columnDefinition = "TEXT")
+    private String requesterSignature; // Base64 encoded image
+
+    @Column(name = "signatoryName")
+    private String signatoryName;
+
+    // Signing token fields (for email link)
+    @Column(name = "signingToken")
+    private String signingToken;
+
+    @Column(name = "signingTokenExpiry")
+    private LocalDateTime signingTokenExpiry;
+
+    // PDF report path
+    @Column(name = "pdfReportPath")
+    private String pdfReportPath;
+
+    @Column(name = "createdAt", updatable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
+        if (requestTime == null) {
+            requestTime = LocalDateTime.now();
         }
         if (status == null) {
             status = "PENDING";
         }
-        if (requestTime == null) {
-            requestTime = LocalDateTime.now();
+        if (quantity == null) {
+            quantity = 1;
         }
+    }
+
+    public boolean isSigned() {
+        return requesterSignature != null && !requesterSignature.isEmpty();
     }
 }

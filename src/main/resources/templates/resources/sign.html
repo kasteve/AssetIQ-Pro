@@ -8,7 +8,6 @@
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -30,25 +29,25 @@
     <div class="row g-4 mb-4">
         <div class="col-md-3">
             <div class="stat-card" style="border-left-color: #fd7e14;">
-                <div class="stat-number" th:text="${pendingCount != null ? pendingCount : 0}">0</div>
+                <div class="stat-number" th:text="${pendingCount}">0</div>
                 <div class="stat-label">Pending</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stat-card" style="border-left-color: #198754;">
-                <div class="stat-number" th:text="${acceptedCount != null ? acceptedCount : 0}">0</div>
+                <div class="stat-number" th:text="${acceptedCount}">0</div>
                 <div class="stat-label">Accepted</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stat-card" style="border-left-color: #dc3545;">
-                <div class="stat-number" th:text="${declinedCount != null ? declinedCount : 0}">0</div>
+                <div class="stat-number" th:text="${declinedCount}">0</div>
                 <div class="stat-label">Declined</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stat-card" style="border-left-color: #6610f2;">
-                <div class="stat-number" th:text="${completedCount != null ? completedCount : 0}">0</div>
+                <div class="stat-number" th:text="${completedCount}">0</div>
                 <div class="stat-label">Completed</div>
             </div>
         </div>
@@ -64,22 +63,19 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
                 <i class="fas fa-clock me-1"></i>Pending
-                <span th:if="${pendingCount != null and pendingCount > 0}"
-                      class="badge bg-warning ms-1" th:text="${pendingCount}">0</span>
+                <span th:if="${pendingCount > 0}" class="badge bg-warning ms-1" th:text="${pendingCount}">0</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="accepted-tab" data-bs-toggle="tab" data-bs-target="#accepted" type="button" role="tab">
                 <i class="fas fa-check me-1"></i>Accepted
-                <span th:if="${acceptedCount != null and acceptedCount > 0}"
-                      class="badge bg-success ms-1" th:text="${acceptedCount}">0</span>
+                <span th:if="${acceptedCount > 0}" class="badge bg-success ms-1" th:text="${acceptedCount}">0</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed" type="button" role="tab">
                 <i class="fas fa-check-double me-1"></i>Completed
-                <span th:if="${completedCount != null and completedCount > 0}"
-                      class="badge bg-info ms-1" th:text="${completedCount}">0</span>
+                <span th:if="${completedCount > 0}" class="badge bg-info ms-1" th:text="${completedCount}">0</span>
             </button>
         </li>
     </ul>
@@ -121,12 +117,12 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm action-btn-group" role="group">
-                                    <!-- View Button -->
+                                    <!-- View -->
                                     <button class="btn btn-outline-primary" th:onclick="'viewRequest(' + ${req.requestId} + ')'" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
 
-                                    <!-- PENDING: Accept / Reject -->
+                                    <!-- PENDING: Accept/Reject -->
                                     <th:block th:if="${req.status == 'PENDING'}">
                                         <button class="btn btn-outline-success" th:onclick="'showAdminApprove(' + ${req.requestId} + ')'" title="Accept">
                                             <i class="fas fa-check"></i> Accept
@@ -136,23 +132,23 @@
                                         </button>
                                     </th:block>
 
-                                    <!-- ACCEPTED: Mark Complete -->
+                                    <!-- ACCEPTED: Complete -->
                                     <th:block th:if="${req.status == 'ACCEPTED'}">
-                                        <button class="btn btn-outline-success" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'" title="Mark as Complete">
+                                        <button class="btn btn-outline-success" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'" title="Mark Complete">
                                             <i class="fas fa-check-double"></i> Complete
                                         </button>
                                     </th:block>
 
                                     <!-- COMPLETED: Sign (if not signed) -->
                                     <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature == null}">
-                                        <button class="btn btn-outline-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'" title="Sign Acknowledgement">
+                                        <button class="btn btn-outline-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'" title="Sign">
                                             <i class="fas fa-signature"></i> Sign
                                         </button>
                                     </th:block>
 
-                                    <!-- COMPLETED & SIGNED: Generate PDF -->
+                                    <!-- COMPLETED & SIGNED: Download PDF -->
                                     <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature != null}">
-                                        <button class="btn btn-outline-danger" th:onclick="'generatePDF(' + ${req.requestId} + ')'" title="Generate PDF">
+                                        <button class="btn btn-outline-danger" th:onclick="'downloadPDF(' + ${req.requestId} + ')'" title="Download PDF">
                                             <i class="fas fa-file-pdf"></i> PDF
                                         </button>
                                     </th:block>
@@ -264,7 +260,7 @@
                                         </button>
                                     </th:block>
                                     <th:block th:if="${req.requesterSignature != null}">
-                                        <button class="btn btn-sm btn-danger" th:onclick="'generatePDF(' + ${req.requestId} + ')'">
+                                        <button class="btn btn-sm btn-danger" th:onclick="'downloadPDF(' + ${req.requestId} + ')'">
                                             <i class="fas fa-file-pdf"></i> PDF
                                         </button>
                                     </th:block>
@@ -346,8 +342,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-danger d-none" id="pdfFromModalBtn" onclick="generatePDFFromModal()">
-                        <i class="fas fa-file-pdf"></i> Generate PDF
+                    <button type="button" class="btn btn-danger d-none" id="pdfFromModalBtn" onclick="downloadPDFFromModal()">
+                        <i class="fas fa-file-pdf"></i> Download PDF
                     </button>
                 </div>
             </div>
@@ -500,7 +496,7 @@
         .res-id { color: #9aa0a6; font-weight: 600; }
         .res-user { font-weight: 700; color: var(--ink); }
         .res-type { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; }
-        .res-desc { color: #495057; max-width: 280px; word-break: break-word; }
+        .res-desc { color: #495057; max-width: 280px; }
         .res-date { color: #6c757d; font-variant-numeric: tabular-nums; }
 
         .status-badge { display: inline-block; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; }
@@ -516,9 +512,6 @@
         .action-btn-group .btn-outline-success:hover { background: #198754; border-color: #198754; color: white; }
         .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: white; }
 
-        .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
-        .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
-
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
         .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
@@ -531,7 +524,7 @@
         .signature-pad canvas { width: 100%; height: 150px; border-radius: 6px; cursor: crosshair; background: white; }
         .signature-tools { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 
-        .detail-item { margin-bottom: 12px; }
+        .detail-item { margin-bottom: 10px; }
         .detail-item .label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa0a6; display: block; }
         .detail-item .value { font-size: 14px; color: var(--ink); font-weight: 500; }
 
@@ -560,17 +553,6 @@
             color: white !important;
             border-color: var(--primary-color) !important;
         }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .content { padding: 16px; }
-            .page-header-row { flex-direction: column; align-items: stretch; }
-            .page-header-row h4 { text-align: center; }
-            .page-header-row > div { display: flex; flex-direction: column; gap: 8px; }
-            .page-header-row .btn { width: 100%; }
-            .action-btn-group .btn { font-size: 10px !important; padding: 4px 6px !important; }
-            .res-desc { max-width: 100px; }
-        }
     </style>
 </div>
 
@@ -581,7 +563,14 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-    <script th:inline="none">
+    <script>
+        let currentViewRequestId = null;
+        let canvas = null;
+        let ctx = null;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
         $(document).ready(function() {
             const tableConfig = {
                 pageLength: 10,
@@ -628,8 +617,6 @@
         // ============================================
         // View Request
         // ============================================
-        let currentViewRequestId = null;
-
         function viewRequest(id) {
             currentViewRequestId = id;
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewRequestModal'));
@@ -812,16 +799,12 @@
         function submitMarkComplete() {
             const id = document.getElementById('completeId').value;
             const notes = document.getElementById('completeNotes').value;
-            fetch('/assetIQ-pro/resources/' + id + '/complete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'deliveryNotes=' + encodeURIComponent(notes || '')
+            fetch('/assetIQ-pro/resources/' + id + '/complete?deliveryNotes=' + encodeURIComponent(notes || ''), {
+                method: 'POST'
             })
             .then(response => {
                 if (response.ok) {
-                    alert('✅ Request marked as completed! The requester can now sign the acknowledgment.');
+                    alert('✅ Request marked as completed! The requester will receive a signing link via email.');
                     bootstrap.Modal.getInstance(document.getElementById('markCompleteModal')).hide();
                     window.location.reload();
                 } else {
@@ -834,12 +817,6 @@
         // ============================================
         // Acknowledge Signature
         // ============================================
-        let canvas = null;
-        let ctx = null;
-        let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
-
         function initSignaturePad() {
             canvas = document.getElementById('signatureCanvas');
             if (!canvas) return;
@@ -928,7 +905,8 @@
             }
 
             const dataUrl = canvas.toDataURL('image/png');
-            if (dataUrl === 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') {
+            const emptySignature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+            if (dataUrl === emptySignature) {
                 alert('⚠️ Please draw your signature first.');
                 return;
             }
@@ -960,15 +938,15 @@
         }
 
         // ============================================
-        // Generate PDF
+        // Download PDF
         // ============================================
-        function generatePDF(id) {
-            window.open('/assetIQ-pro/resources/' + id + '/generate-pdf', '_blank');
+        function downloadPDF(id) {
+            window.open('/assetIQ-pro/resources/' + id + '/pdf', '_blank');
         }
 
-        function generatePDFFromModal() {
+        function downloadPDFFromModal() {
             if (currentViewRequestId) {
-                generatePDF(currentViewRequestId);
+                downloadPDF(currentViewRequestId);
             }
         }
     </script>

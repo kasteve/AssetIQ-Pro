@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Error - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center">
+                <div class="card shadow border-danger">
+                    <div class="card-body py-5">
+                        <i class="fas fa-exclamation-triangle text-danger" style="font-size: 64px;"></i>
+                        <h2 class="mt-3 text-danger">Error</h2>
+                        <p class="lead" th:text="${error}">Invalid or expired signing link.</p>
+                        <p class="text-muted">Please contact your administrator for assistance.</p>
+                        <a href="/" class="btn btn-primary mt-3">
+                            <i class="fas fa-home me-2"></i>Go Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

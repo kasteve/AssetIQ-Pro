@@ -23,6 +23,7 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
 import com.stevecodes.AssetIQPro.entity.InfraRequest;
+import com.stevecodes.AssetIQPro.entity.ResourceRequest;
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
@@ -333,6 +334,285 @@ public class PdfGenerationService {
             content.append("Request: ").append(request.getRequestId())
                     .append("\nType: ").append(request.getResourceType())
                     .append("\nStatus: ").append(request.getStatus() != null ? request.getStatus().name() : "PENDING");
+
+            QRCodeWriter qrWriter = new QRCodeWriter();
+            BitMatrix matrix = qrWriter.encode(content.toString(), BarcodeFormat.QR_CODE, 150, 150);
+            BufferedImage image = MatrixToImageWriter.toBufferedImage(matrix);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "PNG", baos);
+
+            ImageData imgData = ImageDataFactory.create(baos.toByteArray());
+            return new Image(imgData);
+
+        } catch (WriterException | java.io.IOException e) {
+            log.warn("QR generation failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // ============================================
+    // Resource Request PDF
+    // ============================================
+
+    public byte[] generateResourceRequestReport(ResourceRequest request) throws Exception {
+        log.info("Generating resource request report for request {}", request.getRequestId());
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(outputStream);
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc, PageSize.A4);
+        document.setMargins(28, 28, 24, 28);
+
+        PdfFont regularFont = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+        PdfFont boldFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+
+        // Header
+        addResourceHeader(document, request, boldFont, regularFont);
+
+        // Request Details
+        addSectionHeading(document, "Request Details", boldFont);
+        Table detailsTable = createResourceDetailsTable(request, boldFont, regularFont);
+        document.add(detailsTable);
+
+        // Approval Timeline
+        addSectionHeading(document, "Approval Timeline", boldFont);
+        Table timelineTable = createResourceTimelineTable(request, boldFont, regularFont);
+        document.add(timelineTable);
+
+        // Signatures
+        addSectionHeading(document, "Signatures", boldFont);
+        Table signatureTable = createResourceSignatureTable(request, boldFont, regularFont);
+        document.add(signatureTable);
+
+        addResourceFooter(document, request, regularFont);
+
+        document.close();
+        log.info("Generated resource request report for request {}", request.getRequestId());
+        return outputStream.toByteArray();
+    }
+
+    private void addResourceHeader(Document document, ResourceRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table header = new Table(UnitValue.createPercentArray(new float[]{1.2f, 4.4f, 2.4f, 1.3f}));
+        header.setWidth(UnitValue.createPercentValue(100));
+
+        Cell brandCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+        brandCell.add(new Paragraph("IQ")
+                .setFont(boldFont).setFontSize(13).setFontColor(WHITE)
+                .setBackgroundColor(NAVY).setPadding(6)
+                .setTextAlignment(TextAlignment.CENTER));
+        header.addCell(brandCell);
+
+        Cell titleCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+        titleCell.add(new Paragraph("RESOURCE REQUEST REPORT")
+                .setFont(boldFont).setFontSize(15).setFontColor(NAVY).setCharacterSpacing(0.8f));
+        titleCell.add(new Paragraph("AssetIQ-Pro — Asset Management System")
+                .setFont(regularFont).setFontSize(8.5f).setFontColor(INK_SOFT));
+        header.addCell(titleCell);
+
+        Cell refCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        String statusText = request.getStatus() != null ? request.getStatus() : "PENDING";
+        refCell.add(new Paragraph("Request #: " + request.getRequestId()).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        refCell.add(new Paragraph("Status: " + statusText).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        refCell.add(new Paragraph("Date: " + formatDateTime(request.getRequestTime())).setFont(regularFont).setFontSize(9).setFontColor(INK_SOFT));
+        header.addCell(refCell);
+
+        Cell qrCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4)
+                .setTextAlignment(TextAlignment.CENTER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        try {
+            Image qrImage = generateResourceQRCode(request);
+            if (qrImage != null) {
+                qrImage.setWidth(46);
+                qrImage.setHeight(46);
+                qrCell.add(qrImage);
+            }
+        } catch (Exception e) {
+            log.warn("QR generation failed: {}", e.getMessage());
+        }
+        header.addCell(qrCell);
+
+        document.add(header);
+
+        LineSeparator line = new LineSeparator(new SolidLine(2f));
+        line.setStrokeColor(NAVY);
+        line.setMarginTop(4);
+        line.setMarginBottom(6);
+        document.add(line);
+    }
+
+    private Table createResourceDetailsTable(ResourceRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 70}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addCell(fieldCell("Request ID", String.valueOf(request.getRequestId()), boldFont, regularFont));
+        table.addCell(fieldCell("Resource Type", request.getResourceType(), boldFont, regularFont));
+        table.addCell(fieldCell("Quantity", String.valueOf(request.getQuantity()), boldFont, regularFont));
+        table.addCell(fieldCell("Status", request.getStatus() != null ? request.getStatus() : "N/A", boldFont, regularFont));
+        table.addCell(fieldCell("Requested At", formatDateTime(request.getRequestTime()), boldFont, regularFont));
+        table.addCell(fieldCell("Requested By", request.getRequestedBy(), boldFont, regularFont));
+        table.addCell(fieldCell("Description", val(request.getDescription()), boldFont, regularFont));
+        table.addCell(fieldCell("Justification", val(request.getJustification()), boldFont, regularFont));
+
+        if (request.getAdminComment() != null) {
+            table.addCell(fieldCell("Admin Comment", request.getAdminComment(), boldFont, regularFont));
+        }
+
+        if (request.getDeliveryNotes() != null) {
+            table.addCell(fieldCell("Delivery Notes", request.getDeliveryNotes(), boldFont, regularFont));
+        }
+
+        return table;
+    }
+
+    private Table createResourceTimelineTable(ResourceRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 40, 30}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addHeaderCell(compareHeaderCell("Stage", boldFont));
+        table.addHeaderCell(compareHeaderCell("Action By", boldFont));
+        table.addHeaderCell(compareHeaderCell("Timestamp", boldFont));
+
+        // Created
+        table.addCell(compareValueCell("Request Created", regularFont));
+        table.addCell(compareValueCell(request.getRequestedBy(), regularFont));
+        table.addCell(compareValueCell(formatDateTime(request.getRequestTime()), regularFont));
+
+        // Accepted
+        if (request.getAcceptedAt() != null) {
+            table.addCell(compareValueCell("Accepted", regularFont));
+            table.addCell(compareValueCell("Administrator", regularFont));
+            table.addCell(compareValueCell(formatDateTime(request.getAcceptedAt()), regularFont));
+        } else {
+            table.addCell(compareValueCell("Accepted", regularFont));
+            table.addCell(compareValueCell("Pending", regularFont));
+            table.addCell(compareValueCell("-", regularFont));
+        }
+
+        // Completed
+        if (request.getCompletedAt() != null) {
+            table.addCell(compareValueCell("Completed", regularFont));
+            table.addCell(compareValueCell("Administrator", regularFont));
+            table.addCell(compareValueCell(formatDateTime(request.getCompletedAt()), regularFont));
+        } else {
+            table.addCell(compareValueCell("Completed", regularFont));
+            table.addCell(compareValueCell("Pending", regularFont));
+            table.addCell(compareValueCell("-", regularFont));
+        }
+
+        // Signed
+        if (request.getAcknowledgedAt() != null) {
+            table.addCell(compareValueCell("Signed", regularFont));
+            table.addCell(compareValueCell(request.getSignatoryName(), regularFont));
+            table.addCell(compareValueCell(formatDateTime(request.getAcknowledgedAt()), regularFont));
+        } else if ("COMPLETED".equals(request.getStatus())) {
+            table.addCell(compareValueCell("Signed", regularFont));
+            table.addCell(compareValueCell("Awaiting Signature", regularFont));
+            table.addCell(compareValueCell("-", regularFont));
+        } else {
+            table.addCell(compareValueCell("Signed", regularFont));
+            table.addCell(compareValueCell("N/A", regularFont));
+            table.addCell(compareValueCell("-", regularFont));
+        }
+
+        return table;
+    }
+
+    private Table createResourceSignatureTable(ResourceRequest request, PdfFont boldFont, PdfFont regularFont) {
+        Table table = new Table(UnitValue.createPercentArray(new float[]{40, 60}));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        table.addHeaderCell(compareHeaderCell("Role", boldFont));
+        table.addHeaderCell(compareHeaderCell("Signature", boldFont));
+
+        // Requester Signature
+        boolean isSigned = request.isSigned();
+
+        Cell nameCell = new Cell().setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f));
+        nameCell.add(new Paragraph("Requester: " + request.getRequestedBy())
+                .setFont(regularFont).setFontSize(10).setFontColor(INK));
+        table.addCell(nameCell);
+
+        Cell sigCell = new Cell().setPadding(7)
+                .setBorder(new SolidBorder(LINE_SOFT, 0.75f));
+
+        Div sigDiv = new Div().setHeight(40)
+                .setBorderBottom(new SolidBorder(INK, 0.75f));
+
+        if (isSigned && request.getRequesterSignature() != null) {
+            try {
+                String clean = request.getRequesterSignature().startsWith("data:image")
+                        ? request.getRequesterSignature().substring(request.getRequesterSignature().indexOf(",") + 1)
+                        : request.getRequesterSignature();
+                byte[] sigBytes = Base64.getDecoder().decode(clean);
+                ImageData sigData = ImageDataFactory.create(sigBytes);
+                Image sigImage = new Image(sigData);
+                sigImage.setMaxHeight(36);
+                sigImage.setMaxWidth(200);
+                sigDiv.add(sigImage);
+            } catch (Exception e) {
+                log.warn("Could not decode signature: {}", e.getMessage());
+                sigDiv.add(new Paragraph("✓ Signed").setFont(boldFont).setFontSize(12).setFontColor(GOOD));
+            }
+        } else if ("COMPLETED".equals(request.getStatus())) {
+            sigDiv.add(new Paragraph("________________________")
+                    .setFont(regularFont).setFontSize(10).setFontColor(MUTED));
+        } else {
+            sigDiv.add(new Paragraph("Not required")
+                    .setFont(regularFont).setFontSize(10).setFontColor(MUTED));
+        }
+        sigCell.add(sigDiv);
+
+        if (isSigned && request.getAcknowledgedAt() != null) {
+            sigCell.add(new Paragraph("Signed by: " + request.getSignatoryName())
+                    .setFont(regularFont).setFontSize(8).setFontColor(INK_SOFT));
+            sigCell.add(new Paragraph("Signed on: " + formatDateTime(request.getAcknowledgedAt()))
+                    .setFont(regularFont).setFontSize(8).setFontColor(INK_SOFT));
+        } else if ("COMPLETED".equals(request.getStatus())) {
+            sigCell.add(new Paragraph("Awaiting signature")
+                    .setFont(regularFont).setFontSize(8).setFontColor(MUTED));
+        } else {
+            sigCell.add(new Paragraph("N/A")
+                    .setFont(regularFont).setFontSize(8).setFontColor(MUTED));
+        }
+
+        table.addCell(sigCell);
+
+        return table;
+    }
+
+    private void addResourceFooter(Document document, ResourceRequest request, PdfFont regularFont) {
+        LineSeparator line = new LineSeparator(new SolidLine(0.75f));
+        line.setStrokeColor(LINE_SOFT);
+        line.setMarginTop(10);
+        line.setMarginBottom(4);
+        document.add(line);
+
+        Table footer = new Table(UnitValue.createPercentArray(new float[]{1, 1}));
+        footer.setWidth(UnitValue.createPercentValue(100));
+
+        Cell left = new Cell().setBorder(Border.NO_BORDER).setPadding(2);
+        left.add(new Paragraph("Request #" + request.getRequestId() + "  ·  Generated " +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")))
+                .setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
+        footer.addCell(left);
+
+        Cell right = new Cell().setBorder(Border.NO_BORDER).setPadding(2).setTextAlignment(TextAlignment.RIGHT);
+        right.add(new Paragraph("AssetIQ-Pro").setFont(regularFont).setFontSize(7.5f).setFontColor(INK_SOFT));
+        footer.addCell(right);
+
+        document.add(footer);
+    }
+
+    private Image generateResourceQRCode(ResourceRequest request) {
+        try {
+            StringBuilder content = new StringBuilder();
+            content.append("Request: ").append(request.getRequestId())
+                    .append("\nType: ").append(request.getResourceType())
+                    .append("\nStatus: ").append(request.getStatus() != null ? request.getStatus() : "PENDING");
 
             QRCodeWriter qrWriter = new QRCodeWriter();
             BitMatrix matrix = qrWriter.encode(content.toString(), BarcodeFormat.QR_CODE, 150, 150);

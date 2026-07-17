@@ -1,15 +1,22 @@
 package com.stevecodes.AssetIQPro.controller;
 
-import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
+import com.stevecodes.AssetIQPro.entity.ResourceRequest;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.ResourceRequestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 @Slf4j
@@ -21,58 +28,114 @@ public class ResourceViewController {
     private final ResourceRequestService resourceRequestService;
     private final AppUserService userService;
 
-    @GetMapping
-    public String resources(Model model) {
-        log.info("Loading administration resources page");
-        model.addAttribute("resourceRequests", resourceRequestService.getAllResourceRequests());
+    @GetMapping("/list")
+    public String listResourceRequests(Model model) {
+        log.info("Displaying resource requests list");
+
+        List<ResourceRequestDTO> allRequests = resourceRequestService.getAllResourceRequests();
+        List<ResourceRequestDTO> pendingRequests = resourceRequestService.getPendingResourceRequests();
+        List<ResourceRequestDTO> acceptedRequests = resourceRequestService.getAcceptedResourceRequests();
+        List<ResourceRequestDTO> completedRequests = resourceRequestService.getCompletedResourceRequests();
+
+        long pendingCount = resourceRequestService.countPendingRequests();
+        long acceptedCount = resourceRequestService.countAcceptedRequests();
+        long declinedCount = resourceRequestService.countDeclinedRequests();
+        long completedCount = resourceRequestService.countCompletedRequests();
+
+        model.addAttribute("resourceRequests", allRequests);
+        model.addAttribute("pendingRequests", pendingRequests);
+        model.addAttribute("acceptedRequests", acceptedRequests);
+        model.addAttribute("completedRequests", completedRequests);
+
+        model.addAttribute("pendingCount", pendingCount);
+        model.addAttribute("acceptedCount", acceptedCount);
+        model.addAttribute("declinedCount", declinedCount);
+        model.addAttribute("completedCount", completedCount);
+
         return "resources/list";
     }
 
-    @PostMapping("/request")
-    public String requestResource(@RequestParam Long userId,
-                                  @RequestParam String resourceType,
-                                  @RequestParam String description,
-                                  @RequestParam(required = false) Integer quantity,
+    @GetMapping("/{id}")
+    @ResponseBody
+    public ResourceRequestDTO viewRequest(@PathVariable Long id) {
+        log.info("Fetching resource request: {}", id);
+        return resourceRequestService.getResourceRequestById(id);
+    }
+
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) {
+        try {
+            log.info("Downloading PDF for resource request: {}", id);
+
+            ResourceRequestDTO request = resourceRequestService.getResourceRequestById(id);
+
+            if (request.getPdfReportPath() == null) {
+                log.warn("PDF not found for request: {}", id);
+                return ResponseEntity.notFound().build();
+            }
+
+            Path pdfPath = Paths.get(request.getPdfReportPath());
+            byte[] pdfBytes = Files.readAllBytes(pdfPath);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "resource-request-" + id + ".pdf");
+
+            return ResponseEntity.ok().headers(headers).body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Error downloading PDF for request {}: {}", id, e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/sign")
+    public String showSignPage(@RequestParam String token, Model model) {
+        try {
+            log.info("Sign page accessed with token: {}", token);
+            ResourceRequest request = resourceRequestService.getResourceRequestBySigningToken(token);
+
+            String requesterName = userService.getUserById(request.getUserId())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+
+            model.addAttribute("request", request);
+            model.addAttribute("requesterName", requesterName);
+            model.addAttribute("token", token);
+            model.addAttribute("alreadySigned", request.isSigned());
+
+            return "resources/sign";
+        } catch (Exception e) {
+            log.error("Error validating token: {}", e.getMessage(), e);
+            model.addAttribute("error", "Invalid or expired signing link: " + e.getMessage());
+            return "resources/sign-error";
+        }
+    }
+
+    @PostMapping("/sign")
+    public String submitSignature(@RequestParam Long requestId,
+                                  @RequestParam String token,
+                                  @RequestParam String signature,
+                                  @RequestParam String signatoryName,
                                   RedirectAttributes redirectAttributes) {
         try {
-            String requestedBy = userService.getUserById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"))
-                    .getUsername();
-
-            resourceRequestService.createResourceRequest(userId, requestedBy, description, resourceType, quantity);
-            redirectAttributes.addFlashAttribute("success", "Resource requested successfully!");
+            log.info("Submitting signature for request: {}, token: {}", requestId, token);
+            resourceRequestService.saveRequesterSignature(requestId, token, signature, signatoryName);
+            redirectAttributes.addFlashAttribute("message", "Thank you! Request completed successfully.");
+            return "redirect:/resources/sign-thankyou";
         } catch (Exception e) {
-            log.error("Error requesting resource: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to request resource.");
+            log.error("Error submitting signature: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to submit signature: " + e.getMessage());
+            return "redirect:/resources/sign-error";
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
-    @PostMapping("/{requestId}/accept")
-    public String acceptResourceRequest(@PathVariable Long requestId,
-                                        @RequestParam(required = false) String adminComment,
-                                        RedirectAttributes redirectAttributes) {
-        try {
-            resourceRequestService.acceptResourceRequest(requestId, adminComment);
-            redirectAttributes.addFlashAttribute("success", "Resource request accepted.");
-        } catch (Exception e) {
-            log.error("Error accepting resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to accept request.");
-        }
-        return "redirect:/resources";
+    @GetMapping("/sign-thankyou")
+    public String signThankyou() {
+        return "resources/sign-thankyou";
     }
 
-    @PostMapping("/{requestId}/decline")
-    public String declineResourceRequest(@PathVariable Long requestId,
-                                         @RequestParam String declinedReason,
-                                         RedirectAttributes redirectAttributes) {
-        try {
-            resourceRequestService.declineResourceRequest(requestId, declinedReason);
-            redirectAttributes.addFlashAttribute("success", "Resource request declined.");
-        } catch (Exception e) {
-            log.error("Error declining resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to decline request.");
-        }
-        return "redirect:/resources";
+    @GetMapping("/sign-error")
+    public String signError() {
+        return "resources/sign-error";
     }
 }

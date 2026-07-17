@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.config;
 
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.Permission;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import com.stevecodes.AssetIQPro.security.CustomUserDetailsService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,7 +51,6 @@ public class SecurityConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve files from the uploads directory with context path
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:./uploads/");
     }
@@ -75,9 +75,12 @@ public class SecurityConfig implements WebMvcConfigurer {
                     session.setAttribute("mustChangePassword", user.isMustChangePassword());
 
                     java.util.List<String> permissionNames = user.getPermissions().stream()
-                            .map(p -> p.getPermissionName())
+                            .map(Permission::getPermissionName)
                             .collect(java.util.stream.Collectors.toList());
                     session.setAttribute("permissionNames", permissionNames);
+
+                    // Log authorities for debugging
+                    System.out.println("User: " + username + " has permissions: " + permissionNames);
                 }
 
                 response.sendRedirect("/assetIQ-pro/dashboard");
