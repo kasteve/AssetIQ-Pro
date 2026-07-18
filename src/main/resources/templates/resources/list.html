@@ -626,7 +626,7 @@
         });
 
         // ============================================
-        // View Request
+        // View Request - REST API
         // ============================================
         let currentViewRequestId = null;
 
@@ -746,7 +746,7 @@
         }
 
         // ============================================
-        // Admin Approve
+        // Admin Approve - REST API
         // ============================================
         function showAdminApprove(id) {
             document.getElementById('adminApproveId').value = id;
@@ -757,7 +757,7 @@
         function submitAdminApprove() {
             const id = document.getElementById('adminApproveId').value;
             const comment = document.getElementById('adminApproveComment').value;
-            fetch('/assetIQ-pro/resources/' + id + '/accept?adminComment=' + encodeURIComponent(comment || ''), {
+            fetch('/assetIQ-pro/api/resource-requests/' + id + '/accept?adminComment=' + encodeURIComponent(comment || ''), {
                 method: 'POST'
             })
             .then(response => {
@@ -773,7 +773,7 @@
         }
 
         // ============================================
-        // Admin Reject
+        // Admin Reject - REST API
         // ============================================
         function showAdminReject(id) {
             document.getElementById('adminRejectId').value = id;
@@ -785,7 +785,7 @@
             const id = document.getElementById('adminRejectId').value;
             const reason = document.getElementById('adminRejectReason').value;
             if (!reason.trim()) { alert('⚠️ Reason is required!'); return; }
-            fetch('/assetIQ-pro/resources/' + id + '/decline?declinedReason=' + encodeURIComponent(reason), {
+            fetch('/assetIQ-pro/api/resource-requests/' + id + '/decline?declinedReason=' + encodeURIComponent(reason), {
                 method: 'POST'
             })
             .then(response => {
@@ -801,7 +801,7 @@
         }
 
         // ============================================
-        // Mark Complete
+        // Mark Complete - REST API (FIXED)
         // ============================================
         function showMarkComplete(id) {
             document.getElementById('completeId').value = id;
@@ -812,16 +812,14 @@
         function submitMarkComplete() {
             const id = document.getElementById('completeId').value;
             const notes = document.getElementById('completeNotes').value;
-            fetch('/assetIQ-pro/resources/' + id + '/complete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'deliveryNotes=' + encodeURIComponent(notes || '')
+
+            // Using the REST API endpoint
+            fetch('/assetIQ-pro/api/resource-requests/' + id + '/complete?deliveryNotes=' + encodeURIComponent(notes || ''), {
+                method: 'POST'
             })
             .then(response => {
                 if (response.ok) {
-                    alert('✅ Request marked as completed! The requester can now sign the acknowledgment.');
+                    alert('✅ Request marked as completed! The requester will receive a signing link via email.');
                     bootstrap.Modal.getInstance(document.getElementById('markCompleteModal')).hide();
                     window.location.reload();
                 } else {
@@ -832,7 +830,7 @@
         }
 
         // ============================================
-        // Acknowledge Signature
+        // Acknowledge Signature - REST API
         // ============================================
         let canvas = null;
         let ctx = null;
@@ -940,7 +938,7 @@
             formData.append('signature', dataUrl);
             formData.append('signatoryName', signatoryName);
 
-            fetch('/assetIQ-pro/resources/' + id + '/acknowledge', {
+            fetch('/assetIQ-pro/api/resource-requests/' + id + '/acknowledge', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -963,7 +961,7 @@
         // Generate PDF
         // ============================================
         function generatePDF(id) {
-            window.open('/assetIQ-pro/resources/' + id + '/generate-pdf', '_blank');
+            window.open('/assetIQ-pro/resources/' + id + '/pdf', '_blank');
         }
 
         function generatePDFFromModal() {

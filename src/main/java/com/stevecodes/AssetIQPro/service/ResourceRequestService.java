@@ -271,12 +271,23 @@ public class ResourceRequestService {
 
         ResourceRequest request = validateRequest(requestId);
 
-        if (!token.equals(request.getSigningToken())) {
+        // Validate token
+        if (request.getSigningToken() == null || !request.getSigningToken().equals(token)) {
+            log.error("Invalid token. Expected: {}, Got: {}", request.getSigningToken(), token);
             throw new RuntimeException("Invalid token");
         }
+
+        // Check token expiry
         if (request.getSigningTokenExpiry() == null ||
                 request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
+            log.error("Token expired. Expiry: {}, Now: {}", request.getSigningTokenExpiry(), LocalDateTime.now());
             throw new RuntimeException("Token has expired");
+        }
+
+        // Check if already signed
+        if (request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty()) {
+            log.warn("Request {} already signed", requestId);
+            throw new RuntimeException("Request has already been signed");
         }
 
         request.setRequesterSignature(signature);
@@ -293,12 +304,13 @@ public class ResourceRequestService {
             log.info("PDF regenerated with signature for request: {}", requestId);
         } catch (Exception e) {
             log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
+            // Continue even if PDF generation fails
         }
 
         resourceRequestRepository.save(request);
 
         auditService.logAction("RESOURCE_REQUEST_SIGNED",
-                "Resource request signed by: " + signatoryName,
+                "Resource request signed by: " + signatoryName + " for request: " + requestId,
                 request.getUserId());
     }
 

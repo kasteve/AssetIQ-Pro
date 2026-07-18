@@ -91,8 +91,35 @@ public class ResourceViewController {
     @GetMapping("/sign")
     public String showSignPage(@RequestParam String token, Model model) {
         try {
-            log.info("Sign page accessed with token: {}", token);
+            log.info("========== SIGN PAGE ACCESSED ==========");
+            log.info("Token received: {}", token);
+
             ResourceRequest request = resourceRequestService.getResourceRequestBySigningToken(token);
+
+            if (request == null) {
+                log.error("No request found for token: {}", token);
+                model.addAttribute("error", "Invalid signing link. Please contact your administrator.");
+                return "resources/sign-error";
+            }
+
+            log.info("Request found: ID={}, Status={}", request.getRequestId(), request.getStatus());
+            log.info("Token expiry: {}, Current time: {}", request.getSigningTokenExpiry(), java.time.LocalDateTime.now());
+
+            // Check if token is expired
+            if (request.getSigningTokenExpiry() != null &&
+                    request.getSigningTokenExpiry().isBefore(java.time.LocalDateTime.now())) {
+                log.error("Token expired for request: {}", request.getRequestId());
+                model.addAttribute("error", "This signing link has expired. Please request a new one from the administrator.");
+                return "resources/sign-error";
+            }
+
+            // Check if already signed
+            if (request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty()) {
+                log.info("Request {} already signed", request.getRequestId());
+                model.addAttribute("alreadySigned", true);
+                model.addAttribute("request", request);
+                return "resources/sign";
+            }
 
             String requesterName = userService.getUserById(request.getUserId())
                     .map(user -> user.getFullName())
@@ -101,8 +128,9 @@ public class ResourceViewController {
             model.addAttribute("request", request);
             model.addAttribute("requesterName", requesterName);
             model.addAttribute("token", token);
-            model.addAttribute("alreadySigned", request.isSigned());
+            model.addAttribute("alreadySigned", false);
 
+            log.info("Sign page rendered successfully for request: {}", request.getRequestId());
             return "resources/sign";
         } catch (Exception e) {
             log.error("Error validating token: {}", e.getMessage(), e);
