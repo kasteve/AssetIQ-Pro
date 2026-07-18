@@ -35,6 +35,10 @@ public class BookingDTO {
     private LocalDateTime declinedAt;
     private String declinedReason;
 
+    // Server Room Comments
+    private String infraComment;
+    private String requesterComment;
+
     // Signout fields
     private String signoutToken;
     private LocalDateTime signoutTokenExpiry;

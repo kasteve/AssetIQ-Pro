@@ -41,6 +41,10 @@ public class UserRequestController {
     private final BookingRepository bookingRepository;
     private final AppUserService userService;
 
+    // ============================================
+    // Dashboard
+    // ============================================
+
     @GetMapping("/bookings-dashboard")
     public String myRequests(HttpSession session, Model model) {
         Long userId = (Long) session.getAttribute("userId");
@@ -391,6 +395,10 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
+    // ============================================
+    // Slot Request Response
+    // ============================================
+
     @GetMapping("/slot-request/{bookingId}/respond")
     public String showSlotRequestResponse(@PathVariable Long bookingId,
                                           @RequestParam Long requesterId,
@@ -433,8 +441,6 @@ public class UserRequestController {
         }
     }
 
-    // Add these methods to UserRequestController.java
-
     @PostMapping("/slot-request/{bookingId}/approve")
     public String approveSlotRequest(@PathVariable Long bookingId,
                                      @RequestParam Long requesterId,
@@ -470,16 +476,180 @@ public class UserRequestController {
     }
 
     @GetMapping("/slot-request/thankyou")
-    public String slotRequestThankYou(Model model, RedirectAttributes redirectAttributes) {
-        log.info("Showing slot request thank you page");
+    public String slotRequestThankYou() {
         return "bookings/slot-request-thankyou";
     }
 
     @GetMapping("/slot-request/error")
-    public String slotRequestError(Model model, RedirectAttributes redirectAttributes) {
-        log.info("Showing slot request error page");
+    public String slotRequestError() {
         return "bookings/slot-request-error";
     }
+
+    // ============================================
+    // Server Room - Infrastructure Approval
+    // ============================================
+
+    @GetMapping("/server-room/{bookingId}/respond")
+    public String showServerRoomResponse(@PathVariable Long bookingId,
+                                         @RequestParam(required = false) String action,
+                                         Model model) {
+        try {
+            log.info("Showing server room response page for booking: {}", bookingId);
+
+            Booking booking = bookingService.getBookingById(bookingId);
+            Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
+            String roomName = room != null ? room.getRoomName() : "Server Room";
+
+            String requesterName = userService.getUserById(booking.getUserId())
+                    .map(AppUser::getFullName)
+                    .orElse("Unknown User");
+
+            String timeSlot = booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                    " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+
+            model.addAttribute("booking", booking);
+            model.addAttribute("bookingId", bookingId);
+            model.addAttribute("roomName", roomName);
+            model.addAttribute("requesterName", requesterName);
+            model.addAttribute("timeSlot", timeSlot);
+            model.addAttribute("purpose", booking.getPurpose());
+            model.addAttribute("action", action);
+
+            return "bookings/server-room-approval";
+        } catch (Exception e) {
+            log.error("Error showing server room response: {}", e.getMessage());
+            model.addAttribute("error", "Failed to load server room request details.");
+            return "bookings/server-room-error";
+        }
+    }
+
+    @PostMapping("/server-room/{bookingId}/approve")
+    public String approveServerRoom(@PathVariable Long bookingId,
+                                    @RequestParam(required = false) String infraComment,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            Long userId = (Long) session.getAttribute("userId");
+            log.info("User {} approving server room booking: {}", userId, bookingId);
+
+            bookingService.approveServerRoom(bookingId, userId, infraComment);
+
+            redirectAttributes.addFlashAttribute("message", "Server room booking approved successfully!");
+            return "redirect:/bookings/server-room/thankyou";
+        } catch (Exception e) {
+            log.error("Error approving server room: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to approve server room: " + e.getMessage());
+            return "redirect:/bookings/server-room/error";
+        }
+    }
+
+    @PostMapping("/server-room/{bookingId}/decline")
+    public String declineServerRoom(@PathVariable Long bookingId,
+                                    @RequestParam String declinedReason,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            Long userId = (Long) session.getAttribute("userId");
+            log.info("User {} declining server room booking: {} - Reason: {}", userId, bookingId, declinedReason);
+
+            bookingService.declineServerRoom(bookingId, userId, declinedReason);
+
+            redirectAttributes.addFlashAttribute("message", "Server room booking declined successfully.");
+            return "redirect:/bookings/server-room/thankyou";
+        } catch (Exception e) {
+            log.error("Error declining server room: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to decline server room: " + e.getMessage());
+            return "redirect:/bookings/server-room/error";
+        }
+    }
+
+    @PostMapping("/server-room/{bookingId}/signout-link")
+    public String generateServerRoomSignOutLink(@PathVariable Long bookingId,
+                                                @RequestParam(required = false) String infraComment,
+                                                HttpSession session,
+                                                RedirectAttributes redirectAttributes) {
+        try {
+            Long userId = (Long) session.getAttribute("userId");
+            log.info("User {} generating sign-out link for server room booking: {}", userId, bookingId);
+
+            String link = bookingService.generateServerRoomSignOutLink(bookingId, userId, infraComment);
+
+            redirectAttributes.addFlashAttribute("message", "Sign-out link generated and sent to requester!");
+            return "redirect:/bookings/server-room/thankyou";
+        } catch (Exception e) {
+            log.error("Error generating sign-out link: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to generate sign-out link: " + e.getMessage());
+            return "redirect:/bookings/server-room/error";
+        }
+    }
+
+    @GetMapping("/server-room/sign-out")
+    public String showServerRoomSignOut(@RequestParam String token, Model model) {
+        log.info("Showing server room sign-out page for token: {}", token);
+        Booking booking = bookingService.findBySignoutToken(token);
+
+        if (booking == null) {
+            model.addAttribute("error", "Invalid or expired sign-out link.");
+            return "bookings/server-room-error";
+        }
+
+        if (booking.getSignoutTokenExpiry() != null &&
+                booking.getSignoutTokenExpiry().isBefore(LocalDateTime.now())) {
+            model.addAttribute("error", "Sign-out link has expired. Please request a new one.");
+            return "bookings/server-room-error";
+        }
+
+        Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
+        String roomName = room != null ? room.getRoomName() : "Server Room";
+
+        model.addAttribute("token", token);
+        model.addAttribute("booking", booking);
+        model.addAttribute("roomName", roomName);
+        model.addAttribute("bookingId", booking.getBookingId());
+        return "bookings/server-room-signout";
+    }
+
+    @PostMapping("/server-room/sign-out")
+    public String completeServerRoomSignOut(@RequestParam String token,
+                                            @RequestParam String signature,
+                                            @RequestParam(required = false) String requesterComment,
+                                            RedirectAttributes redirectAttributes) {
+        try {
+            log.info("Completing server room sign-out for token: {}", token);
+            bookingService.completeServerRoomSignOut(token, signature, requesterComment);
+
+            redirectAttributes.addFlashAttribute("message", "Server room sign-out completed successfully. Thank you!");
+            return "redirect:/bookings/server-room/signout-thankyou";
+        } catch (Exception e) {
+            log.error("Error completing sign-out: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to sign out: " + e.getMessage());
+            return "redirect:/bookings/server-room/signout-error";
+        }
+    }
+
+    @GetMapping("/server-room/thankyou")
+    public String serverRoomThankYou() {
+        return "bookings/server-room-thankyou";
+    }
+
+    @GetMapping("/server-room/error")
+    public String serverRoomError() {
+        return "bookings/server-room-error";
+    }
+
+    @GetMapping("/server-room/signout-thankyou")
+    public String signOutThankYou() {
+        return "bookings/server-room-signout-thankyou";
+    }
+
+    @GetMapping("/server-room/signout-error")
+    public String signOutError() {
+        return "bookings/server-room-signout-error";
+    }
+
+    // ============================================
+    // Admin - Cancel Booking
+    // ============================================
 
     @PostMapping("/admin/booking/{bookingId}/cancel")
     public String adminCancelBooking(@PathVariable Long bookingId,
@@ -495,92 +665,5 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("error", "Failed to cancel booking: " + e.getMessage());
         }
         return "redirect:/bookings/bookings-dashboard";
-    }
-
-    // ============================================
-    // Server Room - Infrastructure Approval
-    // ============================================
-
-    @PostMapping("/server-room/{bookingId}/approve")
-    public String approveServerRoom(@PathVariable Long bookingId,
-                                    @RequestParam String comment,
-                                    HttpSession session,
-                                    RedirectAttributes redirectAttributes) {
-        try {
-            Long userId = (Long) session.getAttribute("userId");
-            log.info("User {} approving server room booking: {}", userId, bookingId);
-            bookingService.approveServerRoom(bookingId, userId, comment);
-            redirectAttributes.addFlashAttribute("success", "Server room booking approved successfully!");
-        } catch (Exception e) {
-            log.error("Error approving server room: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to approve server room.");
-        }
-        return "redirect:/admin/server-room-requests";
-    }
-
-    @PostMapping("/server-room/{bookingId}/decline")
-    public String declineServerRoom(@PathVariable Long bookingId,
-                                    @RequestParam String reason,
-                                    HttpSession session,
-                                    RedirectAttributes redirectAttributes) {
-        try {
-            Long userId = (Long) session.getAttribute("userId");
-            log.info("User {} declining server room booking: {} - Reason: {}", userId, bookingId, reason);
-            bookingService.declineServerRoom(bookingId, userId, reason);
-            redirectAttributes.addFlashAttribute("success", "Server room booking declined successfully!");
-        } catch (Exception e) {
-            log.error("Error declining server room: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to decline server room.");
-        }
-        return "redirect:/admin/server-room-requests";
-    }
-
-    @PostMapping("/server-room/{bookingId}/signout")
-    public String generateServerRoomSignOut(@PathVariable Long bookingId,
-                                            HttpSession session,
-                                            RedirectAttributes redirectAttributes) {
-        try {
-            Long userId = (Long) session.getAttribute("userId");
-            log.info("User {} generating sign-out link for server room booking: {}", userId, bookingId);
-            String link = bookingService.generateServerRoomSignOutLink(bookingId, userId);
-            redirectAttributes.addFlashAttribute("success", "Sign-out link generated and sent to requester: " + link);
-        } catch (Exception e) {
-            log.error("Error generating sign-out link: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to generate sign-out link.");
-        }
-        return "redirect:/admin/server-room-requests";
-    }
-
-    @GetMapping("/server-room/sign-out")
-    public String showServerRoomSignOut(@RequestParam String token, Model model) {
-        log.info("Showing server room sign-out page for token: {}", token);
-        model.addAttribute("token", token);
-        return "bookings/server-room-signout";
-    }
-
-    @PostMapping("/server-room/sign-out")
-    public String completeServerRoomSignOut(@RequestParam String token,
-                                            @RequestParam String signature,
-                                            RedirectAttributes redirectAttributes) {
-        try {
-            log.info("Completing server room sign-out for token: {}", token);
-            bookingService.completeServerRoomSignOut(token, signature);
-            redirectAttributes.addFlashAttribute("message", "Server room sign-out completed successfully. Thank you!");
-            return "redirect:/bookings/server-room/signout-thankyou";
-        } catch (Exception e) {
-            log.error("Error completing sign-out: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to sign out: " + e.getMessage());
-            return "redirect:/bookings/server-room/signout-error";
-        }
-    }
-
-    @GetMapping("/server-room/signout-thankyou")
-    public String signOutThankYou() {
-        return "bookings/server-room-signout-thankyou";
-    }
-
-    @GetMapping("/server-room/signout-error")
-    public String signOutError() {
-        return "bookings/server-room-signout-error";
     }
 }

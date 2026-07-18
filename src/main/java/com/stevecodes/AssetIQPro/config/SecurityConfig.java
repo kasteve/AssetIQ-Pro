@@ -123,7 +123,12 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/bookings/driver/**",
                                 "/bookings/driver-requests",
                                 "/bookings/slot-request/**",
-                                "/uploads/**"
+                                "/uploads/**",
+                                "/bookings/server-room/**",
+                                "/bookings/server-room/thankyou",
+                                "/bookings/server-room/error",
+                                "/bookings/server-room/signout-thankyou",
+                                "/bookings/server-room/signout-error"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

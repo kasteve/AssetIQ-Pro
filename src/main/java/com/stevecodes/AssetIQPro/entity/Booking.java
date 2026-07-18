@@ -66,6 +66,13 @@ public class Booking {
     @Column(name = "declined_reason")
     private String declinedReason;
 
+    // Server Room Comments
+    @Column(name = "infra_comment", columnDefinition = "TEXT")
+    private String infraComment;
+
+    @Column(name = "requester_comment", columnDefinition = "TEXT")
+    private String requesterComment;
+
     @Column(name = "signout_token")
     private String signoutToken;
 
