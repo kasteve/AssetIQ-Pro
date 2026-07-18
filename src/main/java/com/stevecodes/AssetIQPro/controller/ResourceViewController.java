@@ -4,6 +4,7 @@ import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
 import com.stevecodes.AssetIQPro.entity.ResourceRequest;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.ResourceRequestService;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -28,6 +30,31 @@ public class ResourceViewController {
     private final ResourceRequestService resourceRequestService;
     private final AppUserService userService;
 
+    // ============================================
+    // Create Resource Request - POST
+    // ============================================
+    @PostMapping("/request")
+    public String createResourceRequest(@RequestParam Long userId,
+                                        @RequestParam String requestedBy,
+                                        @RequestParam String resourceType,
+                                        @RequestParam String description,
+                                        @RequestParam(required = false, defaultValue = "1") Integer quantity,
+                                        @RequestParam(required = false) String justification,
+                                        RedirectAttributes redirectAttributes) {
+        try {
+            log.info("Creating resource request for user: {}", userId);
+            resourceRequestService.createResourceRequest(userId, requestedBy, description, resourceType, quantity, justification);
+            redirectAttributes.addFlashAttribute("success", "✅ Resource request created successfully!");
+        } catch (Exception e) {
+            log.error("Error creating resource request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "❌ Failed to create resource request: " + e.getMessage());
+        }
+        return "redirect:/resources/list";
+    }
+
+    // ============================================
+    // List Page
+    // ============================================
     @GetMapping("/list")
     public String listResourceRequests(Model model) {
         log.info("Displaying resource requests list");
@@ -46,7 +73,6 @@ public class ResourceViewController {
         model.addAttribute("pendingRequests", pendingRequests);
         model.addAttribute("acceptedRequests", acceptedRequests);
         model.addAttribute("completedRequests", completedRequests);
-
         model.addAttribute("pendingCount", pendingCount);
         model.addAttribute("acceptedCount", acceptedCount);
         model.addAttribute("declinedCount", declinedCount);
@@ -55,6 +81,9 @@ public class ResourceViewController {
         return "resources/list";
     }
 
+    // ============================================
+    // View Request - REST API
+    // ============================================
     @GetMapping("/{id}")
     @ResponseBody
     public ResourceRequestDTO viewRequest(@PathVariable Long id) {
@@ -62,6 +91,9 @@ public class ResourceViewController {
         return resourceRequestService.getResourceRequestById(id);
     }
 
+    // ============================================
+    // Download PDF
+    // ============================================
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) {
         try {
@@ -75,6 +107,11 @@ public class ResourceViewController {
             }
 
             Path pdfPath = Paths.get(request.getPdfReportPath());
+            if (!Files.exists(pdfPath)) {
+                log.warn("PDF file not found at path: {}", pdfPath);
+                return ResponseEntity.notFound().build();
+            }
+
             byte[] pdfBytes = Files.readAllBytes(pdfPath);
 
             HttpHeaders headers = new HttpHeaders();
@@ -88,6 +125,9 @@ public class ResourceViewController {
         }
     }
 
+    // ============================================
+    // Sign Page - Standalone (No Sidebar)
+    // ============================================
     @GetMapping("/sign")
     public String showSignPage(@RequestParam String token, Model model) {
         try {
@@ -103,17 +143,14 @@ public class ResourceViewController {
             }
 
             log.info("Request found: ID={}, Status={}", request.getRequestId(), request.getStatus());
-            log.info("Token expiry: {}, Current time: {}", request.getSigningTokenExpiry(), java.time.LocalDateTime.now());
 
-            // Check if token is expired
             if (request.getSigningTokenExpiry() != null &&
-                    request.getSigningTokenExpiry().isBefore(java.time.LocalDateTime.now())) {
+                    request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
                 log.error("Token expired for request: {}", request.getRequestId());
                 model.addAttribute("error", "This signing link has expired. Please request a new one from the administrator.");
                 return "resources/sign-error";
             }
 
-            // Check if already signed
             if (request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty()) {
                 log.info("Request {} already signed", request.getRequestId());
                 model.addAttribute("alreadySigned", true);
@@ -139,15 +176,26 @@ public class ResourceViewController {
         }
     }
 
+    // ============================================
+    // Submit Signature
+    // ============================================
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Long requestId,
                                   @RequestParam String token,
                                   @RequestParam String signature,
-                                  @RequestParam String signatoryName,
                                   RedirectAttributes redirectAttributes) {
         try {
             log.info("Submitting signature for request: {}, token: {}", requestId, token);
+
+            ResourceRequest request = resourceRequestService.getResourceRequestEntityById(requestId);
+            String signatoryName = userService.getUserById(request.getUserId())
+                    .map(user -> user.getFullName())
+                    .orElse("Unknown");
+
+            log.info("Signatory name auto-captured: {}", signatoryName);
+
             resourceRequestService.saveRequesterSignature(requestId, token, signature, signatoryName);
+
             redirectAttributes.addFlashAttribute("message", "Thank you! Request completed successfully.");
             return "redirect:/resources/sign-thankyou";
         } catch (Exception e) {
@@ -157,11 +205,34 @@ public class ResourceViewController {
         }
     }
 
+    // ============================================
+    // Resend Signing Link (Reminder)
+    // ============================================
+    @PostMapping("/{id}/resend-link")
+    public String resendSigningLink(@PathVariable Long id,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            log.info("Resending signing link for request: {}", id);
+            resourceRequestService.resendSigningLink(id);
+            redirectAttributes.addFlashAttribute("success", "✅ Signing link resent successfully!");
+        } catch (Exception e) {
+            log.error("Error resending signing link: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "❌ Failed to resend signing link: " + e.getMessage());
+        }
+        return "redirect:/resources/list";
+    }
+
+    // ============================================
+    // Thank You Page - Standalone (No Sidebar)
+    // ============================================
     @GetMapping("/sign-thankyou")
     public String signThankyou() {
         return "resources/sign-thankyou";
     }
 
+    // ============================================
+    // Error Page - Standalone (No Sidebar)
+    // ============================================
     @GetMapping("/sign-error")
     public String signError() {
         return "resources/sign-error";

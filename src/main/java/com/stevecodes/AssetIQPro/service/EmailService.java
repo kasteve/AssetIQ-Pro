@@ -55,7 +55,6 @@ public class EmailService {
 
     public void sendSimpleEmail(String toEmail, String subject, String body) {
         try {
-            // Log email content before sending
             logEmailContent("Simple Email", toEmail, subject, body);
 
             SimpleMailMessage message = new SimpleMailMessage();
@@ -69,7 +68,40 @@ public class EmailService {
         } catch (Exception e) {
             log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage());
             logEmailContent("Simple Email (FAILED)", toEmail, subject, body);
-            // DO NOT re-throw - just log
+        }
+    }
+
+    /**
+     * Send email with attachment
+     */
+    public void sendEmailWithAttachment(String toEmail, String subject, String body, byte[] attachment, String fileName) {
+        try {
+            log.info("📧 Sending email with attachment to: {}", toEmail);
+            logEmailContent("Email with Attachment", toEmail, subject, body);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(body);
+            helper.setFrom(FROM_EMAIL);
+
+            if (attachment != null && attachment.length > 0) {
+                ByteArrayResource resource = new ByteArrayResource(attachment);
+                helper.addAttachment(fileName, resource);
+                log.info("📎 Attachment added: {}", fileName);
+            }
+
+            mailSender.send(message);
+            logEmailSent("Email with Attachment", toEmail, subject);
+        } catch (MessagingException e) {
+            log.error("❌ Failed to send email with attachment to {}: {}", toEmail, e.getMessage());
+            // Fallback to simple email without attachment
+            sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent. Please download from the portal.)");
+        } catch (Exception e) {
+            log.error("❌ Unexpected error sending email with attachment: {}", e.getMessage());
+            sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent. Please download from the portal.)");
         }
     }
 
@@ -194,10 +226,6 @@ public class EmailService {
 
         sendSimpleEmail(toEmail, subject, body);
     }
-
-    // ============================================
-    // Infrastructure Request Signing Email
-    // ============================================
 
     @Async
     public void sendInfraRequestSigningLink(String toEmail, String requesterName,
@@ -336,7 +364,6 @@ public class EmailService {
                 AssetIQ-Pro
                 """, assetTag, transferId);
 
-            // Log email content before sending
             logEmailContent("Transfer Completion", String.join(", ", toEmails), subject, body);
 
             MimeMessage message = mailSender.createMimeMessage();
@@ -467,22 +494,24 @@ public class EmailService {
         }
     }
 
-    // Add these methods to EmailService.java
+    // ============================================
+    // Room Booking Emails
+    // ============================================
 
     @Async
     public void sendRoomSlotRequest(String toEmail, String requesterName,
                                     String roomName, String timeSlot) {
         String subject = "Room Slot Request - " + roomName;
         String body = String.format("""
-        Dear User,
-        
-        %s has requested to use the room '%s' during your booked time slot (%s).
-        
-        Please login to approve or decline this request.
-        
-        Best regards,
-        AssetIQ-Pro Team
-        """, requesterName, roomName, timeSlot);
+            Dear User,
+            
+            %s has requested to use the room '%s' during your booked time slot (%s).
+            
+            Please login to approve or decline this request.
+            
+            Best regards,
+            AssetIQ-Pro Team
+            """, requesterName, roomName, timeSlot);
 
         sendSimpleEmail(toEmail, subject, body);
     }
@@ -492,16 +521,16 @@ public class EmailService {
                                                   String resourceType, String requestId) {
         String subject = "Resource Request Acknowledged - #" + requestId;
         String body = String.format("""
-        Dear %s,
-        
-        Thank you for acknowledging receipt of your resource request.
-        
-        Resource: %s
-        Request #: %s
-        
-        Best regards,
-        AssetIQ-Pro Team
-        """, requesterName, resourceType, requestId);
+            Dear %s,
+            
+            Thank you for acknowledging receipt of your resource request.
+            
+            Resource: %s
+            Request #: %s
+            
+            Best regards,
+            AssetIQ-Pro Team
+            """, requesterName, resourceType, requestId);
 
         sendSimpleEmail(toEmail, subject, body);
     }

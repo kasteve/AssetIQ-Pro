@@ -1,31 +1,62 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layouts/default}">
-
+<html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Thank You - AssetIQ-Pro</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .thank-card {
+            max-width: 500px;
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .thank-card .card-body {
+            padding: 48px 32px;
+            background: white;
+            text-align: center;
+        }
+        .thank-card .icon {
+            font-size: 72px;
+            color: #198754;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: none;
+            padding: 12px 40px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(26, 26, 46, 0.3);
+        }
+    </style>
 </head>
-
 <body>
-<div layout:fragment="content">
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6 text-center">
-                <div class="card shadow">
-                    <div class="card-body py-5">
-                        <i class="fas fa-check-circle text-success" style="font-size: 64px;"></i>
-                        <h2 class="mt-3">Thank You!</h2>
-                        <p class="lead">Your signature has been recorded successfully.</p>
-                        <p class="text-muted">You will receive a confirmation email with the signed document.</p>
-                        <a href="/" class="btn btn-primary mt-3">
-                            <i class="fas fa-home me-2"></i>Go Home
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+<div class="thank-card card">
+    <div class="card-body">
+        <i class="fas fa-check-circle icon"></i>
+        <h2 class="mt-3 fw-bold">Thank You!</h2>
+        <p class="lead">Your signature has been recorded successfully.</p>
+        <p class="text-muted">A confirmation email with the signed document has been sent.</p>
+        <hr>
+        <p class="text-muted small">You may close this window now.</p>
     </div>
 </div>
+
 </body>
 </html>

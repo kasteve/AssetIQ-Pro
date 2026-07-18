@@ -148,6 +148,10 @@
                                         <button class="btn btn-outline-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'" title="Sign Acknowledgement">
                                             <i class="fas fa-signature"></i> Sign
                                         </button>
+                                        <!-- Reminder Button -->
+                                        <button class="btn btn-outline-warning" th:onclick="'resendLink(' + ${req.requestId} + ')'" title="Resend Signing Link">
+                                            <i class="fas fa-envelope"></i>
+                                        </button>
                                     </th:block>
 
                                     <!-- COMPLETED & SIGNED: Generate PDF -->
@@ -261,6 +265,9 @@
                                     <th:block th:if="${req.requesterSignature == null}">
                                         <button class="btn btn-sm btn-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'">
                                             <i class="fas fa-signature"></i> Sign
+                                        </button>
+                                        <button class="btn btn-sm btn-warning" th:onclick="'resendLink(' + ${req.requestId} + ')'">
+                                            <i class="fas fa-envelope"></i> Reminder
                                         </button>
                                     </th:block>
                                     <th:block th:if="${req.requesterSignature != null}">
@@ -430,7 +437,7 @@
         </div>
     </div>
 
-    <!-- Acknowledge Modal -->
+    <!-- Acknowledge Modal - No manual name field, auto-populated -->
     <div class="modal fade" id="acknowledgeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -442,8 +449,9 @@
                     <input type="hidden" id="acknowledgeId">
                     <p><i class="fas fa-info-circle text-info me-2"></i>Please sign below to acknowledge receipt of the resources.</p>
                     <div class="mb-3">
-                        <label class="form-label">Full Name *</label>
-                        <input type="text" id="signatoryName" class="form-control" placeholder="Enter your full name" required>
+                        <label class="form-label">Requester Name</label>
+                        <input type="text" id="signatoryNameDisplay" class="form-control" readonly style="background-color: #f8f9fa; cursor: not-allowed;">
+                        <small class="text-muted">Name is automatically captured from the request</small>
                     </div>
                     <div class="signature-pad">
                         <canvas id="signatureCanvas" width="500" height="150"></canvas>
@@ -481,6 +489,8 @@
         .btn-sm { padding: 6px 10px !important; font-size: 12px !important; border-radius: 8px !important; }
         .btn-success { background: #198754 !important; border: none !important; }
         .btn-danger { background: #dc3545 !important; border: none !important; }
+        .btn-warning { background: #ffc107 !important; border: none !important; color: #212529 !important; }
+        .btn-warning:hover { background: #e0a800 !important; color: #212529 !important; }
 
         .stat-card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #0d6efd; height: 100%; }
         .stat-number { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.2; }
@@ -515,9 +525,7 @@
         .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; color: white; }
         .action-btn-group .btn-outline-success:hover { background: #198754; border-color: #198754; color: white; }
         .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: white; }
-
-        .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
-        .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
+        .action-btn-group .btn-outline-warning:hover { background: #ffc107; border-color: #ffc107; color: #212529; }
 
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
@@ -526,6 +534,7 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+        .modal-body .form-control[readonly] { background-color: #f8f9fa; cursor: not-allowed; }
 
         .signature-pad { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px; background: white; }
         .signature-pad canvas { width: 100%; height: 150px; border-radius: 6px; cursor: crosshair; background: white; }
@@ -561,7 +570,6 @@
             border-color: var(--primary-color) !important;
         }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .content { padding: 16px; }
             .page-header-row { flex-direction: column; align-items: stretch; }
@@ -596,28 +604,24 @@
                 }
             };
 
-            // All table
             if ($.fn.DataTable.isDataTable('#allResourcesTable')) {
                 $('#allResourcesTable').DataTable().destroy();
             }
             const allConfig = {...tableConfig, columnDefs: [{ orderable: false, targets: 7 }]};
             $('#allResourcesTable').DataTable(allConfig);
 
-            // Pending table
             if ($.fn.DataTable.isDataTable('#pendingTable')) {
                 $('#pendingTable').DataTable().destroy();
             }
             const pendingConfig = {...tableConfig, columnDefs: [{ orderable: false, targets: 5 }]};
             $('#pendingTable').DataTable(pendingConfig);
 
-            // Accepted table
             if ($.fn.DataTable.isDataTable('#acceptedTable')) {
                 $('#acceptedTable').DataTable().destroy();
             }
             const acceptedConfig = {...tableConfig, columnDefs: [{ orderable: false, targets: 5 }]};
             $('#acceptedTable').DataTable(acceptedConfig);
 
-            // Completed table
             if ($.fn.DataTable.isDataTable('#completedTable')) {
                 $('#completedTable').DataTable().destroy();
             }
@@ -626,7 +630,7 @@
         });
 
         // ============================================
-        // View Request - REST API
+        // View Request
         // ============================================
         let currentViewRequestId = null;
 
@@ -652,7 +656,6 @@
                 .then(request => {
                     document.getElementById('viewRequestId').textContent = request.requestId;
 
-                    // Show PDF button if signed
                     if (request.status === 'COMPLETED' && request.requesterSignature) {
                         pdfBtn.classList.remove('d-none');
                     }
@@ -746,7 +749,7 @@
         }
 
         // ============================================
-        // Admin Approve - REST API
+        // Admin Approve
         // ============================================
         function showAdminApprove(id) {
             document.getElementById('adminApproveId').value = id;
@@ -773,7 +776,7 @@
         }
 
         // ============================================
-        // Admin Reject - REST API
+        // Admin Reject
         // ============================================
         function showAdminReject(id) {
             document.getElementById('adminRejectId').value = id;
@@ -801,7 +804,7 @@
         }
 
         // ============================================
-        // Mark Complete - REST API (FIXED)
+        // Mark Complete
         // ============================================
         function showMarkComplete(id) {
             document.getElementById('completeId').value = id;
@@ -812,8 +815,6 @@
         function submitMarkComplete() {
             const id = document.getElementById('completeId').value;
             const notes = document.getElementById('completeNotes').value;
-
-            // Using the REST API endpoint
             fetch('/assetIQ-pro/api/resource-requests/' + id + '/complete?deliveryNotes=' + encodeURIComponent(notes || ''), {
                 method: 'POST'
             })
@@ -830,7 +831,7 @@
         }
 
         // ============================================
-        // Acknowledge Signature - REST API
+        // Acknowledge Signature - No manual name field
         // ============================================
         let canvas = null;
         let ctx = null;
@@ -909,7 +910,18 @@
 
         function showAcknowledge(id) {
             document.getElementById('acknowledgeId').value = id;
-            document.getElementById('signatoryName').value = '';
+
+            // Fetch and display the requester name
+            fetch('/assetIQ-pro/api/resource-requests/' + id)
+                .then(response => response.json())
+                .then(request => {
+                    document.getElementById('signatoryNameDisplay').value = request.requestedBy || 'Unknown';
+                })
+                .catch(error => {
+                    console.error('Error fetching requester name:', error);
+                    document.getElementById('signatoryNameDisplay').value = 'Unknown';
+                });
+
             clearSignature();
             const modal = new bootstrap.Modal(document.getElementById('acknowledgeModal'));
             modal.show();
@@ -918,12 +930,6 @@
 
         function submitAcknowledge() {
             if (!canvas) return;
-
-            const signatoryName = document.getElementById('signatoryName').value.trim();
-            if (!signatoryName) {
-                alert('⚠️ Please enter your full name.');
-                return;
-            }
 
             const dataUrl = canvas.toDataURL('image/png');
             if (dataUrl === 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') {
@@ -936,7 +942,6 @@
 
             const formData = new URLSearchParams();
             formData.append('signature', dataUrl);
-            formData.append('signatoryName', signatoryName);
 
             fetch('/assetIQ-pro/api/resource-requests/' + id + '/acknowledge', {
                 method: 'POST',
@@ -955,6 +960,25 @@
                 }
             })
             .catch(error => alert('❌ Error: ' + error.message));
+        }
+
+        // ============================================
+        // Resend Signing Link (Reminder)
+        // ============================================
+        function resendLink(id) {
+            if (confirm('Send a reminder email with the signing link to the requester?')) {
+                fetch('/assetIQ-pro/resources/' + id + '/resend-link', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('✅ Signing link resent successfully!');
+                    } else {
+                        alert('❌ Failed to resend signing link.');
+                    }
+                })
+                .catch(error => alert('❌ Error: ' + error.message));
+            }
         }
 
         // ============================================

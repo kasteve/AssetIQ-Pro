@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -110,7 +113,7 @@ public class ResourceRequestService {
     }
 
     // ============================================
-    // Request Management - Direct Admin Approval
+    // Request Management
     // ============================================
 
     @Transactional
@@ -129,7 +132,6 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify admin
         emailService.sendResourceRequestNotification(
                 "admin@company.com",
                 "New Resource Request Pending Approval",
@@ -172,7 +174,6 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify requester
         String requesterEmail = getEmailForUser(request.getUserId());
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
@@ -202,7 +203,6 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Notify requester
         String requesterEmail = getEmailForUser(request.getUserId());
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
@@ -230,7 +230,6 @@ public class ResourceRequestService {
         request.setCompletedAt(LocalDateTime.now());
         request.setDeliveryNotes(deliveryNotes);
 
-        // Generate signing token
         String token = UUID.randomUUID().toString();
         request.setSigningToken(token);
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
@@ -248,7 +247,7 @@ public class ResourceRequestService {
             log.error("Failed to generate PDF for resource request {}: {}", requestId, e.getMessage());
         }
 
-        // Notify requester with signature link
+        // Send email with signing link
         String requesterEmail = getEmailForUser(request.getUserId());
         String signatureLink = "http://localhost:8091/assetIQ-pro/resources/sign?token=" + token;
         emailService.sendResourceRequestStatusUpdate(
@@ -271,20 +270,17 @@ public class ResourceRequestService {
 
         ResourceRequest request = validateRequest(requestId);
 
-        // Validate token
         if (request.getSigningToken() == null || !request.getSigningToken().equals(token)) {
             log.error("Invalid token. Expected: {}, Got: {}", request.getSigningToken(), token);
             throw new RuntimeException("Invalid token");
         }
 
-        // Check token expiry
         if (request.getSigningTokenExpiry() == null ||
                 request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
             log.error("Token expired. Expiry: {}, Now: {}", request.getSigningTokenExpiry(), LocalDateTime.now());
             throw new RuntimeException("Token has expired");
         }
 
-        // Check if already signed
         if (request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty()) {
             log.warn("Request {} already signed", requestId);
             throw new RuntimeException("Request has already been signed");
@@ -304,13 +300,55 @@ public class ResourceRequestService {
             log.info("PDF regenerated with signature for request: {}", requestId);
         } catch (Exception e) {
             log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
-            // Continue even if PDF generation fails
         }
 
         resourceRequestRepository.save(request);
 
+        // Send email with PDF attachment
+        try {
+            sendSignedConfirmationEmail(request);
+        } catch (Exception e) {
+            log.error("Failed to send confirmation email with PDF: {}", e.getMessage());
+        }
+
         auditService.logAction("RESOURCE_REQUEST_SIGNED",
                 "Resource request signed by: " + signatoryName + " for request: " + requestId,
+                request.getUserId());
+    }
+
+    @Transactional
+    public void resendSigningLink(Long requestId) {
+        log.info("Resending signing link for request: {}", requestId);
+
+        ResourceRequest request = validateRequest(requestId);
+
+        if (!"COMPLETED".equals(request.getStatus())) {
+            throw new IllegalStateException("Request must be COMPLETED to resend link. Current status: " + request.getStatus());
+        }
+
+        if (request.getRequesterSignature() != null && !request.getRequesterSignature().isEmpty()) {
+            throw new IllegalStateException("Request has already been signed");
+        }
+
+        // Generate new token
+        String token = UUID.randomUUID().toString();
+        request.setSigningToken(token);
+        request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
+        resourceRequestRepository.save(request);
+
+        // Resend email
+        String requesterEmail = getEmailForUser(request.getUserId());
+        String signatureLink = "http://localhost:8091/assetIQ-pro/resources/sign?token=" + token;
+        emailService.sendResourceRequestStatusUpdate(
+                requesterEmail,
+                "REMINDER: Resource Request - Please Sign",
+                "This is a reminder that your request for " + request.getResourceType() + " is awaiting your signature.\n\n" +
+                        "Please sign to acknowledge receipt: " + signatureLink + "\n\n" +
+                        "This link will expire in 48 hours."
+        );
+
+        auditService.logAction("RESOURCE_REQUEST_LINK_RESENT",
+                "Signing link resent for request: " + requestId,
                 request.getUserId());
     }
 
@@ -350,13 +388,7 @@ public class ResourceRequestService {
 
         resourceRequestRepository.save(request);
 
-        String requesterEmail = getEmailForUser(userId);
-        emailService.sendResourceRequestStatusUpdate(
-                requesterEmail,
-                "Resource Request Signed - Completed",
-                "Thank you for signing the receipt for your resource request #" + requestId +
-                        ".\n\nA PDF report has been generated and is available for download."
-        );
+        sendSignedConfirmationEmail(request);
 
         auditService.logAction("RESOURCE_REQUEST_ACKNOWLEDGED",
                 "Resource request acknowledged by user: " + userId + ", signatory: " + signatoryName,
@@ -380,6 +412,64 @@ public class ResourceRequestService {
         auditService.logAction("RESOURCE_REQUEST_RECALLED",
                 "Resource request recalled: " + requestId,
                 request.getUserId());
+    }
+
+    // ============================================
+    // Email with PDF Attachment
+    // ============================================
+    private void sendSignedConfirmationEmail(ResourceRequest request) {
+        try {
+            String requesterEmail = getEmailForUser(request.getUserId());
+            String subject = "Resource Request Signed - Completed #" + request.getRequestId();
+            String body = "Thank you for signing the receipt for your resource request #" + request.getRequestId() +
+                    ".\n\nA signed PDF report is attached for your records.\n\n" +
+                    "Request Details:\n" +
+                    "- Resource Type: " + request.getResourceType() + "\n" +
+                    "- Description: " + request.getDescription() + "\n" +
+                    "- Quantity: " + request.getQuantity() + "\n" +
+                    "- Signed by: " + request.getSignatoryName() + "\n" +
+                    "- Signed on: " + request.getAcknowledgedAt() + "\n\n" +
+                    "You can also download the PDF from the portal at any time.";
+
+            // Get PDF bytes
+            if (request.getPdfReportPath() != null) {
+                Path pdfPath = Paths.get(request.getPdfReportPath());
+                if (Files.exists(pdfPath)) {
+                    byte[] pdfBytes = Files.readAllBytes(pdfPath);
+                    String fileName = "resource-request-" + request.getRequestId() + "-signed.pdf";
+
+                    // Send email with attachment
+                    emailService.sendEmailWithAttachment(
+                            requesterEmail,
+                            subject,
+                            body,
+                            pdfBytes,
+                            fileName
+                    );
+                    log.info("Signed confirmation email with PDF attachment sent to: {}", requesterEmail);
+                } else {
+                    // Fallback - send without attachment
+                    emailService.sendResourceRequestStatusUpdate(requesterEmail, subject, body);
+                    log.warn("PDF file not found, sent email without attachment");
+                }
+            } else {
+                // Fallback - send without attachment
+                emailService.sendResourceRequestStatusUpdate(requesterEmail, subject, body);
+                log.warn("PDF path is null, sent email without attachment");
+            }
+        } catch (Exception e) {
+            log.error("Failed to send signed confirmation email: {}", e.getMessage());
+            // Try to send without attachment as fallback
+            try {
+                String requesterEmail = getEmailForUser(request.getUserId());
+                String subject = "Resource Request Signed - Completed #" + request.getRequestId();
+                String body = "Thank you for signing the receipt for your resource request #" + request.getRequestId() +
+                        ".\n\nYou can download the signed PDF from the portal at any time.";
+                emailService.sendResourceRequestStatusUpdate(requesterEmail, subject, body);
+            } catch (Exception fallbackError) {
+                log.error("Fallback email also failed: {}", fallbackError.getMessage());
+            }
+        }
     }
 
     // ============================================
