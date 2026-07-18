@@ -57,6 +57,9 @@ public class UserRequestController {
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
         model.addAttribute("roomBookings", roomBookings);
 
+        // All rooms (for the Book Room modal)
+        model.addAttribute("allRooms", roomRepository.findAll());
+
         // Available rooms
         List<Room> availableRooms = roomRepository.findAvailableRooms(LocalDateTime.now());
         model.addAttribute("availableRooms", availableRooms);
