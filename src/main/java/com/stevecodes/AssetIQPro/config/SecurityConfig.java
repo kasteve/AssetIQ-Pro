@@ -122,6 +122,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/bookings/driver-dashboard",
                                 "/bookings/driver/**",
                                 "/bookings/driver-requests",
+                                "/bookings/slot-request/**",
                                 "/uploads/**"
                         ).permitAll()
                         .anyRequest().authenticated()

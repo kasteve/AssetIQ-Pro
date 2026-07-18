@@ -29,13 +29,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT b FROM Booking b WHERE b.endTime < :now AND b.status = 'BOOKED'")
     List<Booking> findExpiredBookings(@Param("now") LocalDateTime now);
 
-    // FIXED: Added default status list if not provided
-    @Query("SELECT b FROM Booking b WHERE b.roomId = :roomId AND b.status IN ('BOOKED', 'CONFIRMED', 'PENDING') AND b.startTime BETWEEN :startDate AND :endDate")
+    @Query("SELECT b FROM Booking b WHERE b.roomId = :roomId AND b.startTime BETWEEN :startDate AND :endDate AND b.status IN ('BOOKED', 'CONFIRMED', 'PENDING', 'ACTIVE')")
     List<Booking> findBookingsForRoomInDateRange(@Param("roomId") Long roomId,
                                                  @Param("startDate") LocalDateTime startDate,
                                                  @Param("endDate") LocalDateTime endDate);
 
-    // Overloaded version with statuses
     @Query("SELECT b FROM Booking b WHERE b.roomId = :roomId AND b.status IN :statuses AND b.startTime BETWEEN :startDate AND :endDate")
     List<Booking> findBookingsForRoomInDateRangeWithStatuses(@Param("roomId") Long roomId,
                                                              @Param("startDate") LocalDateTime startDate,

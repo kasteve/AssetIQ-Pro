@@ -38,7 +38,13 @@ public class BookingService {
 
     @Transactional
     public BookingDTO createRoomBooking(BookingDTO dto) {
-        log.info("Creating room booking for user: {}, room: {}", dto.getUserId(), dto.getRoomId());
+        log.info("=== CREATE ROOM BOOKING SERVICE ===");
+        log.info("userId: {}, roomId: {}, startTime: {}, endTime: {}",
+                dto.getUserId(), dto.getRoomId(), dto.getStartTime(), dto.getEndTime());
+
+        Room room = roomRepository.findById(dto.getRoomId())
+                .orElseThrow(() -> new RuntimeException("Room not found: " + dto.getRoomId()));
+        log.info("Room found: {}, type: {}", room.getRoomName(), room.getRoomType());
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime maxDate = now.plusDays(MAX_BOOKING_DAYS);
@@ -48,11 +54,9 @@ public class BookingService {
         }
 
         if (dto.getStartTime().isAfter(maxDate)) {
-            throw new IllegalStateException("Bookings are only allowed within " + MAX_BOOKING_DAYS + " days from today. Please select a date within the next " + MAX_BOOKING_DAYS + " days.");
+            throw new IllegalStateException("Bookings are only allowed within " + MAX_BOOKING_DAYS +
+                    " days from today. Please select a date within the next " + MAX_BOOKING_DAYS + " days.");
         }
-
-        Room room = roomRepository.findById(dto.getRoomId())
-                .orElseThrow(() -> new RuntimeException("Room not found: " + dto.getRoomId()));
 
         if (room.getStatus() != Room.RoomStatus.AVAILABLE) {
             throw new IllegalStateException("Room is not available for booking.");
@@ -60,12 +64,13 @@ public class BookingService {
 
         String booker = getRoomBooker(dto.getRoomId(), dto.getStartTime(), dto.getEndTime());
         if (booker != null) {
-            throw new IllegalStateException("Room is already booked by " + booker + " at the requested time. Please choose a different time.");
+            throw new IllegalStateException("Room is already booked by " + booker +
+                    " at the requested time. Please choose a different time.");
         }
 
         boolean isServerRoom = "Server Room".equalsIgnoreCase(room.getRoomType()) ||
                 "Server".equalsIgnoreCase(room.getRoomType()) ||
-                room.getRoomName().toLowerCase().contains("server");
+                (room.getRoomName() != null && room.getRoomName().toLowerCase().contains("server"));
 
         Booking booking = new Booking();
         booking.setUserId(dto.getUserId());
@@ -80,9 +85,11 @@ public class BookingService {
             log.info("Server room booking requires infrastructure approval");
         } else {
             booking.setStatus(BookingStatus.BOOKED);
+            log.info("Regular room booking - status set to BOOKED");
         }
 
         Booking saved = bookingRepository.save(booking);
+        log.info("✅ Booking saved with ID: {}, Status: {}", saved.getBookingId(), saved.getStatus());
 
         if (isServerRoom) {
             notifyInfrastructureTeam(saved, room);
@@ -98,20 +105,40 @@ public class BookingService {
     }
 
     public String getRoomBooker(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        log.info("Checking room availability for room: {}, start: {}, end: {}", roomId, startTime, endTime);
+
         List<Booking> bookings = bookingRepository.findByRoomId(roomId);
+        log.info("Found {} bookings for room {}", bookings.size(), roomId);
+
         for (Booking booking : bookings) {
+            if (booking.getStatus() == BookingStatus.CANCELLED) {
+                continue;
+            }
+
+            if (booking.getStatus() == BookingStatus.PENDING) {
+                log.info("Skipping PENDING booking {} - does not block availability", booking.getBookingId());
+                continue;
+            }
+
             if (booking.getStatus() == BookingStatus.BOOKED ||
                     booking.getStatus() == BookingStatus.CONFIRMED ||
-                    booking.getStatus() == BookingStatus.PENDING) {
+                    booking.getStatus() == BookingStatus.ACTIVE) {
+
                 boolean overlaps = !endTime.isBefore(booking.getStartTime()) &&
                         !startTime.isAfter(booking.getEndTime());
+
                 if (overlaps) {
-                    return appUserService.getUserById(booking.getUserId())
+                    String bookerName = appUserService.getUserById(booking.getUserId())
                             .map(user -> user.getFullName())
                             .orElse("User #" + booking.getUserId());
+                    log.info("Conflict found: Room is booked by {} from {} to {}",
+                            bookerName, booking.getStartTime(), booking.getEndTime());
+                    return bookerName;
                 }
             }
         }
+
+        log.info("No conflict found - room is available");
         return null;
     }
 
@@ -123,7 +150,6 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
-    // FIXED: Updated to use the correct repository method
     public List<BookingDTO> getBookingsForRoomInDateRange(Long roomId, LocalDateTime startDate, LocalDateTime endDate) {
         log.info("Getting bookings for room: {} between {} and {}", roomId, startDate, endDate);
         List<Booking> bookings = bookingRepository.findBookingsForRoomInDateRange(roomId, startDate, endDate);
@@ -321,13 +347,21 @@ public class BookingService {
     }
 
     public List<BookingDTO> getRoomBookingsWithUserNames(Long roomId) {
+        LocalDateTime now = LocalDateTime.now();
         List<Booking> bookings = bookingRepository.findByRoomId(roomId);
+
         return bookings.stream().map(booking -> {
             BookingDTO dto = convertToBookingDTO(booking);
             appUserService.getUserById(booking.getUserId()).ifPresent(user -> {
                 dto.setBookedBy(user.getFullName());
                 dto.setBookedByUsername(user.getUsername());
             });
+
+            // Check if booking is currently active (IN USE)
+            boolean isCurrentlyActive = booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now);
+            dto.setCurrentlyActive(isCurrentlyActive);
+            dto.setActive(true);
+
             return dto;
         }).collect(Collectors.toList());
     }
@@ -345,6 +379,12 @@ public class BookingService {
 
         if (booking.getStatus() != BookingStatus.BOOKED && booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new IllegalStateException("This slot is not available for request.");
+        }
+
+        // Don't allow requesting if the booking is currently active
+        LocalDateTime now = LocalDateTime.now();
+        if (booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now)) {
+            throw new IllegalStateException("Cannot request a slot that is currently in use.");
         }
 
         if (booking.getUserId().equals(requesterId)) {
@@ -367,9 +407,9 @@ public class BookingService {
         booking.setSlotRequestStatus("PENDING");
         bookingRepository.save(booking);
 
+        // Send email with portal link instead of approve/decline links
         String currentBookerEmail = getEmailForUser(booking.getUserId());
-        String approveLink = "http://localhost:8091/assetIQ-pro/bookings/slot-request/" + bookingId + "/approve";
-        String declineLink = "http://localhost:8091/assetIQ-pro/bookings/slot-request/" + bookingId + "/decline";
+        String responseLink = "http://localhost:8091/assetIQ-pro/bookings/slot-request/" + bookingId + "/respond?requesterId=" + requesterId;
 
         emailService.sendSimpleEmail(
                 currentBookerEmail,
@@ -377,9 +417,7 @@ public class BookingService {
                 "Dear User,\n\n" +
                         requesterName + " has requested to use your booked slot for " + roomName + ".\n\n" +
                         "Time Slot: " + timeSlot + "\n\n" +
-                        "Please click one of the links below:\n" +
-                        "Approve: " + approveLink + "\n" +
-                        "Decline: " + declineLink + "\n\n" +
+                        "Please login to respond to this request: " + responseLink + "\n\n" +
                         "Thank you,\nAssetIQ-Pro Team"
         );
 
@@ -388,7 +426,7 @@ public class BookingService {
                 "SLOT_REQUEST_RECEIVED",
                 "Slot Request Received",
                 requesterName + " has requested to use your " + roomName + " slot (" + timeSlot + ")",
-                "/bookings/bookings-dashboard"
+                responseLink
         );
 
         createNotification(
@@ -405,19 +443,19 @@ public class BookingService {
     }
 
     @Transactional
-    public void approveSlotRequest(Long bookingId, Long approverId) {
-        log.info("Approving slot request for booking: {} by user: {}", bookingId, approverId);
+    public void approveSlotRequest(Long bookingId, Long requesterId) {
+        log.info("Approving slot request for booking: {} by requester: {}", bookingId, requesterId);
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
-        if (booking.getSlotRequestUserId() == null) {
-            throw new IllegalStateException("No pending slot request found for this booking.");
+        if (booking.getSlotRequestUserId() == null || !booking.getSlotRequestUserId().equals(requesterId)) {
+            throw new IllegalStateException("No pending slot request found for this user.");
         }
 
-        Long requesterId = booking.getSlotRequestUserId();
         String requesterName = booking.getSlotRequestUserName();
 
+        // Transfer the booking to the requester
         booking.setUserId(requesterId);
         booking.setSlotRequestUserId(null);
         booking.setSlotRequestUserName(null);
@@ -437,22 +475,20 @@ public class BookingService {
         );
 
         auditService.logAction("SLOT_APPROVED",
-                "Slot request approved for booking: " + bookingId + " by user: " + approverId,
-                approverId);
+                "Slot request approved for booking: " + bookingId + " by requester: " + requesterId,
+                requesterId);
     }
 
     @Transactional
-    public void declineSlotRequest(Long bookingId, Long approverId) {
-        log.info("Declining slot request for booking: {} by user: {}", bookingId, approverId);
+    public void declineSlotRequest(Long bookingId, Long requesterId) {
+        log.info("Declining slot request for booking: {} by requester: {}", bookingId, requesterId);
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
-        if (booking.getSlotRequestUserId() == null) {
-            throw new IllegalStateException("No pending slot request found for this booking.");
+        if (booking.getSlotRequestUserId() == null || !booking.getSlotRequestUserId().equals(requesterId)) {
+            throw new IllegalStateException("No pending slot request found for this user.");
         }
-
-        Long requesterId = booking.getSlotRequestUserId();
 
         booking.setSlotRequestUserId(null);
         booking.setSlotRequestUserName(null);
@@ -460,18 +496,60 @@ public class BookingService {
         booking.setSlotRequestStatus("DECLINED");
         bookingRepository.save(booking);
 
-        if (requesterId != null) {
-            String requesterEmail = getEmailForUser(requesterId);
-            emailService.sendSimpleEmail(
-                    requesterEmail,
-                    "Slot Request Declined",
-                    "Your slot request has been declined by the current booker."
-            );
-        }
+        String requesterEmail = getEmailForUser(requesterId);
+        emailService.sendSimpleEmail(
+                requesterEmail,
+                "Slot Request Declined",
+                "Your slot request has been declined by the current booker."
+        );
 
         auditService.logAction("SLOT_DECLINED",
-                "Slot request declined for booking: " + bookingId + " by user: " + approverId,
-                approverId);
+                "Slot request declined for booking: " + bookingId + " by requester: " + requesterId,
+                requesterId);
+    }
+
+    // ============================================
+    // Admin Cancel Booking
+    // ============================================
+
+    @Transactional
+    public void adminCancelBooking(Long bookingId, Long adminId) {
+        log.info("Admin {} cancelling booking: {}", adminId, bookingId);
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setNotes("Cancelled by admin: " + adminId + " at " + LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        // Notify the original booker
+        String userEmail = getEmailForUser(booking.getUserId());
+        Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
+        String roomName = room != null ? room.getRoomName() : "Room #" + booking.getRoomId();
+
+        emailService.sendSimpleEmail(
+                userEmail,
+                "Booking Cancelled by Admin",
+                "Your booking for " + roomName + " on " +
+                        booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                        " has been cancelled by an administrator.\n\n" +
+                        "If you have any questions, please contact the administrator."
+        );
+
+        auditService.logAction("BOOKING_ADMIN_CANCELLED",
+                "Booking cancelled by admin: " + bookingId + " by admin: " + adminId,
+                adminId);
+    }
+
+    // ============================================
+    // Get Booking by ID
+    // ============================================
+
+    public Booking getBookingById(Long bookingId) {
+        log.info("Getting booking by ID: {}", bookingId);
+        return bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
     }
 
     // ============================================
@@ -502,6 +580,8 @@ public class BookingService {
 
     public List<BookingDTO> getBookingsWithUserNames(Long userId) {
         List<Booking> bookings = bookingRepository.findByUserId(userId);
+        LocalDateTime now = LocalDateTime.now();
+
         return bookings.stream().map(booking -> {
             BookingDTO dto = new BookingDTO();
             dto.setBookingId(booking.getBookingId());
@@ -511,6 +591,11 @@ public class BookingService {
             dto.setStatus(booking.getStatus().name());
             dto.setPurpose(booking.getPurpose());
             dto.setUserId(booking.getUserId());
+
+            // Check if currently active
+            boolean isCurrentlyActive = booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now);
+            dto.setCurrentlyActive(isCurrentlyActive);
+            dto.setActive(true);
 
             roomRepository.findById(booking.getRoomId()).ifPresent(room -> {
                 dto.setRoomName(room.getRoomName());

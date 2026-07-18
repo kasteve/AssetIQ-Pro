@@ -12,6 +12,21 @@
 <!-- data-current-user-id lets JS know who is logged in without embedding raw SpEL in <script> -->
 <div layout:fragment="content" th:data-current-user-id="${session.userId}">
 
+    <!-- ============================================ -->
+    <!-- SUCCESS / ERROR MESSAGES -->
+    <!-- ============================================ -->
+    <div th:if="${success != null}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span th:text="${success}">Success</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
     <div class="page-header-row">
         <h4><i class="fas fa-list me-2"></i>My Requests</h4>
         <div class="header-actions">
@@ -36,7 +51,7 @@
                 </div>
                 <div class="card-body">
 
-                    <!-- All Drivers (click any to view their bookings and decide) -->
+                    <!-- All Drivers -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <small class="text-muted fw-semibold">Drivers</small>
@@ -124,7 +139,7 @@
                 </div>
                 <div class="card-body">
 
-                    <!-- All Rooms (click any to view their bookings and decide) -->
+                    <!-- All Rooms -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <small class="text-muted fw-semibold">Rooms</small>
@@ -180,12 +195,14 @@
                                                           (${booking.status} == 'PENDING' ? 'pending' :
                                                           (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))"
                                           th:text="${booking.status}">BOOKED</span>
+
                                     <div th:if="${booking.status == 'BOOKED' and booking.userId == session.userId}">
                                         <button class="btn btn-sm btn-warning mt-1 recall-btn"
                                                 th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
                                             <i class="fas fa-undo"></i> Recall
                                         </button>
                                     </div>
+
                                     <div th:if="${booking.status == 'BOOKED' and booking.userId != session.userId}">
                                         <button class="btn btn-sm btn-info mt-1 recall-btn"
                                                 th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
@@ -229,20 +246,20 @@
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
                         <div class="mb-3">
-                            <label class="form-label">Destination *</label>
-                            <input type="text" name="destination" class="form-control" required>
+                            <label for="destinationInput" class="form-label">Destination *</label>
+                            <input type="text" id="destinationInput" name="destination" class="form-control" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Driver (Optional)</label>
-                            <select name="driverId" class="form-select">
+                            <label for="driverSelect" class="form-label">Driver (Optional)</label>
+                            <select id="driverSelect" name="driverId" class="form-select">
                                 <option value="">Any Available Driver</option>
                                 <option th:each="driver : ${availableDrivers}" th:value="${driver.userId}" th:text="${driver.fullName}"></option>
                                 <option value="-1" class="text-primary fw-bold">🚕 Cab (External)</option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Reason</label>
-                            <textarea name="reason" class="form-control" rows="2"></textarea>
+                            <label for="reasonInput" class="form-label">Reason</label>
+                            <textarea id="reasonInput" name="reason" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -262,32 +279,38 @@
                     <h5 class="modal-title"><i class="fas fa-calendar-plus me-2" style="color: #28a745;"></i>Book Room</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/bookings/room}" method="post">
+                <form th:action="@{/bookings/room}" method="post" id="bookRoomForm">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
+
                         <div class="mb-3">
-                            <label class="form-label">Room *</label>
-                            <select name="roomId" class="form-select" required>
+                            <label for="roomSelect" class="form-label">Room *</label>
+                            <select id="roomSelect" name="roomId" class="form-select" required>
                                 <option value="">Select Room</option>
                                 <option th:each="room : ${allRooms}" th:value="${room.roomId}" th:text="${room.roomName} + ' (' + ${room.roomType} + ')'"></option>
                             </select>
                         </div>
+
                         <div class="mb-3">
-                            <label class="form-label">Start Time *</label>
-                            <input type="datetime-local" name="startTime" class="form-control" required>
+                            <label for="startTimeInput" class="form-label">Start Time *</label>
+                            <input type="datetime-local" id="startTimeInput" name="startTime" class="form-control" required>
                         </div>
+
                         <div class="mb-3">
-                            <label class="form-label">End Time *</label>
-                            <input type="datetime-local" name="endTime" class="form-control" required>
+                            <label for="endTimeInput" class="form-label">End Time *</label>
+                            <input type="datetime-local" id="endTimeInput" name="endTime" class="form-control" required>
                         </div>
+
                         <div class="mb-3">
-                            <label class="form-label">Purpose</label>
-                            <textarea name="purpose" class="form-control" rows="2"></textarea>
+                            <label for="purposeInput" class="form-label">Purpose</label>
+                            <textarea id="purposeInput" name="purpose" class="form-control" rows="2" placeholder="What is this booking for?"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">Book Room</button>
+                        <button type="submit" class="btn btn-success" id="bookRoomBtn">
+                            <i class="fas fa-calendar-plus me-1"></i>Book Room
+                        </button>
                     </div>
                 </form>
             </div>
@@ -388,7 +411,6 @@
         .btn-info { background: #0dcaf0 !important; color: white !important; }
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
 
-        /* ===== Cards ===== */
         .booking-card {
             background: white;
             border-radius: 14px;
@@ -414,7 +436,6 @@
         .booking-card .card-body { padding: 16px 20px; flex: 1; }
         .booking-card .card-footer { padding: 12px 20px; border-top: 1px solid #eef0f3; background: transparent; }
 
-        /* ===== Driver / Room list items (clickable) ===== */
         .driver-item, .room-item {
             display: flex;
             justify-content: space-between;
@@ -434,10 +455,15 @@
         .driver-item .driver-status.available, .room-item .room-status.available { background: #e6f7ec; color: #198754; }
         .driver-item .driver-status.busy { background: #fff4e0; color: #fd7e14; }
         .room-item .room-status.occupied { background: #fdeeee; color: #dc3545; }
+
+        .status-badge.inuse {
+            background: #e8f4fd;
+            color: #0dcaf0;
+        }
+
         .driver-item .booking-count { font-size: 12px; color: #6c757d; background: #f0f2f5; padding: 2px 10px; border-radius: 12px; }
         .room-item .room-type { font-size: 11px; color: #6c757d; display: block; }
 
-        /* ===== My requests / bookings rows ===== */
         .booking-row {
             display: flex;
             justify-content: space-between;
@@ -452,7 +478,6 @@
         .empty-state-sm { text-align: center; padding: 30px 20px; color: #adb5bd; }
         .empty-state-sm i { font-size: 24px; margin-bottom: 6px; display: block; }
 
-        /* ===== Pagination ===== */
         .pagination-controls {
             display: flex;
             justify-content: center;
@@ -491,7 +516,6 @@
         .status-badge.recalled { background: #eef0f3; color: #6c757d; }
         .status-badge.completed { background: #eef0fd; color: #6610f2; }
 
-        /* ===== Modals ===== */
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
         .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
@@ -511,16 +535,36 @@
             background: transparent; color: #0dcaf0; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
         }
         .modal-body .slot-request-btn:hover { background: #0dcaf0; color: white; }
+
+        /* Alert Styles */
+        .alert {
+            border-radius: 12px !important;
+            border: none !important;
+            padding: 16px 20px !important;
+            margin-bottom: 20px !important;
+            font-weight: 500 !important;
+        }
+        .alert-success {
+            background: #e6f7ec !important;
+            color: #198754 !important;
+        }
+        .alert-danger {
+            background: #fdeeee !important;
+            color: #dc3545 !important;
+        }
+        .alert i {
+            font-size: 18px;
+        }
     </style>
 </div>
 
 <div layout:fragment="scripts">
     <script>
-        // Current logged-in user id, read from a data attribute (never inline SpEL directly in <script>)
+        // Current logged-in user id
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
 
         // ============================================
-        // Pagination (client-side; rows are already server-rendered)
+        // Pagination
         // ============================================
         function paginateList(listId, paginationId, pageSize) {
             const list = document.getElementById(listId);
@@ -562,7 +606,7 @@
             render();
         }
 
-        // Wire up click handlers via data attributes (avoids th:onclick string-concat / quoting issues)
+        // Wire up click handlers
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.driver-item').forEach(function (el) {
                 el.addEventListener('click', function () {
@@ -577,11 +621,26 @@
 
             paginateList('driverRequestsList', 'driverRequestsPagination', 5);
             paginateList('roomBookingsList', 'roomBookingsPagination', 5);
+
+            // Debug form submission
+            const bookRoomForm = document.getElementById('bookRoomForm');
+            if (bookRoomForm) {
+                console.log('✅ Book Room Form found');
+                bookRoomForm.addEventListener('submit', function(e) {
+                    console.log('📝 Book Room Form Submitted');
+                    console.log('  userId:', this.querySelector('input[name="userId"]')?.value);
+                    console.log('  roomId:', this.querySelector('select[name="roomId"]')?.value);
+                    console.log('  startTime:', this.querySelector('input[name="startTime"]')?.value);
+                    console.log('  endTime:', this.querySelector('input[name="endTime"]')?.value);
+                    console.log('  purpose:', this.querySelector('textarea[name="purpose"]')?.value);
+                });
+            } else {
+                console.warn('❌ Book Room Form NOT found');
+            }
         });
 
         // ============================================
-        // View Driver Details - bookings (last 7 days, server-filtered)
-        // Endpoint: GET /bookings/driver/{driverId}/bookings -> List<DriverRequest>
+        // View Driver Details
         // ============================================
         function viewDriverDetails(driverId, driverName) {
             const modal = new bootstrap.Modal(document.getElementById('driverDetailsModal'));
@@ -657,8 +716,7 @@
         }
 
         // ============================================
-        // View Room Details - bookings by other employees (next 7 days)
-        // Endpoint: GET /bookings/room/{roomId}/bookings -> List<BookingDTO> (all bookings; filtered to 7 days client-side)
+        // View Room Details - Shows active/future bookings with "IN USE" status
         // ============================================
         function viewRoomDetails(roomId, roomName, roomType) {
             const modal = new bootstrap.Modal(document.getElementById('roomDetailsModal'));
@@ -682,16 +740,17 @@
                     return response.json();
                 })
                 .then(allBookings => {
-                    // Show everything the backend returns for this room — pending, approved/booked,
-                    // and completed alike. Filtering to "next 7 days" here was silently hiding
-                    // legitimate pending/approved requests whose scheduled time fell outside that window.
-                    const bookings = (allBookings || []).slice().sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+                    const now = new Date();
+                    // Filter only active and future bookings
+                    const bookings = (allBookings || [])
+                        .filter(b => !b.endTime || new Date(b.endTime) > now)
+                        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
                     if (bookings.length === 0) {
                         body.innerHTML = `
                             <div class="text-center py-4">
                                 <i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i>
-                                <p class="text-muted mt-2">No bookings found for this room</p>
+                                <p class="text-muted mt-2">No active or future bookings for this room</p>
                                 <small class="text-muted">Room Type: <strong>${roomType || 'N/A'}</strong></small>
                             </div>
                         `;
@@ -700,31 +759,52 @@
 
                     let html = `
                         <div class="mb-3">
-                            <small class="text-muted">Total Bookings: <strong>${bookings.length}</strong></small>
+                            <small class="text-muted">Active & Future Bookings: <strong>${bookings.length}</strong></small>
                             <small class="text-muted d-block">Room Type: <strong>${roomType || 'N/A'}</strong></small>
                         </div>
                         <div class="list-group">
                     `;
 
                     bookings.forEach(booking => {
-                        const statusClass = booking.status === 'BOOKED' ? 'booked' :
-                                           booking.status === 'CONFIRMED' ? 'completed' :
-                                           booking.status === 'PENDING' ? 'pending' : 'cancelled';
-                        const isOwner = Number(booking.userId) === CURRENT_USER_ID;
                         const start = new Date(booking.startTime);
                         const end = new Date(booking.endTime);
+                        const isCurrentlyActive = start <= now && end >= now;
+                        const isOwner = Number(booking.userId) === CURRENT_USER_ID;
+                        const isAdmin = false; // Set based on user role if needed
+
+                        // Determine status display
+                        let displayStatus = booking.status || 'BOOKED';
+                        let statusClass = 'booked';
+
+                        if (isCurrentlyActive) {
+                            displayStatus = 'IN USE';
+                            statusClass = 'inuse';
+                        } else if (booking.status === 'PENDING') {
+                            statusClass = 'pending';
+                        } else if (booking.status === 'CANCELLED') {
+                            statusClass = 'cancelled';
+                        } else if (booking.status === 'CONFIRMED') {
+                            statusClass = 'completed';
+                        }
+
                         html += `
                             <div class="booking-list-item">
                                 <div>
                                     <div class="requester">${booking.bookedBy || 'User'}</div>
                                     <div class="time-slot">${start.toLocaleString()} - ${end.toLocaleString()}</div>
                                     ${booking.purpose ? `<div class="time-slot">Purpose: ${booking.purpose}</div>` : ''}
+                                    ${booking.notes ? `<div class="time-slot">Notes: ${booking.notes}</div>` : ''}
                                 </div>
                                 <div class="text-end">
-                                    <span class="status-badge ${statusClass}">${booking.status || 'BOOKED'}</span>
-                                    ${booking.status === 'BOOKED' && !isOwner ? `
+                                    <span class="status-badge ${statusClass}">${displayStatus}</span>
+                                    ${booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner ? `
                                         <button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(${booking.bookingId})">
                                             <i class="fas fa-handshake me-1"></i>Request Slot
+                                        </button>
+                                    ` : ''}
+                                    ${isAdmin ? `
+                                        <button class="btn btn-sm btn-danger mt-1" onclick="adminCancelBooking(${booking.bookingId})">
+                                            <i class="fas fa-times"></i> Cancel
                                         </button>
                                     ` : ''}
                                 </div>
@@ -765,10 +845,34 @@
                         bootstrap.Modal.getInstance(document.getElementById('slotRequestModal')).hide();
                         window.location.reload();
                     } else {
-                        alert('❌ Failed to send slot request.');
+                        return response.text().then(text => {
+                            alert('❌ Failed to send slot request: ' + text);
+                        });
                     }
                 })
                 .catch(error => alert('❌ Error: ' + error.message));
+        }
+
+        // ============================================
+        // Admin Cancel Booking
+        // ============================================
+        function adminCancelBooking(bookingId) {
+            if (confirm('Are you sure you want to cancel this booking?')) {
+                fetch('/assetIQ-pro/bookings/admin/booking/' + bookingId + '/cancel', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('✅ Booking cancelled successfully!');
+                        window.location.reload();
+                    } else {
+                        return response.text().then(text => {
+                            alert('❌ Failed to cancel booking: ' + text);
+                        });
+                    }
+                })
+                .catch(error => alert('❌ Error: ' + error.message));
+            }
         }
 
         // ============================================

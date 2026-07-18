@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Thank You - AssetIQ-Pro</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+        .thank-card {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+            text-align: center;
+            padding: 48px 32px;
+        }
+        .thank-card .icon {
+            font-size: 72px;
+            color: #198754;
+        }
+        .thank-card h2 {
+            margin-top: 16px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+        .thank-card p {
+            color: #6c757d;
+            margin-top: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: none;
+            padding: 12px 40px;
+            border-radius: 10px;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 16px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(26, 26, 46, 0.3);
+        }
+        .alert {
+            border-radius: 12px;
+            border: none;
+            padding: 16px 20px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #e6f7ec;
+            color: #198754;
+        }
+        .alert-danger {
+            background: #fdeeee;
+            color: #dc3545;
+        }
+    </style>
+</head>
+
+<body>
+<div class="thank-card">
+    <div th:if="${message != null}">
+        <i class="fas fa-check-circle icon"></i>
+        <h2>Thank You!</h2>
+        <p th:text="${message}">Slot request approved successfully.</p>
+        <p class="text-muted">The requester has been notified.</p>
+    </div>
+    <div th:if="${error != null}">
+        <i class="fas fa-exclamation-circle text-danger" style="font-size: 72px;"></i>
+        <h2 class="text-danger">Error</h2>
+        <p th:text="${error}">Failed to process slot request.</p>
+        <p class="text-muted">Please try again or contact support.</p>
+    </div>
+    <hr>
+    <p class="text-muted small">You may close this window now.</p>
+    <a href="/assetIQ-pro/bookings/bookings-dashboard" class="btn-primary">Go to Dashboard</a>
+</div>
+</body>
+</html>

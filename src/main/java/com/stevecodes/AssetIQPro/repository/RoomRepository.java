@@ -50,4 +50,11 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
     @Query("SELECT r FROM Room r WHERE r.hasVideoConferencing = true AND r.status = 'AVAILABLE'")
     List<Room> findAvailableRoomsWithVideoConferencing();
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.roomId = :roomId " +
+            "AND b.startTime < :endTime AND b.endTime > :startTime " +
+            "AND b.status IN ('BOOKED', 'CONFIRMED', 'ACTIVE')")
+    long countConfirmedConflicts(@Param("roomId") Long roomId,
+                                 @Param("startTime") LocalDateTime startTime,
+                                 @Param("endTime") LocalDateTime endTime);
 }
