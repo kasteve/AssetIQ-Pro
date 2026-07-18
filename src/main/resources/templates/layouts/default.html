@@ -402,20 +402,15 @@
             </ul>
         </div>
 
-        <!-- ========== BOOKINGS DROPDOWN ========== -->
+        <!-- ========== BOOKINGS - Simplified ========== -->
         <div class="nav-item">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link" th:classappend="${currentPage == 'bookings-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/bookings-dashboard">
                 <i class="fas fa-calendar-check"></i> Bookings
             </a>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/assetIQ-pro/bookings/bookings-dashboard"><i class="fas fa-list"></i> Bookings Dashboard</a></li>
-                <li><a class="dropdown-item" href="/assetIQ-pro/bookings/rooms"><i class="fas fa-door-open"></i> Rooms</a></li>
-                <li><a class="dropdown-item" href="/assetIQ-pro/bookings/driver-requests"><i class="fas fa-car"></i> Drivers</a></li>
-            </ul>
         </div>
 
-        <!-- ========== ADMIN DROPDOWN - Updated with proper authorities ========== -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG')">
+        <!-- ========== ADMIN DROPDOWN ========== -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS')">
             <div class="nav-item">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-cog"></i> Admin
@@ -451,7 +446,7 @@
 
         <div class="nav-divider"></div>
 
-        <!-- Driver Dashboard - DRIVER role -->
+        <!-- Driver Dashboard - DRIVER role only -->
         <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">

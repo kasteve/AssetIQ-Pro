@@ -34,6 +34,15 @@ public class DriverAvailability {
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
+    @Column(name = "current_location")
+    private String currentLocation;
+
+    @Column(name = "vehicle_registration")
+    private String vehicleRegistration;
+
+    @Column(name = "vehicle_type")
+    private String vehicleType;
+
     @PrePersist
     protected void onCreate() {
         if (status == null) {

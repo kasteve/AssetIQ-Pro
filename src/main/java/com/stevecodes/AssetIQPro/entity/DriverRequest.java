@@ -22,13 +22,13 @@ public class DriverRequest {
     private Long userId;
 
     @Column(name = "driver_id")
-    private Long driverId;
+    private Long driverId; // -1 = Cab
 
     @Column(name = "request_time", nullable = false)
     private LocalDateTime requestTime;
 
     @Column(nullable = false)
-    private String status; // PENDING, ACCEPTED, DECLINED, COMPLETED
+    private String status; // PENDING, ACCEPTED, DECLINED, RECALLED, COMPLETED, PENDING_ADMIN
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -58,6 +58,29 @@ public class DriverRequest {
     @Column(name = "declined_reason")
     private String declinedReason;
 
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes; // Stores rating and feedback
+
+    // Trip details
+    @Column(name = "pickup_location")
+    private String pickupLocation;
+
+    @Column(name = "dropoff_location")
+    private String dropoffLocation;
+
+    @Column(name = "trip_start_time")
+    private LocalDateTime tripStartTime;
+
+    @Column(name = "trip_end_time")
+    private LocalDateTime tripEndTime;
+
+    // Rating fields
+    @Column(name = "rating")
+    private Integer rating;
+
+    @Column(name = "feedback", columnDefinition = "TEXT")
+    private String feedback;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -69,5 +92,9 @@ public class DriverRequest {
         if (requestTime == null) {
             requestTime = LocalDateTime.now();
         }
+    }
+
+    public boolean isCabRequest() {
+        return driverId != null && driverId == -1L;
     }
 }

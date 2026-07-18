@@ -2,6 +2,7 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.BookingDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.DriverRequest;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
 import com.stevecodes.AssetIQPro.service.AppUserService;
@@ -44,9 +45,13 @@ public class UserRequestController {
         // Driver requests
         model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
 
-        // Get drivers (users with DRIVER role)
-        List<AppUser> drivers = userService.getUsersByRole("DRIVER");
-        model.addAttribute("availableDrivers", drivers);
+        // Get available drivers with booking counts
+        List<AppUser> availableDrivers = driverService.getAvailableDrivers();
+        model.addAttribute("availableDrivers", availableDrivers);
+
+        // All drivers (for the modal popup)
+        List<AppUser> allDrivers = driverService.getAllDrivers();
+        model.addAttribute("allDrivers", allDrivers);
 
         // Room bookings with user names
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
@@ -56,13 +61,56 @@ public class UserRequestController {
         List<Room> availableRooms = roomRepository.findAvailableRooms(LocalDateTime.now());
         model.addAttribute("availableRooms", availableRooms);
 
-        // Resource requests
-        model.addAttribute("resourceRequests", resourceRequestService.getResourceRequestsByUserId(userId));
-
         // Infrastructure requests
         model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
 
         return "bookings/bookings-dashboard";
+    }
+
+    // ============================================
+    // Room Details - Get all bookings for a room
+    // ============================================
+
+    @GetMapping("/room/{roomId}/bookings")
+    @ResponseBody
+    public List<BookingDTO> getRoomBookings(@PathVariable Long roomId) {
+        log.info("Getting all bookings for room: {}", roomId);
+        return bookingService.getRoomBookingsWithUserNames(roomId);
+    }
+
+    @GetMapping("/room/{roomId}")
+    public String viewRoomDetails(@PathVariable Long roomId, Model model) {
+        log.info("Viewing room details for: {}", roomId);
+        Room room = bookingService.getRoomWithBookings(roomId);
+        List<BookingDTO> bookings = bookingService.getRoomBookingsWithUserNames(roomId);
+
+        model.addAttribute("room", room);
+        model.addAttribute("bookings", bookings);
+        return "bookings/room-details-modal";
+    }
+
+    // ============================================
+    // Driver Details - Get driver bookings
+    // ============================================
+
+    @GetMapping("/driver/{driverId}/bookings")
+    @ResponseBody
+    public List<DriverRequest> getDriverBookings(@PathVariable Long driverId) {
+        log.info("Getting bookings for driver: {}", driverId);
+        return driverService.getDriverBookingsLast7Days(driverId);
+    }
+
+    @GetMapping("/driver/{driverId}/details")
+    public String viewDriverDetails(@PathVariable Long driverId, Model model) {
+        log.info("Viewing driver details for: {}", driverId);
+        AppUser driver = userService.getUserById(driverId).orElse(null);
+        int bookingCount = driverService.getDriverBookingCountLast7Days(driverId);
+        List<DriverRequest> bookings = driverService.getDriverBookingsLast7Days(driverId);
+
+        model.addAttribute("driver", driver);
+        model.addAttribute("bookingCount", bookingCount);
+        model.addAttribute("bookings", bookings);
+        return "bookings/driver-details-modal";
     }
 
     // ============================================
@@ -104,15 +152,62 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
-    @PostMapping("/driver-request/{requestId}/cancel")
-    public String cancelDriverRequest(@PathVariable Long requestId,
+    @PostMapping("/driver-request/{requestId}/accept")
+    public String acceptDriverRequest(@PathVariable Long requestId,
+                                      @RequestParam Long driverId,
                                       RedirectAttributes redirectAttributes) {
         try {
-            driverService.recallRequest(requestId);
-            redirectAttributes.addFlashAttribute("success", "Driver request cancelled successfully!");
+            driverService.acceptRequest(requestId, driverId);
+            redirectAttributes.addFlashAttribute("success", "Driver request accepted successfully!");
         } catch (Exception e) {
-            log.error("Error cancelling driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to cancel driver request.");
+            log.error("Error accepting driver request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to accept driver request.");
+        }
+        return "redirect:/bookings/driver-dashboard";
+    }
+
+    @PostMapping("/driver-request/{requestId}/decline")
+    public String declineDriverRequest(@PathVariable Long requestId,
+                                       @RequestParam Long driverId,
+                                       @RequestParam String reason,
+                                       RedirectAttributes redirectAttributes) {
+        try {
+            driverService.declineRequest(requestId, driverId, reason);
+            redirectAttributes.addFlashAttribute("success", "Driver request declined successfully!");
+        } catch (Exception e) {
+            log.error("Error declining driver request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to decline driver request.");
+        }
+        return "redirect:/bookings/driver-dashboard";
+    }
+
+    @PostMapping("/driver-request/{requestId}/complete")
+    public String completeTrip(@PathVariable Long requestId,
+                               @RequestParam Long driverId,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            driverService.completeTrip(requestId, driverId);
+            redirectAttributes.addFlashAttribute("success", "Trip completed successfully!");
+        } catch (Exception e) {
+            log.error("Error completing trip: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to complete trip.");
+        }
+        return "redirect:/bookings/driver-dashboard";
+    }
+
+    @PostMapping("/driver-request/{requestId}/rate")
+    public String rateDriver(@PathVariable Long requestId,
+                             @RequestParam int rating,
+                             @RequestParam(required = false) String feedback,
+                             HttpSession session,
+                             RedirectAttributes redirectAttributes) {
+        try {
+            Long userId = (Long) session.getAttribute("userId");
+            driverService.rateDriver(requestId, userId, rating, feedback);
+            redirectAttributes.addFlashAttribute("success", "Thank you for rating your driver!");
+        } catch (Exception e) {
+            log.error("Error rating driver: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to rate driver.");
         }
         return "redirect:/bookings/bookings-dashboard";
     }
@@ -188,13 +283,13 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
-    @PostMapping("/room/slot-request/{requestId}/approve")
-    public String approveSlotRequest(@PathVariable Long requestId,
+    @PostMapping("/slot-request/{bookingId}/approve")
+    public String approveSlotRequest(@PathVariable Long bookingId,
                                      HttpSession session,
                                      RedirectAttributes redirectAttributes) {
         try {
             Long userId = (Long) session.getAttribute("userId");
-            bookingService.approveSlotRequest(requestId, userId);
+            bookingService.approveSlotRequest(bookingId, userId);
             redirectAttributes.addFlashAttribute("success", "Slot request approved successfully!");
         } catch (Exception e) {
             log.error("Error approving slot request: {}", e.getMessage());
@@ -203,96 +298,100 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
-    // ============================================
-    // Resource Request Endpoints
-    // ============================================
-
-    @PostMapping("/resource-request/{requestId}/recall")
-    public String recallResourceRequest(@PathVariable Long requestId,
-                                        RedirectAttributes redirectAttributes) {
-        try {
-            resourceRequestService.recallRequest(requestId);
-            redirectAttributes.addFlashAttribute("success", "Resource request recalled successfully!");
-        } catch (Exception e) {
-            log.error("Error recalling resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to recall resource request.");
-        }
-        return "redirect:/bookings/bookings-dashboard";
-    }
-
-    @PostMapping("/resource-request/{requestId}/cancel")
-    public String cancelResourceRequest(@PathVariable Long requestId,
-                                        RedirectAttributes redirectAttributes) {
-        try {
-            resourceRequestService.recallRequest(requestId);
-            redirectAttributes.addFlashAttribute("success", "Resource request cancelled successfully!");
-        } catch (Exception e) {
-            log.error("Error cancelling resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to cancel resource request.");
-        }
-        return "redirect:/bookings/bookings-dashboard";
-    }
-
-    @PostMapping("/resource-request/{requestId}/acknowledge")
-    public String acknowledgeResourceRequest(@PathVariable Long requestId,
-                                             @RequestParam String signature,
-                                             @RequestParam String signatoryName,
-                                             HttpSession session,
-                                             RedirectAttributes redirectAttributes) {
+    @PostMapping("/slot-request/{bookingId}/decline")
+    public String declineSlotRequest(@PathVariable Long bookingId,
+                                     HttpSession session,
+                                     RedirectAttributes redirectAttributes) {
         try {
             Long userId = (Long) session.getAttribute("userId");
-            resourceRequestService.acknowledgeReceipt(requestId, userId, signature, signatoryName);
-            redirectAttributes.addFlashAttribute("success", "Resource request acknowledged successfully!");
+            bookingService.declineSlotRequest(bookingId, userId);
+            redirectAttributes.addFlashAttribute("success", "Slot request declined successfully!");
         } catch (Exception e) {
-            log.error("Error acknowledging resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to acknowledge resource request.");
+            log.error("Error declining slot request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to decline slot request.");
         }
         return "redirect:/bookings/bookings-dashboard";
     }
 
     // ============================================
-    // Admin Resource Request Endpoints (Direct Admin Approval)
+    // Server Room - Infrastructure Approval
     // ============================================
 
-    @PostMapping("/resource-request/{requestId}/admin-accept")
-    public String acceptResourceRequest(@PathVariable Long requestId,
-                                        @RequestParam(required = false) String adminComment,
-                                        RedirectAttributes redirectAttributes) {
+    @PostMapping("/server-room/{bookingId}/approve")
+    public String approveServerRoom(@PathVariable Long bookingId,
+                                    @RequestParam String comment,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
         try {
-            resourceRequestService.acceptResourceRequest(requestId, adminComment);
-            redirectAttributes.addFlashAttribute("success", "Resource request accepted successfully!");
+            Long userId = (Long) session.getAttribute("userId");
+            bookingService.approveServerRoom(bookingId, userId, comment);
+            redirectAttributes.addFlashAttribute("success", "Server room booking approved successfully!");
         } catch (Exception e) {
-            log.error("Error accepting resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to accept resource request.");
+            log.error("Error approving server room: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to approve server room.");
         }
-        return "redirect:/bookings/bookings-dashboard";
+        return "redirect:/admin/server-room-requests";
     }
 
-    @PostMapping("/resource-request/{requestId}/admin-decline")
-    public String declineResourceRequest(@PathVariable Long requestId,
-                                         @RequestParam String reason,
-                                         RedirectAttributes redirectAttributes) {
+    @PostMapping("/server-room/{bookingId}/decline")
+    public String declineServerRoom(@PathVariable Long bookingId,
+                                    @RequestParam String reason,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes) {
         try {
-            resourceRequestService.declineResourceRequest(requestId, reason);
-            redirectAttributes.addFlashAttribute("success", "Resource request declined successfully!");
+            Long userId = (Long) session.getAttribute("userId");
+            bookingService.declineServerRoom(bookingId, userId, reason);
+            redirectAttributes.addFlashAttribute("success", "Server room booking declined successfully!");
         } catch (Exception e) {
-            log.error("Error declining resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to decline resource request.");
+            log.error("Error declining server room: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to decline server room.");
         }
-        return "redirect:/bookings/bookings-dashboard";
+        return "redirect:/admin/server-room-requests";
     }
 
-    @PostMapping("/resource-request/{requestId}/admin-complete")
-    public String completeResourceRequest(@PathVariable Long requestId,
-                                          @RequestParam(required = false) String deliveryNotes,
-                                          RedirectAttributes redirectAttributes) {
+    @PostMapping("/server-room/{bookingId}/signout")
+    public String generateServerRoomSignOut(@PathVariable Long bookingId,
+                                            HttpSession session,
+                                            RedirectAttributes redirectAttributes) {
         try {
-            resourceRequestService.completeResourceRequest(requestId, deliveryNotes);
-            redirectAttributes.addFlashAttribute("success", "Resource request marked as completed successfully!");
+            Long userId = (Long) session.getAttribute("userId");
+            String link = bookingService.generateServerRoomSignOutLink(bookingId, userId);
+            redirectAttributes.addFlashAttribute("success", "Sign-out link generated and sent to requester: " + link);
         } catch (Exception e) {
-            log.error("Error completing resource request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to complete resource request.");
+            log.error("Error generating sign-out link: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to generate sign-out link.");
         }
-        return "redirect:/bookings/bookings-dashboard";
+        return "redirect:/admin/server-room-requests";
+    }
+
+    @GetMapping("/server-room/sign-out")
+    public String showServerRoomSignOut(@RequestParam String token, Model model) {
+        model.addAttribute("token", token);
+        return "bookings/server-room-signout";
+    }
+
+    @PostMapping("/server-room/sign-out")
+    public String completeServerRoomSignOut(@RequestParam String token,
+                                            @RequestParam String signature,
+                                            RedirectAttributes redirectAttributes) {
+        try {
+            bookingService.completeServerRoomSignOut(token, signature);
+            redirectAttributes.addFlashAttribute("message", "Server room sign-out completed successfully. Thank you!");
+            return "redirect:/bookings/server-room/signout-thankyou";
+        } catch (Exception e) {
+            log.error("Error completing sign-out: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to sign out: " + e.getMessage());
+            return "redirect:/bookings/server-room/signout-error";
+        }
+    }
+
+    @GetMapping("/server-room/signout-thankyou")
+    public String signOutThankYou() {
+        return "bookings/server-room-signout-thankyou";
+    }
+
+    @GetMapping("/server-room/signout-error")
+    public String signOutError() {
+        return "bookings/server-room-signout-error";
     }
 }

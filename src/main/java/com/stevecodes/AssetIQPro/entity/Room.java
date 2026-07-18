@@ -19,11 +19,32 @@ public class Room {
     private String roomName;
 
     @Column(name = "room_type")
-    private String roomType;
+    private String roomType; // Boardroom, Meeting Room, Server Room, Office, etc.
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private RoomStatus status = RoomStatus.AVAILABLE;
+
+    @Column(name = "capacity")
+    private Integer capacity;
+
+    @Column(name = "floor")
+    private String floor;
+
+    @Column(name = "building")
+    private String building;
+
+    @Column(name = "has_projector")
+    private Boolean hasProjector = false;
+
+    @Column(name = "has_whiteboard")
+    private Boolean hasWhiteboard = false;
+
+    @Column(name = "has_video_conferencing")
+    private Boolean hasVideoConferencing = false;
+
+    @Column(name = "description")
+    private String description;
 
     public enum RoomStatus {
         AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED

@@ -47,11 +47,59 @@ public class Booking {
     @Column(name = "purpose")
     private String purpose;
 
-    @Column(name = "notes")
+    @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // Server Room specific fields
+    @Column(name = "approved_by")
+    private Long approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "declined_by")
+    private Long declinedBy;
+
+    @Column(name = "declined_at")
+    private LocalDateTime declinedAt;
+
+    @Column(name = "declined_reason")
+    private String declinedReason;
+
+    @Column(name = "signout_token")
+    private String signoutToken;
+
+    @Column(name = "signout_token_expiry")
+    private LocalDateTime signoutTokenExpiry;
+
+    @Column(name = "signed_out_at")
+    private LocalDateTime signedOutAt;
+
+    @Column(name = "signature")
+    private String signature;
+
+    @Column(name = "signatory_name")
+    private String signatoryName;
+
+    // Slot Request fields
+    @Column(name = "slot_request_user_id")
+    private Long slotRequestUserId;
+
+    @Column(name = "slot_request_user_name")
+    private String slotRequestUserName;
+
+    @Column(name = "slot_request_at")
+    private LocalDateTime slotRequestAt;
+
+    @Column(name = "slot_request_status")
+    private String slotRequestStatus; // PENDING, APPROVED, DECLINED
+
     public enum BookingStatus {
-        PENDING, CONFIRMED, CANCELLED, ACTIVE, BOOKED
+        PENDING,      // Waiting for approval (Server Room)
+        BOOKED,       // Confirmed booking
+        CONFIRMED,    // Completed/Signed out
+        CANCELLED,    // Cancelled
+        ACTIVE        // Currently in use (Server Room)
     }
 
     @PrePersist

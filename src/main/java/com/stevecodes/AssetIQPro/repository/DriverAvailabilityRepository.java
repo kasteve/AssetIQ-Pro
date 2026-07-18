@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface DriverAvailabilityRepository extends JpaRepository<DriverAvailability, Long> {
 
     Optional<DriverAvailability> findByDriverId(Long driverId);
+
+    void deleteByDriverId(Long driverId);
 }
