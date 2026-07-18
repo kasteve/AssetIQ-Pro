@@ -81,7 +81,7 @@ public class DriverService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startDate = now.minusDays(MAX_DAYS);
         return driverRequestRepository.findByDriverIdAndRequestTimeBetweenAndStatusIn(
-                driverId, startDate, now, List.of("ACCEPTED", "COMPLETED")
+                driverId, startDate, now, List.of("PENDING", "ACCEPTED", "COMPLETED")
         );
     }
 
