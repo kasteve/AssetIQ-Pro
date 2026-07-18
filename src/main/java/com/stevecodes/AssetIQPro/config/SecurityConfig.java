@@ -79,7 +79,6 @@ public class SecurityConfig implements WebMvcConfigurer {
                             .collect(java.util.stream.Collectors.toList());
                     session.setAttribute("permissionNames", permissionNames);
 
-                    // Log authorities for debugging
                     System.out.println("User: " + username + " has permissions: " + permissionNames);
                 }
 
@@ -104,6 +103,19 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/api/public/**",
                                 "/transfer/sign/**",
                                 "/transfers/sign/**",
+                                // ============================================
+                                // INFRASTRUCTURE REQUEST SIGN PAGES - PUBLIC
+                                // ============================================
+                                "/infra-requests/sign",
+                                "/infra-requests/sign-thankyou",
+                                "/infra-requests/sign-error",
+                                // ============================================
+                                // RESOURCE REQUEST SIGN PAGES - PUBLIC
+                                // ============================================
+                                "/resources/sign",
+                                "/resources/sign-thankyou",
+                                "/resources/sign-error",
+                                // ============================================
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
