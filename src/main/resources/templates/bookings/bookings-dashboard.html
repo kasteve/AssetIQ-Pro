@@ -36,21 +36,23 @@
                 </div>
                 <div class="card-body">
 
-                    <!-- Available Drivers -->
+                    <!-- All Drivers (click any to view their bookings and decide) -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">Available Drivers</small>
-                            <span class="badge bg-success" th:text="${availableDrivers != null ? availableDrivers.size() : 0}">0</span>
+                            <small class="text-muted fw-semibold">Drivers</small>
+                            <span class="badge bg-success" th:text="${allDrivers != null ? allDrivers.size() : 0}">0</span>
                         </div>
 
-                        <div th:if="${availableDrivers != null and !availableDrivers.isEmpty()}">
-                            <div th:each="driver : ${availableDrivers}"
+                        <div th:if="${allDrivers != null and !allDrivers.isEmpty()}">
+                            <div th:each="driver : ${allDrivers}"
                                  class="driver-item"
                                  th:data-driverid="${driver.userId}"
                                  th:data-drivername="${driver.fullName}">
                                 <div>
                                     <span class="driver-name" th:text="${driver.fullName}">Driver Name</span>
-                                    <span class="driver-status available">Available</span>
+                                    <span class="driver-status"
+                                          th:classappend="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'available' : 'busy'"
+                                          th:text="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'Available' : 'Busy'">Available</span>
                                 </div>
                                 <div>
                                     <span class="booking-count">View bookings</span>
@@ -59,9 +61,9 @@
                             </div>
                         </div>
 
-                        <div th:if="${availableDrivers == null or availableDrivers.isEmpty()}" class="empty-state-sm">
+                        <div th:if="${allDrivers == null or allDrivers.isEmpty()}" class="empty-state-sm">
                             <i class="fas fa-car"></i>
-                            No drivers available at the moment
+                            No drivers on record
                         </div>
                     </div>
 
@@ -108,7 +110,7 @@
 
                 </div>
                 <div class="card-footer">
-                    <small class="text-muted">Click on a driver to view their upcoming bookings (next 7 days)</small>
+                    <small class="text-muted">Click on any driver to view their bookings and decide</small>
                 </div>
             </div>
         </div>
@@ -122,15 +124,15 @@
                 </div>
                 <div class="card-body">
 
-                    <!-- Available Rooms -->
+                    <!-- All Rooms (click any to view their bookings and decide) -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">Available Rooms</small>
-                            <span class="badge bg-success" th:text="${availableRooms != null ? availableRooms.size() : 0}">0</span>
+                            <small class="text-muted fw-semibold">Rooms</small>
+                            <span class="badge bg-success" th:text="${allRooms != null ? allRooms.size() : 0}">0</span>
                         </div>
 
-                        <div th:if="${availableRooms != null and !availableRooms.isEmpty()}">
-                            <div th:each="room : ${availableRooms}"
+                        <div th:if="${allRooms != null and !allRooms.isEmpty()}">
+                            <div th:each="room : ${allRooms}"
                                  class="room-item"
                                  th:data-roomid="${room.roomId}"
                                  th:data-roomname="${room.roomName}"
@@ -140,15 +142,17 @@
                                     <span class="room-type" th:text="${room.roomType}">Type</span>
                                 </div>
                                 <div>
-                                    <span class="room-status available">Available</span>
+                                    <span class="room-status"
+                                          th:classappend="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'available' : 'occupied'"
+                                          th:text="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'Available' : 'Occupied'">Available</span>
                                     <i class="fas fa-chevron-right ms-2 text-muted" style="font-size: 12px;"></i>
                                 </div>
                             </div>
                         </div>
 
-                        <div th:if="${availableRooms == null or availableRooms.isEmpty()}" class="empty-state-sm">
+                        <div th:if="${allRooms == null or allRooms.isEmpty()}" class="empty-state-sm">
                             <i class="fas fa-door-open"></i>
-                            No rooms available at the moment
+                            No rooms on record
                         </div>
                     </div>
 
@@ -202,7 +206,7 @@
 
                 </div>
                 <div class="card-footer">
-                    <small class="text-muted">Click on a room to view all upcoming bookings by other employees</small>
+                    <small class="text-muted">Click on any room to view its bookings and decide</small>
                 </div>
             </div>
         </div>
@@ -678,20 +682,16 @@
                     return response.json();
                 })
                 .then(allBookings => {
-                    const now = new Date();
-                    const sevenDaysFromNow = new Date();
-                    sevenDaysFromNow.setDate(now.getDate() + 7);
+                    // Show everything the backend returns for this room — pending, approved/booked,
+                    // and completed alike. Filtering to "next 7 days" here was silently hiding
+                    // legitimate pending/approved requests whose scheduled time fell outside that window.
+                    const bookings = (allBookings || []).slice().sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
-                    const upcomingBookings = (allBookings || []).filter(b => {
-                        const bookingDate = new Date(b.startTime);
-                        return bookingDate >= now && bookingDate <= sevenDaysFromNow;
-                    });
-
-                    if (upcomingBookings.length === 0) {
+                    if (bookings.length === 0) {
                         body.innerHTML = `
                             <div class="text-center py-4">
                                 <i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i>
-                                <p class="text-muted mt-2">No upcoming bookings in the next 7 days</p>
+                                <p class="text-muted mt-2">No bookings found for this room</p>
                                 <small class="text-muted">Room Type: <strong>${roomType || 'N/A'}</strong></small>
                             </div>
                         `;
@@ -700,16 +700,13 @@
 
                     let html = `
                         <div class="mb-3">
-                            <div class="d-flex justify-content-between">
-                                <small class="text-muted">Upcoming Bookings (Next 7 Days): <strong>${upcomingBookings.length}</strong></small>
-                                <small class="text-muted">${now.toLocaleDateString()} - ${sevenDaysFromNow.toLocaleDateString()}</small>
-                            </div>
+                            <small class="text-muted">Total Bookings: <strong>${bookings.length}</strong></small>
                             <small class="text-muted d-block">Room Type: <strong>${roomType || 'N/A'}</strong></small>
                         </div>
                         <div class="list-group">
                     `;
 
-                    upcomingBookings.forEach(booking => {
+                    bookings.forEach(booking => {
                         const statusClass = booking.status === 'BOOKED' ? 'booked' :
                                            booking.status === 'CONFIRMED' ? 'completed' :
                                            booking.status === 'PENDING' ? 'pending' : 'cancelled';

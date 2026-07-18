@@ -17,6 +17,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,6 +65,13 @@ public class UserRequestController {
         // Available rooms
         List<Room> availableRooms = roomRepository.findAvailableRooms(LocalDateTime.now());
         model.addAttribute("availableRooms", availableRooms);
+
+        // IDs of currently-available drivers/rooms, used to badge them Available/Busy in the full list
+        Set<Long> availableDriverIds = availableDrivers.stream().map(AppUser::getUserId).collect(Collectors.toSet());
+        model.addAttribute("availableDriverIds", availableDriverIds);
+
+        Set<Long> availableRoomIds = availableRooms.stream().map(Room::getRoomId).collect(Collectors.toSet());
+        model.addAttribute("availableRoomIds", availableRoomIds);
 
         // Infrastructure requests
         model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
