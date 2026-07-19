@@ -706,7 +706,6 @@ public class BookingService {
 
         if (infraUsers.isEmpty()) {
             log.error("No infrastructure approvers found in the system!");
-            // Send to default admin email as fallback
             emailService.sendSimpleEmail(
                     "admin@company.com",
                     "Server Room Booking Requires Approval - #" + booking.getBookingId(),
@@ -723,24 +722,21 @@ public class BookingService {
                     .orElse("Unknown");
 
             String emailBody = String.format("""
-                    A server room booking requires your approval:
-                    
-                    Room: %s
-                    Requester: %s
-                    Date: %s
-                    Time: %s - %s
-                    Purpose: %s
-                    Booking ID: #%d
-                    
-                    Please review and respond using the link below:
-                    %s
-                    
-                    Approve: %s?action=approve
-                    Decline: %s?action=decline
-                    
-                    Regards,
-                    AssetIQ-Pro System
-                    """,
+                A server room booking requires your approval:
+                
+                Room: %s
+                Requester: %s
+                Date: %s
+                Time: %s - %s
+                Purpose: %s
+                Booking ID: #%d
+                
+                Please review and respond using the link below:
+                %s
+                
+                Regards,
+                AssetIQ-Pro System
+                """,
                     roomName,
                     requesterName,
                     booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
@@ -748,8 +744,6 @@ public class BookingService {
                     booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")),
                     booking.getPurpose() != null ? booking.getPurpose() : "N/A",
                     booking.getBookingId(),
-                    approvalLink,
-                    approvalLink,
                     approvalLink
             );
 

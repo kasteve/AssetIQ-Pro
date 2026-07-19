@@ -2,7 +2,9 @@ package com.stevecodes.AssetIQPro.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -14,6 +16,8 @@ import java.util.List;
 @Table(name = "app_users")
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(exclude = {"permissions", "employee", "departmentEntity"})
+@ToString(exclude = {"permissions", "employee", "departmentEntity"})
 public class AppUser {
 
     @Id
@@ -71,13 +75,13 @@ public class AppUser {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // New: Department relationship
-    @ManyToOne
+    // Department relationship
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     private Department departmentEntity;
 
-    // New: Employee relationship (one-to-one)
-    @OneToOne
+    // Employee relationship (one-to-one)
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
@@ -104,7 +108,7 @@ public class AppUser {
         return role != null && role.equals(roleName);
     }
 
-    // Admin check - uses MANAGE_ROLES permission (since ADMIN is a role, not permission)
+    // Admin check - uses MANAGE_ROLES permission
     public boolean isAdmin() {
         return hasPermission("MANAGE_ROLES") ||
                 hasPermission("ADMIN") ||
@@ -138,5 +142,23 @@ public class AppUser {
 
     public boolean canManageResources() {
         return hasPermission("MANAGE_RESOURCE_REQUESTS") || isAdmin();
+    }
+
+    public boolean isInfrastructure() {
+        return hasRole("INFRA") || hasRole("INFRASTRUCTURE") || hasPermission("APPROVE_INFRA");
+    }
+
+    public String getFullName() {
+        if (fullName != null && !fullName.isEmpty()) {
+            return fullName;
+        }
+        if (employee != null) {
+            return employee.getFullName();
+        }
+        return username;
+    }
+
+    public String getEmail() {
+        return email;
     }
 }

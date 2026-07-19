@@ -2,7 +2,9 @@ package com.stevecodes.AssetIQPro.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +13,8 @@ import java.util.List;
 @Table(name = "Employees", schema = "dbo")
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(exclude = {"department", "user", "lineManager", "subordinates"})
+@ToString(exclude = {"department", "user", "lineManager", "subordinates"})
 public class Employee {
 
     @Id
@@ -33,21 +37,21 @@ public class Employee {
     @Column(name = "phoneNumber")
     private String phoneNumber;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "DepartmentId")
     private Department department;
 
-    @Transient
+    @Column(name = "DepartmentId", insertable = false, updatable = false)
     private Integer departmentId;
 
-    @OneToOne(mappedBy = "employee")
+    @OneToOne(fetch = FetchType.LAZY, mappedBy = "employee")
     private AppUser user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "line_manager_id")
     private Employee lineManager;
 
-    @OneToMany(mappedBy = "lineManager")
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "lineManager")
     private List<Employee> subordinates = new ArrayList<>();
 
     public String getFullName() {

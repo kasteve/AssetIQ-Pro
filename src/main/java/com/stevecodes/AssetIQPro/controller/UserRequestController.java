@@ -583,6 +583,10 @@ public class UserRequestController {
         }
     }
 
+    // ============================================
+    // Server Room - Sign Out
+    // ============================================
+
     @GetMapping("/server-room/sign-out")
     public String showServerRoomSignOut(@RequestParam String token, Model model) {
         log.info("Showing server room sign-out page for token: {}", token);

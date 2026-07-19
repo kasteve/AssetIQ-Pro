@@ -9,8 +9,8 @@
 </head>
 
 <body>
-<!-- data-current-user-id lets JS know who is logged in without embedding raw SpEL in <script> -->
-<div layout:fragment="content" th:data-current-user-id="${session.userId}">
+<!-- data-current-user-id and data-user-role lets JS know who is logged in -->
+<div layout:fragment="content" th:data-current-user-id="${session.userId}" th:data-user-role="${session.role}">
 
     <!-- ============================================ -->
     <!-- SUCCESS / ERROR MESSAGES -->
@@ -196,6 +196,7 @@
                                                           (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))"
                                           th:text="${booking.status}">BOOKED</span>
 
+                                    <!-- Recall for OWNER -->
                                     <div th:if="${booking.status == 'BOOKED' and booking.userId == session.userId}">
                                         <button class="btn btn-sm btn-warning mt-1 recall-btn"
                                                 th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
@@ -203,10 +204,29 @@
                                         </button>
                                     </div>
 
-                                    <div th:if="${booking.status == 'BOOKED' and booking.userId != session.userId}">
+                                    <!-- Request Slot for NON-OWNER (Regular Rooms only) -->
+                                    <div th:if="${booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
                                         <button class="btn btn-sm btn-info mt-1 recall-btn"
                                                 th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
                                             <i class="fas fa-handshake"></i> Request
+                                        </button>
+                                    </div>
+
+                                    <!-- Sign Out Button - INFRA only for Server Rooms -->
+                                    <div th:if="${(session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                        <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
+                                            <input type="hidden" name="infraComment" value="Signing out user">
+                                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <!-- Cancel Button - INFRA only -->
+                                    <div th:if="${(session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING')}">
+                                        <button class="btn btn-sm btn-danger mt-1 w-100"
+                                                th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
+                                            <i class="fas fa-times me-1"></i>Cancel
                                         </button>
                                     </div>
                                 </div>
@@ -560,8 +580,9 @@
 
 <div layout:fragment="scripts">
     <script>
-        // Current logged-in user id
+        // Current logged-in user id and role
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
+        const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
 
         // ============================================
         // Pagination
@@ -716,7 +737,7 @@
         }
 
         // ============================================
-        // View Room Details - Shows active/future bookings with "IN USE" status
+        // View Room Details - Shows active/future bookings with "IN USE" status and INFRA actions
         // ============================================
         function viewRoomDetails(roomId, roomName, roomType) {
             const modal = new bootstrap.Modal(document.getElementById('roomDetailsModal'));
@@ -757,6 +778,9 @@
                         return;
                     }
 
+                    const isInfra = USER_ROLE === 'INFRA' || USER_ROLE === 'INFRASTRUCTURE';
+                    const isServerRoom = roomName && (roomName.toLowerCase().includes('server') || roomType === 'Server Room');
+
                     let html = `
                         <div class="mb-3">
                             <small class="text-muted">Active & Future Bookings: <strong>${bookings.length}</strong></small>
@@ -770,7 +794,6 @@
                         const end = new Date(booking.endTime);
                         const isCurrentlyActive = start <= now && end >= now;
                         const isOwner = Number(booking.userId) === CURRENT_USER_ID;
-                        const isAdmin = false; // Set based on user role if needed
 
                         // Determine status display
                         let displayStatus = booking.status || 'BOOKED';
@@ -794,17 +817,32 @@
                                     <div class="time-slot">${start.toLocaleString()} - ${end.toLocaleString()}</div>
                                     ${booking.purpose ? `<div class="time-slot">Purpose: ${booking.purpose}</div>` : ''}
                                     ${booking.notes ? `<div class="time-slot">Notes: ${booking.notes}</div>` : ''}
+                                    ${isCurrentlyActive ? `<div class="time-slot fw-bold text-primary">🟢 Currently In Use</div>` : ''}
                                 </div>
                                 <div class="text-end">
                                     <span class="status-badge ${statusClass}">${displayStatus}</span>
-                                    ${booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner ? `
+
+                                    <!-- Slot Request - Only for regular rooms, not server rooms -->
+                                    ${booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom ? `
                                         <button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(${booking.bookingId})">
                                             <i class="fas fa-handshake me-1"></i>Request Slot
                                         </button>
                                     ` : ''}
-                                    ${isAdmin ? `
-                                        <button class="btn btn-sm btn-danger mt-1" onclick="adminCancelBooking(${booking.bookingId})">
-                                            <i class="fas fa-times"></i> Cancel
+
+                                    <!-- Sign Out Button - Only INFRA users on Server Room bookings -->
+                                    ${isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE') ? `
+                                        <form action="/assetIQ-pro/bookings/server-room/${booking.bookingId}/signout-link" method="post" class="mt-1">
+                                            <input type="hidden" name="infraComment" value="Signing out user">
+                                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                            </button>
+                                        </form>
+                                    ` : ''}
+
+                                    <!-- Cancel Button - Only INFRA users -->
+                                    ${isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING') ? `
+                                        <button class="btn btn-sm btn-danger mt-1 w-100" onclick="adminCancelBooking(${booking.bookingId})">
+                                            <i class="fas fa-times me-1"></i>Cancel
                                         </button>
                                     ` : ''}
                                 </div>
@@ -854,7 +892,7 @@
         }
 
         // ============================================
-        // Admin Cancel Booking
+        // Admin / INFRA Cancel Booking
         // ============================================
         function adminCancelBooking(bookingId) {
             if (confirm('Are you sure you want to cancel this booking?')) {
