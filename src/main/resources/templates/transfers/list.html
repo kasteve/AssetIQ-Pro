@@ -21,6 +21,18 @@
         </button>
     </div>
 
+    <!-- Success/Error Messages -->
+    <div th:if="${success != null}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span th:text="${success}">Success</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
     <div class="table-card">
         <div class="table-responsive">
             <table id="transfersTable" class="table table-hover transfers-table">
@@ -69,10 +81,13 @@
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
-                            <a th:href="@{/transfers/{id}(id=${transfer.transferId})}" class="btn btn-outline-info" title="View">
+                            <!-- View Button - Opens Modal -->
+                            <button type="button" class="btn btn-outline-info" title="View"
+                                    th:data-transferid="${transfer.transferId}"
+                                    onclick="viewTransfer(this)">
                                 <i class="fas fa-eye"></i>
-                            </a>
-                            <a th:href="@{/transfers/{id}/pdf(id=${transfer.transferId})}" class="btn btn-outline-secondary" title="Download PDF">
+                            </button>
+                            <a th:href="@{/transfers/{id}/pdf(id=${transfer.transferId})}" class="btn btn-outline-secondary" title="Download PDF" target="_blank">
                                 <i class="fas fa-file-pdf"></i>
                             </a>
                             <form th:action="@{/transfers/{id}/initiate-signing(id=${transfer.transferId})}" method="post" style="display:inline;">
@@ -92,7 +107,36 @@
         </div>
     </div>
 
-    <!-- Create Transfer Modal -->
+    <!-- ============================================================ -->
+    <!-- VIEW TRANSFER MODAL -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="viewTransferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-exchange-alt me-2" style="color: #0d6efd;"></i>Transfer #<span id="viewTransferId"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="transferDetailBody">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="pdfFromViewBtn" onclick="downloadPDFFromView()">
+                        <i class="fas fa-file-pdf me-2"></i>Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CREATE TRANSFER MODAL -->
+    <!-- ============================================================ -->
     <div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -182,28 +226,28 @@
                                     <label class="form-label fw-semibold">From Employee</label>
                                     <select name="oldEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">To Employee</label>
                                     <select name="newEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Infrastructure Representative</label>
                                     <select name="infraRepresentativeId" class="form-select">
                                         <option value="">Select Infrastructure Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Finance Representative</label>
                                     <select name="financeRepresentativeId" class="form-select">
                                         <option value="">Select Finance Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                             </div>
@@ -243,35 +287,35 @@
                                     <label class="form-label fw-semibold">Old Handover By</label>
                                     <select name="oldHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Old Received By</label>
                                     <select name="oldReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Handover By</label>
                                     <select name="newHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Received By</label>
                                     <select name="newReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Configured By</label>
                                     <select name="configuredById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
                                     </select>
                                 </div>
                             </div>
@@ -333,6 +377,34 @@
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
+
+        /* Modal Styles */
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
+        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        .detail-item { margin-bottom: 12px; }
+        .detail-item .label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa0a6; display: block; }
+        .detail-item .value { font-size: 14px; color: var(--ink); font-weight: 500; }
+
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-badge.completed { background: #d4edda; color: #157a34; }
+        .status-badge.pending { background: #fff3cd; color: #a3720a; }
+        .status-badge.signed { background: #d4edda; color: #157a34; }
+
+        .modal-body .table thead th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #9aa0a6; border-bottom: 1px solid #eef0f3; padding: 10px 14px; background: #fafbfc; }
+        .modal-body .table tbody td { padding: 10px 14px; font-size: 13px; color: var(--ink); vertical-align: middle; border-bottom: 1px solid #f5f6f8; }
+        .modal-body .table tbody tr:last-child td { border-bottom: none; }
+        .modal-body .table tbody tr:hover { background: #f8f9fb; }
+
+        .alert { border-radius: 12px !important; border: none !important; padding: 16px 20px !important; margin-bottom: 20px !important; font-weight: 500 !important; }
+        .alert-success { background: #e6f7ec !important; color: #198754 !important; }
+        .alert-danger { background: #fdeeee !important; color: #dc3545 !important; }
+        .alert i { font-size: 18px; }
 
         /* Wizard modal */
         .modal-lg { max-width: 720px; }
@@ -407,6 +479,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
     <script th:inline="none">
+        let currentTransferId = null;
+
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#transfersTable')) {
                 $('#transfersTable').DataTable().destroy();
@@ -436,9 +510,360 @@
                 }
             });
         });
-    </script>
 
-    <script>
+        // ============================================
+        // View Transfer - Modal
+        // ============================================
+        function viewTransfer(button) {
+            const id = button.getAttribute('data-transferid');
+            currentTransferId = id;
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewTransferModal'));
+            const body = document.getElementById('transferDetailBody');
+            const pdfBtn = document.getElementById('pdfFromViewBtn');
+
+            body.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            modal.show();
+
+            fetch('/assetIQ-pro/api/transfers/' + id)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load transfer details');
+                    return response.json();
+                })
+                .then(transfer => {
+                    document.getElementById('viewTransferId').textContent = transfer.transferId;
+
+                    const isFullySigned = transfer.fullySigned || false;
+
+                    body.innerHTML = `
+                        <!-- Status Badge -->
+                        <div class="mb-3">
+                            <span class="status-badge ${isFullySigned ? 'completed' : 'pending'}">
+                                ${isFullySigned ? '✅ Fully Signed' : '⏳ Pending Signatures'}
+                            </span>
+                            <span class="ms-2 text-muted small">
+                                Transfer Date: ${transfer.transferDate || 'N/A'}
+                            </span>
+                        </div>
+
+                        <div class="row">
+                            <!-- Asset Info -->
+                            <div class="col-md-6">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-laptop me-2" style="color: #0d6efd;"></i>Asset Information</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Asset Tag</span>
+                                            <span class="value fw-bold">${transfer.assetTag || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Serial Number</span>
+                                            <span class="value">${transfer.serialNumber || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Version / Make</span>
+                                            <span class="value">${transfer.versionMake || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Model / Build</span>
+                                            <span class="value">${transfer.modelBuild || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Category</span>
+                                            <span class="value">${transfer.categoryName || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Company</span>
+                                            <span class="value">${transfer.companyName || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Transfer Info -->
+                            <div class="col-md-6">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-people-arrows me-2" style="color: #6f42c1;"></i>Transfer Information</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="detail-item">
+                                                    <span class="label">From Department</span>
+                                                    <span class="value">${transfer.oldDepartmentName || 'N/A'}</span>
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">From Employee</span>
+                                                    <span class="value">${transfer.oldEmployeeName || 'N/A'}</span>
+                                                    ${transfer.oldEmployeeStaffId ? `<span class="staff-id">(${transfer.oldEmployeeStaffId})</span>` : ''}
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">Old Handover By</span>
+                                                    <span class="value">${transfer.oldHandoverByName || 'N/A'}</span>
+                                                    ${transfer.oldHandoverByStaffId ? `<span class="staff-id">(${transfer.oldHandoverByStaffId})</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="detail-item">
+                                                    <span class="label">To Department</span>
+                                                    <span class="value">${transfer.newDepartmentName || 'N/A'}</span>
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">To Employee</span>
+                                                    <span class="value">${transfer.newEmployeeName || 'N/A'}</span>
+                                                    ${transfer.newEmployeeStaffId ? `<span class="staff-id">(${transfer.newEmployeeStaffId})</span>` : ''}
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">New Handover By</span>
+                                                    <span class="value">${transfer.newHandoverByName || 'N/A'}</span>
+                                                    ${transfer.newHandoverByStaffId ? `<span class="staff-id">(${transfer.newHandoverByStaffId})</span>` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reps -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-user-cog me-2" style="color: #17a2b8;"></i>Configured By</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Name</span>
+                                            <span class="value">${transfer.configuredByName || 'N/A'}</span>
+                                            ${transfer.configuredByStaffId ? `<span class="staff-id">(${transfer.configuredByStaffId})</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-server me-2" style="color: #28a745;"></i>Infrastructure Representative</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Name</span>
+                                            <span class="value">${transfer.infraRepresentativeName || 'N/A'}</span>
+                                            ${transfer.infraRepresentativeStaffId ? `<span class="staff-id">(${transfer.infraRepresentativeStaffId})</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-coins me-2" style="color: #fd7e14;"></i>Finance Representative</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Name</span>
+                                            <span class="value">${transfer.financeRepresentativeName || 'N/A'}</span>
+                                            ${transfer.financeRepresentativeStaffId ? `<span class="staff-id">(${transfer.financeRepresentativeStaffId})</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Condition & Accessories -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-clipboard-check me-2" style="color: #6c757d;"></i>Condition</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="detail-item">
+                                                    <span class="label">Previous Condition</span>
+                                                    <span class="value">${transfer.conditionOld || 'N/A'}</span>
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">Previous Accessories</span>
+                                                    <span class="value">${transfer.accessoriesOld || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="detail-item">
+                                                    <span class="label">Current Condition</span>
+                                                    <span class="value">${transfer.conditionNew || 'N/A'}</span>
+                                                </div>
+                                                <div class="detail-item">
+                                                    <span class="label">Current Accessories</span>
+                                                    <span class="value">${transfer.accessoriesNew || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="panel-card">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-sticky-note me-2" style="color: #6c757d;"></i>Additional Information</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Software Installed</span>
+                                            <span class="value">${transfer.softwareInstalled || 'N/A'}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Comments</span>
+                                            <span class="value">${transfer.comments || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Signature Status -->
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <h6><i class="fas fa-signature me-2" style="color: #198754;"></i>Signature Status</h6>
+                            </div>
+                            <div class="panel-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Role</th>
+                                                <th>Name</th>
+                                                <th>Staff ID</th>
+                                                <th>Status</th>
+                                                <th>Signed At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Configured By</td>
+                                                <td>${transfer.configuredByName || 'N/A'}</td>
+                                                <td>${transfer.configuredByStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.configuredBySignature ? 'signed' : 'pending'}">
+                                                        ${transfer.configuredBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.configuredBySignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Old Handover By</td>
+                                                <td>${transfer.oldHandoverByName || 'N/A'}</td>
+                                                <td>${transfer.oldHandoverByStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.oldHandoverBySignature ? 'signed' : 'pending'}">
+                                                        ${transfer.oldHandoverBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.oldHandoverBySignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Old Received By</td>
+                                                <td>${transfer.oldReceivedByName || 'N/A'}</td>
+                                                <td>${transfer.oldReceivedByStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.oldReceivedBySignature ? 'signed' : 'pending'}">
+                                                        ${transfer.oldReceivedBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.oldReceivedBySignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>New Handover By</td>
+                                                <td>${transfer.newHandoverByName || 'N/A'}</td>
+                                                <td>${transfer.newHandoverByStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.newHandoverBySignature ? 'signed' : 'pending'}">
+                                                        ${transfer.newHandoverBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.newHandoverBySignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>New Received By</td>
+                                                <td>${transfer.newReceivedByName || 'N/A'}</td>
+                                                <td>${transfer.newReceivedByStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.newReceivedBySignature ? 'signed' : 'pending'}">
+                                                        ${transfer.newReceivedBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.newReceivedBySignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Infrastructure Rep</td>
+                                                <td>${transfer.infraRepresentativeName || 'N/A'}</td>
+                                                <td>${transfer.infraRepresentativeStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.infraRepSignature ? 'signed' : 'pending'}">
+                                                        ${transfer.infraRepSignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.infraRepSignedAt || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Finance Rep</td>
+                                                <td>${transfer.financeRepresentativeName || 'N/A'}</td>
+                                                <td>${transfer.financeRepresentativeStaffId || 'N/A'}</td>
+                                                <td>
+                                                    <span class="status-badge ${transfer.financeRepSignature ? 'signed' : 'pending'}">
+                                                        ${transfer.financeRepSignature ? '✅ Signed' : '⏳ Pending'}
+                                                    </span>
+                                                </td>
+                                                <td>${transfer.financeRepSignedAt || '-'}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Show/hide PDF button based on fully signed status
+                    if (isFullySigned) {
+                        pdfBtn.style.display = 'inline-block';
+                    } else {
+                        pdfBtn.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    body.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Failed to load transfer details.
+                        </div>
+                    `;
+                });
+        }
+
+        // ============================================
+        // Download PDF from View Modal
+        // ============================================
+        function downloadPDFFromView() {
+            if (currentTransferId) {
+                window.open('/assetIQ-pro/transfers/' + currentTransferId + '/pdf', '_blank');
+            }
+        }
+
+        // ============================================
+        // Wizard Functions
+        // ============================================
         const TRANSFER_WIZARD_TOTAL_STEPS = 3;
         let transferWizardStep = 1;
 
@@ -461,7 +886,7 @@
             const currentPane = document.querySelector('#createTransferForm .wizard-pane[data-step="' + transferWizardStep + '"]');
             const fields = currentPane.querySelectorAll('input, select, textarea');
             for (const field of fields) {
-                if (!field.checkValidity()) {
+                if (field.hasAttribute('required') && !field.checkValidity()) {
                     field.reportValidity();
                     return;
                 }
@@ -479,6 +904,7 @@
             }
         }
 
+        // Reset wizard when modal opens
         document.addEventListener('DOMContentLoaded', function () {
             const modalEl = document.getElementById('createTransferModal');
             if (modalEl) {

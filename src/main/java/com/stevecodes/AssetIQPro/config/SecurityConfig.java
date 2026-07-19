@@ -116,19 +116,31 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/resources/sign-thankyou",
                                 "/resources/sign-error",
                                 // ============================================
+                                // SLOT REQUEST PAGES - PUBLIC
+                                // ============================================
+                                "/bookings/slot-request/**",
+                                // ============================================
+                                // SERVER ROOM PAGES - PUBLIC
+                                // ============================================
+                                "/bookings/server-room/**",
+                                "/bookings/server-room/sign-out",
+                                "/bookings/server-room/signout-thankyou",
+                                "/bookings/server-room/signout-error",
+                                "/bookings/server-room/thankyou",
+                                "/bookings/server-room/error",
+                                // ============================================
+                                // TRANSFER SIGN PAGES - PUBLIC
+                                // ============================================
+                                "/transfers/thankyou",
+                                "/transfers/error",
+                                // ============================================
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
                                 "/bookings/driver-dashboard",
                                 "/bookings/driver/**",
                                 "/bookings/driver-requests",
-                                "/bookings/slot-request/**",
-                                "/uploads/**",
-                                "/bookings/server-room/**",
-                                "/bookings/server-room/thankyou",
-                                "/bookings/server-room/error",
-                                "/bookings/server-room/signout-thankyou",
-                                "/bookings/server-room/signout-error"
+                                "/uploads/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
