@@ -99,6 +99,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/images/**",
                                 "/webjars/**",
                                 "/error",
+                                "/forgot-password",
+                                "/reset-password",
                                 "/api/auth/**",
                                 "/api/public/**",
                                 "/transfer/sign/**",

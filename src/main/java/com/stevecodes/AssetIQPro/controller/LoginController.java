@@ -11,7 +11,11 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Controller
@@ -130,7 +134,7 @@ public class LoginController {
         try {
             userService.changePassword(userId, newPassword, firstLogin);
 
-            // ✅ CLEAR SESSION FLAGS AFTER PASSWORD CHANGE
+            // Clear session flags after password change
             session.setAttribute("mustChangePassword", false);
             session.setAttribute("isFirstLogin", false);
 
@@ -147,6 +151,85 @@ public class LoginController {
             redirectAttributes.addFlashAttribute("error", "Error: " + e.getMessage());
             return "redirect:/change-password?firstLogin=" + firstLogin;
         }
+    }
+
+    // ============================================
+    // FORGOT PASSWORD ENDPOINTS
+    // ============================================
+
+    @PostMapping("/forgot-password")
+    @ResponseBody
+    public Map<String, Object> forgotPassword(@RequestParam("username") String username) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            log.info("Forgot password request for: {}", username);
+
+            // Check if user exists
+            var userOpt = userService.getUserByUsername(username);
+            if (userOpt.isEmpty()) {
+                // Check by email as well
+                userOpt = userService.getUserByEmail(username);
+            }
+
+            if (userOpt.isEmpty()) {
+                log.warn("User not found for forgot password: {}", username);
+                response.put("success", false);
+                response.put("message", "User not found with the provided username or email.");
+                return response;
+            }
+
+            var user = userOpt.get();
+
+            // Generate reset token
+            String token = userService.generatePasswordResetToken(user.getEmail());
+
+            // Send reset email with temporary password
+            String tempPassword = userService.generateTemporaryPassword();
+            userService.resetPassword(user.getUserId());
+
+            response.put("success", true);
+            response.put("message", "A temporary password has been sent to your email. Please check your inbox.");
+            log.info("Password reset email sent to: {}", user.getEmail());
+
+        } catch (Exception e) {
+            log.error("Error processing forgot password: {}", e.getMessage());
+            response.put("success", false);
+            response.put("message", "An error occurred. Please try again later.");
+        }
+        return response;
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseBody
+    public Map<String, Object> resetPassword(@RequestParam("token") String token,
+                                             @RequestParam("newPassword") String newPassword,
+                                             @RequestParam("confirmPassword") String confirmPassword) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!newPassword.equals(confirmPassword)) {
+                response.put("success", false);
+                response.put("message", "Passwords do not match.");
+                return response;
+            }
+
+            if (!isPasswordStrong(newPassword)) {
+                response.put("success", false);
+                response.put("message", "Password must be at least 8 characters and include uppercase, lowercase, and number.");
+                return response;
+            }
+
+            userService.resetPasswordWithToken(token, newPassword);
+
+            response.put("success", true);
+            response.put("message", "Password reset successfully! You can now login with your new password.");
+            log.info("Password reset successfully with token");
+
+        } catch (Exception e) {
+            log.error("Error resetting password: {}", e.getMessage());
+            response.put("success", false);
+            response.put("message", "Error: " + e.getMessage());
+        }
+        return response;
     }
 
     private boolean isPasswordStrong(String password) {

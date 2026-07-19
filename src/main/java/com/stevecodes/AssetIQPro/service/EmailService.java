@@ -50,7 +50,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Public Email Method - Does NOT throw exceptions
+    // Core Email Methods
     // ============================================
 
     public void sendSimpleEmail(String toEmail, String subject, String body) {
@@ -68,6 +68,33 @@ public class EmailService {
         } catch (Exception e) {
             log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage());
             logEmailContent("Simple Email (FAILED)", toEmail, subject, body);
+        }
+    }
+
+    /**
+     * Send HTML email
+     */
+    public void sendHtmlEmail(String toEmail, String subject, String htmlContent) {
+        try {
+            logEmailContent("HTML Email", toEmail, subject, htmlContent);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true); // true = HTML
+            helper.setFrom(FROM_EMAIL);
+
+            mailSender.send(message);
+            logEmailSent("HTML Email", toEmail, subject);
+        } catch (MessagingException e) {
+            log.error("❌ Failed to send HTML email to {}: {}", toEmail, e.getMessage());
+            // Fallback to plain text
+            sendSimpleEmail(toEmail, subject, "Please view this email in HTML format.");
+        } catch (Exception e) {
+            log.error("❌ Unexpected error sending HTML email: {}", e.getMessage());
+            sendSimpleEmail(toEmail, subject, "Failed to send HTML email.");
         }
     }
 
@@ -137,26 +164,45 @@ public class EmailService {
     }
 
     @Async
-    public void sendPasswordResetEmail(String toEmail, String fullName, String resetToken) {
-        String resetLink = "http://localhost:8091/assetIQ-pro/reset-password?token=" + resetToken;
-        String subject = "Password Reset Request - AssetIQ-Pro";
-        String body = String.format("""
-            Dear %s,
-            
-            We received a request to reset your password for AssetIQ-Pro.
-            
-            Click the link below to reset your password:
-            %s
-            
-            This link will expire in 24 hours.
-            
-            If you did not request a password reset, please ignore this email or contact IT Support.
-            
-            Best regards,
-            AssetIQ-Pro Team
-            """, fullName, resetLink);
+    public void sendPasswordResetEmail(String toEmail, String fullName, String token) {
+        try {
+            String subject = "Password Reset - AssetIQ-Pro";
+            String resetLink = "http://localhost:8091/assetIQ-pro/reset-password?token=" + token;
 
-        sendSimpleEmail(toEmail, subject, body);
+            String htmlContent = "<html><body style='font-family: Arial, sans-serif;'>"
+                    + "<div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9ecef; border-radius: 10px;'>"
+                    + "<h2 style='color: #1a1a2e;'>Asset<span style='color: #0d6efd;'>IQ-Pro</span></h2>"
+                    + "<hr style='border-color: #e9ecef;'>"
+                    + "<p>Dear " + fullName + ",</p>"
+                    + "<p>We received a request to reset your password. Click the button below to set a new password:</p>"
+                    + "<p style='text-align: center; margin: 30px 0;'>"
+                    + "<a href='" + resetLink + "' style='background: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: 600;'>Reset Password</a>"
+                    + "</p>"
+                    + "<p>If you didn't request this, please ignore this email.</p>"
+                    + "<p>This link will expire in 24 hours.</p>"
+                    + "<hr style='border-color: #e9ecef;'>"
+                    + "<p style='color: #6c757d; font-size: 12px;'>AssetIQ-Pro - Asset Management System</p>"
+                    + "</div></body></html>";
+
+            sendHtmlEmail(toEmail, subject, htmlContent);
+            log.info("Password reset email sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+            // Fallback to plain text
+            String fallbackBody = String.format("""
+                Dear %s,
+                
+                We received a request to reset your password.
+                
+                Please use this token to reset your password: %s
+                
+                If you didn't request this, please ignore this email.
+                
+                Best regards,
+                AssetIQ-Pro Team
+                """, fullName, token);
+            sendSimpleEmail(toEmail, "Password Reset - AssetIQ-Pro", fallbackBody);
+        }
     }
 
     @Async
@@ -372,6 +418,7 @@ public class EmailService {
             helper.setTo(toEmails.toArray(new String[0]));
             helper.setSubject(subject);
             helper.setText(body);
+            helper.setFrom(FROM_EMAIL);
 
             helper.addAttachment("Transfer_" + assetTag + ".pdf",
                     new ByteArrayResource(pdfBytes));
@@ -380,6 +427,50 @@ public class EmailService {
             logEmailSent("Transfer Completion", String.join(", ", toEmails), subject);
         } catch (MessagingException e) {
             log.error("❌ Failed to send transfer completion notification: {}", e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendCompletedTransferReport(List<String> signerEmails, Transfer transfer, byte[] pdfBytes) {
+        try {
+            String subject = "Transfer Complete: " + transfer.getAssetTag() + " - #" + transfer.getTransferId();
+            String body = String.format("""
+                Dear Team,
+                
+                The asset transfer for %s has been completed successfully.
+                
+                Transfer ID: %s
+                Asset Tag: %s
+                Transfer Date: %s
+                
+                Please find the fully signed transfer certificate attached.
+                
+                Best regards,
+                Asset Management Team
+                AssetIQ-Pro
+                """,
+                    transfer.getAssetTag(),
+                    transfer.getTransferId(),
+                    transfer.getAssetTag(),
+                    transfer.getTransferDate() != null ? transfer.getTransferDate().toString() : "N/A");
+
+            logEmailContent("Transfer Completion Report", String.join(", ", signerEmails), subject, body);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(signerEmails.toArray(new String[0]));
+            helper.setSubject(subject);
+            helper.setText(body);
+            helper.setFrom(FROM_EMAIL);
+
+            helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
+                    new ByteArrayResource(pdfBytes));
+
+            mailSender.send(message);
+            logEmailSent("Transfer Completion Report", String.join(", ", signerEmails), subject);
+        } catch (MessagingException e) {
+            log.error("❌ Failed to send transfer completion report: {}", e.getMessage());
         }
     }
 
@@ -480,6 +571,7 @@ public class EmailService {
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(body);
+            helper.setFrom(FROM_EMAIL);
 
             File qrFile = new File(qrCodePath);
             if (qrFile.exists()) {
@@ -533,52 +625,5 @@ public class EmailService {
             """, requesterName, resourceType, requestId);
 
         sendSimpleEmail(toEmail, subject, body);
-    }
-
-    // ============================================
-    // Completed Transfer Report (with PDF attachment)
-    // ============================================
-
-    @Async
-    public void sendCompletedTransferReport(List<String> signerEmails, Transfer transfer, byte[] pdfBytes) {
-        try {
-            String subject = "Transfer Complete: " + transfer.getAssetTag() + " - #" + transfer.getTransferId();
-            String body = String.format("""
-                Dear Team,
-                
-                The asset transfer for %s has been completed successfully.
-                
-                Transfer ID: %s
-                Asset Tag: %s
-                Transfer Date: %s
-                
-                Please find the fully signed transfer certificate attached.
-                
-                Best regards,
-                Asset Management Team
-                AssetIQ-Pro
-                """,
-                    transfer.getAssetTag(),
-                    transfer.getTransferId(),
-                    transfer.getAssetTag(),
-                    transfer.getTransferDate() != null ? transfer.getTransferDate().toString() : "N/A");
-
-            logEmailContent("Transfer Completion Report", String.join(", ", signerEmails), subject, body);
-
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(signerEmails.toArray(new String[0]));
-            helper.setSubject(subject);
-            helper.setText(body);
-
-            helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
-                    new ByteArrayResource(pdfBytes));
-
-            mailSender.send(message);
-            logEmailSent("Transfer Completion Report", String.join(", ", signerEmails), subject);
-        } catch (MessagingException e) {
-            log.error("❌ Failed to send transfer completion report: {}", e.getMessage());
-        }
     }
 }

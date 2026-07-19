@@ -103,7 +103,7 @@ public class AppUserService {
 
         // 1. Create Employee first
         Employee employee = new Employee();
-        employee.setStaffId(userDTO.getStaffId());  // FIX: Set staff_id on Employee
+        employee.setStaffId(userDTO.getStaffId());
         employee.setFirstName(getFirstName(userDTO.getFullName()));
         employee.setSurName(getLastName(userDTO.getFullName()));
         employee.setEmailAddress(userDTO.getEmail());
@@ -341,6 +341,38 @@ public class AppUserService {
                 updated.getUserId());
 
         return updated;
+    }
+
+    // ============================================
+    // Password Helper Methods (SINGLE DEFINITION)
+    // ============================================
+
+    public String generateTemporaryPassword() {
+        SecureRandom random = new SecureRandom();
+        StringBuilder password = new StringBuilder(12);
+
+        password.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(random.nextInt(26)));
+        password.append("abcdefghijklmnopqrstuvwxyz".charAt(random.nextInt(26)));
+        password.append("0123456789".charAt(random.nextInt(10)));
+        password.append("!@#$%^&*".charAt(random.nextInt(9)));
+
+        for (int i = 4; i < 12; i++) {
+            password.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
+        }
+
+        return shuffleString(password.toString());
+    }
+
+    private String shuffleString(String input) {
+        char[] chars = input.toCharArray();
+        SecureRandom random = new SecureRandom();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char temp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = temp;
+        }
+        return new String(chars);
     }
 
     @Transactional
@@ -679,34 +711,6 @@ public class AppUserService {
         if (fullName == null) return "";
         int lastSpace = fullName.lastIndexOf(' ');
         return lastSpace > 0 ? fullName.substring(lastSpace + 1) : "";
-    }
-
-    private String generateTemporaryPassword() {
-        SecureRandom random = new SecureRandom();
-        StringBuilder password = new StringBuilder(12);
-
-        password.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(random.nextInt(26)));
-        password.append("abcdefghijklmnopqrstuvwxyz".charAt(random.nextInt(26)));
-        password.append("0123456789".charAt(random.nextInt(10)));
-        password.append("!@#$%^&*".charAt(random.nextInt(9)));
-
-        for (int i = 4; i < 12; i++) {
-            password.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
-        }
-
-        return shuffleString(password.toString());
-    }
-
-    private String shuffleString(String input) {
-        char[] chars = input.toCharArray();
-        SecureRandom random = new SecureRandom();
-        for (int i = chars.length - 1; i > 0; i--) {
-            int j = random.nextInt(i + 1);
-            char temp = chars[i];
-            chars[i] = chars[j];
-            chars[j] = temp;
-        }
-        return new String(chars);
     }
 
     private UserDTO convertToDTO(AppUser user) {
