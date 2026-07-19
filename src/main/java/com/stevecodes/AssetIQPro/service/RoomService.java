@@ -25,6 +25,14 @@ public class RoomService {
         return roomRepository.save(room);
     }
 
+    public Room updateRoom(Long id, String roomName, String roomType, String status) {
+        Room room = getRoomById(id);
+        room.setRoomName(roomName);
+        room.setRoomType(roomType);
+        room.setStatus(Room.RoomStatus.valueOf(status));
+        return roomRepository.save(room);
+    }
+
     public void deleteRoom(Long id) {
         roomRepository.deleteById(id);
     }

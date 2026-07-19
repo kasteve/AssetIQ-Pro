@@ -46,4 +46,17 @@ public class CategoryViewController {
         }
         return "redirect:/admin/categories";
     }
+
+    @PostMapping("/{id}/edit")
+    public String updateCategory(@PathVariable Integer id, @RequestParam String name,
+                                 @RequestParam(required = false) String description,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            categoryService.updateCategory(id, name, description);
+            redirectAttributes.addFlashAttribute("success", "Category updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update category: " + e.getMessage());
+        }
+        return "redirect:/admin/categories";
+    }
 }

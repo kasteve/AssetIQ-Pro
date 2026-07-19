@@ -24,6 +24,12 @@ public class CategoryService {
                 .orElseThrow(() -> new RuntimeException("Category not found: " + id));
     }
 
+    public Category updateCategory(Integer id, String name, String description) {
+        Category category = getCategoryById(id);
+        category.setName(name);
+        category.setDescription(description);
+        return categoryRepository.save(category);
+    }
 
     public Category createCategory(Category category) {
         return categoryRepository.save(category);

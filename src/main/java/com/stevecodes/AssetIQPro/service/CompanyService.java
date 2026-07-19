@@ -24,6 +24,13 @@ public class CompanyService {
         return companyRepository.save(company);
     }
 
+    public Company updateCompany(Long id, String name, String description) {
+        Company company = getCompanyById(id);
+        company.setName(name);
+        company.setDescription(description);
+        return companyRepository.save(company);
+    }
+
     public void deleteCompany(Long id) {
         companyRepository.deleteById(id);
     }

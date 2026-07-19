@@ -31,4 +31,13 @@ public class SupplierService {
     public void deleteSupplier(Integer id) {
         supplierRepository.deleteById(id);
     }
+
+    public Supplier updateSupplier(Integer id, String name, String contact, String email, String phone) {
+        Supplier supplier = getSupplierById(id);
+        supplier.setName(name);
+        supplier.setContact(contact);
+        supplier.setEmail(email);
+        supplier.setPhone(phone);
+        return supplierRepository.save(supplier);
+    }
 }

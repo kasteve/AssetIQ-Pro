@@ -40,6 +40,20 @@ public class RoomViewController {
         return "redirect:/admin/rooms";
     }
 
+    @PostMapping("/{id}/edit")
+    public String updateRoom(@PathVariable Long id, @RequestParam String roomName,
+                             @RequestParam(required = false) String roomType,
+                             @RequestParam(defaultValue = "AVAILABLE") String status,
+                             RedirectAttributes redirectAttributes) {
+        try {
+            roomService.updateRoom(id, roomName, roomType, status);
+            redirectAttributes.addFlashAttribute("success", "Room updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update room: " + e.getMessage());
+        }
+        return "redirect:/admin/rooms";
+    }
+
     @GetMapping("/{id}/delete")
     public String deleteRoom(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {

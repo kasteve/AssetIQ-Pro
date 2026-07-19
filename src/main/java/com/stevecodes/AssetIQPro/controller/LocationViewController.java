@@ -37,6 +37,21 @@ public class LocationViewController {
         return "redirect:/admin/locations";
     }
 
+    @PostMapping("/{id}/edit")
+    public String updateLocation(@PathVariable Integer id, @RequestParam String name,
+                                 @RequestParam(required = false) String address,
+                                 @RequestParam(required = false) String city,
+                                 @RequestParam(required = false) String country,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            locationService.updateLocation(id, name, address, city, country);
+            redirectAttributes.addFlashAttribute("success", "Location updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update location: " + e.getMessage());
+        }
+        return "redirect:/admin/locations";
+    }
+
     @GetMapping("/{id}/delete")
     public String deleteLocation(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
         try {

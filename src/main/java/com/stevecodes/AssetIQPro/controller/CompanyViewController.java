@@ -36,6 +36,19 @@ public class CompanyViewController {
         return "redirect:/admin/companies";
     }
 
+    @PostMapping("/{id}/edit")
+    public String updateCompany(@PathVariable Long id, @RequestParam String name,
+                                @RequestParam(required = false) String description,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            companyService.updateCompany(id, name, description);
+            redirectAttributes.addFlashAttribute("success", "Company updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update company: " + e.getMessage());
+        }
+        return "redirect:/admin/companies";
+    }
+
     @GetMapping("/{id}/delete")
     public String deleteCompany(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {

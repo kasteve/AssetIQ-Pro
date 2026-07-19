@@ -14,6 +14,18 @@
 
 <body>
 <div layout:fragment="content">
+    <!-- Success/Error Messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span th:text="${error}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
     <div class="page-header-row">
         <h4><i class="fas fa-map-marker-alt me-2"></i>Locations</h4>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createLocationModal">
@@ -23,7 +35,7 @@
 
     <div class="table-card">
         <div class="table-responsive">
-            <table id="locationsTable" class="table table-hover loc-table">
+            <table id="locationsTable" class="table table-hover loc-table" th:attr="data-base=@{/admin/locations}">
                 <thead>
                 <tr><th>ID</th><th>Name</th><th>Address</th><th>City</th><th>Country</th><th>Actions</th></tr>
                 </thead>
@@ -36,10 +48,19 @@
                     <td><span class="loc-country" th:text="${loc.country}">Uganda</span></td>
                     <td>
                         <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit" th:onclick="'editLocation(' + ${loc.locationId} + ')'">
+                            <button type="button" class="btn btn-outline-primary" title="Edit"
+                                    data-bs-toggle="modal" data-bs-target="#editLocationModal"
+                                    th:data-id="${loc.locationId}"
+                                    th:data-name="${loc.name}"
+                                    th:data-address="${loc.address}"
+                                    th:data-city="${loc.city}"
+                                    th:data-country="${loc.country}"
+                                    onclick="openEditModal(this)">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete" th:onclick="'deleteLocation(' + ${loc.locationId} + ')'">
+                            <button type="button" class="btn btn-outline-danger" title="Delete"
+                                    th:data-id="${loc.locationId}"
+                                    onclick="deleteLocation(this)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -86,6 +107,45 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Location</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Location Modal -->
+    <div class="modal fade" id="editLocationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2" style="color:#0d6efd;"></i>Edit Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <!-- data-base resolved server-side via th:attr so JS never hardcodes the context path -->
+                <form method="post" id="editLocationForm" th:attr="data-base=@{/admin/locations}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" name="name" class="form-control" id="editLocationName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="address" class="form-control" id="editLocationAddress">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City</label>
+                                <input type="text" name="city" class="form-control" id="editLocationCity">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Country</label>
+                                <input type="text" name="country" class="form-control" id="editLocationCountry">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Location</button>
                     </div>
                 </form>
             </div>
@@ -220,10 +280,36 @@
             });
         });
 
-        function editLocation(id) { window.location.href = '/admin/locations/' + id + '/edit'; }
-        function deleteLocation(id) {
-            if (confirm('Delete this location?')) window.location.href = '/admin/locations/' + id + '/delete';
+        function openEditModal(button) {
+            document.getElementById('editLocationName').value = button.getAttribute('data-name');
+            document.getElementById('editLocationAddress').value = button.getAttribute('data-address');
+            document.getElementById('editLocationCity').value = button.getAttribute('data-city');
+            document.getElementById('editLocationCountry').value = button.getAttribute('data-country');
+            const form = document.getElementById('editLocationForm');
+            form.action = form.getAttribute('data-base') + '/' + button.getAttribute('data-id') + '/edit';
         }
+
+        function deleteLocation(button) {
+            const base = document.getElementById('locationsTable').getAttribute('data-base');
+            const id = button.getAttribute('data-id');
+            if (confirm('Delete this location?')) window.location.href = base + '/' + id + '/delete';
+        }
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 500);
+                }, 5000);
+            });
+        });
     </script>
 </div>
 </body>

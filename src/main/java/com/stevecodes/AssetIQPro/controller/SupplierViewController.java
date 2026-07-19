@@ -40,6 +40,21 @@ public class SupplierViewController {
         return "redirect:/admin/suppliers";
     }
 
+    @PostMapping("/{id}/edit")
+    public String updateSupplier(@PathVariable Integer id, @RequestParam String name,
+                                 @RequestParam(required = false) String contact,
+                                 @RequestParam(required = false) String email,
+                                 @RequestParam(required = false) String phone,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            supplierService.updateSupplier(id, name, contact, email, phone);
+            redirectAttributes.addFlashAttribute("success", "Supplier updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to update supplier: " + e.getMessage());
+        }
+        return "redirect:/admin/suppliers";
+    }
+
     @GetMapping("/{id}/delete")
     public String deleteSupplier(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
         try {

@@ -31,4 +31,13 @@ public class LocationService {
     public void deleteLocation(Integer id) {
         locationRepository.deleteById(id);
     }
+
+    public Location updateLocation(Integer id, String name, String address, String city, String country) {
+        Location location = getLocationById(id);
+        location.setName(name);
+        location.setAddress(address);
+        location.setCity(city);
+        location.setCountry(country);
+        return locationRepository.save(location);
+    }
 }
