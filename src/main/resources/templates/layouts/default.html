@@ -455,15 +455,6 @@
             </div>
         </div>
 
-        <!-- Infra Dashboard - INFRA role -->
-        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'INFRA', 'APPROVE_INFRA', 'APPROVE_INFRA_REQUESTS')">
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests">
-                    <i class="fas fa-tachometer-alt"></i> Infra Dashboard
-                </a>
-            </div>
-        </div>
-
         <!-- Assets & Transfers - Admin only -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'EDIT_ASSETS', 'VIEW_ALL_TRANSACTIONS')">
             <div class="nav-item">
