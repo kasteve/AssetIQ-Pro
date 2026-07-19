@@ -190,14 +190,24 @@
                                            th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</small>
                                 </div>
                                 <div class="text-end">
+                                    <!--
+                                        Status badge - rendered from booking.status only (no in-template date math).
+                                        "IN USE" is derived client-side in JS below, matching the same logic used
+                                        for the room-details modal, to avoid fragile Thymeleaf date expressions.
+                                    -->
                                     <span class="status-badge"
-                                          th:classappend="${booking.status} == 'BOOKED' ? 'booked' :
+                                          th:data-status="${booking.status}"
+                                          th:data-start="${#temporals.format(booking.startTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
+                                          th:data-end="${#temporals.format(booking.endTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
+                                          th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
+                                                          (${booking.status} == 'BOOKED' ? 'booked' :
+                                                          (${booking.status} == 'ACTIVE' ? 'booked' :
                                                           (${booking.status} == 'PENDING' ? 'pending' :
-                                                          (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))"
-                                          th:text="${booking.status}">BOOKED</span>
+                                                          (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
+                                          th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
 
                                     <!-- Recall for OWNER -->
-                                    <div th:if="${booking.status == 'BOOKED' and booking.userId == session.userId}">
+                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId == session.userId}">
                                         <button class="btn btn-sm btn-warning mt-1 recall-btn"
                                                 th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
                                             <i class="fas fa-undo"></i> Recall
@@ -205,7 +215,7 @@
                                     </div>
 
                                     <!-- Request Slot for NON-OWNER (Regular Rooms only) -->
-                                    <div th:if="${booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
+                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
                                         <button class="btn btn-sm btn-info mt-1 recall-btn"
                                                 th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
                                             <i class="fas fa-handshake"></i> Request
@@ -213,7 +223,7 @@
                                     </div>
 
                                     <!-- Sign Out Button - INFRA only for Server Rooms -->
-                                    <div th:if="${(session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
                                         <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
                                             <input type="hidden" name="infraComment" value="Signing out user">
                                             <button type="submit" class="btn btn-sm btn-primary w-100">
@@ -223,7 +233,7 @@
                                     </div>
 
                                     <!-- Cancel Button - INFRA only -->
-                                    <div th:if="${(session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING')}">
+                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
                                         <button class="btn btn-sm btn-danger mt-1 w-100"
                                                 th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
                                             <i class="fas fa-times me-1"></i>Cancel
@@ -414,6 +424,7 @@
 
 <div layout:fragment="styles">
     <style>
+        /* Same styles as before */
         .content { padding: 28px 32px; width: 100%; }
         .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
@@ -556,7 +567,6 @@
         }
         .modal-body .slot-request-btn:hover { background: #0dcaf0; color: white; }
 
-        /* Alert Styles */
         .alert {
             border-radius: 12px !important;
             border: none !important;
@@ -627,6 +637,28 @@
             render();
         }
 
+        // ============================================
+        // "IN USE" badge derivation (client-side, mirrors the modal's logic)
+        // Rooms whose status is BOOKED/ACTIVE and whose window contains "now"
+        // get visually upgraded to an IN USE badge without touching Thymeleaf date math.
+        // ============================================
+        function refreshInUseBadges() {
+            const now = new Date();
+            document.querySelectorAll('#roomBookingsList .status-badge[data-status]').forEach(function (badge) {
+                const status = badge.dataset.status;
+                if (status !== 'BOOKED' && status !== 'ACTIVE') return;
+                if (!badge.dataset.start || !badge.dataset.end) return;
+
+                const start = new Date(badge.dataset.start);
+                const end = new Date(badge.dataset.end);
+                if (start <= now && end >= now) {
+                    badge.classList.remove('booked');
+                    badge.classList.add('inuse');
+                    badge.textContent = 'IN USE';
+                }
+            });
+        }
+
         // Wire up click handlers
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.driver-item').forEach(function (el) {
@@ -642,8 +674,8 @@
 
             paginateList('driverRequestsList', 'driverRequestsPagination', 5);
             paginateList('roomBookingsList', 'roomBookingsPagination', 5);
+            refreshInUseBadges();
 
-            // Debug form submission
             const bookRoomForm = document.getElementById('bookRoomForm');
             if (bookRoomForm) {
                 console.log('✅ Book Room Form found');
@@ -685,13 +717,13 @@
                     return response.json();
                 })
                 .then(bookings => {
-                    const upcomingBookings = bookings || [];
+                    const allBookings = bookings || [];
 
-                    if (upcomingBookings.length === 0) {
+                    if (allBookings.length === 0) {
                         body.innerHTML = `
                             <div class="text-center py-4">
                                 <i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i>
-                                <p class="text-muted mt-2">No upcoming bookings in the next 7 days</p>
+                                <p class="text-muted mt-2">No bookings found for this driver</p>
                                 <small class="text-muted">This driver is available for new bookings</small>
                             </div>
                         `;
@@ -700,12 +732,12 @@
 
                     let html = `
                         <div class="mb-3">
-                            <small class="text-muted">Bookings (Last 7 Days): <strong>${upcomingBookings.length}</strong></small>
+                            <small class="text-muted">Total Bookings: <strong>${allBookings.length}</strong></small>
                         </div>
                         <div class="list-group">
                     `;
 
-                    upcomingBookings.forEach(booking => {
+                    allBookings.forEach(booking => {
                         const statusClass = booking.status === 'ACCEPTED' ? 'booked' :
                                            booking.status === 'COMPLETED' ? 'completed' :
                                            booking.status === 'PENDING' ? 'pending' : 'cancelled';
@@ -737,7 +769,7 @@
         }
 
         // ============================================
-        // View Room Details - Shows active/future bookings with "IN USE" status and INFRA actions
+        // View Room Details
         // ============================================
         function viewRoomDetails(roomId, roomName, roomType) {
             const modal = new bootstrap.Modal(document.getElementById('roomDetailsModal'));
@@ -762,7 +794,6 @@
                 })
                 .then(allBookings => {
                     const now = new Date();
-                    // Filter only active and future bookings
                     const bookings = (allBookings || [])
                         .filter(b => !b.endTime || new Date(b.endTime) > now)
                         .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
@@ -792,10 +823,10 @@
                     bookings.forEach(booking => {
                         const start = new Date(booking.startTime);
                         const end = new Date(booking.endTime);
-                        const isCurrentlyActive = start <= now && end >= now;
+                        const isCurrentlyActive = (booking.status === 'ACTIVE' || booking.status === 'BOOKED') &&
+                                                  start <= now && end >= now;
                         const isOwner = Number(booking.userId) === CURRENT_USER_ID;
 
-                        // Determine status display
                         let displayStatus = booking.status || 'BOOKED';
                         let statusClass = 'booked';
 
@@ -808,6 +839,7 @@
                             statusClass = 'cancelled';
                         } else if (booking.status === 'CONFIRMED') {
                             statusClass = 'completed';
+                            displayStatus = 'COMPLETED';
                         }
 
                         html += `
@@ -818,18 +850,17 @@
                                     ${booking.purpose ? `<div class="time-slot">Purpose: ${booking.purpose}</div>` : ''}
                                     ${booking.notes ? `<div class="time-slot">Notes: ${booking.notes}</div>` : ''}
                                     ${isCurrentlyActive ? `<div class="time-slot fw-bold text-primary">🟢 Currently In Use</div>` : ''}
+                                    ${booking.status === 'CONFIRMED' ? `<div class="time-slot text-success">✅ Signed Out</div>` : ''}
                                 </div>
                                 <div class="text-end">
                                     <span class="status-badge ${statusClass}">${displayStatus}</span>
 
-                                    <!-- Slot Request - Only for regular rooms, not server rooms -->
                                     ${booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom ? `
                                         <button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(${booking.bookingId})">
                                             <i class="fas fa-handshake me-1"></i>Request Slot
                                         </button>
                                     ` : ''}
 
-                                    <!-- Sign Out Button - Only INFRA users on Server Room bookings -->
                                     ${isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE') ? `
                                         <form action="/assetIQ-pro/bookings/server-room/${booking.bookingId}/signout-link" method="post" class="mt-1">
                                             <input type="hidden" name="infraComment" value="Signing out user">
@@ -839,8 +870,7 @@
                                         </form>
                                     ` : ''}
 
-                                    <!-- Cancel Button - Only INFRA users -->
-                                    ${isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING') ? `
+                                    ${isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING' || booking.status === 'ACTIVE') ? `
                                         <button class="btn btn-sm btn-danger mt-1 w-100" onclick="adminCancelBooking(${booking.bookingId})">
                                             <i class="fas fa-times me-1"></i>Cancel
                                         </button>
