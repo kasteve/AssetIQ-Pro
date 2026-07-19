@@ -78,6 +78,9 @@ public class Asset {
     @Column(name = "CreatedAt", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "current_department")
+    private String currentDepartment;
+
     @OneToMany(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AssetAssignment> assignments = new ArrayList<>();
 

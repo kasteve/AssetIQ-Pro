@@ -8,7 +8,7 @@
 </head>
 
 <body>
-<div layout:fragment="content">
+<div layout:fragment="content" th:attr="data-api-base=@{/api/dashboard}">
     <!-- Welcome Section -->
     <div class="welcome-section">
         <h2>Welcome back, <span th:text="${session.fullName} ?: 'User'">User</span> 👋</h2>
@@ -74,10 +74,17 @@
         <div class="col-lg-8">
             <div class="card-premium">
                 <div class="card-header">
-                    <span><i class="fas fa-chart-line me-2" style="color: #0d6efd;"></i>Monthly Trends</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="window.location.href='/assetIQ-pro/reports'">
-                        <i class="fas fa-download me-1"></i>Export
-                    </button>
+                    <span><i class="fas fa-chart-line me-2" style="color: #0d6efd;"></i>Trends</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <select id="trendsPeriod" class="form-select form-select-sm chart-control">
+                            <option value="daily">Daily (30d)</option>
+                            <option value="weekly">Weekly (12wk)</option>
+                            <option value="monthly" selected>Monthly (6mo)</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.location.href='/assetIQ-pro/reports'">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="chart-box"><canvas id="trendsChart"></canvas></div>
@@ -88,6 +95,11 @@
             <div class="card-premium">
                 <div class="card-header">
                     <span><i class="fas fa-chart-pie me-2" style="color: #6f42c1;"></i>Asset Distribution</span>
+                    <select id="distributionDimension" class="form-select form-select-sm chart-control">
+                        <option value="category" selected>By Category</option>
+                        <option value="department">By Department</option>
+                        <option value="status">By Status</option>
+                    </select>
                 </div>
                 <div class="card-body">
                     <div class="chart-box"><canvas id="distributionChart"></canvas></div>
@@ -218,8 +230,17 @@
             font-weight: 600;
             font-size: 14px;
             display: flex; justify-content: space-between; align-items: center;
+            gap: 10px;
         }
         .card-premium .card-body { padding: 18px 22px; }
+
+        .chart-control {
+            width: auto;
+            border-radius: 8px !important;
+            padding: 5px 10px !important;
+            font-size: 12.5px !important;
+            border: 1px solid #e2e8f0 !important;
+        }
 
         .activity-item {
             padding: 12px 0;
@@ -240,54 +261,126 @@
 
 <!-- Scripts specific to dashboard -->
 <div layout:fragment="scripts">
-    <script>
-        // Trends chart
-        const trendsData = [[${stats != null ? stats.monthlyTrends : null}]];
-        new Chart(document.getElementById('trendsChart').getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: trendsData && trendsData.length ? trendsData.map(d => d.month) : ['Jan','Feb','Mar','Apr','May','Jun'],
-                datasets: [
-                    {
-                        label: 'Requests',
-                        data: trendsData && trendsData.length ? trendsData.map(d => d.requests) : [0,0,0,0,0,0],
-                        borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.08)',
-                        fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
-                    },
-                    {
-                        label: 'Completed',
-                        data: trendsData && trendsData.length ? trendsData.map(d => d.completed) : [0,0,0,0,0,0],
-                        borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.08)',
-                        fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
-                scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } }
+    <script th:inline="none">
+        // Context-path-safe API base, resolved server-side (avoids hardcoding /assetIQ-pro/...)
+        const apiBase = document.querySelector('[data-api-base]').getAttribute('data-api-base');
+        const colors = ['#0d6efd','#6610f2','#6f42c1','#d63384','#dc3545','#fd7e14','#ffc107','#28a745','#20c997','#17a2b8'];
+
+        let trendsChart, distributionChart;
+
+        // ---------- Trends chart ----------
+        function renderTrends(trendData) {
+            const labels = trendData && trendData.length ? trendData.map(d => d.month) : ['No data'];
+            const requests = trendData && trendData.length ? trendData.map(d => d.requests) : [0];
+            const completed = trendData && trendData.length ? trendData.map(d => d.completed) : [0];
+
+            if (trendsChart) {
+                trendsChart.data.labels = labels;
+                trendsChart.data.datasets[0].data = requests;
+                trendsChart.data.datasets[1].data = completed;
+                trendsChart.update();
+                return;
             }
+
+            trendsChart = new Chart(document.getElementById('trendsChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Requests', data: requests,
+                            borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.08)',
+                            fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                        },
+                        {
+                            label: 'Completed', data: completed,
+                            borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.08)',
+                            fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } },
+                        x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 0 } }
+                    }
+                }
+            });
+        }
+
+        function loadTrends(period) {
+            const endpoint = period === 'daily' ? '/trends/daily'
+                : period === 'weekly' ? '/trends/weekly'
+                : '/trends';
+            fetch(apiBase + endpoint)
+                .then(r => r.json())
+                .then(renderTrends)
+                .catch(err => console.error('Failed to load trends:', err));
+        }
+
+        // ---------- Distribution chart ----------
+        function renderDistribution(data) {
+            const labels = data && Object.keys(data).length ? Object.keys(data) : ['No Data'];
+            const values = data && Object.keys(data).length ? Object.values(data) : [1];
+            const bg = colors.slice(0, labels.length);
+
+            if (distributionChart) {
+                distributionChart.data.labels = labels;
+                distributionChart.data.datasets[0].data = values;
+                distributionChart.data.datasets[0].backgroundColor = bg;
+                distributionChart.update();
+                return;
+            }
+
+            distributionChart = new Chart(document.getElementById('distributionChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: bg, borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10.5 } } } },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function loadDistribution(dimension) {
+            const endpoint = dimension === 'department' ? '/distribution/department'
+                : dimension === 'status' ? '/distribution/status'
+                : '/asset-distribution';
+            fetch(apiBase + endpoint)
+                .then(r => r.json())
+                .then(renderDistribution)
+                .catch(err => console.error('Failed to load distribution:', err));
+        }
+
+        function loadDistribution(dimension) {
+            const endpoint = dimension === 'department' ? '/distribution/department'
+                : dimension === 'asset-type' ? '/distribution/asset-type'
+                : '/asset-distribution';
+            fetch(apiBase + endpoint)
+                .then(r => r.json())
+                .then(renderDistribution)
+                .catch(err => console.error('Failed to load distribution:', err));
+        }
+
+        // ---------- Wire up controls ----------
+        document.getElementById('trendsPeriod').addEventListener('change', function() {
+            loadTrends(this.value);
+        });
+        document.getElementById('distributionDimension').addEventListener('change', function() {
+            loadDistribution(this.value);
         });
 
-        // Distribution chart
-        const distributionData = [[${stats != null ? stats.assetsByCategory : null}]];
-        const colors = ['#0d6efd','#6610f2','#6f42c1','#d63384','#dc3545','#fd7e14','#ffc107','#28a745','#20c997','#17a2b8'];
-        new Chart(document.getElementById('distributionChart').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: distributionData && Object.keys(distributionData).length ? Object.keys(distributionData) : ['No Data'],
-                datasets: [{
-                    data: distributionData && Object.keys(distributionData).length ? Object.values(distributionData) : [1],
-                    backgroundColor: colors.slice(0, distributionData ? Object.keys(distributionData).length : 1),
-                    borderWidth: 2, borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10.5 } } } },
-                cutout: '65%'
-            }
-        });
+        // ---------- Initial render (server-rendered defaults, no extra request on first paint) ----------
+        const initialTrends = /*[[${stats != null ? stats.monthlyTrends : null}]]*/ null;
+        const initialDistribution = /*[[${stats != null ? stats.assetsByCategory : null}]]*/ null;
+        renderTrends(initialTrends);
+        renderDistribution(initialDistribution);
     </script>
 </div>
 </body>

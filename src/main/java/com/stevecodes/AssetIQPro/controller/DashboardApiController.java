@@ -29,7 +29,7 @@ public class DashboardApiController {
 
     @GetMapping("/trends")
     @Operation(summary = "Get monthly trends")
-    public ResponseEntity<List<DashboardStatsDTO.MonthlyTrendDTO>> getMonthlyTrends() {
+    public ResponseEntity<List<DashboardStatsDTO.TrendDTO>> getMonthlyTrends() {
         return ResponseEntity.ok(dashboardService.getMonthlyTrends());
     }
 
@@ -43,5 +43,23 @@ public class DashboardApiController {
     @Operation(summary = "Get request trends")
     public ResponseEntity<Map<String, Object>> getRequestTrends() {
         return ResponseEntity.ok(dashboardService.getRequestTrends());
+    }
+
+    @GetMapping("/trends/daily")
+    public ResponseEntity<List<DashboardStatsDTO.TrendDTO>> getDailyTrends() {
+        return ResponseEntity.ok(dashboardService.getDailyTrends(30));
+    }
+    @GetMapping("/trends/weekly")
+    public ResponseEntity<List<DashboardStatsDTO.TrendDTO>> getWeeklyTrends() {
+        return ResponseEntity.ok(dashboardService.getWeeklyTrends(12));
+    }
+    @GetMapping("/distribution/department")
+    public ResponseEntity<Map<String, Long>> getByDepartment() {
+        return ResponseEntity.ok(dashboardService.getAssetDistributionByDepartment());
+    }
+
+    @GetMapping("/distribution/status")
+    public ResponseEntity<Map<String, Long>> getByStatus() {
+        return ResponseEntity.ok(dashboardService.getAssetStatusDistribution()); // make this method public
     }
 }

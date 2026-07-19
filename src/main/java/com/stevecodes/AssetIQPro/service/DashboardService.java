@@ -96,7 +96,7 @@ public class DashboardService {
         return distribution;
     }
 
-    private Map<String, Long> getAssetStatusDistribution() {
+    public Map<String, Long> getAssetStatusDistribution() {
         List<Object[]> results = assetRepository.countByStatusGrouped();
         return results.stream()
                 .collect(Collectors.toMap(
@@ -107,35 +107,39 @@ public class DashboardService {
 
     private Map<String, Long> getRequestStatusDistribution() {
         List<Object[]> results = requestRepository.countByStatusGrouped();
-        return results.stream()
-                .collect(Collectors.toMap(
-                        r -> ((InfraRequest.RequestStatus) r[0]).name(),
-                        r -> (Long) r[1]
-                ));
+        Map<String, Long> distribution = new HashMap<>();
+        for (Object[] result : results) {
+            InfraRequest.RequestStatus status = (InfraRequest.RequestStatus) result[0];
+            Long count = (Long) result[1];
+            distribution.put(status != null ? status.name() : "UNKNOWN", count);
+        }
+        return distribution;
     }
 
     private Map<String, Long> getResourceTypeDistribution() {
         List<Object[]> results = requestRepository.countByResourceTypeGrouped();
-        return results.stream()
-                .collect(Collectors.toMap(
-                        r -> (String) r[0],
-                        r -> (Long) r[1]
-                ));
+        Map<String, Long> distribution = new HashMap<>();
+        for (Object[] result : results) {
+            String resourceType = (String) result[0];
+            Long count = (Long) result[1];
+            distribution.put(resourceType != null ? resourceType : "Other", count);
+        }
+        return distribution;
     }
 
     // ============================================
     // Trends
     // ============================================
 
-    public List<DashboardStatsDTO.MonthlyTrendDTO> getMonthlyTrends() {
+    public List<DashboardStatsDTO.TrendDTO> getMonthlyTrends() {
         LocalDateTime now = LocalDateTime.now();
-        List<DashboardStatsDTO.MonthlyTrendDTO> trends = new ArrayList<>();
+        List<DashboardStatsDTO.TrendDTO> trends = new ArrayList<>();
 
         for (int i = 5; i >= 0; i--) {
             LocalDateTime monthStart = now.minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
             LocalDateTime monthEnd = monthStart.plusMonths(1).minusSeconds(1);
 
-            DashboardStatsDTO.MonthlyTrendDTO trend = new DashboardStatsDTO.MonthlyTrendDTO();
+            DashboardStatsDTO.TrendDTO trend = new DashboardStatsDTO.TrendDTO();
             trend.setMonth(monthStart.format(DateTimeFormatter.ofPattern("MMM yyyy")));
 
             // Count requests in this month
@@ -182,7 +186,7 @@ public class DashboardService {
     }
 
     // ============================================
-    // Recent Activity Methods - FIXED
+    // Recent Activity Methods
     // ============================================
 
     public List<Transfer> getRecentTransfers() {
@@ -201,5 +205,58 @@ public class DashboardService {
             log.error("Error getting recent requests: {}", e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    public List<DashboardStatsDTO.TrendDTO> getDailyTrends(int days) {
+        LocalDateTime now = LocalDateTime.now();
+        List<DashboardStatsDTO.TrendDTO> trends = new ArrayList<>();
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDateTime start = now.minusDays(i).toLocalDate().atStartOfDay();
+            LocalDateTime end = start.plusDays(1).minusSeconds(1);
+            trends.add(buildTrend(start.format(DateTimeFormatter.ofPattern("MMM d")), start, end));
+        }
+        return trends;
+    }
+
+    public List<DashboardStatsDTO.TrendDTO> getWeeklyTrends(int weeks) {
+        LocalDateTime now = LocalDateTime.now();
+        List<DashboardStatsDTO.TrendDTO> trends = new ArrayList<>();
+        for (int i = weeks - 1; i >= 0; i--) {
+            LocalDateTime start = now.minusWeeks(i).toLocalDate().with(java.time.DayOfWeek.MONDAY).atStartOfDay();
+            LocalDateTime end = start.plusWeeks(1).minusSeconds(1);
+            trends.add(buildTrend("Wk " + start.format(DateTimeFormatter.ofPattern("MMM d")), start, end));
+        }
+        return trends;
+    }
+
+    private DashboardStatsDTO.TrendDTO buildTrend(String label, LocalDateTime start, LocalDateTime end) {
+        DashboardStatsDTO.TrendDTO t = new DashboardStatsDTO.TrendDTO();
+        t.setMonth(label);
+        t.setRequests(requestRepository.findByCreatedAtBetween(start, end).size());
+        t.setCompleted(requestRepository.findByStatusAndDateRange(InfraRequest.RequestStatus.COMPLETED, start, end).size());
+        t.setAssetsAdded(historyRepository.findByEventTypeAndDateRange(AssetHistory.EVENT_PROCUREMENT, start, end).size());
+        return t;
+    }
+
+    // FIXED: Get asset distribution by department using native query
+    public Map<String, Long> getAssetDistributionByDepartment() {
+        Map<String, Long> distribution = new HashMap<>();
+        try {
+            List<Object[]> results = assetRepository.countByDepartmentGroupedNative();
+            for (Object[] result : results) {
+                String dept = (String) result[0];
+                Long count = ((Number) result[1]).longValue();
+                distribution.put(dept != null ? dept : "Unassigned", count);
+            }
+        } catch (Exception e) {
+            log.warn("Error getting department distribution: {}", e.getMessage());
+            // Fallback: return empty distribution with default values
+            distribution.put("Unassigned", 0L);
+        }
+        return distribution;
+    }
+
+    public Map<String, Long> getAssetDistributionByStatusChart() {
+        return getAssetStatusDistribution();
     }
 }

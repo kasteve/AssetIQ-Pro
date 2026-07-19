@@ -47,12 +47,16 @@ public class DashboardStatsDTO {
     private Map<String, Long> assetsByStatus;
     private Map<String, Long> requestsByStatus;
     private Map<String, Long> requestsByResourceType;
-    private List<MonthlyTrendDTO> monthlyTrends;
+    private Map<String, Long> assetsByDepartment;
+    private Map<String, Long> assetsByAssetType;
+    private List<TrendDTO> monthlyTrends;
+    private List<TrendDTO> dailyTrends;
+    private List<TrendDTO> weeklyTrends;
 
     @Data
     @NoArgsConstructor
-    public static class MonthlyTrendDTO {
-        private String month;
+    public static class TrendDTO {
+        private String month; // used as generic label for day/week/month
         private long requests;
         private long completed;
         private long assetsAdded;

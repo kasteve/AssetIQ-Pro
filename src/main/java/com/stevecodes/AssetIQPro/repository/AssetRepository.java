@@ -49,7 +49,7 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     @Query("SELECT a.status, COUNT(a) FROM Asset a GROUP BY a.status")
     List<Object[]> countByStatusGrouped();
 
-    // Category queries - FIXED: Use custom @Query instead of method name
+    // Category queries
     @Query("SELECT a.category.name, COUNT(a) FROM Asset a GROUP BY a.category.name")
     List<Object[]> countByCategoryGrouped();
 
@@ -65,6 +65,17 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     // All tags for dropdown
     @Query("SELECT a.tag FROM Asset a WHERE a.tag IS NOT NULL ORDER BY a.tag")
     List<String> findAllAssetTags();
+
+    // REMOVED: countByDepartmentGrouped - moved to DashboardService with native query approach
+
+    // Alternative: Use a native query to get department distribution
+    @Query(value = "SELECT COALESCE(d.Name, 'Unassigned') as department, COUNT(a.asset_id) as count " +
+            "FROM assets a " +
+            "LEFT JOIN assignments asg ON a.asset_id = asg.asset_id AND asg.returned_at IS NULL " +
+            "LEFT JOIN app_users u ON asg.assigned_to_user_id = u.user_id " +
+            "LEFT JOIN departments d ON u.department_id = d.department_id " +
+            "GROUP BY d.Name", nativeQuery = true)
+    List<Object[]> countByDepartmentGroupedNative();
 
     // Recent additions
     List<Asset> findTop10ByOrderByCreatedAtDesc();
