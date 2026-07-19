@@ -5,10 +5,24 @@
 
 <head>
     <title>Dashboard - AssetIQ-Pro</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
 <div layout:fragment="content" th:attr="data-api-base=@{/api/dashboard}">
+    <!-- Success/Error Messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span th:text="${error}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
     <!-- Welcome Section -->
     <div class="welcome-section">
         <h2>Welcome back, <span th:text="${session.fullName} ?: 'User'">User</span> 👋</h2>
@@ -256,55 +270,98 @@
         .status-badge { padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
         .chart-box { position: relative; height: 260px; }
+
+        /* Alerts */
+        .alert {
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </div>
 
 <!-- Scripts specific to dashboard -->
 <div layout:fragment="scripts">
-    <script th:inline="none">
-        // Context-path-safe API base, resolved server-side (avoids hardcoding /assetIQ-pro/...)
-        const apiBase = document.querySelector('[data-api-base]').getAttribute('data-api-base');
-        const colors = ['#0d6efd','#6610f2','#6f42c1','#d63384','#dc3545','#fd7e14','#ffc107','#28a745','#20c997','#17a2b8'];
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-        let trendsChart, distributionChart;
+    <script>
+        // Context-path-safe API base, resolved server-side
+        const apiBase = document.querySelector('[data-api-base]').getAttribute('data-api-base');
+        const colors = ['#0d6efd','#6610f2','#6f42c1','#d63384','#dc3545','#fd7e14','#ffc107','#28a745','#20c997','#17a2b8','#e83e8c','#6c757d'];
+
+        let trendsChart = null;
+        let distributionChart = null;
 
         // ---------- Trends chart ----------
         function renderTrends(trendData) {
-            const labels = trendData && trendData.length ? trendData.map(d => d.month) : ['No data'];
-            const requests = trendData && trendData.length ? trendData.map(d => d.requests) : [0];
-            const completed = trendData && trendData.length ? trendData.map(d => d.completed) : [0];
+            const ctx = document.getElementById('trendsChart').getContext('2d');
 
+            // If no data or empty array, use placeholder
+            const labels = trendData && trendData.length ? trendData.map(d => d.month || d.date || 'N/A') : ['No Data'];
+            const requests = trendData && trendData.length ? trendData.map(d => d.requests || 0) : [0];
+            const completed = trendData && trendData.length ? trendData.map(d => d.completed || 0) : [0];
+
+            // Destroy existing chart if it exists
             if (trendsChart) {
-                trendsChart.data.labels = labels;
-                trendsChart.data.datasets[0].data = requests;
-                trendsChart.data.datasets[1].data = completed;
-                trendsChart.update();
-                return;
+                trendsChart.destroy();
+                trendsChart = null;
             }
 
-            trendsChart = new Chart(document.getElementById('trendsChart').getContext('2d'), {
+            trendsChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Requests', data: requests,
-                            borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.08)',
-                            fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                            label: 'Requests',
+                            data: requests,
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13,110,253,0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            borderWidth: 2
                         },
                         {
-                            label: 'Completed', data: completed,
-                            borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.08)',
-                            fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2
+                            label: 'Completed',
+                            data: completed,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40,167,69,0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            borderWidth: 2
                         }
                     ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true, font: { size: 11 } }
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } },
-                        x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 0 } }
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { maxRotation: 45, minRotation: 0 }
+                        }
                     }
                 }
             });
@@ -315,34 +372,59 @@
                 : period === 'weekly' ? '/trends/weekly'
                 : '/trends';
             fetch(apiBase + endpoint)
-                .then(r => r.json())
-                .then(renderTrends)
-                .catch(err => console.error('Failed to load trends:', err));
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    renderTrends(data);
+                })
+                .catch(err => {
+                    console.error('Failed to load trends:', err);
+                    renderTrends(null);
+                });
         }
 
         // ---------- Distribution chart ----------
         function renderDistribution(data) {
-            const labels = data && Object.keys(data).length ? Object.keys(data) : ['No Data'];
-            const values = data && Object.keys(data).length ? Object.values(data) : [1];
-            const bg = colors.slice(0, labels.length);
+            const ctx = document.getElementById('distributionChart').getContext('2d');
 
+            // If no data or empty object, use placeholder
+            const hasData = data && typeof data === 'object' && Object.keys(data).length > 0;
+            const labels = hasData ? Object.keys(data) : ['No Data'];
+            const values = hasData ? Object.values(data) : [1];
+            const backgroundColors = colors.slice(0, labels.length);
+
+            // Destroy existing chart if it exists
             if (distributionChart) {
-                distributionChart.data.labels = labels;
-                distributionChart.data.datasets[0].data = values;
-                distributionChart.data.datasets[0].backgroundColor = bg;
-                distributionChart.update();
-                return;
+                distributionChart.destroy();
+                distributionChart = null;
             }
 
-            distributionChart = new Chart(document.getElementById('distributionChart').getContext('2d'), {
+            distributionChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: labels,
-                    datasets: [{ data: values, backgroundColor: bg, borderWidth: 2, borderColor: '#fff' }]
+                    datasets: [{
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10.5 } } } },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                font: { size: 10.5 },
+                                padding: 12
+                            }
+                        }
+                    },
                     cutout: '65%'
                 }
             });
@@ -353,34 +435,80 @@
                 : dimension === 'status' ? '/distribution/status'
                 : '/asset-distribution';
             fetch(apiBase + endpoint)
-                .then(r => r.json())
-                .then(renderDistribution)
-                .catch(err => console.error('Failed to load distribution:', err));
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    renderDistribution(data);
+                })
+                .catch(err => {
+                    console.error('Failed to load distribution:', err);
+                    renderDistribution(null);
+                });
         }
 
-        function loadDistribution(dimension) {
-            const endpoint = dimension === 'department' ? '/distribution/department'
-                : dimension === 'asset-type' ? '/distribution/asset-type'
-                : '/asset-distribution';
-            fetch(apiBase + endpoint)
-                .then(r => r.json())
-                .then(renderDistribution)
-                .catch(err => console.error('Failed to load distribution:', err));
+        // ---------- Auto-dismiss alerts ----------
+        function dismissAlerts() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 500);
+                }, 5000);
+            });
         }
 
-        // ---------- Wire up controls ----------
-        document.getElementById('trendsPeriod').addEventListener('change', function() {
-            loadTrends(this.value);
-        });
-        document.getElementById('distributionDimension').addEventListener('change', function() {
-            loadDistribution(this.value);
+        // ---------- Document Ready ----------
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wire up controls
+            const trendsPeriod = document.getElementById('trendsPeriod');
+            if (trendsPeriod) {
+                trendsPeriod.addEventListener('change', function() {
+                    loadTrends(this.value);
+                });
+            }
+
+            const distributionDimension = document.getElementById('distributionDimension');
+            if (distributionDimension) {
+                distributionDimension.addEventListener('change', function() {
+                    loadDistribution(this.value);
+                });
+            }
+
+            // Initial render with server data
+            const initialTrends = /*[[${stats != null ? stats.monthlyTrends : null}]]*/ null;
+            const initialDistribution = /*[[${stats != null ? stats.assetsByCategory : null}]]*/ null;
+
+            renderTrends(initialTrends);
+            renderDistribution(initialDistribution);
+
+            // Auto-dismiss alerts
+            dismissAlerts();
+
+            // Handle window resize for charts
+            let resizeTimer;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    if (trendsChart) trendsChart.resize();
+                    if (distributionChart) distributionChart.resize();
+                }, 250);
+            });
         });
 
-        // ---------- Initial render (server-rendered defaults, no extra request on first paint) ----------
-        const initialTrends = /*[[${stats != null ? stats.monthlyTrends : null}]]*/ null;
-        const initialDistribution = /*[[${stats != null ? stats.assetsByCategory : null}]]*/ null;
-        renderTrends(initialTrends);
-        renderDistribution(initialDistribution);
+        // ---------- Manual reload functions (can be called from console) ----------
+        window.reloadDashboard = function() {
+            const period = document.getElementById('trendsPeriod')?.value || 'monthly';
+            const dimension = document.getElementById('distributionDimension')?.value || 'category';
+            loadTrends(period);
+            loadDistribution(dimension);
+        };
     </script>
 </div>
 </body>

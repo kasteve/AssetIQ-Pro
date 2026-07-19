@@ -74,6 +74,7 @@ public class DashboardService {
         // Charts data
         stats.setAssetsByCategory(getAssetDistribution());
         stats.setAssetsByStatus(getAssetStatusDistribution());
+        stats.setAssetsByDepartment(getAssetDistributionByDepartment());
         stats.setRequestsByStatus(getRequestStatusDistribution());
         stats.setRequestsByResourceType(getResourceTypeDistribution());
         stats.setMonthlyTrends(getMonthlyTrends());
@@ -87,10 +88,10 @@ public class DashboardService {
 
     public Map<String, Long> getAssetDistribution() {
         List<Object[]> results = assetRepository.countByCategoryGrouped();
-        Map<String, Long> distribution = new HashMap<>();
+        Map<String, Long> distribution = new LinkedHashMap<>();
         for (Object[] result : results) {
             String categoryName = (String) result[0];
-            Long count = (Long) result[1];
+            Long count = ((Number) result[1]).longValue();
             distribution.put(categoryName != null ? categoryName : "Uncategorized", count);
         }
         return distribution;
@@ -98,19 +99,56 @@ public class DashboardService {
 
     public Map<String, Long> getAssetStatusDistribution() {
         List<Object[]> results = assetRepository.countByStatusGrouped();
-        return results.stream()
-                .collect(Collectors.toMap(
-                        r -> ((Asset.AssetStatus) r[0]).name(),
-                        r -> (Long) r[1]
-                ));
+        Map<String, Long> distribution = new LinkedHashMap<>();
+        for (Object[] result : results) {
+            Asset.AssetStatus status = (Asset.AssetStatus) result[0];
+            Long count = ((Number) result[1]).longValue();
+            distribution.put(status != null ? status.name() : "UNKNOWN", count);
+        }
+        return distribution;
+    }
+
+    public Map<String, Long> getAssetDistributionByDepartment() {
+        Map<String, Long> distribution = new LinkedHashMap<>();
+        try {
+            // First try using department_id (if it exists)
+            List<Object[]> results = assetRepository.countByDepartmentGroupedNative();
+            if (results != null && !results.isEmpty()) {
+                for (Object[] result : results) {
+                    String dept = (String) result[0];
+                    Long count = ((Number) result[1]).longValue();
+                    distribution.put(dept != null && !dept.isEmpty() ? dept : "Unassigned", count);
+                }
+            }
+
+            // If no results from department_id, try current_department field
+            if (distribution.isEmpty()) {
+                List<Object[]> stringResults = assetRepository.countByCurrentDepartmentGrouped();
+                for (Object[] result : stringResults) {
+                    String dept = (String) result[0];
+                    Long count = ((Number) result[1]).longValue();
+                    distribution.put(dept != null && !dept.isEmpty() ? dept : "Unassigned", count);
+                }
+            }
+
+            // If still empty, return all assets as "Unassigned"
+            if (distribution.isEmpty()) {
+                distribution.put("Unassigned", assetRepository.count());
+            }
+        } catch (Exception e) {
+            log.warn("Error getting department distribution: {}", e.getMessage());
+            // Fallback: Return all assets as "Unassigned"
+            distribution.put("Unassigned", assetRepository.count());
+        }
+        return distribution;
     }
 
     private Map<String, Long> getRequestStatusDistribution() {
         List<Object[]> results = requestRepository.countByStatusGrouped();
-        Map<String, Long> distribution = new HashMap<>();
+        Map<String, Long> distribution = new LinkedHashMap<>();
         for (Object[] result : results) {
             InfraRequest.RequestStatus status = (InfraRequest.RequestStatus) result[0];
-            Long count = (Long) result[1];
+            Long count = ((Number) result[1]).longValue();
             distribution.put(status != null ? status.name() : "UNKNOWN", count);
         }
         return distribution;
@@ -118,10 +156,10 @@ public class DashboardService {
 
     private Map<String, Long> getResourceTypeDistribution() {
         List<Object[]> results = requestRepository.countByResourceTypeGrouped();
-        Map<String, Long> distribution = new HashMap<>();
+        Map<String, Long> distribution = new LinkedHashMap<>();
         for (Object[] result : results) {
             String resourceType = (String) result[0];
-            Long count = (Long) result[1];
+            Long count = ((Number) result[1]).longValue();
             distribution.put(resourceType != null ? resourceType : "Other", count);
         }
         return distribution;
@@ -236,24 +274,6 @@ public class DashboardService {
         t.setCompleted(requestRepository.findByStatusAndDateRange(InfraRequest.RequestStatus.COMPLETED, start, end).size());
         t.setAssetsAdded(historyRepository.findByEventTypeAndDateRange(AssetHistory.EVENT_PROCUREMENT, start, end).size());
         return t;
-    }
-
-    // FIXED: Get asset distribution by department using native query
-    public Map<String, Long> getAssetDistributionByDepartment() {
-        Map<String, Long> distribution = new HashMap<>();
-        try {
-            List<Object[]> results = assetRepository.countByDepartmentGroupedNative();
-            for (Object[] result : results) {
-                String dept = (String) result[0];
-                Long count = ((Number) result[1]).longValue();
-                distribution.put(dept != null ? dept : "Unassigned", count);
-            }
-        } catch (Exception e) {
-            log.warn("Error getting department distribution: {}", e.getMessage());
-            // Fallback: return empty distribution with default values
-            distribution.put("Unassigned", 0L);
-        }
-        return distribution;
     }
 
     public Map<String, Long> getAssetDistributionByStatusChart() {
