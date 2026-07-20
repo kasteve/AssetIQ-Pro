@@ -25,6 +25,7 @@ public class TransferTokenService {
     private final TransferTokenRepository transferTokenRepository;
     private final EmployeeRepository employeeRepository;
     private final JavaMailSender mailSender;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     private static class SignerInfo {
         private final Long employeeId;
@@ -132,7 +133,8 @@ public class TransferTokenService {
                 TransferToken savedToken = transferTokenRepository.save(token);
                 createdTokens.add(savedToken);
 
-                String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + savedToken.getToken();
+                // ✅ DYNAMIC URL
+                String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", savedToken.getToken());
 
                 log.info("=========================================");
                 log.info("🔐 SIGNING LINK GENERATED FOR TRANSFER: {}", transfer.getTransferId());
@@ -169,7 +171,8 @@ public class TransferTokenService {
             } catch (Exception e) {
                 log.error("❌ Failed to send email to {} [Thread: {}]: {}",
                         token.getSignerEmail(), Thread.currentThread().getName(), e.getMessage());
-                String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+                // ✅ DYNAMIC URL
+                String manualLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
                 log.info("🔗 MANUAL LINK FOR {}: {}", token.getSignerEmail(), manualLink);
             }
         }
@@ -196,7 +199,8 @@ public class TransferTokenService {
                 failureCount++;
                 log.error("❌ Failed to send email to {} for transfer {} [Thread: {}]: {}",
                         token.getSignerEmail(), transfer.getTransferId(), Thread.currentThread().getName(), e.getMessage(), e);
-                String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+                // ✅ DYNAMIC URL
+                String manualLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
                 log.info("🔗 MANUAL LINK FOR {}: {}", token.getSignerEmail(), manualLink);
             }
         }
@@ -350,7 +354,8 @@ public class TransferTokenService {
 
             String employeeName = getEmployeeName(signer.getEmployeeId());
             String greeting = (employeeName != null) ? employeeName : getRoleDisplayName(signer.getRole());
-            String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+            // ✅ DYNAMIC URL
+            String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
 
             // LOG THE LINK FOR MANUAL RETRIEVAL
             log.info("=========================================");
@@ -414,7 +419,8 @@ public class TransferTokenService {
             log.error("❌ Failed to send email to: {} (Role: {}) on thread: {}",
                     signer.getEmail(), signer.getRole(), Thread.currentThread().getName(), e);
 
-            String manualLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+            // ✅ DYNAMIC URL
+            String manualLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
             log.info("🔗 MANUAL LINK FOR {}: {}", signer.getEmail(), manualLink);
 
             throw new RuntimeException("Email sending failed", e);
@@ -522,7 +528,8 @@ public class TransferTokenService {
                 log.info("📧 Sending reminder email to: {} for token: {}", token.getSignerEmail(), token.getToken());
                 String employeeName = getEmployeeName(token.getSignerEmployeeId());
                 String greeting = (employeeName != null) ? employeeName : getRoleDisplayName(token.getSignerRole());
-                String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+                // ✅ DYNAMIC URL
+                String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
 
                 String subject = "URGENT: Transfer Signature Required - Token Expires Soon (Role: " + getRoleDisplayName(token.getSignerRole()) + ")";
                 String body = String.format("""

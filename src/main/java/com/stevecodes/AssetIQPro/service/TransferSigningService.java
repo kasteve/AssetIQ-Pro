@@ -27,6 +27,7 @@ public class TransferSigningService {
     private final PdfGenerationService pdfGenerationService;
     private final EmailService emailService;
     private final EmployeeRepository employeeRepository;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     public void initiateTransferSigning(Integer transferId) {
         Transfer transfer = transferRepository.findById(transferId)
@@ -41,7 +42,8 @@ public class TransferSigningService {
         List<TransferToken> tokens = tokenRepository.findByTransferId(transferId);
         log.info("📋 ALL SIGNING LINKS FOR TRANSFER {}:", transferId);
         for (TransferToken token : tokens) {
-            String signingLink = "http://localhost:8091/assetIQ-pro/transfers/sign?token=" + token.getToken();
+            // ✅ DYNAMIC URL
+            String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
             log.info("   👤 {}: {}", token.getSignerRole(), signingLink);
             log.info("   📧 Email: {}", token.getSignerEmail());
             log.info("   ⏰ Expires: {}", token.getExpiresAt());

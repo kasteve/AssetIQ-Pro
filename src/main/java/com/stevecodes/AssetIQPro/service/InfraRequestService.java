@@ -38,6 +38,7 @@ public class InfraRequestService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     private static final String UPLOAD_DIR = "uploads/infra/quotations/";
     private static final String REPORT_DIR = "uploads/infra/reports/";
@@ -411,8 +412,9 @@ public class InfraRequestService {
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
         requestRepository.save(request);
 
-        // Send email with signing link
-        String signingLink = "http://localhost:8091/assetIQ-pro/infra-requests/sign?token=" + token;
+        // ✅ DYNAMIC URL
+        String signingLink = baseUrlService.buildUrl("/infra-requests/sign?token=%s", token);
+
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
             emailService.sendSimpleEmail(
                     user.getEmail(),
@@ -607,7 +609,7 @@ public class InfraRequestService {
 
     private void notifyLineManager(InfraRequest request) {
         userRepository.findById(request.getLineManagerId()).ifPresent(manager -> {
-            String approvalLink = "/infra-requests/" + request.getRequestId();
+            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());  // ✅ DYNAMIC
             createNotification(
                     request.getLineManagerId(),
                     Notification.NotificationType.REQUEST_STATUS,
@@ -619,12 +621,13 @@ public class InfraRequestService {
     }
 
     private void notifyRequester(InfraRequest request, String message) {
+        String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());  // ✅ DYNAMIC
         createNotification(
                 request.getRequesterId(),
                 Notification.NotificationType.REQUEST_STATUS,
                 "Infrastructure Request Update",
                 message,
-                "/infra-requests/" + request.getRequestId()
+                requestLink
         );
     }
 

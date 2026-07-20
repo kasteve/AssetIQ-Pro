@@ -22,6 +22,9 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Autowired
+    private BaseUrlService baseUrlService;  // ✅ ADDED
+
     private static final String FROM_EMAIL = "assetiq@company.com";
 
     // ============================================
@@ -83,14 +86,13 @@ public class EmailService {
 
             helper.setTo(toEmail);
             helper.setSubject(subject);
-            helper.setText(htmlContent, true); // true = HTML
+            helper.setText(htmlContent, true);
             helper.setFrom(FROM_EMAIL);
 
             mailSender.send(message);
             logEmailSent("HTML Email", toEmail, subject);
         } catch (MessagingException e) {
             log.error("❌ Failed to send HTML email to {}: {}", toEmail, e.getMessage());
-            // Fallback to plain text
             sendSimpleEmail(toEmail, subject, "Please view this email in HTML format.");
         } catch (Exception e) {
             log.error("❌ Unexpected error sending HTML email: {}", e.getMessage());
@@ -124,7 +126,6 @@ public class EmailService {
             logEmailSent("Email with Attachment", toEmail, subject);
         } catch (MessagingException e) {
             log.error("❌ Failed to send email with attachment to {}: {}", toEmail, e.getMessage());
-            // Fallback to simple email without attachment
             sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent. Please download from the portal.)");
         } catch (Exception e) {
             log.error("❌ Unexpected error sending email with attachment: {}", e.getMessage());
@@ -138,6 +139,7 @@ public class EmailService {
 
     @Async
     public void sendWelcomeEmail(String toEmail, String fullName, String username, String tempPassword) {
+        String loginUrl = baseUrlService.buildUrl("/login");  // ✅ DYNAMIC
         String subject = "Welcome to AssetIQ-Pro - Your Account Details";
         String body = String.format("""
             Dear %s,
@@ -152,13 +154,13 @@ public class EmailService {
             
             IMPORTANT: This is a temporary password. You will be required to change it on your first login.
             
-            Please login to access the system: http://localhost:8091/assetIQ-pro/login
+            Please login to access the system: %s
             
             If you have any questions, please contact IT Support.
             
             Best regards,
             AssetIQ-Pro Team
-            """, fullName, username, tempPassword);
+            """, fullName, username, tempPassword, loginUrl);
 
         sendSimpleEmail(toEmail, subject, body);
     }
@@ -167,7 +169,7 @@ public class EmailService {
     public void sendPasswordResetEmail(String toEmail, String fullName, String token) {
         try {
             String subject = "Password Reset - AssetIQ-Pro";
-            String resetLink = "http://localhost:8091/assetIQ-pro/reset-password?token=" + token;
+            String resetLink = baseUrlService.buildUrl("/reset-password?token=%s", token);  // ✅ DYNAMIC
 
             String htmlContent = "<html><body style='font-family: Arial, sans-serif;'>"
                     + "<div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9ecef; border-radius: 10px;'>"
@@ -188,7 +190,6 @@ public class EmailService {
             log.info("Password reset email sent to: {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
-            // Fallback to plain text
             String fallbackBody = String.format("""
                 Dear %s,
                 
@@ -230,6 +231,7 @@ public class EmailService {
     public void sendInfraRequestStatusUpdate(String toEmail, String requesterName,
                                              String requestId, String status,
                                              String comment, String resourceType) {
+        String requestUrl = baseUrlService.buildUrl("/infra-requests/%s", requestId);  // ✅ DYNAMIC
         String subject = "Infrastructure Request " + status + " - #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -239,12 +241,12 @@ public class EmailService {
             Status: %s
             Comment: %s
             
-            You can view the request details here: http://localhost:8091/assetIQ-pro/infra-requests/%s
+            You can view the request details here: %s
             
             Best regards,
             Infrastructure Team
             AssetIQ-Pro
-            """, requesterName, resourceType, requestId, status, status, comment, requestId);
+            """, requesterName, resourceType, requestId, status, status, comment, requestUrl);
 
         sendSimpleEmail(toEmail, subject, body);
     }
@@ -253,6 +255,7 @@ public class EmailService {
     public void sendInfraRequestApproval(String toEmail, String approverName,
                                          String requestId, String requesterName,
                                          String resourceType, String approvalLink) {
+        String link = approvalLink != null ? approvalLink : baseUrlService.buildUrl("/infra-requests/%s/approve", requestId);  // ✅ DYNAMIC
         String subject = "Action Required: Infrastructure Request Approval - #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -268,7 +271,7 @@ public class EmailService {
             Best regards,
             Infrastructure Team
             AssetIQ-Pro
-            """, approverName, requestId, requesterName, resourceType, approvalLink);
+            """, approverName, requestId, requesterName, resourceType, link);
 
         sendSimpleEmail(toEmail, subject, body);
     }
@@ -277,6 +280,7 @@ public class EmailService {
     public void sendInfraRequestSigningLink(String toEmail, String requesterName,
                                             Long requestId, String signingLink,
                                             String expiryDate) {
+        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/infra-requests/sign/%s", requestId);  // ✅ DYNAMIC
         String subject = "Infrastructure Request - Sign to Complete #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -294,7 +298,7 @@ public class EmailService {
             Best regards,
             Infrastructure Team
             AssetIQ-Pro
-            """, requesterName, requestId, signingLink, expiryDate);
+            """, requesterName, requestId, link, expiryDate);
 
         sendSimpleEmail(toEmail, subject, body);
     }
@@ -369,6 +373,7 @@ public class EmailService {
                                              String assetTag, String transferId,
                                              String role, String signingLink,
                                              String expiresAt) {
+        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/transfers/sign/%s", transferId);  // ✅ DYNAMIC
         String subject = "Signature Required: Asset Transfer - " + assetTag;
         String body = String.format("""
             Dear %s,
@@ -386,7 +391,7 @@ public class EmailService {
             Best regards,
             Asset Management Team
             AssetIQ-Pro
-            """, fullName, transferId, assetTag, role, signingLink, expiresAt);
+            """, fullName, transferId, assetTag, role, link, expiresAt);
 
         sendSimpleEmail(toEmail, subject, body);
     }

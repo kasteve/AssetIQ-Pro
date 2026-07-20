@@ -108,7 +108,7 @@
                     <td>
                         <div th:if="${asset.eolDate}">
                             <span th:text="${#temporals.format(asset.eolDate, 'dd/MM/yyyy')}">2026-01-01</span>
-                            <div th:if="${asset.eolSoon}" class="warning-flag">
+                            <div th:if="${asset.EOLSoon}" class="warning-flag">
                                 <i class="fas fa-exclamation-circle"></i> EOL soon
                             </div>
                         </div>

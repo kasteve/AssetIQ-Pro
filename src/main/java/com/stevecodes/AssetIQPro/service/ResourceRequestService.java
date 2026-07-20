@@ -26,6 +26,7 @@ public class ResourceRequestService {
     private final AuditService auditService;
     private final AppUserService appUserService;
     private final PdfGenerationService pdfGenerationService;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     private static final String REPORT_DIR = "uploads/resources/reports/";
 
@@ -247,9 +248,10 @@ public class ResourceRequestService {
             log.error("Failed to generate PDF for resource request {}: {}", requestId, e.getMessage());
         }
 
-        // Send email with signing link
+        // ✅ DYNAMIC URL
+        String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
+
         String requesterEmail = getEmailForUser(request.getUserId());
-        String signatureLink = "http://localhost:8091/assetIQ-pro/resources/sign?token=" + token;
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Completed - Please Sign",
@@ -336,9 +338,9 @@ public class ResourceRequestService {
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
         resourceRequestRepository.save(request);
 
-        // Resend email
+        // Resend email - ✅ DYNAMIC
         String requesterEmail = getEmailForUser(request.getUserId());
-        String signatureLink = "http://localhost:8091/assetIQ-pro/resources/sign?token=" + token;
+        String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "REMINDER: Resource Request - Please Sign",
@@ -477,14 +479,14 @@ public class ResourceRequestService {
     // ============================================
 
     private String savePdfToFile(byte[] pdfBytes, Long requestId) throws java.io.IOException {
-        java.nio.file.Path uploadPath = java.nio.file.Paths.get(REPORT_DIR);
-        if (!java.nio.file.Files.exists(uploadPath)) {
-            java.nio.file.Files.createDirectories(uploadPath);
+        Path uploadPath = Paths.get(REPORT_DIR);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
         }
 
         String filename = "resource_request_" + requestId + "_" + System.currentTimeMillis() + ".pdf";
-        java.nio.file.Path filePath = uploadPath.resolve(filename);
-        java.nio.file.Files.write(filePath, pdfBytes);
+        Path filePath = uploadPath.resolve(filename);
+        Files.write(filePath, pdfBytes);
         return filePath.toString();
     }
 

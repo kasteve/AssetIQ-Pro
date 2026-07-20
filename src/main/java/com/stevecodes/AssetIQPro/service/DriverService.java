@@ -31,6 +31,7 @@ public class DriverService {
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
     private final AuditService auditService;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     private static final int MAX_DAYS = 7;
 
@@ -245,7 +246,7 @@ public class DriverService {
                 "DRIVER_REQUEST_ACCEPTED",
                 "Driver Request Accepted",
                 "Your driver request has been accepted by " + driverName,
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
 
         auditService.logAction("DRIVER_REQUEST_ACCEPTED",
@@ -288,7 +289,7 @@ public class DriverService {
                 "DRIVER_REQUEST_DECLINED",
                 "Driver Request Declined",
                 "Your driver request has been declined. Reason: " + reason,
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
 
         auditService.logAction("DRIVER_REQUEST_DECLINED",
@@ -316,9 +317,9 @@ public class DriverService {
 
         updateDriverAvailability(driverId, "AVAILABLE");
 
-        // Notify requester for rating
+        // Notify requester for rating - ✅ DYNAMIC
         String requesterEmail = getUserEmail(request.getUserId());
-        String ratingLink = "http://localhost:8091/assetIQ-pro/bookings/driver-rating/" + requestId;
+        String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s", requestId);
 
         emailService.sendSimpleEmail(
                 requesterEmail,
@@ -487,14 +488,15 @@ public class DriverService {
     private void notifyAvailableDrivers(DriverRequest request) {
         List<AppUser> drivers = userRepository.findByRole("DRIVER");
 
+        // ✅ DYNAMIC
+        String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
+
         for (AppUser driver : drivers) {
             // Check if driver is available
             Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
             if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
                 continue;
             }
-
-            String dashboardLink = "http://localhost:8091/assetIQ-pro/bookings/driver-dashboard";
 
             emailService.sendSimpleEmail(
                     driver.getEmail(),
@@ -523,7 +525,8 @@ public class DriverService {
     private void notifyDriver(Long driverId, DriverRequest request) {
         Optional<AppUser> driver = userRepository.findById(driverId);
         if (driver.isPresent()) {
-            String dashboardLink = "http://localhost:8091/assetIQ-pro/bookings/driver-dashboard";
+            // ✅ DYNAMIC
+            String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
 
             emailService.sendSimpleEmail(
                     driver.get().getEmail(),
@@ -550,9 +553,10 @@ public class DriverService {
     private void notifyAdminOfCabRequest(DriverRequest request) {
         List<AppUser> admins = userRepository.findByRole("ADMIN");
 
-        for (AppUser admin : admins) {
-            String dashboardLink = "http://localhost:8091/assetIQ-pro/bookings/cab-requests";
+        // ✅ DYNAMIC
+        String dashboardLink = baseUrlService.buildUrl("/bookings/cab-requests");
 
+        for (AppUser admin : admins) {
             emailService.sendSimpleEmail(
                     admin.getEmail(),
                     "New Cab Request - Action Required",
@@ -572,7 +576,8 @@ public class DriverService {
         notification.setType(type);
         notification.setTitle(title);
         notification.setMessage(message);
-        notification.setLink(link);
+        // ✅ Use baseUrlService for links in notifications
+        notification.setLink(link.startsWith("/") ? baseUrlService.buildUrl(link) : link);
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
         notificationRepository.save(notification);

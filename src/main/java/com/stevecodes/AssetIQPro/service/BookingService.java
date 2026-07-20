@@ -31,6 +31,7 @@ public class BookingService {
     private final AuditService auditService;
     private final AppUserService appUserService;
     private final NotificationRepository notificationRepository;
+    private final BaseUrlService baseUrlService;  // ✅ ADDED
 
     private static final int MAX_BOOKING_DAYS = 7;
 
@@ -205,7 +206,7 @@ public class BookingService {
                 "SERVER_ROOM_APPROVED",
                 "Server Room Approved",
                 "Your server room booking for " + roomName + " has been approved.",
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
 
         auditService.logAction("SERVER_ROOM_APPROVED",
@@ -252,7 +253,7 @@ public class BookingService {
                 "SERVER_ROOM_DECLINED",
                 "Server Room Declined",
                 "Your server room booking for " + roomName + " has been declined. Reason: " + reason,
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
 
         auditService.logAction("SERVER_ROOM_DECLINED",
@@ -284,7 +285,8 @@ public class BookingService {
                 (infraComment != null ? " | Comment: " + infraComment : ""));
         bookingRepository.save(booking);
 
-        String signOutLink = "http://localhost:8091/assetIQ-pro/bookings/server-room/sign-out?token=" + token;
+        // ✅ DYNAMIC URL
+        String signOutLink = baseUrlService.buildUrl("/bookings/server-room/sign-out?token=%s", token);
 
         String requesterEmail = getEmailForUser(booking.getUserId());
         String roomName = roomRepository.findById(booking.getRoomId())
@@ -425,9 +427,10 @@ public class BookingService {
         booking.setSlotRequestStatus("PENDING");
         bookingRepository.save(booking);
 
-        // Send email with portal link
+        // ✅ DYNAMIC URL
+        String responseLink = baseUrlService.buildUrl("/bookings/slot-request/%s/respond?requesterId=%s", bookingId, requesterId);
+
         String currentBookerEmail = getEmailForUser(booking.getUserId());
-        String responseLink = "http://localhost:8091/assetIQ-pro/bookings/slot-request/" + bookingId + "/respond?requesterId=" + requesterId;
 
         emailService.sendSimpleEmail(
                 currentBookerEmail,
@@ -452,7 +455,7 @@ public class BookingService {
                 "SLOT_REQUEST_SENT",
                 "Slot Request Sent",
                 "You have requested to use " + roomName + " from " + timeSlot + ". Waiting for approval.",
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
 
         auditService.logAction("SLOT_REQUESTED",
@@ -691,7 +694,8 @@ public class BookingService {
 
     private void notifyInfrastructureTeam(Booking booking, Room room) {
         String roomName = room != null ? room.getRoomName() : "Server Room";
-        String approvalLink = "http://localhost:8091/assetIQ-pro/bookings/server-room/" + booking.getBookingId() + "/respond";
+        // ✅ DYNAMIC URL
+        String approvalLink = baseUrlService.buildUrl("/bookings/server-room/%s/respond", booking.getBookingId());
 
         // Try multiple role names
         List<com.stevecodes.AssetIQPro.entity.AppUser> infraUsers = new ArrayList<>();
@@ -787,7 +791,7 @@ public class BookingService {
                 "ROOM_BOOKING_CONFIRMED",
                 "Room Booking Confirmed",
                 "Your booking for " + roomName + " has been confirmed.",
-                "/bookings/bookings-dashboard"
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
         );
     }
 
