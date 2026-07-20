@@ -88,7 +88,7 @@ public class AppUserService {
     public AppUser createUser(UserDTO userDTO) {
         log.info("Creating new user: {}", userDTO.getUsername());
 
-        // Validate
+        // Validation
         if (userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username '" + userDTO.getUsername() + "' is already taken.");
         }
@@ -101,7 +101,7 @@ public class AppUserService {
 
         String tempPassword = generateTemporaryPassword();
 
-        // 1. Create Employee first
+        // 1. Create and save Employee
         Employee employee = new Employee();
         employee.setStaffId(userDTO.getStaffId());
         employee.setFirstName(getFirstName(userDTO.getFullName()));
@@ -109,20 +109,19 @@ public class AppUserService {
         employee.setEmailAddress(userDTO.getEmail());
         employee.setPhoneNumber(userDTO.getPhoneNumber());
 
-        // Set department if provided
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             employee.setDepartment(dept);
         }
 
-        // Set Line Manager if provided
         if (userDTO.getLineManagerId() != null) {
             Employee lineManager = employeeRepository.findById(userDTO.getLineManagerId())
                     .orElseThrow(() -> new ResourceNotFoundException("Line Manager not found"));
             employee.setLineManager(lineManager);
         }
 
+        // Save Employee – it is now persistent
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created with ID: {}", savedEmployee.getEmployeeId());
 
@@ -135,7 +134,6 @@ public class AppUserService {
         user.setFullName(userDTO.getFullName());
         user.setRole(userDTO.getRole() != null ? userDTO.getRole() : "EMPLOYEE");
 
-        // Set department entity and department string
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
@@ -149,7 +147,7 @@ public class AppUserService {
         user.setFirstLogin(true);
         user.setCreatedAt(LocalDateTime.now());
 
-        // Link employee
+        // ✅ Link the persistent Employee (owning side)
         user.setEmployee(savedEmployee);
 
         // Assign permissions
@@ -166,12 +164,12 @@ public class AppUserService {
             }
         }
 
+        // ✅ Save AppUser – this will set the foreign key (employee_id)
         AppUser savedUser = userRepository.save(user);
         log.info("User created successfully: {}", savedUser.getUsername());
 
-        // 3. Update employee with user reference
-        savedEmployee.setUser(savedUser);
-        employeeRepository.save(savedEmployee);
+        // ⚠️ DO NOT set the reverse reference on Employee – it is not needed.
+        // savedEmployee.setUser(savedUser);   // <-- REMOVED
 
         log.info("=========================================");
         log.info("👤 NEW USER CREATED");

@@ -44,7 +44,9 @@ public class Employee {
     @Column(name = "DepartmentId", insertable = false, updatable = false)
     private Integer departmentId;
 
-    @OneToOne(fetch = FetchType.LAZY, mappedBy = "employee")
+    // ✅ Use property access to avoid bytecode enhancement conflicts
+    @OneToOne(fetch = FetchType.LAZY, mappedBy = "employee", cascade = {})
+    @Access(AccessType.PROPERTY)
     private AppUser user;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -53,6 +55,15 @@ public class Employee {
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "lineManager")
     private List<Employee> subordinates = new ArrayList<>();
+
+    // ✅ Explicit getter/setter for user (Hibernate will use these)
+    public AppUser getUser() {
+        return user;
+    }
+
+    public void setUser(AppUser user) {
+        this.user = user;
+    }
 
     public String getFullName() {
         if (firstName != null && surName != null) {
