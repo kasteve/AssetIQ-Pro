@@ -420,13 +420,14 @@
 				<executions>
 					<execution>
 						<id>enhance</id>
+						<phase>process-classes</phase>
 						<goals>
 							<goal>enhance</goal>
 						</goals>
 						<configuration>
 							<enableLazyInitialization>true</enableLazyInitialization>
 							<enableDirtyTracking>true</enableDirtyTracking>
-							<enableAssociationManagement>true</enableAssociationManagement>
+							<enableAssociationManagement>false</enableAssociationManagement>
 						</configuration>
 					</execution>
 				</executions>

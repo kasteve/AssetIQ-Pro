@@ -352,7 +352,7 @@ public class AppUserService {
         password.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(random.nextInt(26)));
         password.append("abcdefghijklmnopqrstuvwxyz".charAt(random.nextInt(26)));
         password.append("0123456789".charAt(random.nextInt(10)));
-        password.append("!@#$%^&*".charAt(random.nextInt(9)));
+        password.append("!@#$%^&*".charAt(random.nextInt(8)));
 
         for (int i = 4; i < 12; i++) {
             password.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
