@@ -40,6 +40,12 @@ public class AuditLog {
     @Column(name = "createdAt")
     private LocalDateTime createdAt;
 
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "user_agent")
+    private String userAgent;
+
     public AuditLog(Long userId, String action, String details) {
         this.userId = userId;
         this.action = action;

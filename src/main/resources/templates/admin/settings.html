@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>System Settings - AssetIQ-Pro</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-cog me-2"></i>System Settings</h4>
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+            <i class="fas fa-sync me-2"></i>Refresh
+        </button>
+    </div>
+
+    <!-- Settings Tabs -->
+    <ul class="nav nav-tabs settings-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#security" type="button">
+                <i class="fas fa-shield-alt me-2"></i>Security
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#email" type="button">
+                <i class="fas fa-envelope me-2"></i>Email
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#reports" type="button">
+                <i class="fas fa-file-alt me-2"></i>Reports
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#theme" type="button">
+                <i class="fas fa-palette me-2"></i>Theme
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content settings-content">
+        <!-- Security Settings -->
+        <div class="tab-pane fade show active" id="security" role="tabpanel">
+            <div class="settings-card">
+                <h5><i class="fas fa-key me-2"></i>Password Policy</h5>
+                <form th:action="@{/admin/settings/update-bulk}" method="post" class="settings-form">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Minimum Length</label>
+                            <input type="number" name="password.min.length" class="form-control"
+                                   th:value="${securitySettings['password.min.length'] ?: '8'}"
+                                   min="4" max="50">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Expiry Days (0 = never)</label>
+                            <input type="number" name="password.expiry.days" class="form-control"
+                                   th:value="${securitySettings['password.expiry.days'] ?: '90'}"
+                                   min="0" max="365">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">History Count</label>
+                            <input type="number" name="password.history.count" class="form-control"
+                                   th:value="${securitySettings['password.history.count'] ?: '5'}"
+                                   min="0" max="20">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Max Login Attempts</label>
+                            <input type="number" name="password.max.attempts" class="form-control"
+                                   th:value="${securitySettings['password.max.attempts'] ?: '5'}"
+                                   min="1" max="20">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Session Timeout (minutes)</label>
+                            <input type="number" name="session.timeout.minutes" class="form-control"
+                                   th:value="${securitySettings['session.timeout.minutes'] ?: '30'}"
+                                   min="5" max="480">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Max Concurrent Sessions</label>
+                            <input type="number" name="session.max.concurrent" class="form-control"
+                                   th:value="${securitySettings['session.max.concurrent'] ?: '5'}"
+                                   min="1" max="20">
+                        </div>
+                        <!-- Checkboxes -->
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="password.require.uppercase" value="false">
+                                <input class="form-check-input" type="checkbox" name="password.require.uppercase" value="true"
+                                       th:checked="${(securitySettings['password.require.uppercase'] ?: 'true') == 'true'}">
+                                <label class="form-check-label">Require Uppercase</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="password.require.lowercase" value="false">
+                                <input class="form-check-input" type="checkbox" name="password.require.lowercase" value="true"
+                                       th:checked="${(securitySettings['password.require.lowercase'] ?: 'true') == 'true'}">
+                                <label class="form-check-label">Require Lowercase</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="password.require.number" value="false">
+                                <input class="form-check-input" type="checkbox" name="password.require.number" value="true"
+                                       th:checked="${(securitySettings['password.require.number'] ?: 'true') == 'true'}">
+                                <label class="form-check-label">Require Number</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="password.require.special" value="false">
+                                <input class="form-check-input" type="checkbox" name="password.require.special" value="true"
+                                       th:checked="${(securitySettings['password.require.special'] ?: 'true') == 'true'}">
+                                <label class="form-check-label">Require Special Character</label>
+                            </div>
+                        </div>
+                        <!-- 2FA -->
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="hidden" name="2fa.enabled" value="false">
+                                <input class="form-check-input" type="checkbox" name="2fa.enabled" value="true"
+                                       th:checked="${(securitySettings['2fa.enabled'] ?: 'false') == 'true'}">
+                                <label class="form-check-label fw-bold">Enable Two-Factor Authentication</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">2FA Method</label>
+                            <select name="2fa.method" class="form-select">
+                                <option value="email" th:selected="${(securitySettings['2fa.method'] ?: 'email') == 'email'}">Email</option>
+                                <option value="sms" th:selected="${(securitySettings['2fa.method'] ?: 'email') == 'sms'}">SMS</option>
+                                <option value="authenticator" th:selected="${(securitySettings['2fa.method'] ?: 'email') == 'authenticator'}">Authenticator App</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Security Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Email Settings -->
+        <div class="tab-pane fade" id="email" role="tabpanel">
+            <div class="settings-card">
+                <h5><i class="fas fa-mail-bulk me-2"></i>Email Configuration</h5>
+                <form th:action="@{/admin/settings/update-bulk}" method="post" class="settings-form">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Host</label>
+                            <input type="text" name="email.host" class="form-control"
+                                   th:value="${emailSettings['email.host'] ?: 'smtp.gmail.com'}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" name="email.port" class="form-control"
+                                   th:value="${emailSettings['email.port'] ?: '587'}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="email.username" class="form-control"
+                                   th:value="${emailSettings['email.username'] ?: ''}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Password</label>
+                            <input type="password" name="email.password" class="form-control"
+                                   th:value="${emailSettings['email.password'] ?: ''}">
+                            <small class="text-muted">Leave blank to keep current password</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">From Address</label>
+                            <input type="email" name="email.from" class="form-control"
+                                   th:value="${emailSettings['email.from'] ?: 'noreply@asset-iq-pro.com'}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Test Recipient</label>
+                            <input type="email" name="email.test.recipient" class="form-control"
+                                   th:value="${emailSettings['email.test.recipient'] ?: ''}"
+                                   placeholder="Enter email to test">
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="email.ssl.enabled" value="false">
+                                <input class="form-check-input" type="checkbox" name="email.ssl.enabled" value="true"
+                                       th:checked="${(emailSettings['email.ssl.enabled'] ?: 'false') == 'true'}">
+                                <label class="form-check-label">Enable SSL</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input type="hidden" name="email.tls.enabled" value="false">
+                                <input class="form-check-input" type="checkbox" name="email.tls.enabled" value="true"
+                                       th:checked="${(emailSettings['email.tls.enabled'] ?: 'true') == 'true'}">
+                                <label class="form-check-label">Enable TLS</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-outline-secondary" onclick="testEmailConfig()">
+                                <i class="fas fa-paper-plane me-2"></i>Test Email Configuration
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Email Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Report Settings -->
+        <div class="tab-pane fade" id="reports" role="tabpanel">
+            <div class="settings-card">
+                <h5><i class="fas fa-file-export me-2"></i>Report Configuration</h5>
+                <form th:action="@{/admin/settings/update-bulk}" method="post" class="settings-form">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="hidden" name="report.auto.generate" value="false">
+                                <input class="form-check-input" type="checkbox" name="report.auto.generate" value="true"
+                                       th:checked="${(reportSettings['report.auto.generate'] ?: 'true') == 'true'}">
+                                <label class="form-check-label fw-bold">Auto-Generate Scheduled Reports</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Schedule (Cron Expression)</label>
+                            <input type="text" name="report.schedule.cron" class="form-control"
+                                   th:value="${reportSettings['report.schedule.cron'] ?: '0 0 6 * * *'}">
+                            <small class="text-muted">Daily at 6 AM: 0 0 6 * * *</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Recipients (comma separated)</label>
+                            <input type="text" name="report.recipients" class="form-control"
+                                   th:value="${reportSettings['report.recipients'] ?: 'admin@company.com'}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Report Types</label>
+                            <select name="report.types" class="form-select" multiple size="4">
+                                <option value="asset_summary" th:selected="${(reportSettings['report.types'] ?: '').contains('asset_summary')}">Asset Summary</option>
+                                <option value="warranty_expiry" th:selected="${(reportSettings['report.types'] ?: '').contains('warranty_expiry')}">Warranty Expiry</option>
+                                <option value="transfer_history" th:selected="${(reportSettings['report.types'] ?: '').contains('transfer_history')}">Transfer History</option>
+                                <option value="request_summary" th:selected="${(reportSettings['report.types'] ?: '').contains('request_summary')}">Request Summary</option>
+                                <option value="eol_report" th:selected="${(reportSettings['report.types'] ?: '').contains('eol_report')}">EOL Report</option>
+                            </select>
+                            <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Report Format</label>
+                            <select name="report.format" class="form-select">
+                                <option value="pdf" th:selected="${(reportSettings['report.format'] ?: 'pdf') == 'pdf'}">PDF</option>
+                                <option value="excel" th:selected="${(reportSettings['report.format'] ?: 'pdf') == 'excel'}">Excel</option>
+                                <option value="both" th:selected="${(reportSettings['report.format'] ?: 'pdf') == 'both'}">Both PDF & Excel</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Report Settings
+                        </button>
+                        <button type="button" class="btn btn-success ms-2" onclick="generateReportsNow()">
+                            <i class="fas fa-file-export me-2"></i>Generate Reports Now
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Theme Settings -->
+        <div class="tab-pane fade" id="theme" role="tabpanel">
+            <div class="settings-card">
+                <h5><i class="fas fa-palette me-2"></i>Theme Configuration</h5>
+                <form th:action="@{/admin/settings/update-bulk}" method="post" class="settings-form">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Default Theme</label>
+                            <select name="theme.default" class="form-select">
+                                <option value="light" th:selected="${(themeSettings['theme.default'] ?: 'light') == 'light'}">Light</option>
+                                <option value="dark" th:selected="${(themeSettings['theme.default'] ?: 'light') == 'dark'}">Dark</option>
+                                <option value="system" th:selected="${(themeSettings['theme.default'] ?: 'light') == 'system'}">System Default</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check mt-4">
+                                <input type="hidden" name="theme.allow.custom" value="false">
+                                <input class="form-check-input" type="checkbox" name="theme.allow.custom" value="true"
+                                       th:checked="${(themeSettings['theme.allow.custom'] ?: 'true') == 'true'}">
+                                <label class="form-check-label fw-bold">Allow Users to Customize Theme</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Theme Presets</label>
+                            <select name="theme.presets" class="form-select" multiple size="4">
+                                <option value="light" th:selected="${(themeSettings['theme.presets'] ?: '').contains('light')}">Light</option>
+                                <option value="dark" th:selected="${(themeSettings['theme.presets'] ?: '').contains('dark')}">Dark</option>
+                                <option value="blue" th:selected="${(themeSettings['theme.presets'] ?: '').contains('blue')}">Blue</option>
+                                <option value="green" th:selected="${(themeSettings['theme.presets'] ?: '').contains('green')}">Green</option>
+                                <option value="purple" th:selected="${(themeSettings['theme.presets'] ?: '').contains('purple')}">Purple</option>
+                            </select>
+                            <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Theme Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .settings-tabs { border-bottom: 1px solid #eef0f3; margin-bottom: 24px; }
+        .settings-tabs .nav-link { border: none; color: #6c757d; font-weight: 600; padding: 12px 24px; border-radius: 10px 10px 0 0; }
+        .settings-tabs .nav-link.active { color: var(--primary-color); background: transparent; border-bottom: 3px solid var(--primary-color); }
+        .settings-tabs .nav-link:hover { color: var(--ink); background: #f8f9fb; }
+
+        .settings-card { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .settings-card h5 { font-weight: 700; font-size: 16px; color: var(--ink); margin-bottom: 20px; }
+
+        .settings-content { margin-top: 20px; }
+
+        .form-check-input:checked { background-color: var(--primary-color); border-color: var(--primary-color); }
+        .form-select[multiple] { min-height: 100px; }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script>
+        function testEmailConfig() {
+            const testRecipient = document.querySelector('input[name="email.test.recipient"]');
+            if (!testRecipient.value) {
+                alert('Please enter a test recipient email address.');
+                return;
+            }
+
+            fetch('/assetIQ-pro/admin/settings/api/email/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: testRecipient.value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Test email sent successfully to ' + testRecipient.value);
+                } else {
+                    alert('Failed to send test email: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error testing email: ' + error);
+            });
+        }
+
+        function generateReportsNow() {
+            if (!confirm('Generate all scheduled reports now?')) return;
+
+            fetch('/assetIQ-pro/admin/settings/api/reports/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reports generated successfully!');
+                } else {
+                    alert('Failed to generate reports: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error generating reports: ' + error);
+            });
+        }
+    </script>
+</div>
+</body>
+</html>
