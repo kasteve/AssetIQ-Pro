@@ -88,6 +88,7 @@
                             <button type="button" class="btn btn-outline-info" title="Restock"
                                     th:data-id="${item.id}"
                                     th:data-name="${item.name}"
+                                    th:data-quantity="${item.quantity}"
                                     onclick="openRestockModal(this)">
                                 <i class="fas fa-plus-circle"></i>
                             </button>
@@ -317,7 +318,7 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-    <script>
+    <script th:inline="none">
         $(document).ready(function() {
             // Initialize DataTable if table exists and has data
             if ($.fn.DataTable.isDataTable('#stockTable')) {
@@ -418,8 +419,16 @@
             const id = btn.getAttribute('data-id');
             const name = btn.getAttribute('data-name');
             if (confirm('Are you sure you want to delete "' + name + '" ? This action cannot be undone.')) {
+                const tokenMeta = document.querySelector('meta[name="_csrf"]');
+                const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+                const headers = {};
+                if (tokenMeta && headerMeta) {
+                    headers[headerMeta.content] = tokenMeta.content;
+                }
+
                 fetch('/assetIQ-pro/admin/stock/api/' + id, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: headers
                 })
                 .then(response => {
                     if (response.ok) {
