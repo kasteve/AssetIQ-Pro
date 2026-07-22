@@ -67,6 +67,15 @@ public class AppUser {
     @Column(name = "password_reset_expiry")
     private LocalDateTime passwordResetExpiry;
 
+    // ============================================
+    // Lockout tracking (Password Policy: Max Login Attempts)
+    // ============================================
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

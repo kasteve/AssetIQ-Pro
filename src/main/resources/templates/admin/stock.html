@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Stock Management - AssetIQ-Pro</title>
+    <!-- DataTables CSS (optional) -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-boxes me-2"></i>Stock Management</h4>
+        <div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#stockModal">
+                <i class="fas fa-plus me-2"></i>Add Item
+            </button>
+            <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Success/Error alerts -->
+    <div th:if="${param.success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        <span th:text="${param.success}">Operation successful</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${param.error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span th:text="${param.error}">Error occurred</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Stock Table -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table id="stockTable" class="table table-hover">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Unit</th>
+                    <th>Threshold</th>
+                    <th>Status</th>
+                    <th>Last Updated</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${items}">
+                    <td th:text="${item.id}">1</td>
+                    <td th:text="${item.name}">Pens</td>
+                    <td th:text="${item.description}">Blue ink pens</td>
+                    <td th:text="${item.quantity}">100</td>
+                    <td th:text="${item.unit}">pcs</td>
+                    <td th:text="${item.lowStockThreshold}">5</td>
+                    <td>
+                        <span th:if="${item.quantity <= item.lowStockThreshold}" class="badge bg-danger">Low</span>
+                        <span th:unless="${item.quantity <= item.lowStockThreshold}" class="badge bg-success">OK</span>
+                    </td>
+                    <td th:text="${#temporals.format(item.lastUpdated, 'dd/MM/yyyy HH:mm')}">-</td>
+                    <td>
+                        <div class="btn-group btn-group-sm action-btn-group">
+                            <button type="button" class="btn btn-outline-primary" title="Edit"
+                                    th:data-id="${item.id}"
+                                    th:data-name="${item.name}"
+                                    th:data-description="${item.description}"
+                                    th:data-quantity="${item.quantity}"
+                                    th:data-unit="${item.unit}"
+                                    th:data-threshold="${item.lowStockThreshold}"
+                                    onclick="openEditModal(this)">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-success" title="Deduct"
+                                    th:data-id="${item.id}"
+                                    th:data-name="${item.name}"
+                                    th:data-quantity="${item.quantity}"
+                                    onclick="openDeductModal(this)">
+                                <i class="fas fa-minus-circle"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-info" title="Restock"
+                                    th:data-id="${item.id}"
+                                    th:data-name="${item.name}"
+                                    onclick="openRestockModal(this)">
+                                <i class="fas fa-plus-circle"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" title="Delete"
+                                    th:data-id="${item.id}"
+                                    th:data-name="${item.name}"
+                                    onclick="deleteStockItem(this)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="empty-state" th:if="${items == null or items.isEmpty()}">
+                <i class="fas fa-box-open"></i>
+                No stock items found. Click "Add Item" to get started.
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== Add/Edit Modal ==================== -->
+    <div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="stockModalLabel">
+                        <i class="fas fa-plus-circle me-2" style="color: #0d6efd;"></i>
+                        <span id="stockModalTitle">Add Stock Item</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="stockForm" th:action="@{/admin/stock/api}" method="post">
+                    <input type="hidden" id="editId" name="id" value="">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" id="itemName" name="name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <input type="text" id="itemDescription" name="description" class="form-control">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Quantity *</label>
+                                <input type="number" id="itemQuantity" name="quantity" class="form-control" min="0" step="1" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Unit</label>
+                                <input type="text" id="itemUnit" name="unit" class="form-control" placeholder="e.g., pcs, boxes">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Low Stock Threshold</label>
+                            <input type="number" id="itemThreshold" name="lowStockThreshold" class="form-control" min="0" step="1" value="5">
+                            <small class="text-muted">When quantity falls to or below this value, an alert email will be sent.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="stockModalSaveBtn">
+                            <i class="fas fa-save me-2"></i>Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== Deduct Modal ==================== -->
+    <div class="modal fade" id="deductModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-minus-circle me-2" style="color: #dc3545;"></i>Deduct Stock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="deductForm" th:action="@{/admin/stock/api/{id}/deduct}" method="post">
+                    <div class="modal-body">
+                        <p>Deduct from <strong id="deductItemName"></strong></p>
+                        <input type="hidden" name="id" id="deductItemId">
+                        <div class="mb-3">
+                            <label class="form-label">Amount to Deduct *</label>
+                            <input type="number" id="deductAmount" name="amount" class="form-control" min="1" step="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reason (optional)</label>
+                            <input type="text" name="reason" class="form-control" placeholder="e.g., Issued to department X">
+                        </div>
+                        <div class="alert alert-info">
+                            Current quantity: <strong id="deductCurrentQty">0</strong>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-minus-circle me-2"></i>Deduct
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== Restock Modal ==================== -->
+    <div class="modal fade" id="restockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus-circle me-2" style="color: #28a745;"></i>Restock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="restockForm" th:action="@{/admin/stock/api/{id}/restock}" method="post">
+                    <div class="modal-body">
+                        <p>Restock <strong id="restockItemName"></strong></p>
+                        <input type="hidden" name="id" id="restockItemId">
+                        <div class="mb-3">
+                            <label class="form-label">Amount to Add *</label>
+                            <input type="number" id="restockAmount" name="amount" class="form-control" min="1" step="1" required>
+                        </div>
+                        <div class="alert alert-info">
+                            Current quantity: <strong id="restockCurrentQty">0</strong>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus-circle me-2"></i>Restock
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== Styles ==================== -->
+<div layout:fragment="styles">
+    <style>
+        .page-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .page-header-row h4 {
+            font-weight: 700;
+            font-size: 19px;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+        .page-header-row h4 i {
+            color: var(--primary-color);
+        }
+        .table-card {
+            background: white;
+            border-radius: 14px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+            padding: 16px;
+        }
+        .action-btn-group .btn {
+            border-radius: 8px !important;
+            padding: 6px 10px !important;
+            font-size: 12.5px !important;
+            margin-right: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .action-btn-group .btn:last-child { margin-right: 0; }
+        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; color: white; border-color: #0d6efd; }
+        .action-btn-group .btn-outline-success:hover { background: #28a745; color: white; border-color: #28a745; }
+        .action-btn-group .btn-outline-info:hover { background: #17a2b8; color: white; border-color: #17a2b8; }
+        .action-btn-group .btn-outline-danger:hover { background: #dc3545; color: white; border-color: #dc3545; }
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #adb5bd;
+        }
+        .empty-state i {
+            font-size: 34px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 70px rgba(15,23,42,0.28);
+        }
+        .modal-header {
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 20px 24px;
+        }
+        .modal-footer {
+            border-top: 1px solid rgba(0,0,0,0.06);
+            padding: 16px 24px;
+        }
+        .modal-body .form-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--ink);
+            margin-bottom: 5px;
+        }
+        .modal-body .form-control {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            padding: 10px 14px;
+            font-size: 14px;
+        }
+        .modal-body .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(13,110,253,0.08);
+        }
+        .badge.bg-danger { background: #dc3545; }
+        .badge.bg-success { background: #28a745; }
+    </style>
+</div>
+
+<!-- ==================== Scripts ==================== -->
+<div layout:fragment="scripts">
+    <!-- jQuery (if not already included) and DataTables -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable if table exists and has data
+            if ($.fn.DataTable.isDataTable('#stockTable')) {
+                $('#stockTable').DataTable().destroy();
+            }
+            $('#stockTable').DataTable({
+                destroy: true,
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                order: [[0, 'asc']],
+                columnDefs: [
+                    { orderable: false, targets: 8 }
+                ],
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ items",
+                    infoEmpty: "No stock items found",
+                    infoFiltered: "(filtered from _MAX_ total items)"
+                }
+            });
+        });
+
+        // ==================== Modal Handlers ====================
+
+        // Reset form when Add Item modal opens
+        document.addEventListener('DOMContentLoaded', function() {
+            const addBtn = document.querySelector('[data-bs-target="#stockModal"]');
+            if (addBtn) {
+                addBtn.addEventListener('click', function() {
+                    document.getElementById('stockModalTitle').textContent = 'Add Stock Item';
+                    document.getElementById('stockModalSaveBtn').textContent = 'Add Item';
+                    document.getElementById('stockForm').action = '/assetIQ-pro/admin/stock/api';
+                    document.getElementById('editId').value = '';
+                    document.getElementById('itemName').value = '';
+                    document.getElementById('itemDescription').value = '';
+                    document.getElementById('itemQuantity').value = '';
+                    document.getElementById('itemUnit').value = '';
+                    document.getElementById('itemThreshold').value = 5;
+                });
+            }
+        });
+
+        function openEditModal(btn) {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            const description = btn.getAttribute('data-description');
+            const quantity = btn.getAttribute('data-quantity');
+            const unit = btn.getAttribute('data-unit');
+            const threshold = btn.getAttribute('data-threshold');
+
+            document.getElementById('stockModalTitle').textContent = 'Edit Stock Item';
+            document.getElementById('stockModalSaveBtn').textContent = 'Update Item';
+            document.getElementById('stockForm').action = '/assetIQ-pro/admin/stock/api/' + id;
+            document.getElementById('editId').value = id;
+            document.getElementById('itemName').value = name || '';
+            document.getElementById('itemDescription').value = description || '';
+            document.getElementById('itemQuantity').value = quantity || 0;
+            document.getElementById('itemUnit').value = unit || '';
+            document.getElementById('itemThreshold').value = threshold || 5;
+
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('stockModal'));
+            modal.show();
+        }
+
+        function openDeductModal(btn) {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            const currentQty = btn.getAttribute('data-quantity');
+
+            document.getElementById('deductItemId').value = id;
+            document.getElementById('deductItemName').textContent = name;
+            document.getElementById('deductCurrentQty').textContent = currentQty;
+            document.getElementById('deductAmount').value = '';
+            document.getElementById('deductForm').action = '/assetIQ-pro/admin/stock/api/' + id + '/deduct';
+
+            const modal = new bootstrap.Modal(document.getElementById('deductModal'));
+            modal.show();
+        }
+
+        function openRestockModal(btn) {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            const currentQty = btn.getAttribute('data-quantity');
+
+            document.getElementById('restockItemId').value = id;
+            document.getElementById('restockItemName').textContent = name;
+            document.getElementById('restockCurrentQty').textContent = currentQty;
+            document.getElementById('restockAmount').value = '';
+            document.getElementById('restockForm').action = '/assetIQ-pro/admin/stock/api/' + id + '/restock';
+
+            const modal = new bootstrap.Modal(document.getElementById('restockModal'));
+            modal.show();
+        }
+
+        function deleteStockItem(btn) {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            if (confirm('Are you sure you want to delete "' + name + '" ? This action cannot be undone.')) {
+                fetch('/assetIQ-pro/admin/stock/api/' + id, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        response.text().then(msg => alert('Failed to delete: ' + msg));
+                    }
+                })
+                .catch(err => alert('Error: ' + err));
+            }
+        }
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function() { alert.remove(); }, 500);
+                }, 5000);
+            });
+        });
+    </script>
+</div>
+</body>
+</html>

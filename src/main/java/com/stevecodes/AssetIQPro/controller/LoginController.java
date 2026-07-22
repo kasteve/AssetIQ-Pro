@@ -2,6 +2,7 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.UserDTO;
 import com.stevecodes.AssetIQPro.service.AppUserService;
+import com.stevecodes.AssetIQPro.service.SystemSettingService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class LoginController {
 
     private final AppUserService userService;
+    private final SystemSettingService settingService;
 
     @GetMapping("/login")
     public String showLoginPage() {
@@ -72,6 +74,12 @@ public class LoginController {
             session.setAttribute("permissions", user.getPermissions());
             session.setAttribute("isFirstLogin", user.isFirstLogin());
             session.setAttribute("mustChangePassword", user.isMustChangePassword());
+
+            // Apply configured session timeout
+            int timeoutMinutes = settingService.getInt(SystemSettingService.KEY_SESSION_TIMEOUT);
+            if (timeoutMinutes > 0) {
+                session.setMaxInactiveInterval(timeoutMinutes * 60);
+            }
 
             log.info("Authenticated user: {}, userType: {}", user.getUsername(), user.getUserType());
 
@@ -126,8 +134,9 @@ public class LoginController {
             return "redirect:/change-password?firstLogin=" + firstLogin;
         }
 
-        if (!isPasswordStrong(newPassword)) {
-            redirectAttributes.addFlashAttribute("error", "Password must be at least 8 characters and include uppercase, lowercase, and number.");
+        String policyError = validatePasswordPolicy(newPassword);
+        if (policyError != null) {
+            redirectAttributes.addFlashAttribute("error", policyError);
             return "redirect:/change-password?firstLogin=" + firstLogin;
         }
 
@@ -212,9 +221,10 @@ public class LoginController {
                 return response;
             }
 
-            if (!isPasswordStrong(newPassword)) {
+            String policyError = validatePasswordPolicy(newPassword);
+            if (policyError != null) {
                 response.put("success", false);
-                response.put("message", "Password must be at least 8 characters and include uppercase, lowercase, and number.");
+                response.put("message", policyError);
                 return response;
             }
 
@@ -232,13 +242,29 @@ public class LoginController {
         return response;
     }
 
-    private boolean isPasswordStrong(String password) {
-        if (password == null || password.length() < 8) {
-            return false;
+    /**
+     * Validates a candidate password against the live password policy settings
+     * (SystemSettingService / SECURITY category), rather than a hardcoded rule.
+     * Returns null if valid, or a user-facing error message if not.
+     */
+    private String validatePasswordPolicy(String password) {
+        SystemSettingService.PasswordPolicy policy = settingService.getPasswordPolicy();
+
+        if (password == null || password.length() < policy.getMinLength()) {
+            return "Password must be at least " + policy.getMinLength() + " characters.";
         }
-        boolean hasUpper = password.chars().anyMatch(Character::isUpperCase);
-        boolean hasLower = password.chars().anyMatch(Character::isLowerCase);
-        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
-        return hasUpper && hasLower && hasDigit;
+        if (policy.isRequireUppercase() && password.chars().noneMatch(Character::isUpperCase)) {
+            return "Password must include an uppercase letter.";
+        }
+        if (policy.isRequireLowercase() && password.chars().noneMatch(Character::isLowerCase)) {
+            return "Password must include a lowercase letter.";
+        }
+        if (policy.isRequireNumber() && password.chars().noneMatch(Character::isDigit)) {
+            return "Password must include a number.";
+        }
+        if (policy.isRequireSpecial() && password.chars().noneMatch(c -> "!@#$%^&*()-_+=".indexOf(c) >= 0)) {
+            return "Password must include a special character.";
+        }
+        return null;
     }
 }

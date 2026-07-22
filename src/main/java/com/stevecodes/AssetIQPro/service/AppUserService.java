@@ -5,11 +5,15 @@ import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Department;
 import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.entity.Permission;
+import com.stevecodes.AssetIQPro.entity.PasswordHistory;
+import com.stevecodes.AssetIQPro.exception.AccountLockedException;
+import com.stevecodes.AssetIQPro.exception.PasswordReuseException;
 import com.stevecodes.AssetIQPro.exception.ResourceNotFoundException;
 import com.stevecodes.AssetIQPro.exception.UserAlreadyExistsException;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import com.stevecodes.AssetIQPro.repository.DepartmentRepository;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
+import com.stevecodes.AssetIQPro.repository.PasswordHistoryRepository;
 import com.stevecodes.AssetIQPro.repository.PermissionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +48,9 @@ public class AppUserService {
     private PermissionRepository permissionRepository;
 
     @Autowired
+    private PasswordHistoryRepository passwordHistoryRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -51,10 +59,14 @@ public class AppUserService {
     @Autowired
     private AuditService auditService;
 
+    @Autowired
+    private SystemSettingService settingService;
+
     // ============================================
     // Authentication
     // ============================================
 
+    @Transactional
     public UserDTO authenticateUser(String username, String rawPassword) {
         log.info("Authenticating user: {}", username);
 
@@ -71,13 +83,60 @@ public class AppUserService {
             return null;
         }
 
+        // ---- Lockout check ----
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            long minutesLeft = ChronoUnit.MINUTES.between(LocalDateTime.now(), user.getLockedUntil()) + 1;
+            log.warn("Account locked for user: {} ({} minute(s) remaining)", username, minutesLeft);
+            throw new AccountLockedException(
+                    "Account locked due to too many failed login attempts. Try again in " + minutesLeft + " minute(s).");
+        }
+
+        // Lock window has passed -> clear stale lock/attempts
+        if (user.getLockedUntil() != null && !user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            user.setLockedUntil(null);
+            user.setFailedLoginAttempts(0);
+        }
+
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-            log.warn("Invalid password for user: {}", username);
+            int maxAttempts = settingService.getInt(SystemSettingService.KEY_PASSWORD_MAX_ATTEMPTS);
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+
+            if (maxAttempts > 0 && attempts >= maxAttempts) {
+                // Lock for 30 minutes (adjust as desired)
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(30));
+                userRepository.save(user);
+                log.warn("Account locked after {} failed attempts: {}", attempts, username);
+                throw new AccountLockedException(
+                        "Account locked due to too many failed login attempts. Try again in 30 minute(s).");
+            }
+
+            userRepository.save(user);
+            log.warn("Invalid password for user: {} (attempt {}/{})", username, attempts, maxAttempts);
             return null;
         }
 
+        // Successful login -> reset failed attempt counter
+        if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+            userRepository.save(user);
+        }
+
         log.info("User authenticated successfully: {}", username);
-        return convertToDTO(user);
+        UserDTO dto = convertToDTO(user);
+
+        // ---- Password expiry check (transient flag only, not persisted) ----
+        int expiryDays = settingService.getInt(SystemSettingService.KEY_PASSWORD_EXPIRY_DAYS);
+        if (expiryDays > 0 && user.getLastPasswordChanged() != null) {
+            long daysSinceChange = ChronoUnit.DAYS.between(user.getLastPasswordChanged(), LocalDateTime.now());
+            if (daysSinceChange >= expiryDays) {
+                log.info("Password expired for user: {} ({} days since last change)", username, daysSinceChange);
+                dto.setMustChangePassword(true);
+            }
+        }
+
+        return dto;
     }
 
     // ============================================
@@ -146,6 +205,9 @@ public class AppUserService {
         user.setMustChangePassword(true);
         user.setFirstLogin(true);
         user.setCreatedAt(LocalDateTime.now());
+        user.setLastPasswordChanged(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
 
         // ✅ Link the persistent Employee (owning side)
         user.setEmployee(savedEmployee);
@@ -168,8 +230,8 @@ public class AppUserService {
         AppUser savedUser = userRepository.save(user);
         log.info("User created successfully: {}", savedUser.getUsername());
 
-        // ⚠️ DO NOT set the reverse reference on Employee – it is not needed.
-        // savedEmployee.setUser(savedUser);   // <-- REMOVED
+        // Record initial password in history so it counts against future reuse checks
+        passwordHistoryRepository.save(new PasswordHistory(savedUser.getUserId(), savedUser.getPasswordHash()));
 
         log.info("=========================================");
         log.info("👤 NEW USER CREATED");
@@ -373,6 +435,42 @@ public class AppUserService {
         return new String(chars);
     }
 
+    /**
+     * Checks the candidate new password against the user's stored password history,
+     * per the configured "History Count" policy setting. Throws PasswordReuseException
+     * if the candidate matches one of the last N passwords.
+     */
+    private void enforcePasswordHistory(Long userId, String rawNewPassword) {
+        int historyCount = settingService.getInt(SystemSettingService.KEY_PASSWORD_HISTORY_COUNT);
+        if (historyCount <= 0) return;
+
+        List<PasswordHistory> history = passwordHistoryRepository.findByUserIdOrderByChangedAtDesc(userId);
+        int checkLimit = Math.min(historyCount, history.size());
+
+        for (int i = 0; i < checkLimit; i++) {
+            if (passwordEncoder.matches(rawNewPassword, history.get(i).getPasswordHash())) {
+                throw new PasswordReuseException(
+                        "You cannot reuse one of your last " + historyCount + " password(s). Please choose a different password.");
+            }
+        }
+    }
+
+    /**
+     * Records the new password hash in history and trims older entries beyond
+     * the configured history count (kept as a small buffer of +5 for safety).
+     */
+    private void recordPasswordHistory(Long userId, String newHash) {
+        passwordHistoryRepository.save(new PasswordHistory(userId, newHash));
+
+        int historyCount = settingService.getInt(SystemSettingService.KEY_PASSWORD_HISTORY_COUNT);
+        int keep = Math.max(historyCount, 1) + 5; // small buffer
+        List<PasswordHistory> all = passwordHistoryRepository.findByUserIdOrderByChangedAtDesc(userId);
+        if (all.size() > keep) {
+            List<Long> idsToKeep = all.stream().limit(keep).map(PasswordHistory::getHistoryId).collect(Collectors.toList());
+            passwordHistoryRepository.deleteByUserIdAndHistoryIdNotIn(userId, idsToKeep);
+        }
+    }
+
     @Transactional
     public void updateUserRole(Long userId, String role) {
         log.info("Updating role for user: {}", userId);
@@ -404,13 +502,19 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        enforcePasswordHistory(userId, newPassword);
+
+        String newHash = passwordEncoder.encode(newPassword);
+        user.setPasswordHash(newHash);
         user.setFirstLogin(false);
         user.setMustChangePassword(false);
         user.setLastPasswordChanged(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
 
         userRepository.save(user);
+        recordPasswordHistory(userId, newHash);
         log.info("Password changed for user: {}", userId);
 
         try {
@@ -438,11 +542,15 @@ public class AppUserService {
         log.info("Temporary Password: {}", tempPassword);
         log.info("=========================================");
 
-        user.setPasswordHash(passwordEncoder.encode(tempPassword));
+        String newHash = passwordEncoder.encode(tempPassword);
+        user.setPasswordHash(newHash);
         user.setMustChangePassword(true);
         user.setFirstLogin(true);
         user.setLastPasswordChanged(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
+        recordPasswordHistory(userId, newHash);
 
         try {
             emailService.sendWelcomeEmail(
@@ -493,15 +601,21 @@ public class AppUserService {
             throw new RuntimeException("Reset token has expired");
         }
 
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        enforcePasswordHistory(user.getUserId(), newPassword);
+
+        String newHash = passwordEncoder.encode(newPassword);
+        user.setPasswordHash(newHash);
         user.setFirstLogin(false);
         user.setMustChangePassword(false);
         user.setLastPasswordChanged(LocalDateTime.now());
         user.setPasswordResetToken(null);
         user.setPasswordResetExpiry(null);
         user.setUpdatedAt(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
 
         userRepository.save(user);
+        recordPasswordHistory(user.getUserId(), newHash);
         log.info("Password reset successfully for user: {}", user.getUsername());
 
         try {
@@ -675,6 +789,19 @@ public class AppUserService {
         userRepository.save(user);
 
         auditService.logAction("USER_UNBLOCKED", "User unblocked: " + user.getUsername(), user.getUserId());
+    }
+
+    /**
+     * Admin-triggered manual unlock (clears lockout independent of blocked/active flags).
+     */
+    @Transactional
+    public void unlockUser(Long userId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        user.setLockedUntil(null);
+        user.setFailedLoginAttempts(0);
+        userRepository.save(user);
+        auditService.logAction("USER_UNLOCKED", "User unlocked: " + user.getUsername(), user.getUserId());
     }
 
     @Transactional

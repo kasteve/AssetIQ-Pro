@@ -8,24 +8,53 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.util.List;
+import java.util.Properties;
 
 @Slf4j
 @Service
 public class EmailService {
 
     @Autowired
-    private JavaMailSender mailSender;
+    private BaseUrlService baseUrlService;
 
     @Autowired
-    private BaseUrlService baseUrlService;  // ✅ ADDED
+    private SystemSettingService settingService;
 
-    private static final String FROM_EMAIL = "assetiq@company.com";
+    // ============================================
+    // Dynamic Mail Sender (built from DB-stored settings)
+    // ============================================
+
+    private JavaMailSender buildMailSender() {
+        SystemSettingService.EmailConfig cfg = settingService.getEmailConfig();
+
+        JavaMailSenderImpl sender = new JavaMailSenderImpl();
+        sender.setHost(cfg.getHost());
+        sender.setPort(cfg.getPort());
+        sender.setUsername(cfg.getUsername());
+        sender.setPassword(cfg.getPassword());
+
+        Properties props = sender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", String.valueOf(cfg.isTlsEnabled()));
+        props.put("mail.smtp.starttls.required", String.valueOf(cfg.isTlsEnabled()));
+        props.put("mail.smtp.ssl.enable", String.valueOf(cfg.isSslEnabled()));
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+
+        return sender;
+    }
+
+    private String getFromAddress() {
+        return settingService.getString(SystemSettingService.KEY_EMAIL_FROM);
+    }
 
     // ============================================
     // Helper Method to Log Email Content
@@ -60,11 +89,12 @@ public class EmailService {
         try {
             logEmailContent("Simple Email", toEmail, subject, body);
 
+            JavaMailSender mailSender = buildMailSender();
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(toEmail);
             message.setSubject(subject);
             message.setText(body);
-            message.setFrom(FROM_EMAIL);
+            message.setFrom(getFromAddress());
             mailSender.send(message);
 
             logEmailSent("Simple Email", toEmail, subject);
@@ -81,13 +111,14 @@ public class EmailService {
         try {
             logEmailContent("HTML Email", toEmail, subject, htmlContent);
 
+            JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(getFromAddress());
 
             mailSender.send(message);
             logEmailSent("HTML Email", toEmail, subject);
@@ -108,13 +139,14 @@ public class EmailService {
             log.info("📧 Sending email with attachment to: {}", toEmail);
             logEmailContent("Email with Attachment", toEmail, subject, body);
 
+            JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(body);
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(getFromAddress());
 
             if (attachment != null && attachment.length > 0) {
                 ByteArrayResource resource = new ByteArrayResource(attachment);
@@ -139,7 +171,7 @@ public class EmailService {
 
     @Async
     public void sendWelcomeEmail(String toEmail, String fullName, String username, String tempPassword) {
-        String loginUrl = baseUrlService.buildUrl("/login");  // ✅ DYNAMIC
+        String loginUrl = baseUrlService.buildUrl("/login");
         String subject = "Welcome to AssetIQ-Pro - Your Account Details";
         String body = String.format("""
             Dear %s,
@@ -169,7 +201,7 @@ public class EmailService {
     public void sendPasswordResetEmail(String toEmail, String fullName, String token) {
         try {
             String subject = "Password Reset - AssetIQ-Pro";
-            String resetLink = baseUrlService.buildUrl("/reset-password?token=%s", token);  // ✅ DYNAMIC
+            String resetLink = baseUrlService.buildUrl("/reset-password?token=%s", token);
 
             String htmlContent = "<html><body style='font-family: Arial, sans-serif;'>"
                     + "<div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9ecef; border-radius: 10px;'>"
@@ -231,7 +263,7 @@ public class EmailService {
     public void sendInfraRequestStatusUpdate(String toEmail, String requesterName,
                                              String requestId, String status,
                                              String comment, String resourceType) {
-        String requestUrl = baseUrlService.buildUrl("/infra-requests/%s", requestId);  // ✅ DYNAMIC
+        String requestUrl = baseUrlService.buildUrl("/infra-requests/%s", requestId);
         String subject = "Infrastructure Request " + status + " - #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -255,7 +287,7 @@ public class EmailService {
     public void sendInfraRequestApproval(String toEmail, String approverName,
                                          String requestId, String requesterName,
                                          String resourceType, String approvalLink) {
-        String link = approvalLink != null ? approvalLink : baseUrlService.buildUrl("/infra-requests/%s/approve", requestId);  // ✅ DYNAMIC
+        String link = approvalLink != null ? approvalLink : baseUrlService.buildUrl("/infra-requests/%s/approve", requestId);
         String subject = "Action Required: Infrastructure Request Approval - #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -280,7 +312,7 @@ public class EmailService {
     public void sendInfraRequestSigningLink(String toEmail, String requesterName,
                                             Long requestId, String signingLink,
                                             String expiryDate) {
-        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/infra-requests/sign/%s", requestId);  // ✅ DYNAMIC
+        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/infra-requests/sign/%s", requestId);
         String subject = "Infrastructure Request - Sign to Complete #" + requestId;
         String body = String.format("""
             Dear %s,
@@ -373,7 +405,7 @@ public class EmailService {
                                              String assetTag, String transferId,
                                              String role, String signingLink,
                                              String expiresAt) {
-        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/transfers/sign/%s", transferId);  // ✅ DYNAMIC
+        String link = signingLink != null ? signingLink : baseUrlService.buildUrl("/transfers/sign/%s", transferId);
         String subject = "Signature Required: Asset Transfer - " + assetTag;
         String body = String.format("""
             Dear %s,
@@ -417,13 +449,14 @@ public class EmailService {
 
             logEmailContent("Transfer Completion", String.join(", ", toEmails), subject, body);
 
+            JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             helper.setTo(toEmails.toArray(new String[0]));
             helper.setSubject(subject);
             helper.setText(body);
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(getFromAddress());
 
             helper.addAttachment("Transfer_" + assetTag + ".pdf",
                     new ByteArrayResource(pdfBytes));
@@ -461,13 +494,14 @@ public class EmailService {
 
             logEmailContent("Transfer Completion Report", String.join(", ", signerEmails), subject, body);
 
+            JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             helper.setTo(signerEmails.toArray(new String[0]));
             helper.setSubject(subject);
             helper.setText(body);
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(getFromAddress());
 
             helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
                     new ByteArrayResource(pdfBytes));
@@ -570,13 +604,14 @@ public class EmailService {
         try {
             logEmailContent("Voucher Generated", toEmail, subject, body);
 
+            JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(body);
-            helper.setFrom(FROM_EMAIL);
+            helper.setFrom(getFromAddress());
 
             File qrFile = new File(qrCodePath);
             if (qrFile.exists()) {
