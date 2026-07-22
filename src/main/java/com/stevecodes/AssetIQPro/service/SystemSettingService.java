@@ -306,6 +306,48 @@ public class SystemSettingService {
         }
     }
 
+    // ============================================
+    // Theme Helper Methods (ADDED)
+    // ============================================
+
+    /**
+     * Get the default theme from settings
+     * @return theme name: "light", "dark", "blue", "green", "purple", or "system"
+     */
+    public String getDefaultTheme() {
+        return getString(KEY_THEME_DEFAULT);
+    }
+
+    /**
+     * Check if users are allowed to customize their theme
+     */
+    public boolean isThemeCustomizationAllowed() {
+        return getBoolean(KEY_THEME_ALLOW_CUSTOM);
+    }
+
+    /**
+     * Get the list of available theme presets
+     * @return List of theme names
+     */
+    public List<String> getThemePresets() {
+        return getStringList(KEY_THEME_PRESETS);
+    }
+
+    /**
+     * Get a map of all theme settings
+     */
+    public Map<String, Object> getThemeSettings() {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("defaultTheme", getDefaultTheme());
+        settings.put("allowCustomization", isThemeCustomizationAllowed());
+        settings.put("presets", getThemePresets());
+        return settings;
+    }
+
+    // ============================================
+    // Inner Classes (existing)
+    // ============================================
+
     public static class PasswordPolicy {
         private final int minLength;
         private final boolean requireUppercase;

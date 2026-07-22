@@ -48,7 +48,11 @@
     <th:block layout:fragment="styles"></th:block>
 
     <style>
+        /* ============================================================ */
+        /* THEME SUPPORT - Uses CSS Variables for dynamic theming */
+        /* ============================================================ */
         :root {
+            /* Light theme (default) */
             --primary-color: #0d6efd;
             --primary-dark: #0b5ed7;
             --accent-color: #4fc3f7;
@@ -56,6 +60,65 @@
             --header-height: 70px;
             --bg-color: #f4f6f9;
             --ink: #1a1a2e;
+            --card-bg: #ffffff;
+            --border-color: #e9ecef;
+            --text-muted: #6c757d;
+            --text-secondary: #4a4a4a;
+            --shadow-color: rgba(0,0,0,0.05);
+            --hover-bg: #f8f9fc;
+            --table-stripe: #f8f9fa;
+            --input-bg: #ffffff;
+            --modal-bg: #ffffff;
+            --dropdown-bg: #ffffff;
+        }
+
+        /* Dark theme */
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --ink: #e8e8e8;
+            --card-bg: #1e1e1e;
+            --border-color: #2d2d2d;
+            --text-muted: #9e9e9e;
+            --text-secondary: #b0b0b0;
+            --shadow-color: rgba(255,255,255,0.02);
+            --hover-bg: #2a2a2a;
+            --table-stripe: #1a1a1a;
+            --input-bg: #2a2a2a;
+            --modal-bg: #1e1e1e;
+            --dropdown-bg: #1e1e1e;
+        }
+
+        /* Blue theme */
+        [data-theme="blue"] {
+            --primary-color: #1a73e8;
+            --primary-dark: #1557b0;
+            --accent-color: #4fc3f7;
+            --bg-color: #e8f0fe;
+            --card-bg: #ffffff;
+            --border-color: #d2e3fc;
+            --hover-bg: #d2e3fc;
+        }
+
+        /* Green theme */
+        [data-theme="green"] {
+            --primary-color: #0d7c3f;
+            --primary-dark: #0a5e2f;
+            --accent-color: #4caf50;
+            --bg-color: #e6f4ea;
+            --card-bg: #ffffff;
+            --border-color: #b7e0c5;
+            --hover-bg: #b7e0c5;
+        }
+
+        /* Purple theme */
+        [data-theme="purple"] {
+            --primary-color: #7c3aed;
+            --primary-dark: #5b21b6;
+            --accent-color: #a78bfa;
+            --bg-color: #ede9fe;
+            --card-bg: #ffffff;
+            --border-color: #c4b5fd;
+            --hover-bg: #c4b5fd;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -63,8 +126,10 @@
         body {
             font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--bg-color);
+            color: var(--ink);
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
         /* ========== SIDEBAR ========== */
@@ -218,9 +283,9 @@
 
         /* ========== HEADER ========== */
         .header {
-            background: white;
+            background: var(--card-bg);
             padding: 15px 30px;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -229,7 +294,8 @@
             z-index: 1040;
             min-height: var(--header-height);
             height: var(--header-height);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            box-shadow: 0 1px 4px var(--shadow-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .header .page-title {
@@ -278,7 +344,7 @@
             position: relative;
             background: none;
             border: none;
-            color: #6c757d;
+            color: var(--text-muted);
             font-size: 20px;
             padding: 4px 6px;
             cursor: pointer;
@@ -327,7 +393,7 @@
         /* ========== CONTENT ========== */
         .content { padding: 25px 30px; flex: 1; }
 
-        /* ========== COMMON UTILITIES ========== */
+        /* ========== COMMON UTILITIES (with theme support) ========== */
         .btn {
             border-radius: 10px !important;
             padding: 9px 22px !important;
@@ -347,14 +413,22 @@
             box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3) !important;
         }
 
+        .btn-secondary {
+            background: var(--border-color) !important;
+            border: none !important;
+            color: var(--ink) !important;
+        }
+
         .btn-secondary:hover { transform: translateY(-2px); }
 
         .form-control, .form-select {
             border-radius: 10px !important;
-            border: 1px solid #e2e8f0 !important;
+            border: 1px solid var(--border-color) !important;
             padding: 10px 14px !important;
             font-size: 14px !important;
             transition: all 0.2s ease !important;
+            background: var(--input-bg) !important;
+            color: var(--ink) !important;
         }
 
         .form-control:focus, .form-select:focus {
@@ -373,15 +447,17 @@
             border-radius: 16px !important;
             border: none !important;
             box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28) !important;
+            background: var(--modal-bg) !important;
         }
 
         .modal-header {
-            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            border-bottom: 1px solid var(--border-color) !important;
             padding: 20px 24px !important;
+            color: var(--ink) !important;
         }
 
         .modal-footer {
-            border-top: 1px solid rgba(0,0,0,0.06) !important;
+            border-top: 1px solid var(--border-color) !important;
             padding: 16px 24px !important;
         }
 
@@ -391,12 +467,57 @@
         .empty-state {
             text-align: center;
             padding: 50px 20px;
-            color: #adb5bd;
+            color: var(--text-muted);
         }
         .empty-state i {
             font-size: 34px;
             margin-bottom: 10px;
             display: block;
+        }
+
+        /* Table with theme support */
+        .table-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            overflow: hidden;
+            padding: 16px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .table thead th {
+            background: var(--table-stripe);
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table tbody td {
+            border-bottom: 1px solid var(--border-color);
+            color: var(--ink);
+        }
+
+        .table tbody tr:hover {
+            background: var(--hover-bg);
+        }
+
+        /* Dropdown with theme support */
+        .dropdown-menu {
+            background: var(--dropdown-bg) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--ink) !important;
+        }
+
+        .dropdown-item {
+            color: var(--ink) !important;
+        }
+
+        .dropdown-item:hover {
+            background: var(--hover-bg) !important;
+        }
+
+        .dropdown-divider {
+            border-color: var(--border-color) !important;
         }
 
         /* ========== DATA TABLES EXPORT BUTTONS ========== */
@@ -409,30 +530,35 @@
         .dt-buttons .btn:last-child { margin-right: 0; }
         .dt-buttons .btn-success { background: #28a745 !important; border-color: #28a745 !important; color: white !important; }
         .dt-buttons .btn-success:hover { background: #1e7e34 !important; border-color: #1e7e34 !important; }
-        .dt-buttons .btn-primary { background: #0d6efd !important; border-color: #0d6efd !important; color: white !important; }
-        .dt-buttons .btn-primary:hover { background: #0b5ed7 !important; border-color: #0b5ed7 !important; }
+        .dt-buttons .btn-primary { background: var(--primary-color) !important; border-color: var(--primary-color) !important; color: white !important; }
+        .dt-buttons .btn-primary:hover { background: var(--primary-dark) !important; border-color: var(--primary-dark) !important; }
         .dt-buttons .btn-danger { background: #dc3545 !important; border-color: #dc3545 !important; color: white !important; }
         .dt-buttons .btn-danger:hover { background: #bd2130 !important; border-color: #bd2130 !important; }
 
         /* DataTables overrides */
         .dataTables_wrapper .dataTables_filter input {
             border-radius: 10px !important;
-            border: 1px solid #e2e8f0 !important;
+            border: 1px solid var(--border-color) !important;
             padding: 8px 14px !important;
             font-size: 14px !important;
             margin-left: 8px !important;
+            background: var(--input-bg) !important;
+            color: var(--ink) !important;
         }
         .dataTables_wrapper .dataTables_length select {
             border-radius: 10px !important;
-            border: 1px solid #e2e8f0 !important;
+            border: 1px solid var(--border-color) !important;
             padding: 8px 14px !important;
             font-size: 14px !important;
+            background: var(--input-bg) !important;
+            color: var(--ink) !important;
         }
         .dataTables_wrapper .dataTables_paginate .paginate_button {
             border-radius: 10px !important;
-            border: 1px solid #e9ecef !important;
+            border: 1px solid var(--border-color) !important;
             padding: 6px 14px !important;
             margin: 0 3px !important;
+            color: var(--ink) !important;
         }
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
             background: var(--primary-color) !important;
@@ -440,7 +566,7 @@
             border-color: var(--primary-color) !important;
         }
         .dataTables_wrapper .dataTables_info {
-            color: #6c757d !important;
+            color: var(--text-muted) !important;
             font-size: 13px !important;
         }
 
@@ -594,21 +720,26 @@
                     <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end" style="min-width: 320px; max-height: 400px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
-                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;">
-                        <h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6>
+                    <div style="padding: 12px 18px; border-bottom: 1px solid var(--border-color);">
+                        <h6 class="mb-0 fw-bold" style="font-size: 14px; color: var(--ink);">Notifications</h6>
                     </div>
                     <div th:each="notification : ${notifications}">
-                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
-                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
-                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
+                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid var(--border-color);">
+                            <span th:text="${notification.message}" style="font-size: 13px; color: var(--ink);">Message</span>
+                            <small class="d-block" style="font-size: 11px; color: var(--text-muted);" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
                         </a>
                     </div>
                     <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
-                        <i class="fas fa-inbox text-muted" style="font-size: 24px;"></i>
-                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
+                        <i class="fas fa-inbox text-muted" style="font-size: 24px; color: var(--text-muted);"></i>
+                        <p class="mb-0" style="font-size: 13px; color: var(--text-muted);">No notifications</p>
                     </div>
                 </div>
             </div>
+
+            <!-- Theme Toggle Button -->
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()" title="Toggle Theme" style="border-radius: 8px; padding: 4px 10px;">
+                <i class="fas fa-moon" id="themeIcon"></i>
+            </button>
 
             <!-- User Dropdown -->
             <div class="dropdown">
@@ -616,10 +747,20 @@
                     <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 200px;">
-                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
-                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
+                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}" style="color: var(--ink);">User Name</span></li>
+                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}" style="color: var(--text-muted);">username</span></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <span class="dropdown-item-text fw-bold" style="font-size: 12px; color: var(--ink);">Theme</span>
+                    </li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('light'); return false;"><i class="fas fa-sun me-2"></i> Light</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;"><i class="fas fa-moon me-2"></i> Dark</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('blue'); return false;"><i class="fas fa-water me-2"></i> Blue</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('green'); return false;"><i class="fas fa-leaf me-2"></i> Green</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('purple'); return false;"><i class="fas fa-gem me-2"></i> Purple</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('system'); return false;"><i class="fas fa-desktop me-2"></i> System Default</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
                 </ul>
@@ -719,6 +860,111 @@
     });
 
     // ============================================================
+    // THEME MANAGEMENT
+    // ============================================================
+
+    // Get the default theme from server
+    function loadDefaultTheme() {
+        fetch('/assetIQ-pro/api/theme/default')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                var savedTheme = localStorage.getItem('userTheme');
+                var theme = savedTheme || data.theme || 'light';
+                applyTheme(theme);
+            })
+            .catch(function() {
+                // Fallback to light theme
+                var savedTheme = localStorage.getItem('userTheme') || 'light';
+                applyTheme(savedTheme);
+            });
+    }
+
+    // Apply theme to the page
+    function applyTheme(theme) {
+        var html = document.documentElement;
+        var icon = document.getElementById('themeIcon');
+
+        // Remove all theme attributes
+        html.removeAttribute('data-theme');
+
+        // System theme detection
+        if (theme === 'system') {
+            var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            theme = prefersDark ? 'dark' : 'light';
+        }
+
+        // Apply theme
+        if (theme !== 'light') {
+            html.setAttribute('data-theme', theme);
+        }
+
+        // Update icon
+        if (icon) {
+            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        // Update meta theme-color
+        var metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (metaThemeColor) {
+            if (theme === 'dark') {
+                metaThemeColor.content = '#121212';
+            } else {
+                metaThemeColor.content = '#0d6efd';
+            }
+        }
+
+        // Save to localStorage
+        localStorage.setItem('userTheme', theme);
+    }
+
+    // Toggle between light and dark
+    function toggleTheme() {
+        var currentTheme = localStorage.getItem('userTheme') || 'light';
+        var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+    }
+
+    // Set specific theme
+    function setTheme(theme) {
+        applyTheme(theme);
+        // Close dropdown if open
+        var dropdown = document.querySelector('.dropdown-menu');
+        if (dropdown && dropdown.classList.contains('show')) {
+            var parent = dropdown.closest('.dropdown');
+            if (parent) {
+                var toggleBtn = parent.querySelector('[data-bs-toggle="dropdown"]');
+                if (toggleBtn) {
+                    var bsDropdown = bootstrap.Dropdown.getInstance(toggleBtn);
+                    if (bsDropdown) {
+                        bsDropdown.hide();
+                    }
+                }
+            }
+        }
+    }
+
+    // Listen for system theme changes
+    if (window.matchMedia) {
+        var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', function() {
+            var userTheme = localStorage.getItem('userTheme');
+            if (userTheme === 'system' || !userTheme) {
+                applyTheme('system');
+            }
+        });
+    }
+
+    // Load theme when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDefaultTheme();
+    });
+
+    // Also load theme after any HTMX or AJAX content updates
+    document.addEventListener('htmx:afterSwap', function() {
+        loadDefaultTheme();
+    });
+
+    // ============================================================
     // GLOBAL EXPORT FUNCTION - Works with any DataTable on the page
     // ============================================================
     function exportTable(type) {
@@ -754,19 +1000,8 @@
             // Skip if already initialized
             if ($.fn.DataTable.isDataTable(tableEl)) return;
 
-            // Check if it's the stock table or any other with specific columns
-            var tableId = tableEl.id || 'autoTable';
-            var isStockTable = tableId === 'stockTable' || $(tableEl).closest('#stockManagement').length > 0;
-
             // Determine column definitions
-            var columnDefs = [];
-            if (isStockTable) {
-                // Stock table: last column has actions
-                columnDefs = [{ orderable: false, targets: [-1] }];
-            } else {
-                // Generic: assume last column has actions
-                columnDefs = [{ orderable: false, targets: [-1] }];
-            }
+            var columnDefs = [{ orderable: false, targets: [-1] }];
 
             $(tableEl).DataTable({
                 destroy: true,
