@@ -39,222 +39,255 @@
         </div>
     </div>
 
-    <!-- Side-by-side: Driver Bookings | Room Bookings -->
-    <div class="row g-4">
+    <!-- ================= HORIZONTAL TABS: DRIVERS | ROOMS ================= -->
+    <ul class="nav nav-tabs booking-tabs" id="bookingTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="drivers-tab-btn" data-bs-toggle="tab" data-bs-target="#drivers-pane"
+                    type="button" role="tab" aria-controls="drivers-pane" aria-selected="true">
+                <i class="fas fa-car"></i>
+                <span>Drivers</span>
+                <span class="badge bg-primary" th:text="${driverRequests != null ? driverRequests.size() : 0}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="rooms-tab-btn" data-bs-toggle="tab" data-bs-target="#rooms-pane"
+                    type="button" role="tab" aria-controls="rooms-pane" aria-selected="false">
+                <i class="fas fa-calendar-check"></i>
+                <span>Rooms</span>
+                <span class="badge bg-success" th:text="${roomBookings != null ? roomBookings.size() : 0}">0</span>
+            </button>
+        </li>
+    </ul>
 
-        <!-- ================= DRIVER BOOKINGS ================= -->
-        <div class="col-lg-6">
-            <div class="booking-card">
-                <div class="card-header">
-                    <h6><i class="fas fa-car"></i>Driver Bookings</h6>
-                    <span class="badge bg-primary" th:text="${driverRequests != null ? driverRequests.size() : 0}">0</span>
-                </div>
-                <div class="card-body">
+    <div class="tab-content booking-tab-content" id="bookingTabsContent">
 
-                    <!-- All Drivers -->
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">Drivers</small>
+        <!-- ================= DRIVERS TAB (full width) ================= -->
+        <div class="tab-pane fade show active" id="drivers-pane" role="tabpanel" aria-labelledby="drivers-tab-btn">
+            <div class="row g-4">
+
+                <div class="col-xl-4">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-users"></i>All Drivers</h6>
                             <span class="badge bg-success" th:text="${allDrivers != null ? allDrivers.size() : 0}">0</span>
                         </div>
-
-                        <div th:if="${allDrivers != null and !allDrivers.isEmpty()}">
-                            <div th:each="driver : ${allDrivers}"
-                                 class="driver-item"
-                                 th:data-driverid="${driver.userId}"
-                                 th:data-drivername="${driver.fullName}">
-                                <div>
-                                    <span class="driver-name" th:text="${driver.fullName}">Driver Name</span>
-                                    <span class="driver-status"
-                                          th:classappend="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'available' : 'busy'"
-                                          th:text="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'Available' : 'Busy'">Available</span>
-                                </div>
-                                <div>
-                                    <span class="booking-count">View bookings</span>
-                                    <i class="fas fa-chevron-right ms-2 text-muted" style="font-size: 12px;"></i>
+                        <div class="panel-body">
+                            <div th:if="${allDrivers != null and !allDrivers.isEmpty()}" class="driver-grid">
+                                <div th:each="driver : ${allDrivers}"
+                                     class="driver-item"
+                                     th:data-driverid="${driver.userId}"
+                                     th:data-drivername="${driver.fullName}">
+                                    <div>
+                                        <span class="driver-name" th:text="${driver.fullName}">Driver Name</span>
+                                        <span class="driver-status"
+                                              th:classappend="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'available' : 'busy'"
+                                              th:text="${availableDriverIds != null and availableDriverIds.contains(driver.userId)} ? 'Available' : 'Busy'">Available</span>
+                                    </div>
+                                    <div>
+                                        <span class="booking-count">View bookings</span>
+                                        <i class="fas fa-chevron-right ms-2 text-muted" style="font-size: 12px;"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div th:if="${allDrivers == null or allDrivers.isEmpty()}" class="empty-state-sm">
-                            <i class="fas fa-car"></i>
-                            No drivers on record
+                            <div th:if="${allDrivers == null or allDrivers.isEmpty()}" class="empty-state-sm">
+                                <i class="fas fa-car"></i>
+                                No drivers on record
+                            </div>
+                        </div>
+                        <div class="panel-footer">
+                            <small class="text-muted">Click on any driver to view their bookings and decide</small>
                         </div>
                     </div>
+                </div>
 
-                    <hr>
-
-                    <!-- My Driver Requests -->
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">My Driver Requests</small>
+                <div class="col-xl-8">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-clipboard-list"></i>My Driver Requests</h6>
                             <button class="btn btn-sm btn-primary quick-action-btn" data-bs-toggle="modal" data-bs-target="#requestDriverModal">
                                 <i class="fas fa-plus me-1"></i>Request
                             </button>
                         </div>
-
-                        <div th:if="${driverRequests != null and !driverRequests.isEmpty()}" id="driverRequestsList">
-                            <div th:each="req : ${driverRequests}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title" th:text="${req.destination}">Destination</div>
-                                    <small class="text-muted" th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge"
-                                          th:classappend="${req.status} == 'PENDING' ? 'pending' :
-                                                          (${req.status} == 'ACCEPTED' ? 'accepted' :
-                                                          (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
-                                          th:text="${req.status}">PENDING</span>
-                                    <div th:if="${req.status} == 'PENDING'">
-                                        <button class="btn btn-sm btn-warning mt-1 recall-btn"
-                                                th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-undo"></i> Recall
-                                        </button>
+                        <div class="panel-body">
+                            <div th:if="${driverRequests != null and !driverRequests.isEmpty()}" id="driverRequestsList">
+                                <div th:each="req : ${driverRequests}" class="booking-row">
+                                    <div>
+                                        <div class="booking-row-title" th:text="${req.destination}">Destination</div>
+                                        <small class="text-muted" th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="status-badge"
+                                              th:classappend="${req.status} == 'PENDING' ? 'pending' :
+                                                              (${req.status} == 'ACCEPTED' ? 'accepted' :
+                                                              (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
+                                              th:text="${req.status}">PENDING</span>
+                                        <div th:if="${req.status} == 'PENDING'">
+                                            <button class="btn btn-sm btn-warning mt-1 recall-btn"
+                                                    th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-undo"></i> Recall
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
-                            <i class="fas fa-car"></i>
-                            No driver requests
-                        </div>
+                            <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
+                                <i class="fas fa-car"></i>
+                                No driver requests
+                            </div>
 
-                        <div class="pagination-controls" id="driverRequestsPagination"></div>
+                            <div class="pagination-controls" id="driverRequestsPagination"></div>
+                        </div>
                     </div>
+                </div>
 
-                </div>
-                <div class="card-footer">
-                    <small class="text-muted">Click on any driver to view their bookings and decide</small>
-                </div>
             </div>
         </div>
 
-        <!-- ================= ROOM BOOKINGS ================= -->
-        <div class="col-lg-6">
-            <div class="booking-card">
-                <div class="card-header">
-                    <h6><i class="fas fa-calendar-check"></i>Room Bookings</h6>
-                    <span class="badge bg-success" th:text="${roomBookings != null ? roomBookings.size() : 0}">0</span>
-                </div>
-                <div class="card-body">
+        <!-- ================= ROOMS TAB (full width) ================= -->
+        <div class="tab-pane fade" id="rooms-pane" role="tabpanel" aria-labelledby="rooms-tab-btn">
+            <div class="row g-4">
 
-                    <!-- All Rooms -->
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">Rooms</small>
+                <div class="col-xl-4">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-door-open"></i>All Rooms</h6>
                             <span class="badge bg-success" th:text="${allRooms != null ? allRooms.size() : 0}">0</span>
                         </div>
-
-                        <div th:if="${allRooms != null and !allRooms.isEmpty()}">
-                            <div th:each="room : ${allRooms}"
-                                 class="room-item"
-                                 th:data-roomid="${room.roomId}"
-                                 th:data-roomname="${room.roomName}"
-                                 th:data-roomtype="${room.roomType}">
-                                <div>
-                                    <span class="room-name" th:text="${room.roomName}">Room Name</span>
-                                    <span class="room-type" th:text="${room.roomType}">Type</span>
-                                </div>
-                                <div>
-                                    <span class="room-status"
-                                          th:classappend="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'available' : 'occupied'"
-                                          th:text="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'Available' : 'Occupied'">Available</span>
-                                    <i class="fas fa-chevron-right ms-2 text-muted" style="font-size: 12px;"></i>
+                        <div class="panel-body">
+                            <div th:if="${allRooms != null and !allRooms.isEmpty()}" class="room-grid">
+                                <div th:each="room : ${allRooms}"
+                                     class="room-item"
+                                     th:data-roomid="${room.roomId}"
+                                     th:data-roomname="${room.roomName}"
+                                     th:data-roomtype="${room.roomType}">
+                                    <div>
+                                        <span class="room-name" th:text="${room.roomName}">Room Name</span>
+                                        <span class="room-type" th:text="${room.roomType}">Type</span>
+                                    </div>
+                                    <div>
+                                        <span class="room-status"
+                                              th:classappend="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'available' : 'occupied'"
+                                              th:text="${availableRoomIds != null and availableRoomIds.contains(room.roomId)} ? 'Available' : 'Occupied'">Available</span>
+                                        <i class="fas fa-chevron-right ms-2 text-muted" style="font-size: 12px;"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div th:if="${allRooms == null or allRooms.isEmpty()}" class="empty-state-sm">
-                            <i class="fas fa-door-open"></i>
-                            No rooms on record
+                            <div th:if="${allRooms == null or allRooms.isEmpty()}" class="empty-state-sm">
+                                <i class="fas fa-door-open"></i>
+                                No rooms on record
+                            </div>
+                        </div>
+                        <div class="panel-footer">
+                            <small class="text-muted">Click on any room to view its bookings and decide</small>
                         </div>
                     </div>
+                </div>
 
-                    <hr>
-
-                    <!-- My Room Bookings -->
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted fw-semibold">My Room Bookings</small>
-                            <button class="btn btn-sm btn-success quick-action-btn" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
-                                <i class="fas fa-plus me-1"></i>Book
-                            </button>
-                        </div>
-
-                        <div th:if="${roomBookings != null and !roomBookings.isEmpty()}" id="roomBookingsList">
-                            <div th:each="booking : ${roomBookings}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title" th:text="${booking.roomName}">Room</div>
-                                    <small class="text-muted"
-                                           th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</small>
+                <div class="col-xl-8">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-calendar-check"></i>My Room Bookings</h6>
+                            <div class="panel-header-actions">
+                                <div class="btn-group btn-group-sm view-toggle-group" role="group" aria-label="Room bookings view toggle">
+                                    <button type="button" id="roomViewListBtn" class="btn view-toggle-btn active" onclick="setRoomBookingsView('list')" title="List view">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                    <button type="button" id="roomViewCalendarBtn" class="btn view-toggle-btn" onclick="setRoomBookingsView('calendar')" title="Calendar view">
+                                        <i class="fas fa-calendar-alt"></i>
+                                    </button>
                                 </div>
-                                <div class="text-end">
-                                    <!--
-                                        Status badge - rendered from booking.status only (no in-template date math).
-                                        "IN USE" is derived client-side in JS below, matching the same logic used
-                                        for the room-details modal, to avoid fragile Thymeleaf date expressions.
-                                    -->
-                                    <span class="status-badge"
-                                          th:data-status="${booking.status}"
-                                          th:data-start="${#temporals.format(booking.startTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
-                                          th:data-end="${#temporals.format(booking.endTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
-                                          th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
-                                                          (${booking.status} == 'BOOKED' ? 'booked' :
-                                                          (${booking.status} == 'ACTIVE' ? 'booked' :
-                                                          (${booking.status} == 'PENDING' ? 'pending' :
-                                                          (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
-                                          th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
-
-                                    <!-- Recall for OWNER -->
-                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId == session.userId}">
-                                        <button class="btn btn-sm btn-warning mt-1 recall-btn"
-                                                th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
-                                            <i class="fas fa-undo"></i> Recall
-                                        </button>
+                                <button class="btn btn-sm btn-success quick-action-btn" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
+                                    <i class="fas fa-plus me-1"></i>Book
+                                </button>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div th:if="${roomBookings != null and !roomBookings.isEmpty()}" id="roomBookingsList">
+                                <div th:each="booking : ${roomBookings}" class="booking-row"
+                                     th:data-bookingid="${booking.bookingId}"
+                                     th:data-roomid="${booking.roomId}"
+                                     th:data-roomtype="${booking.roomType}">
+                                    <div>
+                                        <div class="booking-row-title" th:text="${booking.roomName}">Room</div>
+                                        <small class="text-muted"
+                                               th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</small>
                                     </div>
+                                    <div class="text-end">
+                                        <!--
+                                            Status badge - rendered from booking.status only (no in-template date math).
+                                            "IN USE" is derived client-side in JS below, matching the same logic used
+                                            for the room-details modal, to avoid fragile Thymeleaf date expressions.
+                                        -->
+                                        <span class="status-badge"
+                                              th:data-status="${booking.status}"
+                                              th:data-start="${#temporals.format(booking.startTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
+                                              th:data-end="${#temporals.format(booking.endTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
+                                              th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
+                                                              (${booking.status} == 'BOOKED' ? 'booked' :
+                                                              (${booking.status} == 'ACTIVE' ? 'booked' :
+                                                              (${booking.status} == 'PENDING' ? 'pending' :
+                                                              (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
+                                              th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
 
-                                    <!-- Request Slot for NON-OWNER (Regular Rooms only) -->
-                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
-                                        <button class="btn btn-sm btn-info mt-1 recall-btn"
-                                                th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
-                                            <i class="fas fa-handshake"></i> Request
-                                        </button>
-                                    </div>
-
-                                    <!-- Sign Out Button - INFRA only for Server Rooms -->
-                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
-                                        <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
-                                            <input type="hidden" name="infraComment" value="Signing out user">
-                                            <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                        <!-- Recall for OWNER -->
+                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId == session.userId}">
+                                            <button class="btn btn-sm btn-warning mt-1 recall-btn"
+                                                    th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
+                                                <i class="fas fa-undo"></i> Recall
                                             </button>
-                                        </form>
-                                    </div>
+                                        </div>
 
-                                    <!-- Cancel Button - INFRA only -->
-                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
-                                        <button class="btn btn-sm btn-danger mt-1 w-100"
-                                                th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
-                                            <i class="fas fa-times me-1"></i>Cancel
-                                        </button>
+                                        <!-- Request Slot for NON-OWNER (Regular Rooms only) -->
+                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
+                                            <button class="btn btn-sm btn-info mt-1 recall-btn"
+                                                    th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
+                                                <i class="fas fa-handshake"></i> Request
+                                            </button>
+                                        </div>
+
+                                        <!-- Sign Out Button - INFRA only for Server Rooms -->
+                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                            <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
+                                                <input type="hidden" name="infraComment" value="Signing out user">
+                                                <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                    <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                        <!-- Cancel Button - INFRA only -->
+                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
+                                            <button class="btn btn-sm btn-danger mt-1 w-100"
+                                                    th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
+                                                <i class="fas fa-times me-1"></i>Cancel
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div th:if="${roomBookings == null or roomBookings.isEmpty()}" class="empty-state-sm">
-                            <i class="fas fa-calendar-check"></i>
-                            No room bookings
-                        </div>
+                            <div th:if="${roomBookings == null or roomBookings.isEmpty()}" id="roomBookingsEmpty" class="empty-state-sm">
+                                <i class="fas fa-calendar-check"></i>
+                                No room bookings
+                            </div>
 
-                        <div class="pagination-controls" id="roomBookingsPagination"></div>
+                            <div class="pagination-controls" id="roomBookingsPagination"></div>
+
+                            <!-- Calendar view (hidden until toggled) -->
+                            <div id="roomBookingsCalendar" class="room-bookings-calendar" style="display: none;"></div>
+                            <div class="calendar-legend" id="roomBookingsLegend" style="display: none;">
+                                <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Booked</span>
+                                <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
+                                <span class="legend-item"><span class="legend-dot" style="background:#6610f2;"></span>Completed</span>
+                                <span class="legend-item"><span class="legend-dot" style="background:#dc3545;"></span>Cancelled</span>
+                            </div>
+                        </div>
                     </div>
+                </div>
 
-                </div>
-                <div class="card-footer">
-                    <small class="text-muted">Click on any room to view its bookings and decide</small>
-                </div>
             </div>
         </div>
 
@@ -442,7 +475,46 @@
         .btn-info { background: #0dcaf0 !important; color: white !important; }
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
 
-        .booking-card {
+        /* ============================================
+           Horizontal tabs: Drivers | Rooms
+           ============================================ */
+        .booking-tabs {
+            border-bottom: 2px solid #eef0f3;
+            gap: 6px;
+            margin-bottom: 22px;
+        }
+        .booking-tabs .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none !important;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 12px 20px !important;
+            font-weight: 700;
+            font-size: 14.5px;
+            color: #6c757d;
+            background: transparent;
+            position: relative;
+            top: 2px;
+        }
+        .booking-tabs .nav-link i { font-size: 15px; }
+        .booking-tabs .nav-link .badge { font-size: 10.5px; }
+        .booking-tabs .nav-link:hover {
+            color: var(--ink);
+            background: #f8f9fb;
+            border: none;
+        }
+        .booking-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: white;
+            border-bottom: 2px solid var(--primary-color) !important;
+            box-shadow: 0 -4px 14px rgba(0,0,0,0.04);
+        }
+
+        .booking-tab-content { width: 100%; }
+
+        /* Full-width panels used inside each tab pane */
+        .booking-panel {
             background: white;
             border-radius: 14px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -450,11 +522,11 @@
             height: 100%;
             display: flex;
             flex-direction: column;
-            transition: box-shadow 0.25s ease, transform 0.25s ease;
+            transition: box-shadow 0.25s ease;
             border: 1px solid #eef0f3;
         }
-        .booking-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-        .booking-card .card-header {
+        .booking-panel:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+        .booking-panel .panel-header {
             padding: 16px 20px;
             border-bottom: 1px solid #eef0f3;
             display: flex;
@@ -462,10 +534,80 @@
             align-items: center;
             background: transparent;
         }
-        .booking-card .card-header h6 { font-weight: 700; font-size: 14px; margin: 0; color: var(--ink); }
-        .booking-card .card-header h6 i { color: var(--primary-color); margin-right: 8px; }
-        .booking-card .card-body { padding: 16px 20px; flex: 1; }
-        .booking-card .card-footer { padding: 12px 20px; border-top: 1px solid #eef0f3; background: transparent; }
+        .booking-panel .panel-header h6 { font-weight: 700; font-size: 14px; margin: 0; color: var(--ink); }
+        .booking-panel .panel-header h6 i { color: var(--primary-color); margin-right: 8px; }
+        .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
+        .booking-panel .panel-footer { padding: 12px 20px; border-top: 1px solid #eef0f3; background: transparent; }
+
+        .panel-header-actions { display: flex; align-items: center; gap: 10px; }
+
+        .view-toggle-group { border-radius: 8px; overflow: hidden; }
+        .view-toggle-group .view-toggle-btn {
+            padding: 6px 11px !important;
+            border-radius: 0 !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #6c757d !important;
+            background: white !important;
+            font-size: 12px !important;
+        }
+        .view-toggle-group .view-toggle-btn:hover { background: #f8f9fb !important; }
+        .view-toggle-group .view-toggle-btn.active {
+            background: var(--primary-color) !important;
+            border-color: var(--primary-color) !important;
+            color: white !important;
+        }
+
+        /* Room bookings calendar (FullCalendar) */
+        .room-bookings-calendar {
+            border: 1px solid #eef0f3;
+            border-radius: 12px;
+            padding: 14px;
+            background: white;
+        }
+        .room-bookings-calendar .fc { font-family: inherit; font-size: 13px; }
+        .room-bookings-calendar .fc-toolbar-title { font-size: 15px !important; font-weight: 700; color: var(--ink); }
+        .room-bookings-calendar .fc-button {
+            background: white !important;
+            border: 1px solid #e2e8f0 !important;
+            color: var(--ink) !important;
+            box-shadow: none !important;
+            border-radius: 8px !important;
+            padding: 5px 10px !important;
+            font-size: 12.5px !important;
+            text-transform: capitalize !important;
+        }
+        .room-bookings-calendar .fc-button:hover { background: #f8f9fb !important; }
+        .room-bookings-calendar .fc-button-primary:not(:disabled).fc-button-active,
+        .room-bookings-calendar .fc-button-primary:not(:disabled):active {
+            background: var(--primary-color) !important;
+            border-color: var(--primary-color) !important;
+            color: white !important;
+        }
+        .room-bookings-calendar .fc-daygrid-event {
+            border-radius: 6px;
+            padding: 1px 5px;
+            font-size: 11px;
+            font-weight: 600;
+            border: none !important;
+            cursor: pointer;
+        }
+        .room-bookings-calendar .fc-list-event { cursor: pointer; }
+        .room-bookings-calendar .fc-daygrid-day-number,
+        .room-bookings-calendar .fc-col-header-cell-cushion { color: var(--ink); }
+
+        .calendar-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; padding: 0 4px; }
+        .calendar-legend .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #6c757d; font-weight: 600; }
+        .calendar-legend .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+        /* Grid of driver/room cards - scales across the wider tab width */
+        .driver-grid, .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
 
         .driver-item, .room-item {
             display: flex;
@@ -589,6 +731,9 @@
 </div>
 
 <div layout:fragment="scripts">
+    <!-- FullCalendar (for the Room Bookings calendar view) -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
     <script>
         // Current logged-in user id and role
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
@@ -659,6 +804,94 @@
             });
         }
 
+        // ============================================
+        // Room Bookings: List / Calendar view toggle
+        // Builds calendar events straight from the already-rendered
+        // #roomBookingsList rows - no extra network calls needed.
+        // ============================================
+        let roomCalendar = null;
+
+        function statusColor(status) {
+            if (status === 'PENDING') return '#fd7e14';
+            if (status === 'CANCELLED') return '#dc3545';
+            if (status === 'CONFIRMED') return '#6610f2';
+            return '#198754'; // BOOKED / ACTIVE
+        }
+
+        function buildRoomBookingEvents() {
+            const rows = document.querySelectorAll('#roomBookingsList > .booking-row');
+            const events = [];
+            rows.forEach(function (row) {
+                const badge = row.querySelector('.status-badge[data-status]');
+                if (!badge || !badge.dataset.start || !badge.dataset.end) return;
+
+                const status = badge.dataset.status;
+                const roomName = row.querySelector('.booking-row-title')?.textContent?.trim() || 'Room';
+
+                events.push({
+                    title: roomName,
+                    start: badge.dataset.start,
+                    end: badge.dataset.end,
+                    backgroundColor: statusColor(status),
+                    borderColor: statusColor(status),
+                    extendedProps: {
+                        roomId: row.dataset.roomid,
+                        roomName: roomName,
+                        roomType: row.dataset.roomtype
+                    }
+                });
+            });
+            return events;
+        }
+
+        function initRoomCalendar() {
+            const calendarEl = document.getElementById('roomBookingsCalendar');
+            if (!calendarEl || roomCalendar || typeof FullCalendar === 'undefined') return;
+
+            roomCalendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listMonth'
+                },
+                height: 'auto',
+                events: buildRoomBookingEvents(),
+                eventClick: function (info) {
+                    const props = info.event.extendedProps;
+                    if (props.roomId) {
+                        viewRoomDetails(props.roomId, props.roomName, props.roomType);
+                    }
+                }
+            });
+            roomCalendar.render();
+        }
+
+        function setRoomBookingsView(view) {
+            const listEl = document.getElementById('roomBookingsList');
+            const paginationEl = document.getElementById('roomBookingsPagination');
+            const emptyEl = document.getElementById('roomBookingsEmpty');
+            const calendarEl = document.getElementById('roomBookingsCalendar');
+            const legendEl = document.getElementById('roomBookingsLegend');
+            const listBtn = document.getElementById('roomViewListBtn');
+            const calBtn = document.getElementById('roomViewCalendarBtn');
+
+            const showCalendar = view === 'calendar';
+
+            if (listEl) listEl.style.display = showCalendar ? 'none' : '';
+            if (paginationEl) paginationEl.style.display = showCalendar ? 'none' : '';
+            if (emptyEl) emptyEl.style.display = showCalendar ? 'none' : '';
+            if (calendarEl) calendarEl.style.display = showCalendar ? 'block' : 'none';
+            if (legendEl) legendEl.style.display = showCalendar ? 'flex' : 'none';
+            listBtn?.classList.toggle('active', !showCalendar);
+            calBtn?.classList.toggle('active', showCalendar);
+
+            if (showCalendar) {
+                initRoomCalendar();
+                roomCalendar?.updateSize();
+            }
+        }
+
         // Wire up click handlers
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.driver-item').forEach(function (el) {
@@ -672,9 +905,15 @@
                 });
             });
 
-            paginateList('driverRequestsList', 'driverRequestsPagination', 5);
-            paginateList('roomBookingsList', 'roomBookingsPagination', 5);
+            paginateList('driverRequestsList', 'driverRequestsPagination', 8);
+            paginateList('roomBookingsList', 'roomBookingsPagination', 8);
             refreshInUseBadges();
+
+            // Keep the calendar sized correctly if the user switches away to the
+            // Drivers tab and back while Calendar view is active.
+            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () {
+                roomCalendar?.updateSize();
+            });
 
             const bookRoomForm = document.getElementById('bookRoomForm');
             if (bookRoomForm) {

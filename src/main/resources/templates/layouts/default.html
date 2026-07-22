@@ -1,597 +1,818 @@
-    <!DOCTYPE html>
-    <html xmlns:th="http://www.thymeleaf.org"
-          xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-          xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title th:text="${pageTitle} ?: 'AssetIQ-Pro'">AssetIQ-Pro</title>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AssetIQ-Pro - Interswitch Asset Management System. Manage assets, transfers, bookings, and infrastructure requests.">
+    <meta name="keywords" content="asset management, inventory, IT asset, Interswitch, AssetIQ-Pro">
+    <meta name="author" content="Interswitch">
+    <meta name="robots" content="index, follow">
 
-        <!-- Bootstrap 5 CSS -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <!-- Font Awesome 6 -->
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-        <!-- Google Fonts -->
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-        <!-- Chart.js -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="AssetIQ-Pro - Asset Management System">
+    <meta property="og:description" content="Unified Asset Management System for Interswitch">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://assetiq-pro.interswitch.com">
+    <meta property="og:image" content="/assetIQ-pro/images/og-image.png">
 
-        <!-- Child page styles -->
-        <th:block layout:fragment="styles"></th:block>
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#0d6efd">
 
-        <style>
-            :root {
-                --primary-color: #0d6efd;
-                --primary-dark: #0b5ed7;
-                --accent-color: #4fc3f7;
-                --sidebar-width: 260px;
-                --header-height: 70px;
-                --bg-color: #f4f6f9;
-                --ink: #1a1a2e;
-            }
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assetIQ-pro/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assetIQ-pro/favicon/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assetIQ-pro/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/assetIQ-pro/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="/assetIQ-pro/favicon/favicon.ico">
 
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { height: 100%; }
-            body {
-                font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: var(--bg-color);
-                overflow-x: hidden;
-                -webkit-font-smoothing: antialiased;
-            }
+    <title th:text="${pageTitle} ?: 'AssetIQ-Pro'">AssetIQ-Pro</title>
 
-            /* ========== SIDEBAR ========== */
-            .sidebar {
-                position: fixed;
-                top: 0; left: 0;
-                width: var(--sidebar-width);
-                height: 100vh;
-                background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-                color: white;
-                padding: 0;
-                transition: all 0.3s ease;
-                z-index: 1050;
-                overflow-y: auto;
-                overflow-x: hidden;
-                box-shadow: 4px 0 24px rgba(0,0,0,0.12);
-                border-right: 1px solid rgba(255,255,255,0.04);
-            }
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <!-- DataTables Buttons CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
 
-            .sidebar::-webkit-scrollbar { width: 4px; }
-            .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    <!-- Child page styles -->
+    <th:block layout:fragment="styles"></th:block>
 
-            .sidebar .logo {
-                padding: 26px 20px 22px 20px;
-                border-bottom: 1px solid rgba(255,255,255,0.07);
-                margin-bottom: 16px;
-            }
-            .sidebar .logo h3 {
-                font-weight: 800;
-                font-size: 22px;
-                margin: 0;
-                letter-spacing: -0.5px;
-            }
-            .sidebar .logo h3 i {
-                color: var(--accent-color);
-                filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.35));
-            }
-            .sidebar .logo h3 span { color: var(--accent-color); }
-            .sidebar .logo small {
-                color: rgba(255,255,255,0.4);
-                font-size: 11px;
-                font-weight: 500;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-                display: block;
-                margin-top: 3px;
-            }
-
-            .sidebar .nav { padding: 0 12px; }
-            .sidebar .nav-item { margin-bottom: 3px; }
-
-            .sidebar .nav-link {
-                color: rgba(255,255,255,0.65);
-                padding: 11px 16px;
-                border-radius: 10px;
-                transition: all 0.25s ease;
-                text-decoration: none;
-                display: flex;
-                align-items: center;
-                font-size: 14px;
-                font-weight: 500;
-                position: relative;
-                cursor: pointer;
-            }
-
-            .sidebar .nav-link:hover {
-                background: rgba(255,255,255,0.08);
-                color: white;
-                transform: translateX(2px);
-            }
-
-            .sidebar .nav-link.active {
-                background: linear-gradient(135deg, var(--primary-color), #3b82f6);
-                color: white;
-                box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35);
-            }
-
-            .sidebar .nav-link i {
-                width: 22px;
-                margin-right: 12px;
-                font-size: 16px;
-                text-align: center;
-            }
-
-            .sidebar .nav-link .badge {
-                margin-left: auto;
-                background: #dc3545;
-                color: white;
-                padding: 2px 9px;
-                border-radius: 20px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-
-            /* ========== DROPDOWN IN SIDEBAR ========== */
-            .sidebar .nav-link.dropdown-toggle::after {
-                margin-left: auto;
-                border-top-color: rgba(255,255,255,0.4);
-            }
-
-            .sidebar .dropdown-menu {
-                background: #1a1a2e;
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 10px;
-                padding: 6px 0;
-                backdrop-filter: blur(8px);
-                width: 100%;
-                position: relative;
-                box-shadow: none;
-                margin: 4px 0 8px 0;
-                max-height: 240px;
-                overflow-y: auto;
-            }
-
-            .sidebar .dropdown-item {
-                color: rgba(255,255,255,0.7);
-                padding: 8px 16px 8px 44px;
-                font-size: 13px;
-                border-radius: 6px;
-                transition: all 0.2s ease;
-                text-decoration: none;
-                display: flex;
-                align-items: center;
-            }
-
-            .sidebar .dropdown-item:hover {
-                background: rgba(255,255,255,0.08);
-                color: white;
-            }
-
-            .sidebar .dropdown-item i {
-                width: 18px;
-                margin-right: 10px;
-                font-size: 13px;
-                color: rgba(255,255,255,0.4);
-            }
-
-            .sidebar .nav-divider {
-                height: 1px;
-                background: rgba(255,255,255,0.07);
-                margin: 12px 16px;
-            }
-
-            /* ========== MAIN CONTENT ========== */
-            .main-content {
-                margin-left: var(--sidebar-width);
-                min-height: 100vh;
-                display: flex;
-                flex-direction: column;
-            }
-
-            /* ========== HEADER ========== */
-            .header {
-                background: white;
-                padding: 15px 30px;
-                border-bottom: 1px solid #e9ecef;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                position: sticky;
-                top: 0;
-                z-index: 1040;
-                min-height: var(--header-height);
-                height: var(--header-height);
-                box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-            }
-
-            .header .page-title {
-                font-size: 18px;
-                font-weight: 700;
-                color: var(--ink);
-                margin: 0;
-                letter-spacing: -0.3px;
-            }
-
-            .header .page-title i {
-                color: var(--primary-color);
-                margin-right: 8px;
-            }
-
-            .header .user-info {
-                display: flex;
-                align-items: center;
-                gap: 16px;
-            }
-
-            .header .user-info .dropdown-toggle::after { display: none; }
-
-            .header .user-avatar {
-                width: 38px;
-                height: 38px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, var(--primary-color), #6610f2);
-                color: white;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 700;
-                font-size: 15px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25);
-            }
-
-            .header .user-avatar:hover {
-                transform: scale(1.06);
-                box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
-            }
-
-            .header .notif-btn {
-                position: relative;
-                background: none;
-                border: none;
-                color: #6c757d;
-                font-size: 20px;
-                padding: 4px 6px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-
-            .header .notif-btn:hover { color: var(--ink); }
-
-            .header .notif-badge {
-                position: absolute;
-                top: -4px;
-                right: -4px;
-                background: #dc3545;
-                color: white;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 2px 7px;
-                border-radius: 20px;
-                min-width: 18px;
-                text-align: center;
-            }
-
-            .sidebar-toggle {
-                display: none;
-                background: none;
-                border: none;
-                font-size: 22px;
-                color: var(--ink);
-                cursor: pointer;
-                padding: 0 6px;
-            }
-
-            @media (max-width: 768px) {
-                .sidebar {
-                    transform: translateX(-100%);
-                    width: 280px;
-                }
-                .sidebar.open { transform: translateX(0); }
-                .main-content { margin-left: 0; }
-                .header { padding: 12px 16px; }
-                .header .page-title { font-size: 15px; }
-                .content { padding: 16px; }
-                .sidebar-toggle { display: block !important; }
-            }
-
-            /* ========== CONTENT ========== */
-            .content { padding: 25px 30px; flex: 1; }
-
-            /* ========== COMMON UTILITIES ========== */
-            .btn {
-                border-radius: 10px !important;
-                padding: 9px 22px !important;
-                font-weight: 600 !important;
-                font-size: 14px !important;
-                transition: all 0.25s ease !important;
-            }
-
-            .btn-primary {
-                background: var(--primary-color) !important;
-                border: none !important;
-            }
-
-            .btn-primary:hover {
-                background: var(--primary-dark) !important;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3) !important;
-            }
-
-            .btn-secondary:hover { transform: translateY(-2px); }
-
-            .form-control, .form-select {
-                border-radius: 10px !important;
-                border: 1px solid #e2e8f0 !important;
-                padding: 10px 14px !important;
-                font-size: 14px !important;
-                transition: all 0.2s ease !important;
-            }
-
-            .form-control:focus, .form-select:focus {
-                border-color: var(--primary-color) !important;
-                box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.08) !important;
-            }
-
-            .form-label {
-                font-weight: 600 !important;
-                font-size: 13px !important;
-                color: var(--ink) !important;
-                margin-bottom: 5px !important;
-            }
-
-            .modal-content {
-                border-radius: 16px !important;
-                border: none !important;
-                box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28) !important;
-            }
-
-            .modal-header {
-                border-bottom: 1px solid rgba(0,0,0,0.06) !important;
-                padding: 20px 24px !important;
-            }
-
-            .modal-footer {
-                border-top: 1px solid rgba(0,0,0,0.06) !important;
-                padding: 16px 24px !important;
-            }
-
-            .modal-body { max-height: calc(100vh - 220px); overflow-y: auto; }
-            .modal-title i { margin-right: 8px; }
-
-            .empty-state {
-                text-align: center;
-                padding: 50px 20px;
-                color: #adb5bd;
-            }
-            .empty-state i {
-                font-size: 34px;
-                margin-bottom: 10px;
-                display: block;
-            }
-        </style>
-
-        <!-- Child page additional styles -->
-        <th:block layout:fragment="styles"></th:block>
-    </head>
-    <body>
-
-    <!-- ========== SIDEBAR ========== -->
-    <div class="sidebar" id="sidebar">
-        <div class="logo">
-            <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
-            <small>Interswitch Asset Management</small>
-        </div>
-        <nav class="nav flex-column">
-            <!-- Dashboard - Everyone -->
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
-                    <i class="fas fa-chart-pie"></i> Dashboard
-                </a>
-            </div>
-
-            <!-- ========== RESOURCES DROPDOWN ========== -->
-            <div class="nav-item">
-                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-boxes"></i> Resources
-                </a>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a></li>
-                </ul>
-            </div>
-
-            <!-- ========== BOOKINGS - Simplified ========== -->
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'bookings-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/bookings-dashboard">
-                    <i class="fas fa-calendar-check"></i> Bookings
-                </a>
-            </div>
-
-            <!-- ========== ADMIN DROPDOWN ========== -->
-            <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS')">
-                <div class="nav-item">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-cog"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a></li>  <!-- ✅ NEW Settings link -->
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a></li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Vouchers - Everyone -->
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
-                    <i class="fas fa-ticket-alt"></i> Vouchers
-                </a>
-            </div>
-
-            <!-- Reports - Everyone -->
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
-                    <i class="fas fa-file-alt"></i> Reports
-                </a>
-            </div>
-
-            <div class="nav-divider"></div>
-
-            <!-- Driver Dashboard - DRIVER role only -->
-            <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER')">
-                <div class="nav-item">
-                    <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
-                        <i class="fas fa-tachometer-alt"></i> Driver Dashboard
-                    </a>
-                </div>
-            </div>
-
-            <!-- Assets & Transfers - Admin only -->
-            <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'EDIT_ASSETS', 'VIEW_ALL_TRANSACTIONS')">
-                <div class="nav-item">
-                    <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
-                        <i class="fas fa-laptop"></i> Assets
-                        <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
-                        <i class="fas fa-exchange-alt"></i> Transfers
-                    </a>
-                </div>
-            </div>
-
-            <!-- Logout -->
-            <div class="nav-item">
-                <a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
-            </div>
-        </nav>
-    </div>
-
-    <!-- ========== MAIN CONTENT ========== -->
-    <div class="main-content">
-
-        <!-- HEADER -->
-        <header class="header">
-            <div>
-                <button class="sidebar-toggle" onclick="toggleSidebar()">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <span class="page-title">
-                    <i class="fas fa-chevron-right" style="font-size: 14px; opacity: 0.4;"></i>
-                    <span th:text="${pageTitle} ?: 'Dashboard'">Dashboard</span>
-                </span>
-            </div>
-
-            <div class="user-info">
-                <!-- Notifications -->
-                <div class="dropdown">
-                    <button class="notif-btn" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-bell"></i>
-                        <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-end" style="min-width: 320px; max-height: 400px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
-                        <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;">
-                            <h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6>
-                        </div>
-                        <div th:each="notification : ${notifications}">
-                            <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
-                                <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
-                                <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
-                            </a>
-                        </div>
-                        <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
-                            <i class="fas fa-inbox text-muted" style="font-size: 24px;"></i>
-                            <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- User Dropdown -->
-                <div class="dropdown">
-                    <button class="btn btn-link p-0" data-bs-toggle="dropdown">
-                        <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 200px;">
-                        <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
-                        <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </header>
-
-        <!-- CONTENT -->
-        <div class="content">
-            <th:block layout:fragment="content">
-                <!-- Child page content goes here -->
-            </th:block>
-        </div>
-    </div>
-
-    <!-- ========== SCRIPTS ========== -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --primary-dark: #0b5ed7;
+            --accent-color: #4fc3f7;
+            --sidebar-width: 260px;
+            --header-height: 70px;
+            --bg-color: #f4f6f9;
+            --ink: #1a1a2e;
         }
 
-        // Close sidebar on outside click (mobile)
-        document.addEventListener('click', function(event) {
-            const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.querySelector('.sidebar-toggle');
-            if (!sidebar) return;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
 
-            const isClickInside = sidebar.contains(event.target);
-            const isClickOnToggle = toggleBtn && toggleBtn.contains(event.target);
+        /* ========== SIDEBAR ========== */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 0;
+            transition: all 0.3s ease;
+            z-index: 1050;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+            border-right: 1px solid rgba(255,255,255,0.04);
+        }
 
-            if (!isClickInside && !isClickOnToggle && window.innerWidth <= 768) {
-                sidebar.classList.remove('open');
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .sidebar .logo {
+            padding: 26px 20px 22px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            margin-bottom: 16px;
+        }
+        .sidebar .logo h3 {
+            font-weight: 800;
+            font-size: 22px;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+        .sidebar .logo h3 i {
+            color: var(--accent-color);
+            filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.35));
+        }
+        .sidebar .logo h3 span { color: var(--accent-color); }
+        .sidebar .logo small {
+            color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            display: block;
+            margin-top: 3px;
+        }
+
+        .sidebar .nav { padding: 0 12px; }
+        .sidebar .nav-item { margin-bottom: 3px; }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.65);
+            padding: 11px 16px;
+            border-radius: 10px;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.08);
+            color: white;
+            transform: translateX(2px);
+        }
+
+        .sidebar .nav-link.active {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35);
+        }
+
+        .sidebar .nav-link i {
+            width: 22px;
+            margin-right: 12px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .sidebar .nav-link .badge {
+            margin-left: auto;
+            background: #dc3545;
+            color: white;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* ========== DROPDOWN IN SIDEBAR ========== */
+        .sidebar .nav-link.dropdown-toggle::after {
+            margin-left: auto;
+            border-top-color: rgba(255,255,255,0.4);
+        }
+
+        .sidebar .dropdown-menu {
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 6px 0;
+            backdrop-filter: blur(8px);
+            width: 100%;
+            position: relative;
+            box-shadow: none;
+            margin: 4px 0 8px 0;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .sidebar .dropdown-item {
+            color: rgba(255,255,255,0.7);
+            padding: 8px 16px 8px 44px;
+            font-size: 13px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+
+        .sidebar .dropdown-item:hover {
+            background: rgba(255,255,255,0.08);
+            color: white;
+        }
+
+        .sidebar .dropdown-item i {
+            width: 18px;
+            margin-right: 10px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .sidebar .nav-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.07);
+            margin: 12px 16px;
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            background: white;
+            padding: 15px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            min-height: var(--header-height);
+            height: var(--header-height);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+
+        .header .page-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+
+        .header .page-title i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+
+        .header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header .user-info .dropdown-toggle::after { display: none; }
+
+        .header .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), #6610f2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25);
+        }
+
+        .header .user-avatar:hover {
+            transform: scale(1.06);
+            box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+        }
+
+        .header .notif-btn {
+            position: relative;
+            background: none;
+            border: none;
+            color: #6c757d;
+            font-size: 20px;
+            padding: 4px 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header .notif-btn:hover { color: var(--ink); }
+
+        .header .notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 22px;
+            color: var(--ink);
+            cursor: pointer;
+            padding: 0 6px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
             }
-        });
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .header { padding: 12px 16px; }
+            .header .page-title { font-size: 15px; }
+            .content { padding: 16px; }
+            .sidebar-toggle { display: block !important; }
+        }
 
-        // Close sidebar when window resizes to desktop
-        window.addEventListener('resize', function() {
-            const sidebar = document.getElementById('sidebar');
-            if (window.innerWidth > 768) {
-                sidebar.classList.remove('open');
+        /* ========== CONTENT ========== */
+        .content { padding: 25px 30px; flex: 1; }
+
+        /* ========== COMMON UTILITIES ========== */
+        .btn {
+            border-radius: 10px !important;
+            padding: 9px 22px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            transition: all 0.25s ease !important;
+        }
+
+        .btn-primary {
+            background: var(--primary-color) !important;
+            border: none !important;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3) !important;
+        }
+
+        .btn-secondary:hover { transform: translateY(-2px); }
+
+        .form-control, .form-select {
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 10px 14px !important;
+            font-size: 14px !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.08) !important;
+        }
+
+        .form-label {
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            color: var(--ink) !important;
+            margin-bottom: 5px !important;
+        }
+
+        .modal-content {
+            border-radius: 16px !important;
+            border: none !important;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28) !important;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            padding: 20px 24px !important;
+        }
+
+        .modal-footer {
+            border-top: 1px solid rgba(0,0,0,0.06) !important;
+            padding: 16px 24px !important;
+        }
+
+        .modal-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+        .modal-title i { margin-right: 8px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #adb5bd;
+        }
+        .empty-state i {
+            font-size: 34px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* ========== DATA TABLES EXPORT BUTTONS ========== */
+        .dt-buttons .btn {
+            border-radius: 8px !important;
+            padding: 6px 14px !important;
+            font-size: 13px !important;
+            margin-right: 4px !important;
+        }
+        .dt-buttons .btn:last-child { margin-right: 0; }
+        .dt-buttons .btn-success { background: #28a745 !important; border-color: #28a745 !important; color: white !important; }
+        .dt-buttons .btn-success:hover { background: #1e7e34 !important; border-color: #1e7e34 !important; }
+        .dt-buttons .btn-primary { background: #0d6efd !important; border-color: #0d6efd !important; color: white !important; }
+        .dt-buttons .btn-primary:hover { background: #0b5ed7 !important; border-color: #0b5ed7 !important; }
+        .dt-buttons .btn-danger { background: #dc3545 !important; border-color: #dc3545 !important; color: white !important; }
+        .dt-buttons .btn-danger:hover { background: #bd2130 !important; border-color: #bd2130 !important; }
+
+        /* DataTables overrides */
+        .dataTables_wrapper .dataTables_filter input {
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 8px 14px !important;
+            font-size: 14px !important;
+            margin-left: 8px !important;
+        }
+        .dataTables_wrapper .dataTables_length select {
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 8px 14px !important;
+            font-size: 14px !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            border-radius: 10px !important;
+            border: 1px solid #e9ecef !important;
+            padding: 6px 14px !important;
+            margin: 0 3px !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: var(--primary-color) !important;
+            color: white !important;
+            border-color: var(--primary-color) !important;
+        }
+        .dataTables_wrapper .dataTables_info {
+            color: #6c757d !important;
+            font-size: 13px !important;
+        }
+
+        /* Responsive DataTables */
+        .dataTables_wrapper .dataTables_filter input,
+        .dataTables_wrapper .dataTables_length select {
+            width: auto !important;
+            max-width: 200px !important;
+        }
+        @media (max-width: 576px) {
+            .dataTables_wrapper .dataTables_filter input {
+                max-width: 120px !important;
+                font-size: 12px !important;
             }
-        });
+            .dt-buttons .btn {
+                font-size: 11px !important;
+                padding: 4px 10px !important;
+            }
+        }
+    </style>
 
-        // Fix: bring an opened sidebar dropdown fully into view
-        document.addEventListener('shown.bs.dropdown', function (event) {
-            const toggle = event.target;
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar && sidebar.contains(toggle)) {
-                const menu = toggle.nextElementSibling;
-                if (menu) {
-                    setTimeout(() => {
-                        menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    }, 50);
+    <!-- Child page additional styles -->
+    <th:block layout:fragment="styles"></th:block>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<div class="sidebar" id="sidebar">
+    <div class="logo">
+        <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
+        <small>Interswitch Asset Management</small>
+    </div>
+    <nav class="nav flex-column">
+        <!-- Dashboard - Everyone -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
+                <i class="fas fa-chart-pie"></i> Dashboard
+            </a>
+        </div>
+
+        <!-- ========== RESOURCES DROPDOWN ========== -->
+        <div class="nav-item">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-boxes"></i> Resources
+            </a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a></li>
+                <li><a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a></li>
+            </ul>
+        </div>
+
+        <!-- ========== BOOKINGS - Simplified ========== -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'bookings-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/bookings-dashboard">
+                <i class="fas fa-calendar-check"></i> Bookings
+            </a>
+        </div>
+
+        <!-- ========== ADMIN DROPDOWN ========== -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS')">
+            <div class="nav-item">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-cog"></i> Admin
+                </a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Vouchers - Everyone -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
+                <i class="fas fa-ticket-alt"></i> Vouchers
+            </a>
+        </div>
+
+        <!-- Reports - Everyone -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
+                <i class="fas fa-file-alt"></i> Reports
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- Driver Dashboard - DRIVER role only -->
+        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Driver Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Assets & Transfers - Admin only -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'EDIT_ASSETS', 'VIEW_ALL_TRANSACTIONS')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                    <i class="fas fa-laptop"></i> Assets
+                    <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
+                    <i class="fas fa-exchange-alt"></i> Transfers
+                </a>
+            </div>
+        </div>
+
+        <!-- Logout -->
+        <div class="nav-item">
+            <a class="nav-link" href="/assetIQ-pro/logout" style="color: rgba(255,255,255,0.45);">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- ========== MAIN CONTENT ========== -->
+<div class="main-content">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="page-title">
+                <i class="fas fa-chevron-right" style="font-size: 14px; opacity: 0.4;"></i>
+                <span th:text="${pageTitle} ?: 'Dashboard'">Dashboard</span>
+            </span>
+        </div>
+
+        <div class="user-info">
+            <!-- Notifications -->
+            <div class="dropdown">
+                <button class="notif-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" th:text="${unreadNotifications} ?: '0'">0</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end" style="min-width: 320px; max-height: 400px; overflow-y: auto; border-radius: 14px; padding: 0; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12);">
+                    <div style="padding: 12px 18px; border-bottom: 1px solid #f0f0f0;">
+                        <h6 class="mb-0 fw-bold" style="font-size: 14px;">Notifications</h6>
+                    </div>
+                    <div th:each="notification : ${notifications}">
+                        <a class="dropdown-item" th:href="${notification.link}" style="padding: 10px 18px; border-bottom: 1px solid #f5f5f5;">
+                            <span th:text="${notification.message}" style="font-size: 13px;">Message</span>
+                            <small class="text-muted d-block" style="font-size: 11px;" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}">Time</small>
+                        </a>
+                    </div>
+                    <div class="text-center p-3" th:if="${notifications == null or notifications.isEmpty()}">
+                        <i class="fas fa-inbox text-muted" style="font-size: 24px;"></i>
+                        <p class="text-muted mb-0" style="font-size: 13px;">No notifications</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-link p-0" data-bs-toggle="dropdown">
+                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 200px;">
+                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}">User Name</span></li>
+                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}">username</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="/assetIQ-pro/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+        <!-- ============================================================ -->
+        <!-- EXPORT BUTTONS COMPONENT (Fragment) – can be used on any page -->
+        <!-- ============================================================ -->
+        <div th:fragment="exportButtons">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button class="btn btn-sm btn-success" onclick="exportTable('csv')">
+                    <i class="fas fa-file-csv me-1"></i> CSV
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="exportTable('excel')">
+                    <i class="fas fa-file-excel me-1"></i> Excel
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="exportTable('pdf')">
+                    <i class="fas fa-file-pdf me-1"></i> PDF
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <th:block layout:fragment="content">
+            <!-- Child page content goes here -->
+        </th:block>
+    </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<!-- jQuery (required for DataTables) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<!-- DataTables Buttons JS -->
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!--/*/ <th:block th:inline="javascript"> /*/-->
+<script>
+    // ============================================================
+    // SIDEBAR TOGGLE
+    // ============================================================
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // Close sidebar on outside click (mobile)
+    document.addEventListener('click', function(event) {
+        var sidebar = document.getElementById('sidebar');
+        var toggleBtn = document.querySelector('.sidebar-toggle');
+        if (!sidebar) return;
+
+        var isClickInside = sidebar.contains(event.target);
+        var isClickOnToggle = toggleBtn && toggleBtn.contains(event.target);
+
+        if (!isClickInside && !isClickOnToggle && window.innerWidth <= 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+
+    // Close sidebar when window resizes to desktop
+    window.addEventListener('resize', function() {
+        var sidebar = document.getElementById('sidebar');
+        if (window.innerWidth > 768) {
+            sidebar.classList.remove('open');
+        }
+    });
+
+    // Fix: bring an opened sidebar dropdown fully into view
+    document.addEventListener('shown.bs.dropdown', function (event) {
+        var toggle = event.target;
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.contains(toggle)) {
+            var menu = toggle.nextElementSibling;
+            if (menu) {
+                setTimeout(function() {
+                    menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }, 50);
+            }
+        }
+    });
+
+    // ============================================================
+    // GLOBAL EXPORT FUNCTION - Works with any DataTable on the page
+    // ============================================================
+    function exportTable(type) {
+        // Find the first DataTable on the page
+        var table = $('table.dataTable').DataTable();
+        if (!table) {
+            alert('No DataTable found on this page.');
+            return;
+        }
+
+        switch(type) {
+            case 'csv':
+                table.button('.buttons-csv').trigger();
+                break;
+            case 'excel':
+                table.button('.buttons-excel').trigger();
+                break;
+            case 'pdf':
+                table.button('.buttons-pdf').trigger();
+                break;
+            default:
+                alert('Unknown export type.');
+        }
+    }
+
+    // ============================================================
+    // AUTO-INITIALIZE DATATABLES WITH EXPORT BUTTONS
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if any data table exists without DataTable initialized
+        var tables = document.querySelectorAll('table.dataTable');
+        tables.forEach(function(tableEl) {
+            // Skip if already initialized
+            if ($.fn.DataTable.isDataTable(tableEl)) return;
+
+            // Check if it's the stock table or any other with specific columns
+            var tableId = tableEl.id || 'autoTable';
+            var isStockTable = tableId === 'stockTable' || $(tableEl).closest('#stockManagement').length > 0;
+
+            // Determine column definitions
+            var columnDefs = [];
+            if (isStockTable) {
+                // Stock table: last column has actions
+                columnDefs = [{ orderable: false, targets: [-1] }];
+            } else {
+                // Generic: assume last column has actions
+                columnDefs = [{ orderable: false, targets: [-1] }];
+            }
+
+            $(tableEl).DataTable({
+                destroy: true,
+                pageLength: 10,
+                lengthMenu: [
+                    [10, 25, 50, 100, -1],
+                    [10, 25, 50, 100, "All"]
+                ],
+                order: [ [0, 'asc'] ],
+                columnDefs: columnDefs,
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No records found",
+                    infoFiltered: "(filtered from _MAX_ total records)"
                 }
+            });
+        });
+    });
+
+    // Re-initialize DataTables after HTMX or AJAX content load (if applicable)
+    document.addEventListener('htmx:afterSwap', function() {
+        var tables = document.querySelectorAll('table.dataTable');
+        tables.forEach(function(tableEl) {
+            if ($.fn.DataTable.isDataTable(tableEl)) {
+                $(tableEl).DataTable().destroy();
             }
         });
-    </script>
+        // Manually trigger re-init
+        var event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+    });
+</script>
+<!--/*/ </th:block> /*/-->
 
-    <!-- Child page scripts placeholder -->
-    <th:block layout:fragment="scripts"></th:block>
+<!-- Child page scripts placeholder -->
+<th:block layout:fragment="scripts"></th:block>
 
-    </body>
-    </html>
+</body>
+</html>

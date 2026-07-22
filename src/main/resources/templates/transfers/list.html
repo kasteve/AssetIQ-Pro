@@ -14,23 +14,15 @@
 
 <body>
 <div layout:fragment="content">
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080;"></div>
+
     <div class="page-header-row">
         <h4><i class="fas fa-exchange-alt me-2"></i>Asset Transfers</h4>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTransferModal">
             <i class="fas fa-plus me-2"></i>Create Transfer
         </button>
-    </div>
-
-    <!-- Success/Error Messages -->
-    <div th:if="${success != null}" class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i>
-        <span th:text="${success}">Success</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    <div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        <span th:text="${error}">Error</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 
     <div class="table-card">
@@ -401,10 +393,16 @@
         .modal-body .table tbody tr:last-child td { border-bottom: none; }
         .modal-body .table tbody tr:hover { background: #f8f9fb; }
 
-        .alert { border-radius: 12px !important; border: none !important; padding: 16px 20px !important; margin-bottom: 20px !important; font-weight: 500 !important; }
-        .alert-success { background: #e6f7ec !important; color: #198754 !important; }
-        .alert-danger { background: #fdeeee !important; color: #dc3545 !important; }
-        .alert i { font-size: 18px; }
+        /* Toasts */
+        #toastContainer { max-width: 380px; }
+        .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
+        .app-toast .toast-header { border-bottom: none !important; padding: 12px 14px 4px 14px; font-weight: 700; font-size: 13.5px; }
+        .app-toast .toast-body { padding: 4px 14px 14px 14px; font-size: 13.5px; color: var(--ink); }
+        .app-toast.toast-success .toast-header { color: #198754; background: #fff !important; }
+        .app-toast.toast-success .toast-header i { color: #198754; }
+        .app-toast.toast-error .toast-header { color: #dc3545; background: #fff !important; }
+        .app-toast.toast-error .toast-header i { color: #dc3545; }
+        .app-toast .btn-close { font-size: 10px; }
 
         /* Wizard modal */
         .modal-lg { max-width: 720px; }
@@ -461,6 +459,10 @@
             font-size: 13px !important;
             margin-right: 4px !important;
         }
+
+        @media (max-width: 768px) {
+            #toastContainer { max-width: calc(100% - 24px); }
+        }
     </style>
 </div>
 
@@ -510,6 +512,35 @@
                 }
             });
         });
+
+        // ============================================
+        // Toast Notifications
+        // ============================================
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
+            const label = isSuccess ? 'Success' : 'Error';
+            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
+                    <div class="toast-header">
+                        <i class="fas ${icon} me-2"></i>
+                        <strong class="me-auto">${label}</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">${message}</div>
+                </div>
+            `;
+
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl);
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            toast.show();
+        }
 
         // ============================================
         // View Transfer - Modal
@@ -913,6 +944,22 @@
                     showTransferWizardStep(1);
                 });
             }
+        });
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- Flash-message toasts: separate th:inline="javascript" block   -->
+    <!-- so Thymeleaf inlining doesn't clash with the DataTables       -->
+    <!-- th:inline="none" script above.                                -->
+    <!-- ============================================================ -->
+    <script th:if="${success != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${success}]]*/ 'Success', 'success');
+        });
+    </script>
+    <script th:if="${error != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${error}]]*/ 'Error', 'error');
         });
     </script>
 </div>

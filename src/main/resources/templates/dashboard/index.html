@@ -27,20 +27,6 @@
     <div class="welcome-section">
         <h2>Welcome back, <span th:text="${session.fullName} ?: 'User'">User</span> 👋</h2>
         <p>Here's what's happening with your assets and requests today.</p>
-        <div class="quick-actions">
-            <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createAssetModal">
-                <i class="fas fa-plus-circle"></i> New Asset
-            </a>
-            <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createTransferModal">
-                <i class="fas fa-exchange-alt"></i> Transfer
-            </a>
-            <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#createRequestModal">
-                <i class="fas fa-tools"></i> Infra Request
-            </a>
-            <a class="quick-action-btn" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
-                <i class="fas fa-calendar-plus"></i> Book Room
-            </a>
-        </div>
     </div>
 
     <!-- Stats -->
@@ -91,9 +77,9 @@
                     <span><i class="fas fa-chart-line me-2" style="color: #0d6efd;"></i>Trends</span>
                     <div class="d-flex align-items-center gap-2">
                         <select id="trendsPeriod" class="form-select form-select-sm chart-control">
-                            <option value="daily">Daily (30d)</option>
+                            <option value="daily" selected>Daily (30d)</option>
                             <option value="weekly">Weekly (12wk)</option>
-                            <option value="monthly" selected>Monthly (6mo)</option>
+                            <option value="monthly">Monthly (6mo)</option>
                         </select>
                         <button class="btn btn-sm btn-outline-secondary" onclick="window.location.href='/assetIQ-pro/reports'">
                             <i class="fas fa-download me-1"></i>Export
@@ -110,9 +96,9 @@
                 <div class="card-header">
                     <span><i class="fas fa-chart-pie me-2" style="color: #6f42c1;"></i>Asset Distribution</span>
                     <select id="distributionDimension" class="form-select form-select-sm chart-control">
-                        <option value="category" selected>By Category</option>
+                        <option value="category">By Category</option>
                         <option value="department">By Department</option>
-                        <option value="status">By Status</option>
+                        <option value="status" selected>By Status</option>
                     </select>
                 </div>
                 <div class="card-body">
@@ -481,12 +467,9 @@
                 });
             }
 
-            // Initial render with server data
-            const initialTrends = /*[[${stats != null ? stats.monthlyTrends : null}]]*/ null;
-            const initialDistribution = /*[[${stats != null ? stats.assetsByCategory : null}]]*/ null;
-
-            renderTrends(initialTrends);
-            renderDistribution(initialDistribution);
+            // Initial load - Daily trends (30d) and Status distribution by default
+            loadTrends('daily');
+            loadDistribution('status');
 
             // Auto-dismiss alerts
             dismissAlerts();
@@ -504,8 +487,8 @@
 
         // ---------- Manual reload functions (can be called from console) ----------
         window.reloadDashboard = function() {
-            const period = document.getElementById('trendsPeriod')?.value || 'monthly';
-            const dimension = document.getElementById('distributionDimension')?.value || 'category';
+            const period = document.getElementById('trendsPeriod')?.value || 'daily';
+            const dimension = document.getElementById('distributionDimension')?.value || 'status';
             loadTrends(period);
             loadDistribution(dimension);
         };
