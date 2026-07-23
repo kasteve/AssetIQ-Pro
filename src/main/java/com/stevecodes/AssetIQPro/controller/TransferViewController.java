@@ -1,12 +1,16 @@
 package com.stevecodes.AssetIQPro.controller;
 
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.entity.TransferToken;
 import com.stevecodes.AssetIQPro.repository.TransferTokenRepository;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -32,16 +36,20 @@ public class TransferViewController {
     private final AssetService assetService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS', 'ADMIN', 'SUPER_ADMIN')")
     public String transfers(Model model) {
         log.info("Loading transfers page");
 
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
         List<Transfer> transfers = transferService.getAllTransfers();
 
-        // Populate employee names and staff IDs
         for (Transfer transfer : transfers) {
             populateEmployeeDetails(transfer);
 
-            // Populate department names
             if (transfer.getOldDepartmentId() != null) {
                 departmentService.getDepartmentById(transfer.getOldDepartmentId())
                         .ifPresent(dept -> transfer.setOldDepartmentName(dept.getName()));
@@ -57,11 +65,14 @@ public class TransferViewController {
         model.addAttribute("categories", categoryService.getAllCategories());
         model.addAttribute("departments", departmentService.getAllDepartments());
         model.addAttribute("employees", employeeService.getAllEmployees());
+        model.addAttribute("canCreate", currentUser.hasAnyPermission("TRANSFER_CREATE", "EDIT_ASSETS", "ADMIN"));
+        model.addAttribute("canInitiateSigning", currentUser.hasAnyPermission("TRANSFER_CREATE", "EDIT_ASSETS", "ADMIN"));
+        model.addAttribute("canViewAll", currentUser.hasAnyPermission("TRANSFER_VIEW", "VIEW_ALL_TRANSACTIONS", "ADMIN"));
+
         return "transfers/list";
     }
 
     private void populateEmployeeDetails(Transfer transfer) {
-        // From Employee
         if (transfer.getOldEmployeeId() != null) {
             employeeService.getEmployeeById(transfer.getOldEmployeeId())
                     .ifPresent(emp -> {
@@ -72,7 +83,6 @@ public class TransferViewController {
                     });
         }
 
-        // To Employee
         if (transfer.getNewEmployeeId() != null) {
             employeeService.getEmployeeById(transfer.getNewEmployeeId())
                     .ifPresent(emp -> {
@@ -83,7 +93,6 @@ public class TransferViewController {
                     });
         }
 
-        // Configured By
         if (transfer.getConfiguredById() != null) {
             employeeService.getEmployeeById(transfer.getConfiguredById())
                     .ifPresent(emp -> {
@@ -94,7 +103,6 @@ public class TransferViewController {
                     });
         }
 
-        // Old Handover
         if (transfer.getOldHandoverById() != null) {
             employeeService.getEmployeeById(transfer.getOldHandoverById())
                     .ifPresent(emp -> {
@@ -105,7 +113,6 @@ public class TransferViewController {
                     });
         }
 
-        // Old Received
         if (transfer.getOldReceivedById() != null) {
             employeeService.getEmployeeById(transfer.getOldReceivedById())
                     .ifPresent(emp -> {
@@ -116,7 +123,6 @@ public class TransferViewController {
                     });
         }
 
-        // New Handover
         if (transfer.getNewHandoverById() != null) {
             employeeService.getEmployeeById(transfer.getNewHandoverById())
                     .ifPresent(emp -> {
@@ -127,7 +133,6 @@ public class TransferViewController {
                     });
         }
 
-        // New Received
         if (transfer.getNewReceivedById() != null) {
             employeeService.getEmployeeById(transfer.getNewReceivedById())
                     .ifPresent(emp -> {
@@ -138,7 +143,6 @@ public class TransferViewController {
                     });
         }
 
-        // Infrastructure Representative
         if (transfer.getInfraRepresentativeId() != null) {
             employeeService.getEmployeeById(transfer.getInfraRepresentativeId())
                     .ifPresent(emp -> {
@@ -149,7 +153,6 @@ public class TransferViewController {
                     });
         }
 
-        // Finance Representative
         if (transfer.getFinanceRepresentativeId() != null) {
             employeeService.getEmployeeById(transfer.getFinanceRepresentativeId())
                     .ifPresent(emp -> {
@@ -162,8 +165,14 @@ public class TransferViewController {
     }
 
     @GetMapping("/create")
+    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String createTransfer(@RequestParam(required = false) String assetTag, Model model) {
         log.info("Create transfer page accessed with assetTag: {}", assetTag);
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
 
         model.addAttribute("assetTag", assetTag);
         model.addAttribute("companies", companyService.getAllCompanies());
@@ -191,10 +200,8 @@ public class TransferViewController {
             TransferToken transferToken = transferSigningService.validateToken(token);
             Transfer transfer = transferService.getTransferById(transferToken.getTransferId());
 
-            // Populate employee details
             populateEmployeeDetails(transfer);
 
-            // Populate department names
             if (transfer.getOldDepartmentId() != null) {
                 departmentService.getDepartmentById(transfer.getOldDepartmentId())
                         .ifPresent(dept -> transfer.setOldDepartmentName(dept.getName()));
@@ -283,10 +290,17 @@ public class TransferViewController {
     }
 
     @PostMapping("/create")
+    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String createTransfer(Transfer transfer,
                                  @RequestParam(required = false) MultipartFile file,
                                  RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             if (transfer.getTransferDate() == null) {
                 transfer.setTransferDate(LocalDate.now());
             }
@@ -297,6 +311,10 @@ public class TransferViewController {
 
             redirectAttributes.addFlashAttribute("success", "Transfer created successfully! Signing emails sent to all signers.");
             return "redirect:/transfers";
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to create transfers.");
+            return "redirect:/transfers";
         } catch (Exception e) {
             log.error("Error creating transfer: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to create transfer: " + e.getMessage());
@@ -305,10 +323,20 @@ public class TransferViewController {
     }
 
     @PostMapping("/{transferId}/initiate-signing")
+    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String initiateSigning(@PathVariable Integer transferId, RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             transferSigningService.initiateTransferSigning(transferId);
             redirectAttributes.addFlashAttribute("success", "Signing emails sent successfully!");
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to initiate signing.");
         } catch (Exception e) {
             log.error("Error initiating signing: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to send signing emails: " + e.getMessage());
@@ -324,6 +352,9 @@ public class TransferViewController {
                     .header("Content-Type", "application/pdf")
                     .header("Content-Disposition", "attachment; filename=transfer_" + transferId + ".pdf")
                     .body(pdf);
+        } catch (IllegalStateException e) {
+            log.warn("PDF not available: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error generating PDF for transfer {}: {}", transferId, e.getMessage());
             return ResponseEntity.notFound().build();

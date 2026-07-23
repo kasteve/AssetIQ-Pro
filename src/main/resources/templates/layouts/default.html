@@ -70,6 +70,10 @@
             --input-bg: #ffffff;
             --modal-bg: #ffffff;
             --dropdown-bg: #ffffff;
+            --sidebar-bg: #1a1a2e;
+            --sidebar-text: rgba(255,255,255,0.65);
+            --sidebar-hover: rgba(255,255,255,0.08);
+            --sidebar-active: linear-gradient(135deg, #0d6efd, #3b82f6);
         }
 
         /* Dark theme */
@@ -86,6 +90,10 @@
             --input-bg: #2a2a2a;
             --modal-bg: #1e1e1e;
             --dropdown-bg: #1e1e1e;
+            --sidebar-bg: #0d0d0d;
+            --sidebar-text: rgba(255,255,255,0.6);
+            --sidebar-hover: rgba(255,255,255,0.06);
+            --sidebar-active: linear-gradient(135deg, #1a73e8, #3b82f6);
         }
 
         /* Blue theme */
@@ -138,7 +146,7 @@
             top: 0; left: 0;
             width: var(--sidebar-width);
             height: 100vh;
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            background: var(--sidebar-bg);
             color: white;
             padding: 0;
             transition: all 0.3s ease;
@@ -182,7 +190,7 @@
         .sidebar .nav-item { margin-bottom: 3px; }
 
         .sidebar .nav-link {
-            color: rgba(255,255,255,0.65);
+            color: var(--sidebar-text);
             padding: 11px 16px;
             border-radius: 10px;
             transition: all 0.25s ease;
@@ -196,13 +204,13 @@
         }
 
         .sidebar .nav-link:hover {
-            background: rgba(255,255,255,0.08);
+            background: var(--sidebar-hover);
             color: white;
             transform: translateX(2px);
         }
 
         .sidebar .nav-link.active {
-            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            background: var(--sidebar-active);
             color: white;
             box-shadow: 0 6px 18px rgba(13, 110, 253, 0.35);
         }
@@ -231,7 +239,7 @@
         }
 
         .sidebar .dropdown-menu {
-            background: #1a1a2e;
+            background: var(--sidebar-bg);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 10px;
             padding: 6px 0;
@@ -245,7 +253,7 @@
         }
 
         .sidebar .dropdown-item {
-            color: rgba(255,255,255,0.7);
+            color: var(--sidebar-text);
             padding: 8px 16px 8px 44px;
             font-size: 13px;
             border-radius: 6px;
@@ -256,7 +264,7 @@
         }
 
         .sidebar .dropdown-item:hover {
-            background: rgba(255,255,255,0.08);
+            background: var(--sidebar-hover);
             color: white;
         }
 
@@ -613,12 +621,16 @@
                 <i class="fas fa-boxes"></i> Resources
             </a>
             <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a></li>
-                <li><a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a></li>
+                <li sec:authorize="hasAnyAuthority('INFRA_REQUEST_VIEW', 'ADMIN')">
+                    <a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a>
+                </li>
+                <li sec:authorize="hasAnyAuthority('RESOURCE_REQUEST_VIEW', 'ADMIN')">
+                    <a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a>
+                </li>
             </ul>
         </div>
 
-        <!-- ========== BOOKINGS - Simplified ========== -->
+        <!-- ========== BOOKINGS ========== -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'bookings-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/bookings-dashboard">
                 <i class="fas fa-calendar-check"></i> Bookings
@@ -632,18 +644,54 @@
                     <i class="fas fa-cog"></i> Admin
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a></li>
-                    <li><a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a></li>
+                    <!-- Users - requires USER_VIEW or CREATE_USERS or MANAGE_ROLES -->
+                    <li sec:authorize="hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_ROLES', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a>
+                    </li>
+                    <!-- Employees - requires EMPLOYEE_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('EMPLOYEE_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
+                    </li>
+                    <!-- Departments - requires DEPARTMENT_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('DEPARTMENT_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
+                    </li>
+                    <!-- Categories - requires CATEGORY_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('CATEGORY_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
+                    </li>
+                    <!-- Locations - requires LOCATION_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('LOCATION_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a>
+                    </li>
+                    <!-- Suppliers - requires SUPPLIER_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('SUPPLIER_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+                    </li>
+                    <!-- Companies - requires COMPANY_VIEW -->
+                    <li sec:authorize="hasAnyAuthority('COMPANY_VIEW', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
+                    </li>
+                    <!-- Rooms - requires ROOM_VIEW_ALL or MANAGE_BOOKINGS -->
+                    <li sec:authorize="hasAnyAuthority('ROOM_VIEW_ALL', 'MANAGE_BOOKINGS', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
+                    </li>
+                    <!-- Stock - requires MANAGE_INVENTORY -->
+                    <li sec:authorize="hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a>
+                    </li>
+                    <!-- Settings - requires MANAGE_CONFIG -->
+                    <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a>
+                    </li>
+                    <!-- Audit - requires VIEW_AUDIT -->
+                    <li sec:authorize="hasAnyAuthority('VIEW_AUDIT', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
+                    </li>
+                    <!-- Permissions - requires MANAGE_ROLES -->
+                    <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
+                        <a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -665,7 +713,7 @@
         <div class="nav-divider"></div>
 
         <!-- Driver Dashboard - DRIVER role only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER')">
+        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER', 'DRIVER_VIEW')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
                     <i class="fas fa-tachometer-alt"></i> Driver Dashboard
@@ -674,7 +722,7 @@
         </div>
 
         <!-- Assets & Transfers - Admin only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'EDIT_ASSETS', 'VIEW_ALL_TRANSACTIONS')">
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
                     <i class="fas fa-laptop"></i> Assets
@@ -684,6 +732,15 @@
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
                     <i class="fas fa-exchange-alt"></i> Transfers
+                </a>
+            </div>
+        </div>
+
+        <!-- Infrastructure Dashboard - INFRA role only -->
+        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'INFRA', 'APPROVE_INFRA', 'REVIEW_INFRA')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests/dashboard">
+                    <i class="fas fa-server"></i> Infrastructure Dashboard
                 </a>
             </div>
         </div>

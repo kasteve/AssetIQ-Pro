@@ -13,8 +13,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.stream.Collectors;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -30,8 +31,28 @@ public class CustomUserDetailsService implements UserDetailsService {
         AppUser appUser = userRepository.findByUsernameOrEmail(username, username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        log.info("User found: {}, active: {}, blocked: {}",
-                appUser.getUsername(), appUser.isActive(), appUser.isBlocked());
+        log.info("User found: {}, active: {}, blocked: {}, role: {}, permissions: {}",
+                appUser.getUsername(), appUser.isActive(), appUser.isBlocked(),
+                appUser.getRole(), appUser.getPermissions().size());
+
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
+
+        // Add permissions as authorities
+        for (Permission permission : appUser.getPermissions()) {
+            authorities.add(new SimpleGrantedAuthority(permission.getPermissionName()));
+            log.debug("Added permission authority: {}", permission.getPermissionName());
+        }
+
+        // Add role as authority (ROLE_ prefix for Spring Security)
+        if (appUser.getRole() != null && !appUser.getRole().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + appUser.getRole()));
+            log.debug("Added role authority: ROLE_{}", appUser.getRole());
+        }
+
+        // Add default ROLE_USER for all authenticated users
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+
+        log.info("User {} has {} authorities", username, authorities.size());
 
         return new User(
                 appUser.getUsername(),
@@ -40,14 +61,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 true,
                 true,
                 !appUser.isBlocked(),
-                getAuthorities(appUser)
+                authorities
         );
-    }
-
-    private Collection<? extends GrantedAuthority> getAuthorities(AppUser appUser) {
-        return appUser.getPermissions().stream()
-                .map(Permission::getPermissionName)
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
     }
 }

@@ -25,7 +25,7 @@ public class AuthenticationController {
     private final JwtUtil jwtUtil;
 
     // ============================================
-    // Login
+    // Login (Public - No Auth Required)
     // ============================================
 
     @PostMapping("/login")
@@ -43,14 +43,12 @@ public class AuthenticationController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             }
 
-            // Check if user is blocked
             if (user.isBlocked()) {
                 response.put("success", false);
                 response.put("message", "Your account has been blocked. Please contact administrator.");
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
             }
 
-            // Check if user is active
             if (!user.isActive()) {
                 response.put("success", false);
                 response.put("message", "Your account is inactive. Please contact administrator.");
@@ -80,10 +78,6 @@ public class AuthenticationController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
     }
-
-    // ============================================
-    // Web Login (Session-based)
-    // ============================================
 
     @PostMapping("/web-login")
     @Operation(summary = "Login for web application (session-based)")
@@ -115,10 +109,6 @@ public class AuthenticationController {
         return "redirect:/dashboard";
     }
 
-    // ============================================
-    // Logout
-    // ============================================
-
     @PostMapping("/logout")
     @Operation(summary = "Logout user")
     public ResponseEntity<Map<String, String>> logout(HttpSession session) {
@@ -137,10 +127,6 @@ public class AuthenticationController {
         }
         return "redirect:/login?logout=true";
     }
-
-    // ============================================
-    // Password Management
-    // ============================================
 
     @PostMapping("/change-password")
     @Operation(summary = "Change user password")
@@ -202,7 +188,7 @@ public class AuthenticationController {
             String token = userService.generatePasswordResetToken(email);
             response.put("success", "true");
             response.put("message", "Password reset link sent to your email");
-            response.put("resetToken", token); // For development only - remove in production
+            response.put("resetToken", token);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", "false");
@@ -236,10 +222,6 @@ public class AuthenticationController {
         }
     }
 
-    // ============================================
-    // Token Validation
-    // ============================================
-
     @GetMapping("/validate")
     @Operation(summary = "Validate JWT token")
     public ResponseEntity<Map<String, Object>> validateToken(@RequestHeader("Authorization") String authHeader) {
@@ -269,10 +251,6 @@ public class AuthenticationController {
             return ResponseEntity.ok(response);
         }
     }
-
-    // ============================================
-    // Session Information
-    // ============================================
 
     @GetMapping("/session")
     @Operation(summary = "Get current session information")

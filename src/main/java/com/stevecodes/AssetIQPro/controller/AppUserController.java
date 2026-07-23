@@ -6,7 +6,7 @@ import com.stevecodes.AssetIQPro.service.AppUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,20 +19,22 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/users")
 @Tag(name = "User Management", description = "Admin user management APIs")
-@PreAuthorize("hasAuthority('CREATE_USERS')")
+@RequiredArgsConstructor
+@PreAuthorize("hasAnyAuthority('CREATE_USERS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
 public class AppUserController {
 
-    @Autowired
-    private AppUserService userService;
+    private final AppUserService userService;
 
     @GetMapping
     @Operation(summary = "Get all users")
+    @PreAuthorize("hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<AppUser>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
     @GetMapping("/{userId}")
     @Operation(summary = "Get user by ID")
+    @PreAuthorize("hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AppUser> getUserById(@PathVariable Long userId) {
         return userService.getUserById(userId)
                 .map(ResponseEntity::ok)
@@ -41,6 +43,7 @@ public class AppUserController {
 
     @GetMapping("/{userId}/permissions")
     @Operation(summary = "Get user permissions")
+    @PreAuthorize("hasAnyAuthority('MANAGE_ROLES', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<String>> getUserPermissions(@PathVariable Long userId) {
         AppUser user = userService.getUserById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -52,6 +55,7 @@ public class AppUserController {
 
     @PutMapping("/{userId}/permissions")
     @Operation(summary = "Sync user permissions")
+    @PreAuthorize("hasAnyAuthority('MANAGE_ROLES', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> syncPermissions(@PathVariable Long userId,
                                                 @RequestBody List<String> permissions) {
         userService.syncPermissions(userId, permissions);
@@ -60,6 +64,7 @@ public class AppUserController {
 
     @PutMapping("/{userId}/role")
     @Operation(summary = "Update user role")
+    @PreAuthorize("hasAnyAuthority('MANAGE_ROLES', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> updateUserRole(@PathVariable Long userId,
                                                @RequestBody Map<String, String> payload) {
         String role = payload.get("role");
@@ -69,6 +74,7 @@ public class AppUserController {
 
     @PostMapping
     @Operation(summary = "Create new user")
+    @PreAuthorize("hasAnyAuthority('CREATE_USERS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AppUser> createUser(@Valid @RequestBody UserDTO userDTO) {
         AppUser created = userService.createUser(userDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -76,6 +82,7 @@ public class AppUserController {
 
     @PutMapping("/{userId}")
     @Operation(summary = "Update user")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<AppUser> updateUser(@PathVariable Long userId,
                                               @Valid @RequestBody UserDTO userDTO) {
         AppUser updated = userService.updateUser(userId, userDTO);
@@ -84,6 +91,7 @@ public class AppUserController {
 
     @DeleteMapping("/{userId}")
     @Operation(summary = "Delete user")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
@@ -91,6 +99,7 @@ public class AppUserController {
 
     @PostMapping("/{userId}/toggle-status")
     @Operation(summary = "Toggle user active status")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> toggleUserStatus(@PathVariable Long userId) {
         userService.toggleUserStatus(userId);
         return ResponseEntity.ok().build();
@@ -98,6 +107,7 @@ public class AppUserController {
 
     @PostMapping("/{userId}/block")
     @Operation(summary = "Block user")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> blockUser(@PathVariable Long userId) {
         userService.blockUser(userId);
         return ResponseEntity.ok().build();
@@ -105,6 +115,7 @@ public class AppUserController {
 
     @PostMapping("/{userId}/unblock")
     @Operation(summary = "Unblock user")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Void> unblockUser(@PathVariable Long userId) {
         userService.unblockUser(userId);
         return ResponseEntity.ok().build();
@@ -112,6 +123,7 @@ public class AppUserController {
 
     @PostMapping("/{userId}/reset-password")
     @Operation(summary = "Reset user password")
+    @PreAuthorize("hasAnyAuthority('RESET_PASSWORDS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Map<String, String>> resetPassword(@PathVariable Long userId) {
         AppUser user = userService.getUserById(userId).orElse(null);
         if (user == null) {
@@ -127,6 +139,7 @@ public class AppUserController {
 
     @GetMapping("/permissions/{permissionName}")
     @Operation(summary = "Get users with specific permission")
+    @PreAuthorize("hasAnyAuthority('MANAGE_ROLES', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<AppUser>> getUsersWithPermission(@PathVariable String permissionName) {
         return ResponseEntity.ok(userService.getUsersWithPermission(permissionName));
     }

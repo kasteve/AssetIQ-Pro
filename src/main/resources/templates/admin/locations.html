@@ -14,16 +14,13 @@
 
 <body>
 <div layout:fragment="content">
-    <!-- Success/Error Messages -->
-    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i>
-        <span th:text="${success}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        <span th:text="${error}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+    <!-- ===== CENTER ALERT BOX ===== -->
+    <div id="centerAlertOverlay" class="center-alert-overlay">
+        <div id="centerAlertBox" class="center-alert-box">
+            <div class="center-alert-icon"><i id="centerAlertIcon" class="fas fa-check-circle"></i></div>
+            <div class="center-alert-message" id="centerAlertMessage"></div>
+        </div>
     </div>
 
     <div class="page-header-row">
@@ -60,6 +57,7 @@
                             </button>
                             <button type="button" class="btn btn-outline-danger" title="Delete"
                                     th:data-id="${loc.locationId}"
+                                    th:data-name="${loc.name}"
                                     onclick="deleteLocation(this)">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -151,6 +149,28 @@
             </div>
         </div>
     </div>
+
+    <!-- Delete Location Confirmation Modal -->
+    <div class="modal fade" id="deleteLocationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-trash me-2" style="color: #dc3545;"></i>Delete Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="deleteLocationId">
+                    <p class="mb-0">Are you sure you want to delete <strong id="deleteLocationName"></strong>? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="submitDeleteLocation()">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div layout:fragment="styles">
@@ -196,6 +216,31 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        /* Center Alert */
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
+        }
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
 
         /* DataTables overrides */
         .dataTables_wrapper .dataTables_filter input {
@@ -280,6 +325,36 @@
             });
         });
 
+        // ============================================
+        // Center Alert (success/error) - square box, center screen
+        // ============================================
+        let centerAlertTimeout = null;
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const overlay = document.getElementById('centerAlertOverlay');
+            const box = document.getElementById('centerAlertBox');
+            const icon = document.getElementById('centerAlertIcon');
+            const msg = document.getElementById('centerAlertMessage');
+
+            icon.className = 'fas ' + (isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle');
+            box.classList.remove('center-alert-success', 'center-alert-error');
+            box.classList.add(isSuccess ? 'center-alert-success' : 'center-alert-error');
+            msg.textContent = message;
+
+            if (centerAlertTimeout) {
+                clearTimeout(centerAlertTimeout);
+                centerAlertTimeout = null;
+            }
+
+            overlay.classList.add('show');
+
+            centerAlertTimeout = setTimeout(function () {
+                overlay.classList.remove('show');
+                centerAlertTimeout = null;
+            }, 2000);
+        }
+
         function openEditModal(button) {
             document.getElementById('editLocationName').value = button.getAttribute('data-name');
             document.getElementById('editLocationAddress').value = button.getAttribute('data-address');
@@ -289,26 +364,37 @@
             form.action = form.getAttribute('data-base') + '/' + button.getAttribute('data-id') + '/edit';
         }
 
+        // ============================================
+        // Delete Location - via confirmation modal
+        // ============================================
         function deleteLocation(button) {
-            const base = document.getElementById('locationsTable').getAttribute('data-base');
             const id = button.getAttribute('data-id');
-            if (confirm('Delete this location?')) window.location.href = base + '/' + id + '/delete';
+            const name = button.getAttribute('data-name') || ('#' + id);
+            document.getElementById('deleteLocationId').value = id;
+            document.getElementById('deleteLocationName').textContent = name;
+            new bootstrap.Modal(document.getElementById('deleteLocationModal')).show();
         }
 
-        // Auto-dismiss alerts after 5 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                setTimeout(function() {
-                    alert.style.transition = 'opacity 0.5s ease';
-                    alert.style.opacity = '0';
-                    setTimeout(function() {
-                        if (alert.parentNode) {
-                            alert.remove();
-                        }
-                    }, 500);
-                }, 5000);
-            });
+        function submitDeleteLocation() {
+            const base = document.getElementById('locationsTable').getAttribute('data-base');
+            const id = document.getElementById('deleteLocationId').value;
+            window.location.href = base + '/' + id + '/delete';
+        }
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- Flash-message toasts: separate th:inline="javascript" block   -->
+    <!-- so Thymeleaf inlining doesn't clash with the DataTables       -->
+    <!-- th:inline="none" script above.                                -->
+    <!-- ============================================================ -->
+    <script th:if="${success != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${success}]]*/ 'Success', 'success');
+        });
+    </script>
+    <script th:if="${error != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${error}]]*/ 'Error', 'error');
         });
     </script>
 </div>

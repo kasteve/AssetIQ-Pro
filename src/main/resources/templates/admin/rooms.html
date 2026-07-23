@@ -9,16 +9,13 @@
 
 <body>
 <div layout:fragment="content">
-    <!-- Success/Error Messages -->
-    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i>
-        <span th:text="${success}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        <span th:text="${error}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+    <!-- ===== CENTER ALERT BOX ===== -->
+    <div id="centerAlertOverlay" class="center-alert-overlay">
+        <div id="centerAlertBox" class="center-alert-box">
+            <div class="center-alert-icon"><i id="centerAlertIcon" class="fas fa-check-circle"></i></div>
+            <div class="center-alert-message" id="centerAlertMessage"></div>
+        </div>
     </div>
 
     <div class="page-header-row">
@@ -207,11 +204,66 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        /* Center Alert */
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
+        }
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
     </style>
 </div>
 
 <div layout:fragment="scripts">
     <script th:inline="none">
+        // ============================================
+        // Center Alert (success/error) - square box, center screen
+        // ============================================
+        let centerAlertTimeout = null;
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const overlay = document.getElementById('centerAlertOverlay');
+            const box = document.getElementById('centerAlertBox');
+            const icon = document.getElementById('centerAlertIcon');
+            const msg = document.getElementById('centerAlertMessage');
+
+            icon.className = 'fas ' + (isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle');
+            box.classList.remove('center-alert-success', 'center-alert-error');
+            box.classList.add(isSuccess ? 'center-alert-success' : 'center-alert-error');
+            msg.textContent = message;
+
+            if (centerAlertTimeout) {
+                clearTimeout(centerAlertTimeout);
+                centerAlertTimeout = null;
+            }
+
+            overlay.classList.add('show');
+
+            centerAlertTimeout = setTimeout(function () {
+                overlay.classList.remove('show');
+                centerAlertTimeout = null;
+            }, 2000);
+        }
+
         function openEditModal(button) {
             document.getElementById('editRoomName').value = button.getAttribute('data-name');
             document.getElementById('editRoomType').value = button.getAttribute('data-type');
@@ -225,21 +277,21 @@
             const id = button.getAttribute('data-id');
             if (confirm('Delete this room?')) window.location.href = base + '/' + id + '/delete';
         }
+    </script>
 
-        // Auto-dismiss alerts after 5 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                setTimeout(function() {
-                    alert.style.transition = 'opacity 0.5s ease';
-                    alert.style.opacity = '0';
-                    setTimeout(function() {
-                        if (alert.parentNode) {
-                            alert.remove();
-                        }
-                    }, 500);
-                }, 5000);
-            });
+    <!-- ============================================================ -->
+    <!-- Flash-message alerts: separate th:inline="javascript" blocks  -->
+    <!-- so Thymeleaf inlining doesn't clash with the th:inline="none" -->
+    <!-- script above.                                                  -->
+    <!-- ============================================================ -->
+    <script th:if="${success != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${success}]]*/ 'Success', 'success');
+        });
+    </script>
+    <script th:if="${error != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${error}]]*/ 'Error', 'error');
         });
     </script>
 </div>

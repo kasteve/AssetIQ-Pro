@@ -1,7 +1,9 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.ResourceRequest;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.ResourceRequestService;
 import jakarta.servlet.http.HttpSession;
@@ -10,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -30,9 +33,6 @@ public class ResourceViewController {
     private final ResourceRequestService resourceRequestService;
     private final AppUserService userService;
 
-    // ============================================
-    // Create Resource Request - POST
-    // ============================================
     @PostMapping("/request")
     public String createResourceRequest(@RequestParam Long userId,
                                         @RequestParam String requestedBy,
@@ -42,9 +42,22 @@ public class ResourceViewController {
                                         @RequestParam(required = false) String justification,
                                         RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
+            if (!currentUser.hasAnyPermission("RESOURCE_REQUEST_CREATE", "ADMIN")) {
+                throw new AccessDeniedException("You don't have permission to create resource requests.");
+            }
+
             log.info("Creating resource request for user: {}", userId);
             resourceRequestService.createResourceRequest(userId, requestedBy, description, resourceType, quantity, justification);
             redirectAttributes.addFlashAttribute("success", "✅ Resource request created successfully!");
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to create resource requests.");
         } catch (Exception e) {
             log.error("Error creating resource request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "❌ Failed to create resource request: " + e.getMessage());
@@ -52,12 +65,14 @@ public class ResourceViewController {
         return "redirect:/resources/list";
     }
 
-    // ============================================
-    // List Page
-    // ============================================
     @GetMapping("/list")
     public String listResourceRequests(Model model) {
         log.info("Displaying resource requests list");
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
 
         List<ResourceRequestDTO> allRequests = resourceRequestService.getAllResourceRequests();
         List<ResourceRequestDTO> pendingRequests = resourceRequestService.getPendingResourceRequests();
@@ -78,12 +93,12 @@ public class ResourceViewController {
         model.addAttribute("declinedCount", declinedCount);
         model.addAttribute("completedCount", completedCount);
 
+        model.addAttribute("canApprove", currentUser.hasAnyPermission("RESOURCE_REQUEST_APPROVE", "ADMIN"));
+        model.addAttribute("canCreate", currentUser.hasAnyPermission("RESOURCE_REQUEST_CREATE", "ADMIN"));
+
         return "resources/list";
     }
 
-    // ============================================
-    // View Request - REST API
-    // ============================================
     @GetMapping("/{id}")
     @ResponseBody
     public ResourceRequestDTO viewRequest(@PathVariable Long id) {
@@ -91,9 +106,6 @@ public class ResourceViewController {
         return resourceRequestService.getResourceRequestById(id);
     }
 
-    // ============================================
-    // Download PDF
-    // ============================================
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) {
         try {
@@ -125,9 +137,6 @@ public class ResourceViewController {
         }
     }
 
-    // ============================================
-    // Sign Page - Standalone (No Sidebar)
-    // ============================================
     @GetMapping("/sign")
     public String showSignPage(@RequestParam String token, Model model) {
         try {
@@ -176,9 +185,6 @@ public class ResourceViewController {
         }
     }
 
-    // ============================================
-    // Submit Signature
-    // ============================================
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Long requestId,
                                   @RequestParam String token,
@@ -205,16 +211,26 @@ public class ResourceViewController {
         }
     }
 
-    // ============================================
-    // Resend Signing Link (Reminder)
-    // ============================================
     @PostMapping("/{id}/resend-link")
     public String resendSigningLink(@PathVariable Long id,
                                     RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
+            if (!currentUser.hasAnyPermission("RESOURCE_REQUEST_APPROVE", "ADMIN")) {
+                throw new AccessDeniedException("You don't have permission to resend signing links.");
+            }
+
             log.info("Resending signing link for request: {}", id);
             resourceRequestService.resendSigningLink(id);
             redirectAttributes.addFlashAttribute("success", "✅ Signing link resent successfully!");
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to resend signing links.");
         } catch (Exception e) {
             log.error("Error resending signing link: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "❌ Failed to resend signing link: " + e.getMessage());
@@ -222,17 +238,11 @@ public class ResourceViewController {
         return "redirect:/resources/list";
     }
 
-    // ============================================
-    // Thank You Page - Standalone (No Sidebar)
-    // ============================================
     @GetMapping("/sign-thankyou")
     public String signThankyou() {
         return "resources/sign-thankyou";
     }
 
-    // ============================================
-    // Error Page - Standalone (No Sidebar)
-    // ============================================
     @GetMapping("/sign-error")
     public String signError() {
         return "resources/sign-error";

@@ -1,7 +1,9 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.InfraRequestDTO;
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.InfraRequest;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.InfraRequestService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,11 @@ public class InfraRequestViewController {
     public String infraRequests(Model model) {
         log.info("Loading infrastructure requests page");
 
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
         List<InfraRequestDTO> requests = requestService.getAllRequests();
         model.addAttribute("requests", requests);
 
@@ -42,6 +49,11 @@ public class InfraRequestViewController {
         model.addAttribute("pendingLMRequests", pendingLMRequests);
         model.addAttribute("pendingRequests", pendingRequests);
         model.addAttribute("pendingFinanceRequests", pendingFinanceRequests);
+
+        model.addAttribute("canApproveLM", currentUser.hasAnyPermission("APPROVE_LM", "ADMIN"));
+        model.addAttribute("canApproveInfra", currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA", "ADMIN"));
+        model.addAttribute("canApproveFinance", currentUser.hasAnyPermission("APPROVE_FINANCE", "ADMIN"));
+        model.addAttribute("canCreate", currentUser.hasAnyPermission("INFRA_REQUEST_CREATE", "ADMIN"));
 
         return "infra-requests/list";
     }
@@ -85,7 +97,6 @@ public class InfraRequestViewController {
             log.info("Sign page accessed with token: {}", token);
             InfraRequest request = requestService.getRequestBySigningToken(token);
 
-            // Get requester name
             String requesterName = userService.getUserById(request.getRequesterId())
                     .map(user -> user.getFullName())
                     .orElse("Unknown");
@@ -134,6 +145,11 @@ public class InfraRequestViewController {
     public String infraDashboard(Model model) {
         log.info("Loading infrastructure dashboard");
 
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
         List<InfraRequestDTO> pendingRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW);
         List<InfraRequestDTO> pendingLMRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_LM_APPROVAL);
         List<InfraRequestDTO> pendingFinanceRequests = requestService.getFinanceRequests();
@@ -141,6 +157,10 @@ public class InfraRequestViewController {
         model.addAttribute("pendingRequests", pendingRequests);
         model.addAttribute("pendingLMRequests", pendingLMRequests);
         model.addAttribute("pendingFinanceRequests", pendingFinanceRequests);
+
+        model.addAttribute("canApproveLM", currentUser.hasAnyPermission("APPROVE_LM", "ADMIN"));
+        model.addAttribute("canApproveInfra", currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA", "ADMIN"));
+        model.addAttribute("canApproveFinance", currentUser.hasAnyPermission("APPROVE_FINANCE", "ADMIN"));
 
         return "infra-requests/dashboard";
     }

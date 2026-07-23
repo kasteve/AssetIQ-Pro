@@ -1,9 +1,13 @@
 package com.stevecodes.AssetIQPro.controller;
 
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Asset;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -28,19 +32,31 @@ public class AssetViewController {
     private final EmployeeService employeeService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('ASSET_VIEW', 'ADMIN', 'SUPER_ADMIN')")
     public String assets(Model model) {
         log.info("Loading assets page");
-        model.addAttribute("assets", assetService.getAllAssets()); // Should return List<Asset>
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
+        model.addAttribute("assets", assetService.getAllAssets());
         model.addAttribute("categories", categoryService.getAllCategories());
         model.addAttribute("locations", locationService.getAllLocations());
         model.addAttribute("suppliers", supplierService.getAllSuppliers());
         model.addAttribute("companies", companyService.getAllCompanies());
         model.addAttribute("employees", employeeService.getAllEmployees());
         model.addAttribute("departments", departmentService.getAllDepartments());
+        model.addAttribute("canEdit", currentUser.hasAnyPermission("ASSET_EDIT", "EDIT_ASSETS", "ADMIN"));
+        model.addAttribute("canDelete", currentUser.hasAnyPermission("DELETE_ASSETS", "ADMIN"));
+        model.addAttribute("canCreate", currentUser.hasAnyPermission("ASSET_CREATE", "EDIT_ASSETS", "ADMIN"));
+
         return "assets/list";
     }
 
     @PostMapping("/create")
+    @PreAuthorize("hasAnyAuthority('ASSET_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String createAsset(
             @RequestParam String tag,
             @RequestParam String name,
@@ -59,6 +75,12 @@ public class AssetViewController {
             @RequestParam(value = "invoice", required = false) MultipartFile file,
             RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Asset asset = new Asset();
             asset.setTag(tag);
             asset.setName(name);
@@ -100,6 +122,10 @@ public class AssetViewController {
 
             redirectAttributes.addFlashAttribute("success", "Asset created successfully!");
             return "redirect:/assets";
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to create assets.");
+            return "redirect:/assets";
         } catch (Exception e) {
             log.error("Error creating asset: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to create asset: " + e.getMessage());
@@ -108,6 +134,7 @@ public class AssetViewController {
     }
 
     @PostMapping("/{id}/update")
+    @PreAuthorize("hasAnyAuthority('ASSET_EDIT', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String updateAsset(
             @PathVariable Integer id,
             @RequestParam String tag,
@@ -126,6 +153,12 @@ public class AssetViewController {
             @RequestParam(required = false) Integer eolNotificationDays,
             RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Asset asset = new Asset();
             asset.setAssetId(id);
             asset.setTag(tag);
@@ -163,6 +196,10 @@ public class AssetViewController {
             assetService.updateAsset(id, asset);
             redirectAttributes.addFlashAttribute("success", "Asset updated successfully!");
             return "redirect:/assets";
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to edit assets.");
+            return "redirect:/assets";
         } catch (Exception e) {
             log.error("Error updating asset: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to update asset: " + e.getMessage());
@@ -171,10 +208,20 @@ public class AssetViewController {
     }
 
     @PostMapping("/{id}/delete")
+    @PreAuthorize("hasAnyAuthority('DELETE_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String deleteAsset(@PathVariable Integer id, RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             assetService.deleteAsset(id);
             redirectAttributes.addFlashAttribute("success", "Asset deleted successfully!");
+        } catch (AccessDeniedException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to delete assets.");
         } catch (Exception e) {
             log.error("Error deleting asset: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to delete asset: " + e.getMessage());

@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig implements WebMvcConfigurer {
 
@@ -65,7 +67,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                 AppUser user = userRepository.findByUsernameOrEmail(username, username).orElse(null);
 
                 if (user != null) {
-                    HttpSession session = request.getSession();
+                    HttpSession session = request.getSession(true);  // ✅ true = create if not exists
                     session.setAttribute("userId", user.getUserId());
                     session.setAttribute("username", user.getUsername());
                     session.setAttribute("fullName", user.getFullName());
@@ -80,6 +82,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                     session.setAttribute("permissionNames", permissionNames);
 
                     System.out.println("User: " + username + " has permissions: " + permissionNames);
+                    System.out.println("Session ID: " + session.getId());
                 }
 
                 response.sendRedirect("/assetIQ-pro/dashboard");
@@ -91,6 +94,11 @@ public class SecurityConfig implements WebMvcConfigurer {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session
+                        .sessionFixation(sessionFixation -> sessionFixation.newSession())  // ✅ Create new session on login
+                        .maximumSessions(10)  // ✅ Allow up to 10 concurrent sessions
+                        .expiredUrl("/login?expired=true")
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/login",
@@ -105,37 +113,21 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/api/public/**",
                                 "/transfer/sign/**",
                                 "/transfers/sign/**",
-                                // ============================================
-                                // INFRASTRUCTURE REQUEST SIGN PAGES - PUBLIC
-                                // ============================================
                                 "/infra-requests/sign",
                                 "/infra-requests/sign-thankyou",
                                 "/infra-requests/sign-error",
-                                // ============================================
-                                // RESOURCE REQUEST SIGN PAGES - PUBLIC
-                                // ============================================
                                 "/resources/sign",
                                 "/resources/sign-thankyou",
                                 "/resources/sign-error",
-                                // ============================================
-                                // SLOT REQUEST PAGES - PUBLIC
-                                // ============================================
                                 "/bookings/slot-request/**",
-                                // ============================================
-                                // SERVER ROOM PAGES - PUBLIC
-                                // ============================================
                                 "/bookings/server-room/**",
                                 "/bookings/server-room/sign-out",
                                 "/bookings/server-room/signout-thankyou",
                                 "/bookings/server-room/signout-error",
                                 "/bookings/server-room/thankyou",
                                 "/bookings/server-room/error",
-                                // ============================================
-                                // TRANSFER SIGN PAGES - PUBLIC
-                                // ============================================
                                 "/transfers/thankyou",
                                 "/transfers/error",
-                                // ============================================
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
@@ -144,6 +136,17 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/bookings/driver-requests",
                                 "/uploads/**"
                         ).permitAll()
+                        .requestMatchers(
+                                "/assets/**",
+                                "/transfers/**",
+                                "/dashboard",
+                                "/admin/**",
+                                "/bookings/**",
+                                "/infra-requests/**",
+                                "/resources/**",
+                                "/vouchers/**",
+                                "/reports/**"
+                        ).authenticated()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

@@ -60,12 +60,14 @@ public class LoginController {
                 return "login";
             }
 
+            // ✅ Proper session management - invalidate old session if exists
             HttpSession oldSession = request.getSession(false);
             if (oldSession != null) {
                 oldSession.invalidate();
                 log.info("Old session invalidated for user: {}", username);
             }
 
+            // ✅ Create new session
             HttpSession session = request.getSession(true);
             session.setAttribute("userId", user.getUserId());
             session.setAttribute("username", user.getUsername());
@@ -75,21 +77,30 @@ public class LoginController {
             session.setAttribute("isFirstLogin", user.isFirstLogin());
             session.setAttribute("mustChangePassword", user.isMustChangePassword());
 
+            // Store permission names
+            if (user.getPermissions() != null) {
+                session.setAttribute("permissionNames", user.getPermissions());
+                log.info("User permissions: {}", user.getPermissions());
+            }
+
             // Apply configured session timeout
             int timeoutMinutes = settingService.getInt(SystemSettingService.KEY_SESSION_TIMEOUT);
             if (timeoutMinutes > 0) {
                 session.setMaxInactiveInterval(timeoutMinutes * 60);
+                log.info("Session timeout set to {} minutes", timeoutMinutes);
             }
 
             log.info("Authenticated user: {}, userType: {}", user.getUsername(), user.getUserType());
+            log.info("Session ID: {}", session.getId());
 
+            // ✅ Check if user needs to change password
             if (user.isMustChangePassword() || user.isFirstLogin()) {
-                log.info("First-time login detected, redirecting to change-password for user: {}", username);
-                return "redirect:/change-password?firstLogin=true";
+                log.info("Password change required for user: {}", username);
+                return "redirect:/assetIQ-pro/change-password?firstLogin=true";  // ✅ Added context path
             }
 
             log.info("Session created successfully for user: {}", username);
-            return "redirect:/dashboard";
+            return "redirect:/assetIQ-pro/dashboard";  // ✅ Added context path
 
         } catch (Exception ex) {
             log.error("Unexpected error during login for username: {}", username, ex);
@@ -104,7 +115,7 @@ public class LoginController {
             session.invalidate();
             log.info("User logged out successfully.");
         }
-        return "redirect:/login?logout=true";
+        return "redirect:/assetIQ-pro/login?logout=true";  // ✅ Added context path
     }
 
     @GetMapping("/change-password")
@@ -114,11 +125,16 @@ public class LoginController {
         Long userId = (Long) session.getAttribute("userId");
 
         if (userId == null) {
-            return "redirect:/login";
+            log.warn("No userId in session, redirecting to login");
+            return "redirect:/assetIQ-pro/login";  // ✅ Added context path
         }
 
+        // Get password policy for display
+        SystemSettingService.PasswordPolicy policy = settingService.getPasswordPolicy();
         model.addAttribute("userId", userId);
         model.addAttribute("firstLogin", firstLogin);
+        model.addAttribute("passwordPolicy", policy);
+
         return "change-password";
     }
 
@@ -129,18 +145,21 @@ public class LoginController {
                                         @RequestParam(required = false) boolean firstLogin,
                                         RedirectAttributes redirectAttributes,
                                         HttpSession session) {
+        // Validate passwords match
         if (!newPassword.equals(confirmPassword)) {
             redirectAttributes.addFlashAttribute("error", "Passwords do not match.");
-            return "redirect:/change-password?firstLogin=" + firstLogin;
+            return "redirect:/assetIQ-pro/change-password?firstLogin=" + firstLogin;  // ✅ Added context path
         }
 
+        // Validate against password policy
         String policyError = validatePasswordPolicy(newPassword);
         if (policyError != null) {
             redirectAttributes.addFlashAttribute("error", policyError);
-            return "redirect:/change-password?firstLogin=" + firstLogin;
+            return "redirect:/assetIQ-pro/change-password?firstLogin=" + firstLogin;  // ✅ Added context path
         }
 
         try {
+            // Change password
             userService.changePassword(userId, newPassword, firstLogin);
 
             // Clear session flags after password change
@@ -151,14 +170,14 @@ public class LoginController {
             log.info("Password changed for user ID: {}", userId);
 
             if (firstLogin) {
-                return "redirect:/login";
+                return "redirect:/assetIQ-pro/login?success=true";  // ✅ Added context path
             }
-            return "redirect:/dashboard";
+            return "redirect:/assetIQ-pro/dashboard";  // ✅ Added context path
 
         } catch (Exception e) {
             log.error("Error changing password for user ID: {}", userId, e);
             redirectAttributes.addFlashAttribute("error", "Error: " + e.getMessage());
-            return "redirect:/change-password?firstLogin=" + firstLogin;
+            return "redirect:/assetIQ-pro/change-password?firstLogin=" + firstLogin;  // ✅ Added context path
         }
     }
 
@@ -173,10 +192,9 @@ public class LoginController {
         try {
             log.info("Forgot password request for: {}", username);
 
-            // Check if user exists
+            // Check if user exists by username or email
             var userOpt = userService.getUserByUsername(username);
             if (userOpt.isEmpty()) {
-                // Check by email as well
                 userOpt = userService.getUserByEmail(username);
             }
 
@@ -189,15 +207,18 @@ public class LoginController {
 
             var user = userOpt.get();
 
+            // Check if user is active
+            if (!user.isActive()) {
+                response.put("success", false);
+                response.put("message", "Your account is inactive. Please contact administrator.");
+                return response;
+            }
+
             // Generate reset token
             String token = userService.generatePasswordResetToken(user.getEmail());
 
-            // Send reset email with temporary password
-            String tempPassword = userService.generateTemporaryPassword();
-            userService.resetPassword(user.getUserId());
-
             response.put("success", true);
-            response.put("message", "A temporary password has been sent to your email. Please check your inbox.");
+            response.put("message", "A password reset link has been sent to your email. Please check your inbox.");
             log.info("Password reset email sent to: {}", user.getEmail());
 
         } catch (Exception e) {
@@ -215,12 +236,14 @@ public class LoginController {
                                              @RequestParam("confirmPassword") String confirmPassword) {
         Map<String, Object> response = new HashMap<>();
         try {
+            // Validate passwords match
             if (!newPassword.equals(confirmPassword)) {
                 response.put("success", false);
                 response.put("message", "Passwords do not match.");
                 return response;
             }
 
+            // Validate against password policy
             String policyError = validatePasswordPolicy(newPassword);
             if (policyError != null) {
                 response.put("success", false);
@@ -228,6 +251,7 @@ public class LoginController {
                 return response;
             }
 
+            // Reset password with token
             userService.resetPasswordWithToken(token, newPassword);
 
             response.put("success", true);
@@ -244,8 +268,6 @@ public class LoginController {
 
     /**
      * Validates a candidate password against the live password policy settings
-     * (SystemSettingService / SECURITY category), rather than a hardcoded rule.
-     * Returns null if valid, or a user-facing error message if not.
      */
     private String validatePasswordPolicy(String password) {
         SystemSettingService.PasswordPolicy policy = settingService.getPasswordPolicy();

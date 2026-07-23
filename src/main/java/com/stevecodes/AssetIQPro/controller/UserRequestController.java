@@ -7,6 +7,7 @@ import com.stevecodes.AssetIQPro.entity.DriverRequest;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.BookingRepository;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.BookingService;
 import com.stevecodes.AssetIQPro.service.DriverService;
@@ -16,6 +17,8 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -41,11 +44,8 @@ public class UserRequestController {
     private final BookingRepository bookingRepository;
     private final AppUserService userService;
 
-    // ============================================
-    // Dashboard
-    // ============================================
-
     @GetMapping("/bookings-dashboard")
+    @PreAuthorize("isAuthenticated()")
     public String myRequests(HttpSession session, Model model) {
         Long userId = (Long) session.getAttribute("userId");
 
@@ -53,28 +53,27 @@ public class UserRequestController {
             return "redirect:/login";
         }
 
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
         log.info("Loading dashboard for user: {}", userId);
 
-        // Driver requests
         model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
 
-        // Get available drivers with booking counts
         List<AppUser> availableDrivers = driverService.getAvailableDrivers();
         model.addAttribute("availableDrivers", availableDrivers);
 
-        // All drivers (for the modal popup)
         List<AppUser> allDrivers = driverService.getAllDrivers();
         model.addAttribute("allDrivers", allDrivers);
 
-        // Room bookings with user names
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
         model.addAttribute("roomBookings", roomBookings);
 
-        // All rooms (for the Book Room modal)
         List<Room> allRooms = roomRepository.findAllOrderedByName();
         model.addAttribute("allRooms", allRooms);
 
-        // Calculate actual availability based on current bookings
         LocalDateTime now = LocalDateTime.now();
         Set<Long> occupiedRoomIds = bookingRepository.findActiveBookingsAtTime(now,
                         List.of(Booking.BookingStatus.BOOKED, Booking.BookingStatus.ACTIVE, Booking.BookingStatus.CONFIRMED))
@@ -82,35 +81,32 @@ public class UserRequestController {
                 .map(Booking::getRoomId)
                 .collect(Collectors.toSet());
 
-        // IDs of currently-available rooms (not occupied)
         Set<Long> availableRoomIds = allRooms.stream()
                 .filter(room -> !occupiedRoomIds.contains(room.getRoomId()))
                 .map(Room::getRoomId)
                 .collect(Collectors.toSet());
         model.addAttribute("availableRoomIds", availableRoomIds);
 
-        // IDs of currently-available drivers
-        List<Room> availableRooms = roomRepository.findAvailableRooms(LocalDateTime.now());
         Set<Long> availableDriverIds = availableDrivers.stream().map(AppUser::getUserId).collect(Collectors.toSet());
         model.addAttribute("availableDriverIds", availableDriverIds);
 
-        // Infrastructure requests
         model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
+
+        model.addAttribute("canManageBookings", currentUser.canManageBookings());
+        model.addAttribute("canViewAllRooms", currentUser.hasPermission("ROOM_VIEW_ALL"));
+        model.addAttribute("canBookRoom", currentUser.hasPermission("ROOM_BOOK"));
+        model.addAttribute("isDriver", currentUser.isDriver());
 
         return "bookings/bookings-dashboard";
     }
 
-    // ============================================
-    // Room Details - Get active and future bookings for a room
-    // ============================================
-
     @GetMapping("/room/{roomId}/bookings")
     @ResponseBody
+    @PreAuthorize("isAuthenticated()")
     public List<BookingDTO> getRoomBookings(@PathVariable Long roomId) {
         log.info("Getting active and future bookings for room: {}", roomId);
         List<BookingDTO> allBookings = bookingService.getRoomBookingsWithUserNames(roomId);
 
-        // Filter to only show active and future bookings (not past)
         LocalDateTime now = LocalDateTime.now();
         return allBookings.stream()
                 .filter(booking -> booking.getEndTime() == null || booking.getEndTime().isAfter(now))
@@ -118,12 +114,12 @@ public class UserRequestController {
     }
 
     @GetMapping("/room/{roomId}")
+    @PreAuthorize("isAuthenticated()")
     public String viewRoomDetails(@PathVariable Long roomId, Model model) {
         log.info("Viewing room details for: {}", roomId);
         Room room = bookingService.getRoomWithBookings(roomId);
         List<BookingDTO> bookings = bookingService.getRoomBookingsWithUserNames(roomId);
 
-        // Filter to only show active and future bookings
         LocalDateTime now = LocalDateTime.now();
         List<BookingDTO> filteredBookings = bookings.stream()
                 .filter(booking -> booking.getEndTime() == null || booking.getEndTime().isAfter(now))
@@ -134,18 +130,16 @@ public class UserRequestController {
         return "bookings/room-details-modal";
     }
 
-    // ============================================
-    // Driver Details - Get driver bookings
-    // ============================================
-
     @GetMapping("/driver/{driverId}/bookings")
     @ResponseBody
+    @PreAuthorize("isAuthenticated()")
     public List<DriverRequest> getDriverBookings(@PathVariable Long driverId) {
         log.info("Getting bookings for driver: {}", driverId);
         return driverService.getDriverBookingsLast7Days(driverId);
     }
 
     @GetMapping("/driver/{driverId}/details")
+    @PreAuthorize("isAuthenticated()")
     public String viewDriverDetails(@PathVariable Long driverId, Model model) {
         log.info("Viewing driver details for: {}", driverId);
         AppUser driver = userService.getUserById(driverId).orElse(null);
@@ -158,17 +152,20 @@ public class UserRequestController {
         return "bookings/driver-details-modal";
     }
 
-    // ============================================
-    // Driver Request Endpoints
-    // ============================================
-
     @PostMapping("/driver-request")
+    @PreAuthorize("isAuthenticated()")
     public String createDriverRequest(@RequestParam Long userId,
                                       @RequestParam String destination,
                                       @RequestParam(required = false) Long driverId,
                                       @RequestParam(required = false) String reason,
                                       RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("=== CREATE DRIVER REQUEST ===");
             log.info("userId: {}, destination: {}, driverId: {}", userId, destination, driverId);
 
@@ -189,9 +186,16 @@ public class UserRequestController {
     }
 
     @PostMapping("/driver-request/{requestId}/recall")
+    @PreAuthorize("isAuthenticated()")
     public String recallDriverRequest(@PathVariable Long requestId,
                                       RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Recalling driver request: {}", requestId);
             driverService.recallRequest(requestId);
             redirectAttributes.addFlashAttribute("success", "Driver request recalled successfully!");
@@ -203,13 +207,22 @@ public class UserRequestController {
     }
 
     @PostMapping("/driver-request/{requestId}/accept")
+    @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
     public String acceptDriverRequest(@PathVariable Long requestId,
                                       @RequestParam Long driverId,
                                       RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Driver {} accepting request: {}", driverId, requestId);
             driverService.acceptRequest(requestId, driverId);
             redirectAttributes.addFlashAttribute("success", "Driver request accepted successfully!");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to accept driver requests.");
         } catch (Exception e) {
             log.error("Error accepting driver request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to accept driver request.");
@@ -218,14 +231,23 @@ public class UserRequestController {
     }
 
     @PostMapping("/driver-request/{requestId}/decline")
+    @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
     public String declineDriverRequest(@PathVariable Long requestId,
                                        @RequestParam Long driverId,
                                        @RequestParam String reason,
                                        RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Driver {} declining request: {} - Reason: {}", driverId, requestId, reason);
             driverService.declineRequest(requestId, driverId, reason);
             redirectAttributes.addFlashAttribute("success", "Driver request declined successfully!");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to decline driver requests.");
         } catch (Exception e) {
             log.error("Error declining driver request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to decline driver request.");
@@ -234,13 +256,22 @@ public class UserRequestController {
     }
 
     @PostMapping("/driver-request/{requestId}/complete")
+    @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
     public String completeTrip(@PathVariable Long requestId,
                                @RequestParam Long driverId,
                                RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Driver {} completing trip for request: {}", driverId, requestId);
             driverService.completeTrip(requestId, driverId);
             redirectAttributes.addFlashAttribute("success", "Trip completed successfully!");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to complete trips.");
         } catch (Exception e) {
             log.error("Error completing trip: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to complete trip.");
@@ -249,12 +280,19 @@ public class UserRequestController {
     }
 
     @PostMapping("/driver-request/{requestId}/rate")
+    @PreAuthorize("isAuthenticated()")
     public String rateDriver(@PathVariable Long requestId,
                              @RequestParam int rating,
                              @RequestParam(required = false) String feedback,
                              HttpSession session,
                              RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} rating driver for request: {} - Rating: {}", userId, requestId, rating);
             driverService.rateDriver(requestId, userId, rating, feedback);
@@ -266,11 +304,8 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
-    // ============================================
-    // Room Booking Endpoint
-    // ============================================
-
     @PostMapping("/room")
+    @PreAuthorize("hasAnyAuthority('ROOM_BOOK', 'ADMIN', 'SUPER_ADMIN')")
     public String createRoomBooking(
             @RequestParam Long userId,
             @RequestParam Long roomId,
@@ -281,6 +316,12 @@ public class UserRequestController {
             RedirectAttributes redirectAttributes) {
 
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("========================================");
             log.info("📝 CREATE ROOM BOOKING REQUEST");
             log.info("userId: {}", userId);
@@ -290,14 +331,12 @@ public class UserRequestController {
             log.info("purpose: {}", purpose);
             log.info("========================================");
 
-            // Validate that end time is after start time
             if (endTime.isBefore(startTime) || endTime.equals(startTime)) {
                 log.error("❌ End time must be after start time");
                 redirectAttributes.addFlashAttribute("error", "End time must be after start time.");
                 return "redirect:/bookings/bookings-dashboard";
             }
 
-            // Validate that start time is in the future
             LocalDateTime now = LocalDateTime.now();
             if (startTime.isBefore(now)) {
                 log.error("❌ Start time must be in the future. startTime: {}, now: {}", startTime, now);
@@ -305,14 +344,12 @@ public class UserRequestController {
                 return "redirect:/bookings/bookings-dashboard";
             }
 
-            // Validate that booking is within 7 days
             LocalDateTime maxDate = now.plusDays(7);
             if (startTime.isAfter(maxDate)) {
                 redirectAttributes.addFlashAttribute("error", "Bookings are only allowed within 7 days from today. Please select a date within the next 7 days.");
                 return "redirect:/bookings/bookings-dashboard";
             }
 
-            // Check if room exists
             Room room = roomRepository.findById(roomId).orElse(null);
             if (room == null) {
                 log.error("❌ Room not found: {}", roomId);
@@ -321,7 +358,6 @@ public class UserRequestController {
             }
             log.info("✅ Room found: {}, Type: {}", room.getRoomName(), room.getRoomType());
 
-            // Check if room is available
             if (room.getStatus() != Room.RoomStatus.AVAILABLE) {
                 log.error("❌ Room is not available. Status: {}", room.getStatus());
                 redirectAttributes.addFlashAttribute("error", "Room is not available for booking.");
@@ -344,6 +380,8 @@ public class UserRequestController {
         } catch (IllegalStateException e) {
             log.error("❌ Booking validation error: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", e.getMessage());
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to book rooms.");
         } catch (Exception e) {
             log.error("❌ Error booking room: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to book room: " + e.getMessage());
@@ -352,9 +390,16 @@ public class UserRequestController {
     }
 
     @PostMapping("/room/{bookingId}/recall")
+    @PreAuthorize("isAuthenticated()")
     public String recallRoomBooking(@PathVariable Long bookingId,
                                     RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Recalling room booking: {}", bookingId);
             bookingService.recallRoomBooking(bookingId);
             redirectAttributes.addFlashAttribute("success", "Room booking recalled successfully!");
@@ -366,12 +411,21 @@ public class UserRequestController {
     }
 
     @PostMapping("/room/{bookingId}/cancel")
+    @PreAuthorize("hasAnyAuthority('ROOM_CANCEL', 'ADMIN', 'SUPER_ADMIN')")
     public String cancelRoomBooking(@PathVariable Long bookingId,
                                     RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Cancelling room booking: {}", bookingId);
             bookingService.cancelBooking(bookingId);
             redirectAttributes.addFlashAttribute("success", "Room booking cancelled successfully!");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to cancel room bookings.");
         } catch (Exception e) {
             log.error("Error cancelling room booking: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to cancel room booking.");
@@ -380,10 +434,17 @@ public class UserRequestController {
     }
 
     @PostMapping("/room/{bookingId}/request-slot")
+    @PreAuthorize("isAuthenticated()")
     public String requestSlot(@PathVariable Long bookingId,
                               HttpSession session,
                               RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} requesting slot for booking: {}", userId, bookingId);
             bookingService.requestSlot(bookingId, userId);
@@ -395,16 +456,18 @@ public class UserRequestController {
         return "redirect:/bookings/bookings-dashboard";
     }
 
-    // ============================================
-    // Slot Request Response
-    // ============================================
-
     @GetMapping("/slot-request/{bookingId}/respond")
+    @PreAuthorize("isAuthenticated()")
     public String showSlotRequestResponse(@PathVariable Long bookingId,
                                           @RequestParam Long requesterId,
                                           HttpSession session,
                                           Model model) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return "redirect:/login";
+            }
+
             log.info("Showing slot request response page for booking: {}, requester: {}", bookingId, requesterId);
 
             Booking booking = bookingService.getBookingById(bookingId);
@@ -412,16 +475,13 @@ public class UserRequestController {
                     .map(AppUser::getFullName)
                     .orElse("User #" + requesterId);
 
-            // Get room details
             Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
             String roomName = room != null ? room.getRoomName() : "Room #" + booking.getRoomId();
 
-            // Get booked by name
             String bookedBy = userService.getUserById(booking.getUserId())
                     .map(AppUser::getFullName)
                     .orElse("Unknown User");
 
-            // Format time slot
             String timeSlot = booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
                     " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
 
@@ -442,11 +502,18 @@ public class UserRequestController {
     }
 
     @PostMapping("/slot-request/{bookingId}/approve")
+    @PreAuthorize("isAuthenticated()")
     public String approveSlotRequest(@PathVariable Long bookingId,
                                      @RequestParam Long requesterId,
                                      HttpSession session,
                                      RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Approving slot request for booking: {} by requester: {}", bookingId, requesterId);
             bookingService.approveSlotRequest(bookingId, requesterId);
             redirectAttributes.addFlashAttribute("message", "Slot request approved successfully!");
@@ -459,11 +526,18 @@ public class UserRequestController {
     }
 
     @PostMapping("/slot-request/{bookingId}/decline")
+    @PreAuthorize("isAuthenticated()")
     public String declineSlotRequest(@PathVariable Long bookingId,
                                      @RequestParam Long requesterId,
                                      HttpSession session,
                                      RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Declining slot request for booking: {} by requester: {}", bookingId, requesterId);
             bookingService.declineSlotRequest(bookingId, requesterId);
             redirectAttributes.addFlashAttribute("message", "Slot request declined successfully.");
@@ -485,15 +559,17 @@ public class UserRequestController {
         return "bookings/slot-request-error";
     }
 
-    // ============================================
-    // Server Room - Infrastructure Approval
-    // ============================================
-
     @GetMapping("/server-room/{bookingId}/respond")
+    @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'REVIEW_INFRA', 'ADMIN', 'SUPER_ADMIN')")
     public String showServerRoomResponse(@PathVariable Long bookingId,
                                          @RequestParam(required = false) String action,
                                          Model model) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return "redirect:/login";
+            }
+
             log.info("Showing server room response page for booking: {}", bookingId);
 
             Booking booking = bookingService.getBookingById(bookingId);
@@ -524,11 +600,18 @@ public class UserRequestController {
     }
 
     @PostMapping("/server-room/{bookingId}/approve")
+    @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'REVIEW_INFRA', 'ADMIN', 'SUPER_ADMIN')")
     public String approveServerRoom(@PathVariable Long bookingId,
                                     @RequestParam(required = false) String infraComment,
                                     HttpSession session,
                                     RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} approving server room booking: {}", userId, bookingId);
 
@@ -536,19 +619,29 @@ public class UserRequestController {
 
             redirectAttributes.addFlashAttribute("message", "Server room booking approved successfully!");
             return "redirect:/bookings/server-room/thankyou";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to approve server room bookings.");
         } catch (Exception e) {
             log.error("Error approving server room: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to approve server room: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
+        return infraComment;
     }
 
     @PostMapping("/server-room/{bookingId}/decline")
+    @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'REVIEW_INFRA', 'ADMIN', 'SUPER_ADMIN')")
     public String declineServerRoom(@PathVariable Long bookingId,
                                     @RequestParam String declinedReason,
                                     HttpSession session,
                                     RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} declining server room booking: {} - Reason: {}", userId, bookingId, declinedReason);
 
@@ -556,19 +649,29 @@ public class UserRequestController {
 
             redirectAttributes.addFlashAttribute("message", "Server room booking declined successfully.");
             return "redirect:/bookings/server-room/thankyou";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to decline server room bookings.");
         } catch (Exception e) {
             log.error("Error declining server room: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to decline server room: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
+        return declinedReason;
     }
 
     @PostMapping("/server-room/{bookingId}/signout-link")
+    @PreAuthorize("hasAnyAuthority('APPROVE_INFRA', 'REVIEW_INFRA', 'ADMIN', 'SUPER_ADMIN')")
     public String generateServerRoomSignOutLink(@PathVariable Long bookingId,
                                                 @RequestParam(required = false) String infraComment,
                                                 HttpSession session,
                                                 RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} generating sign-out link for server room booking: {}", userId, bookingId);
 
@@ -576,18 +679,18 @@ public class UserRequestController {
 
             redirectAttributes.addFlashAttribute("message", "Sign-out link generated and sent to requester!");
             return "redirect:/bookings/server-room/thankyou";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to generate sign-out links.");
         } catch (Exception e) {
             log.error("Error generating sign-out link: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to generate sign-out link: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
+        return infraComment;
     }
 
-    // ============================================
-    // Server Room - Sign Out
-    // ============================================
-
     @GetMapping("/server-room/sign-out")
+    @PreAuthorize("isAuthenticated()")
     public String showServerRoomSignOut(@RequestParam String token, Model model) {
         log.info("Showing server room sign-out page for token: {}", token);
         Booking booking = bookingService.findBySignoutToken(token);
@@ -614,11 +717,18 @@ public class UserRequestController {
     }
 
     @PostMapping("/server-room/sign-out")
+    @PreAuthorize("isAuthenticated()")
     public String completeServerRoomSignOut(@RequestParam String token,
                                             @RequestParam String signature,
                                             @RequestParam(required = false) String requesterComment,
                                             RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             log.info("Completing server room sign-out for token: {}", token);
             bookingService.completeServerRoomSignOut(token, signature, requesterComment);
 
@@ -651,19 +761,24 @@ public class UserRequestController {
         return "bookings/server-room-signout-error";
     }
 
-    // ============================================
-    // Admin - Cancel Booking
-    // ============================================
-
     @PostMapping("/admin/booking/{bookingId}/cancel")
+    @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN', 'SUPER_ADMIN')")
     public String adminCancelBooking(@PathVariable Long bookingId,
                                      HttpSession session,
                                      RedirectAttributes redirectAttributes) {
         try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
             Long userId = (Long) session.getAttribute("userId");
             log.info("Admin {} cancelling booking: {}", userId, bookingId);
             bookingService.adminCancelBooking(bookingId, userId);
             redirectAttributes.addFlashAttribute("success", "Booking cancelled successfully!");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to cancel bookings.");
         } catch (Exception e) {
             log.error("Error cancelling booking: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to cancel booking: " + e.getMessage());

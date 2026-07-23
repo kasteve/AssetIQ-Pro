@@ -159,7 +159,7 @@
                             <button type="button" class="btn btn-outline-danger" title="Delete"
                                     th:data-assetid="${asset.assetId}"
                                     th:data-tag="${asset.tag}"
-                                    onclick="confirmDeleteAsset(this)">
+                                    onclick="deleteAsset(this)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -399,6 +399,28 @@
         </div>
     </div>
 
+    <!-- Delete Asset Confirmation Modal -->
+    <div class="modal fade" id="deleteAssetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-trash me-2" style="color: #dc3545;"></i>Delete Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="deleteAssetId">
+                    <p class="mb-0">Are you sure you want to delete asset <strong id="deleteAssetTag"></strong>? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="submitDeleteAsset()">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Create Transfer Modal -->
     <div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -604,28 +626,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Delete Asset Confirmation Modal -->
-    <div class="modal fade" id="deleteAssetModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-trash me-2" style="color: #dc3545;"></i>Delete Asset</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="deleteAssetId">
-                    <p class="mb-0">Are you sure you want to delete asset <strong id="deleteAssetTag"></strong>? This action cannot be undone.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" onclick="submitDeleteAsset()">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <div layout:fragment="styles">
@@ -811,6 +811,8 @@
             });
         });
 
+        let currentAssetId = null;
+
         // ============================================
         // Toast Notifications
         // ============================================
@@ -840,10 +842,8 @@
             toast.show();
         }
 
-        let currentAssetId = null;
-
         // ===== Asset Actions =====
-        function confirmDeleteAsset(button) {
+        function deleteAsset(button) {
             const id = button.getAttribute('data-assetid');
             const tag = button.getAttribute('data-tag') || ('#' + id);
             document.getElementById('deleteAssetId').value = id;

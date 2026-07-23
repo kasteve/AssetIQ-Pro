@@ -67,9 +67,6 @@ public class AppUser {
     @Column(name = "password_reset_expiry")
     private LocalDateTime passwordResetExpiry;
 
-    // ============================================
-    // Lockout tracking (Password Policy: Max Login Attempts)
-    // ============================================
     @Column(name = "failed_login_attempts", nullable = false)
     private int failedLoginAttempts = 0;
 
@@ -84,12 +81,10 @@ public class AppUser {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Department relationship
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     private Department departmentEntity;
 
-    // Employee relationship (one-to-one)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;
@@ -102,27 +97,66 @@ public class AppUser {
     )
     private List<Permission> permissions = new ArrayList<>();
 
+    // ============================================
+    // Permission Helper Methods
+    // ============================================
+
     public void addPermission(Permission permission) {
         if (!permissions.contains(permission)) {
             permissions.add(permission);
         }
     }
 
+    /**
+     * Check if user has a specific permission.
+     * Does NOT call isAdmin() to avoid infinite recursion.
+     */
     public boolean hasPermission(String permissionName) {
+        if (permissionName == null) return false;
         return permissions.stream()
                 .anyMatch(p -> p.getPermissionName().equals(permissionName));
+    }
+
+    public boolean hasAnyPermission(String... permissionNames) {
+        if (permissionNames == null) return false;
+        for (String name : permissionNames) {
+            if (hasPermission(name)) return true;
+        }
+        return false;
+    }
+
+    public boolean hasAllPermissions(String... permissionNames) {
+        if (permissionNames == null) return false;
+        for (String name : permissionNames) {
+            if (!hasPermission(name)) return false;
+        }
+        return true;
     }
 
     public boolean hasRole(String roleName) {
         return role != null && role.equals(roleName);
     }
 
-    // Admin check - uses MANAGE_ROLES permission
+    public boolean hasAnyRole(String... roleNames) {
+        if (roleNames == null) return false;
+        for (String name : roleNames) {
+            if (hasRole(name)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if user is an admin.
+     * Does NOT call hasPermission() to avoid infinite recursion.
+     * Checks permissions and role directly.
+     */
     public boolean isAdmin() {
-        return hasPermission("MANAGE_ROLES") ||
-                hasPermission("ADMIN") ||
-                hasPermission("SUPER_ADMIN") ||
-                hasRole("ADMIN");
+        return permissions.stream()
+                .anyMatch(p -> p.getPermissionName().equals("MANAGE_ROLES") ||
+                        p.getPermissionName().equals("ADMIN") ||
+                        p.getPermissionName().equals("SUPER_ADMIN")) ||
+                hasRole("ADMIN") ||
+                hasRole("SUPERADMIN");
     }
 
     public boolean canManageUsers() {
@@ -153,8 +187,35 @@ public class AppUser {
         return hasPermission("MANAGE_RESOURCE_REQUESTS") || isAdmin();
     }
 
+    public boolean canManageConfig() {
+        return hasPermission("MANAGE_CONFIG") || isAdmin();
+    }
+
+    public boolean canManageAssets() {
+        return hasPermission("ASSET_VIEW") || hasPermission("ASSET_CREATE") ||
+                hasPermission("ASSET_EDIT") || hasPermission("DELETE_ASSETS") || isAdmin();
+    }
+
+    public boolean canViewTransfers() {
+        return hasPermission("TRANSFER_VIEW") || hasPermission("TRANSFER_CREATE") ||
+                hasPermission("VIEW_ALL_TRANSACTIONS") || isAdmin();
+    }
+
+    public boolean canCreateTransfers() {
+        return hasPermission("TRANSFER_CREATE") || isAdmin();
+    }
+
     public boolean isInfrastructure() {
-        return hasRole("INFRA") || hasRole("INFRASTRUCTURE") || hasPermission("APPROVE_INFRA");
+        return hasRole("INFRA") || hasRole("INFRASTRUCTURE") ||
+                hasPermission("APPROVE_INFRA") || hasPermission("REVIEW_INFRA");
+    }
+
+    public boolean isFinance() {
+        return hasRole("FINANCE") || hasPermission("APPROVE_FINANCE");
+    }
+
+    public boolean isDriver() {
+        return hasRole("DRIVER") || hasPermission("DRIVER_VIEW");
     }
 
     public String getFullName() {

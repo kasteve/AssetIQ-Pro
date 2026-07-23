@@ -15,8 +15,13 @@
 <body>
 <div layout:fragment="content">
 
-    <!-- ===== TOAST CONTAINER ===== -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080;"></div>
+    <!-- ===== CENTER ALERT BOX ===== -->
+    <div id="centerAlertOverlay" class="center-alert-overlay">
+        <div id="centerAlertBox" class="center-alert-box">
+            <div class="center-alert-icon"><i id="centerAlertIcon" class="fas fa-check-circle"></i></div>
+            <div class="center-alert-message" id="centerAlertMessage"></div>
+        </div>
+    </div>
 
     <div class="page-header-row">
         <h4><i class="fas fa-exchange-alt me-2"></i>Asset Transfers</h4>
@@ -393,16 +398,30 @@
         .modal-body .table tbody tr:last-child td { border-bottom: none; }
         .modal-body .table tbody tr:hover { background: #f8f9fb; }
 
-        /* Toasts */
-        #toastContainer { max-width: 380px; }
-        .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
-        .app-toast .toast-header { border-bottom: none !important; padding: 12px 14px 4px 14px; font-weight: 700; font-size: 13.5px; }
-        .app-toast .toast-body { padding: 4px 14px 14px 14px; font-size: 13.5px; color: var(--ink); }
-        .app-toast.toast-success .toast-header { color: #198754; background: #fff !important; }
-        .app-toast.toast-success .toast-header i { color: #198754; }
-        .app-toast.toast-error .toast-header { color: #dc3545; background: #fff !important; }
-        .app-toast.toast-error .toast-header i { color: #dc3545; }
-        .app-toast .btn-close { font-size: 10px; }
+        /* Center Alert */
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
+        }
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
 
         /* Wizard modal */
         .modal-lg { max-width: 720px; }
@@ -460,9 +479,6 @@
             margin-right: 4px !important;
         }
 
-        @media (max-width: 768px) {
-            #toastContainer { max-width: calc(100% - 24px); }
-        }
     </style>
 </div>
 
@@ -514,32 +530,33 @@
         });
 
         // ============================================
-        // Toast Notifications
+        // Center Alert (success/error) - square box, center screen
         // ============================================
+        let centerAlertTimeout = null;
         function showToast(message, type) {
             type = type || 'success';
             const isSuccess = type === 'success';
-            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
-            const label = isSuccess ? 'Success' : 'Error';
-            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            const overlay = document.getElementById('centerAlertOverlay');
+            const box = document.getElementById('centerAlertBox');
+            const icon = document.getElementById('centerAlertIcon');
+            const msg = document.getElementById('centerAlertMessage');
 
-            const toastHtml = `
-                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
-                    <div class="toast-header">
-                        <i class="fas ${icon} me-2"></i>
-                        <strong class="me-auto">${label}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                    <div class="toast-body">${message}</div>
-                </div>
-            `;
+            icon.className = 'fas ' + (isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle');
+            box.classList.remove('center-alert-success', 'center-alert-error');
+            box.classList.add(isSuccess ? 'center-alert-success' : 'center-alert-error');
+            msg.textContent = message;
 
-            const container = document.getElementById('toastContainer');
-            container.insertAdjacentHTML('beforeend', toastHtml);
-            const toastEl = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastEl);
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-            toast.show();
+            if (centerAlertTimeout) {
+                clearTimeout(centerAlertTimeout);
+                centerAlertTimeout = null;
+            }
+
+            overlay.classList.add('show');
+
+            centerAlertTimeout = setTimeout(function () {
+                overlay.classList.remove('show');
+                centerAlertTimeout = null;
+            }, 2000);
         }
 
         // ============================================
