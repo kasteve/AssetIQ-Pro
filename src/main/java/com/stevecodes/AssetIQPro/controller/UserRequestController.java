@@ -92,6 +92,13 @@ public class UserRequestController {
 
         model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
 
+        // ✅ NEW: Add pending approvals for drivers, admins, and super admins
+        if (currentUser.isDriver() || currentUser.isAdmin()) {
+            List<DriverRequest> pendingApprovals = driverService.getPendingRequestsForDriver(currentUser.getUserId());
+            model.addAttribute("pendingDriverApprovals", pendingApprovals);
+            log.info("Found {} pending approvals for driver: {}", pendingApprovals.size(), currentUser.getUsername());
+        }
+
         model.addAttribute("canManageBookings", currentUser.canManageBookings());
         model.addAttribute("canViewAllRooms", currentUser.hasPermission("ROOM_VIEW_ALL"));
         model.addAttribute("canBookRoom", currentUser.hasPermission("ROOM_BOOK"));
@@ -223,18 +230,21 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("success", "Driver request accepted successfully!");
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to accept driver requests.");
+        } catch (IllegalStateException e) {
+            log.error("Error accepting driver request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (Exception e) {
             log.error("Error accepting driver request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to accept driver request.");
         }
-        return "redirect:/bookings/driver-dashboard";
+        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/decline")
     @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
     public String declineDriverRequest(@PathVariable Long requestId,
                                        @RequestParam Long driverId,
-                                       @RequestParam String reason,
+                                       @RequestParam(required = false) String reason,
                                        RedirectAttributes redirectAttributes) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
@@ -243,16 +253,20 @@ public class UserRequestController {
                 return "redirect:/login";
             }
 
-            log.info("Driver {} declining request: {} - Reason: {}", driverId, requestId, reason);
-            driverService.declineRequest(requestId, driverId, reason);
+            String declineReason = (reason != null && !reason.isEmpty()) ? reason : "No reason provided";
+            log.info("Driver {} declining request: {} - Reason: {}", driverId, requestId, declineReason);
+            driverService.declineRequest(requestId, driverId, declineReason);
             redirectAttributes.addFlashAttribute("success", "Driver request declined successfully!");
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to decline driver requests.");
+        } catch (IllegalStateException e) {
+            log.error("Error declining driver request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (Exception e) {
             log.error("Error declining driver request: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to decline driver request.");
         }
-        return "redirect:/bookings/driver-dashboard";
+        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/complete")
@@ -272,11 +286,14 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("success", "Trip completed successfully!");
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to complete trips.");
+        } catch (IllegalStateException e) {
+            log.error("Error completing trip: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (Exception e) {
             log.error("Error completing trip: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", "Failed to complete trip.");
         }
-        return "redirect:/bookings/driver-dashboard";
+        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/rate")
@@ -626,7 +643,7 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("error", "Failed to approve server room: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
-        return infraComment;
+        return "redirect:/bookings/server-room/thankyou";
     }
 
     @PostMapping("/server-room/{bookingId}/decline")
@@ -656,7 +673,7 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("error", "Failed to decline server room: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
-        return declinedReason;
+        return "redirect:/bookings/server-room/thankyou";
     }
 
     @PostMapping("/server-room/{bookingId}/signout-link")
@@ -686,7 +703,7 @@ public class UserRequestController {
             redirectAttributes.addFlashAttribute("error", "Failed to generate sign-out link: " + e.getMessage());
             return "redirect:/bookings/server-room/error";
         }
-        return infraComment;
+        return "redirect:/bookings/server-room/thankyou";
     }
 
     @GetMapping("/server-room/sign-out")

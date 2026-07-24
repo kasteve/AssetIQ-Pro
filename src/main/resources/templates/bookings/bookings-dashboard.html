@@ -9,22 +9,14 @@
 </head>
 
 <body>
-<!-- data-current-user-id and data-user-role lets JS know who is logged in -->
 <div layout:fragment="content" th:data-current-user-id="${session.userId}" th:data-user-role="${session.role}">
 
-    <!-- ============================================ -->
-    <!-- SUCCESS / ERROR MESSAGES -->
-    <!-- ============================================ -->
-    <div th:if="${success != null}" class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i>
-        <span th:text="${success}">Success</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-
-    <div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        <span th:text="${error}">Error</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- ===== CENTER ALERT BOX ===== -->
+    <div id="centerAlertOverlay" class="center-alert-overlay">
+        <div id="centerAlertBox" class="center-alert-box">
+            <div class="center-alert-icon"><i id="centerAlertIcon" class="fas fa-check-circle"></i></div>
+            <div class="center-alert-message" id="centerAlertMessage"></div>
+        </div>
     </div>
 
     <div class="page-header-row">
@@ -39,7 +31,7 @@
         </div>
     </div>
 
-    <!-- ================= HORIZONTAL TABS: DRIVERS | ROOMS ================= -->
+    <!-- ================= HORIZONTAL TABS ================= -->
     <ul class="nav nav-tabs booking-tabs" id="bookingTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="drivers-tab-btn" data-bs-toggle="tab" data-bs-target="#drivers-pane"
@@ -57,14 +49,24 @@
                 <span class="badge bg-success" th:text="${roomBookings != null ? roomBookings.size() : 0}">0</span>
             </button>
         </li>
+        <!-- ============ NEW: DRIVER APPROVALS TAB ============ -->
+        <li class="nav-item" role="presentation"
+            th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver}">
+            <button class="nav-link" id="approvals-tab-btn" data-bs-toggle="tab"
+                    data-bs-target="#approvals-pane" type="button" role="tab"
+                    aria-controls="approvals-pane" aria-selected="false">
+                <i class="fas fa-check-double"></i>
+                <span>Pending Approvals</span>
+                <span class="badge bg-warning" th:text="${pendingDriverApprovals != null ? pendingDriverApprovals.size() : 0}">0</span>
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content booking-tab-content" id="bookingTabsContent">
 
-        <!-- ================= DRIVERS TAB (full width) ================= -->
+        <!-- ================= DRIVERS TAB ================= -->
         <div class="tab-pane fade show active" id="drivers-pane" role="tabpanel" aria-labelledby="drivers-tab-btn">
             <div class="row g-4">
-
                 <div class="col-xl-4">
                     <div class="booking-panel">
                         <div class="panel-header">
@@ -89,7 +91,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div th:if="${allDrivers == null or allDrivers.isEmpty()}" class="empty-state-sm">
                                 <i class="fas fa-car"></i>
                                 No drivers on record
@@ -100,7 +101,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="col-xl-8">
                     <div class="booking-panel">
                         <div class="panel-header">
@@ -131,24 +131,20 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
                                 <i class="fas fa-car"></i>
                                 No driver requests
                             </div>
-
                             <div class="pagination-controls" id="driverRequestsPagination"></div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
-        <!-- ================= ROOMS TAB (full width) ================= -->
+        <!-- ================= ROOMS TAB ================= -->
         <div class="tab-pane fade" id="rooms-pane" role="tabpanel" aria-labelledby="rooms-tab-btn">
             <div class="row g-4">
-
                 <div class="col-xl-4">
                     <div class="booking-panel">
                         <div class="panel-header">
@@ -174,7 +170,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div th:if="${allRooms == null or allRooms.isEmpty()}" class="empty-state-sm">
                                 <i class="fas fa-door-open"></i>
                                 No rooms on record
@@ -185,13 +180,12 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="col-xl-8">
                     <div class="booking-panel">
                         <div class="panel-header">
                             <h6><i class="fas fa-calendar-check"></i>My Room Bookings</h6>
                             <div class="panel-header-actions">
-                                <div class="btn-group btn-group-sm view-toggle-group" role="group" aria-label="Room bookings view toggle">
+                                <div class="btn-group btn-group-sm view-toggle-group" role="group">
                                     <button type="button" id="roomViewListBtn" class="btn view-toggle-btn active" onclick="setRoomBookingsView('list')" title="List view">
                                         <i class="fas fa-list"></i>
                                     </button>
@@ -216,11 +210,6 @@
                                                th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</small>
                                     </div>
                                     <div class="text-end">
-                                        <!--
-                                            Status badge - rendered from booking.status only (no in-template date math).
-                                            "IN USE" is derived client-side in JS below, matching the same logic used
-                                            for the room-details modal, to avoid fragile Thymeleaf date expressions.
-                                        -->
                                         <span class="status-badge"
                                               th:data-status="${booking.status}"
                                               th:data-start="${#temporals.format(booking.startTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
@@ -231,24 +220,18 @@
                                                               (${booking.status} == 'PENDING' ? 'pending' :
                                                               (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
                                               th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
-
-                                        <!-- Recall for OWNER -->
                                         <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId == session.userId}">
                                             <button class="btn btn-sm btn-warning mt-1 recall-btn"
                                                     th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
                                                 <i class="fas fa-undo"></i> Recall
                                             </button>
                                         </div>
-
-                                        <!-- Request Slot for NON-OWNER (Regular Rooms only) -->
                                         <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
                                             <button class="btn btn-sm btn-info mt-1 recall-btn"
                                                     th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
                                                 <i class="fas fa-handshake"></i> Request
                                             </button>
                                         </div>
-
-                                        <!-- Sign Out Button - INFRA only for Server Rooms -->
                                         <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
                                             <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
                                                 <input type="hidden" name="infraComment" value="Signing out user">
@@ -257,8 +240,6 @@
                                                 </button>
                                             </form>
                                         </div>
-
-                                        <!-- Cancel Button - INFRA only -->
                                         <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
                                             <button class="btn btn-sm btn-danger mt-1 w-100"
                                                     th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
@@ -268,15 +249,11 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div th:if="${roomBookings == null or roomBookings.isEmpty()}" id="roomBookingsEmpty" class="empty-state-sm">
                                 <i class="fas fa-calendar-check"></i>
                                 No room bookings
                             </div>
-
                             <div class="pagination-controls" id="roomBookingsPagination"></div>
-
-                            <!-- Calendar view (hidden until toggled) -->
                             <div id="roomBookingsCalendar" class="room-bookings-calendar" style="display: none;"></div>
                             <div class="calendar-legend" id="roomBookingsLegend" style="display: none;">
                                 <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Booked</span>
@@ -287,14 +264,79 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
+        <!-- ================= DRIVER APPROVALS TAB ================= -->
+        <div class="tab-pane fade" id="approvals-pane" role="tabpanel"
+             aria-labelledby="approvals-tab-btn"
+             th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver}">
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-tasks"></i>Driver Requests Pending Your Approval</h6>
+                            <span class="badge bg-warning" th:text="${pendingDriverApprovals != null ? pendingDriverApprovals.size() : 0}">0</span>
+                        </div>
+                        <div class="panel-body">
+                            <div th:if="${pendingDriverApprovals != null and !pendingDriverApprovals.isEmpty()}">
+                                <div th:each="req : ${pendingDriverApprovals}" class="booking-row">
+                                    <div>
+                                        <div class="booking-row-title">
+                                            <i class="fas fa-user me-2"></i>
+                                            <span th:text="${req.requestedBy}">Requester</span>
+                                        </div>
+                                        <small class="text-muted">
+                                            Destination: <strong th:text="${req.destination}">Destination</strong>
+                                        </small>
+                                        <br>
+                                        <small class="text-muted">
+                                            Requested: <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
+                                        </small>
+                                        <div th:if="${req.reason}" class="mt-1">
+                                            <small class="text-muted">Reason: <span th:text="${req.reason}">Reason</span></small>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="status-badge pending">PENDING</span>
+                                        <div class="mt-2">
+                                            <textarea class="form-control form-control-sm mb-1"
+                                                      th:id="'rejectReason_' + ${req.requestId}"
+                                                      rows="1"
+                                                      placeholder="Rejection reason (optional)"
+                                                      style="width: 180px; font-size: 12px;"></textarea>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-success"
+                                                        th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                    <i class="fas fa-check"></i> Accept
+                                                </button>
+                                                <button class="btn btn-sm btn-danger"
+                                                        th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                    <i class="fas fa-times"></i> Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div th:if="${pendingDriverApprovals == null or pendingDriverApprovals.isEmpty()}"
+                                 class="empty-state-sm">
+                                <i class="fas fa-check-circle" style="color: #198754;"></i>
+                                <p class="mt-2">No pending driver requests to approve</p>
+                                <small class="text-muted">All requests have been processed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODALS -->
+    <!-- MODALS (Same as before) -->
     <!-- ============================================================ -->
 
     <!-- Request Driver Modal -->
@@ -345,7 +387,6 @@
                 <form th:action="@{/bookings/room}" method="post" id="bookRoomForm">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
-
                         <div class="mb-3">
                             <label for="roomSelect" class="form-label">Room *</label>
                             <select id="roomSelect" name="roomId" class="form-select" required>
@@ -353,17 +394,14 @@
                                 <option th:each="room : ${allRooms}" th:value="${room.roomId}" th:text="${room.roomName} + ' (' + ${room.roomType} + ')'"></option>
                             </select>
                         </div>
-
                         <div class="mb-3">
                             <label for="startTimeInput" class="form-label">Start Time *</label>
                             <input type="datetime-local" id="startTimeInput" name="startTime" class="form-control" required>
                         </div>
-
                         <div class="mb-3">
                             <label for="endTimeInput" class="form-label">End Time *</label>
                             <input type="datetime-local" id="endTimeInput" name="endTime" class="form-control" required>
                         </div>
-
                         <div class="mb-3">
                             <label for="purposeInput" class="form-label">Purpose</label>
                             <textarea id="purposeInput" name="purpose" class="form-control" rows="2" placeholder="What is this booking for?"></textarea>
@@ -453,17 +491,37 @@
         </div>
     </div>
 
+    <!-- Confirm Action Modal (replaces native browser confirm()) -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-question-circle me-2" style="color: #fd7e14;"></i>Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="confirmActionMessage">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionBtn">
+                        <i class="fas fa-check me-1"></i>Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
+<!-- Styles and Scripts (same as before, with added approval functions) -->
 <div layout:fragment="styles">
     <style>
-        /* Same styles as before */
         .content { padding: 28px 32px; width: 100%; }
         .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
         .page-header-row h4 i { color: var(--primary-color); }
         .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
         .btn { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; }
         .btn-primary { background: var(--primary-color) !important; }
         .btn-primary:hover { background: var(--primary-dark) !important; }
@@ -474,221 +532,57 @@
         .btn-danger { background: #dc3545 !important; }
         .btn-info { background: #0dcaf0 !important; color: white !important; }
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
-
-        /* ============================================
-           Horizontal tabs: Drivers | Rooms
-           ============================================ */
-        .booking-tabs {
-            border-bottom: 2px solid #eef0f3;
-            gap: 6px;
-            margin-bottom: 22px;
-        }
-        .booking-tabs .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: none !important;
-            border-radius: 10px 10px 0 0 !important;
-            padding: 12px 20px !important;
-            font-weight: 700;
-            font-size: 14.5px;
-            color: #6c757d;
-            background: transparent;
-            position: relative;
-            top: 2px;
-        }
+        .booking-tabs { border-bottom: 2px solid #eef0f3; gap: 6px; margin-bottom: 22px; }
+        .booking-tabs .nav-link { display: flex; align-items: center; gap: 8px; border: none !important; border-radius: 10px 10px 0 0 !important; padding: 12px 20px !important; font-weight: 700; font-size: 14.5px; color: #6c757d; background: transparent; position: relative; top: 2px; }
         .booking-tabs .nav-link i { font-size: 15px; }
         .booking-tabs .nav-link .badge { font-size: 10.5px; }
-        .booking-tabs .nav-link:hover {
-            color: var(--ink);
-            background: #f8f9fb;
-            border: none;
-        }
-        .booking-tabs .nav-link.active {
-            color: var(--primary-color);
-            background: white;
-            border-bottom: 2px solid var(--primary-color) !important;
-            box-shadow: 0 -4px 14px rgba(0,0,0,0.04);
-        }
-
+        .booking-tabs .nav-link:hover { color: var(--ink); background: #f8f9fb; border: none; }
+        .booking-tabs .nav-link.active { color: var(--primary-color); background: white; border-bottom: 2px solid var(--primary-color) !important; box-shadow: 0 -4px 14px rgba(0,0,0,0.04); }
         .booking-tab-content { width: 100%; }
-
-        /* Full-width panels used inside each tab pane */
-        .booking-panel {
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            overflow: hidden;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            transition: box-shadow 0.25s ease;
-            border: 1px solid #eef0f3;
-        }
+        .booking-panel { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; height: 100%; display: flex; flex-direction: column; transition: box-shadow 0.25s ease; border: 1px solid #eef0f3; }
         .booking-panel:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-        .booking-panel .panel-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid #eef0f3;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: transparent;
-        }
+        .booking-panel .panel-header { padding: 16px 20px; border-bottom: 1px solid #eef0f3; display: flex; justify-content: space-between; align-items: center; background: transparent; }
         .booking-panel .panel-header h6 { font-weight: 700; font-size: 14px; margin: 0; color: var(--ink); }
         .booking-panel .panel-header h6 i { color: var(--primary-color); margin-right: 8px; }
         .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
         .booking-panel .panel-footer { padding: 12px 20px; border-top: 1px solid #eef0f3; background: transparent; }
-
         .panel-header-actions { display: flex; align-items: center; gap: 10px; }
-
         .view-toggle-group { border-radius: 8px; overflow: hidden; }
-        .view-toggle-group .view-toggle-btn {
-            padding: 6px 11px !important;
-            border-radius: 0 !important;
-            border: 1px solid #e2e8f0 !important;
-            color: #6c757d !important;
-            background: white !important;
-            font-size: 12px !important;
-        }
+        .view-toggle-group .view-toggle-btn { padding: 6px 11px !important; border-radius: 0 !important; border: 1px solid #e2e8f0 !important; color: #6c757d !important; background: white !important; font-size: 12px !important; }
         .view-toggle-group .view-toggle-btn:hover { background: #f8f9fb !important; }
-        .view-toggle-group .view-toggle-btn.active {
-            background: var(--primary-color) !important;
-            border-color: var(--primary-color) !important;
-            color: white !important;
-        }
-
-        /* Room bookings calendar (FullCalendar) */
-        .room-bookings-calendar {
-            border: 1px solid #eef0f3;
-            border-radius: 12px;
-            padding: 14px;
-            background: white;
-        }
-        .room-bookings-calendar .fc { font-family: inherit; font-size: 13px; }
-        .room-bookings-calendar .fc-toolbar-title { font-size: 15px !important; font-weight: 700; color: var(--ink); }
-        .room-bookings-calendar .fc-button {
-            background: white !important;
-            border: 1px solid #e2e8f0 !important;
-            color: var(--ink) !important;
-            box-shadow: none !important;
-            border-radius: 8px !important;
-            padding: 5px 10px !important;
-            font-size: 12.5px !important;
-            text-transform: capitalize !important;
-        }
-        .room-bookings-calendar .fc-button:hover { background: #f8f9fb !important; }
-        .room-bookings-calendar .fc-button-primary:not(:disabled).fc-button-active,
-        .room-bookings-calendar .fc-button-primary:not(:disabled):active {
-            background: var(--primary-color) !important;
-            border-color: var(--primary-color) !important;
-            color: white !important;
-        }
-        .room-bookings-calendar .fc-daygrid-event {
-            border-radius: 6px;
-            padding: 1px 5px;
-            font-size: 11px;
-            font-weight: 600;
-            border: none !important;
-            cursor: pointer;
-        }
-        .room-bookings-calendar .fc-list-event { cursor: pointer; }
-        .room-bookings-calendar .fc-daygrid-day-number,
-        .room-bookings-calendar .fc-col-header-cell-cushion { color: var(--ink); }
-
-        .calendar-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; padding: 0 4px; }
-        .calendar-legend .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #6c757d; font-weight: 600; }
-        .calendar-legend .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-
-        /* Grid of driver/room cards - scales across the wider tab width */
-        .driver-grid, .room-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-            gap: 8px;
-            max-height: 420px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        .driver-item, .room-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 14px;
-            border-radius: 10px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            border: 1px solid transparent;
-            margin-bottom: 6px;
-        }
+        .view-toggle-group .view-toggle-btn.active { background: var(--primary-color) !important; border-color: var(--primary-color) !important; color: white !important; }
+        .driver-grid, .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+        .driver-item, .room-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; transition: all 0.2s ease; cursor: pointer; border: 1px solid transparent; margin-bottom: 6px; }
         .driver-item:hover, .room-item:hover { background: #f8f9fb; border-color: #e8ecf0; }
         .driver-item .driver-name, .room-item .room-name { font-weight: 600; color: var(--ink); font-size: 14px; display: block; }
-        .driver-item .driver-status, .room-item .room-status {
-            font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-top: 2px;
-        }
+        .driver-item .driver-status, .room-item .room-status { font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-top: 2px; }
         .driver-item .driver-status.available, .room-item .room-status.available { background: #e6f7ec; color: #198754; }
         .driver-item .driver-status.busy { background: #fff4e0; color: #fd7e14; }
         .room-item .room-status.occupied { background: #fdeeee; color: #dc3545; }
-
-        .status-badge.inuse {
-            background: #e8f4fd;
-            color: #0dcaf0;
-        }
-
+        .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
         .driver-item .booking-count { font-size: 12px; color: #6c757d; background: #f0f2f5; padding: 2px 10px; border-radius: 12px; }
         .room-item .room-type { font-size: 11px; color: #6c757d; display: block; }
-
-        .booking-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 14px;
-            border-bottom: 1px solid #f0f2f5;
-        }
+        .booking-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #f0f2f5; }
         .booking-row:last-child { border-bottom: none; }
         .booking-row-title { font-weight: 600; font-size: 13px; color: var(--ink); }
         .recall-btn { padding: 2px 8px !important; font-size: 10px !important; }
-
         .empty-state-sm { text-align: center; padding: 30px 20px; color: #adb5bd; }
         .empty-state-sm i { font-size: 24px; margin-bottom: 6px; display: block; }
-
-        .pagination-controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 12px;
-            margin-top: 10px;
-        }
-        .pagination-controls .page-btn {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            background: white;
-            color: var(--ink);
-            font-size: 11px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            padding: 0 !important;
-        }
+        .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 10px; }
+        .pagination-controls .page-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; color: var(--ink); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; padding: 0 !important; }
         .pagination-controls .page-btn:hover:not(:disabled) { background: var(--primary-color); border-color: var(--primary-color); color: white; }
         .pagination-controls .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .pagination-controls .page-indicator { font-size: 11.5px; color: #6c757d; font-weight: 600; }
-
         .quick-action-btn { padding: 6px 14px; font-size: 12px; border-radius: 8px; font-weight: 600; border: none; transition: all 0.2s ease; }
         .quick-action-btn:hover { transform: scale(1.02); }
         .quick-action-btn.btn-primary { background: var(--primary-color); color: white; }
         .quick-action-btn.btn-success { background: #198754; color: white; }
-
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
         .status-badge.pending { background: #fff4e0; color: #fd7e14; }
         .status-badge.accepted, .status-badge.booked { background: #e6f7ec; color: #198754; }
         .status-badge.rejected, .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
         .status-badge.recalled { background: #eef0f3; color: #6c757d; }
         .status-badge.completed { background: #eef0fd; color: #6610f2; }
-
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
         .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
@@ -697,79 +591,100 @@
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
 
-        .modal-body .booking-list-item {
-            padding: 10px 14px; border-bottom: 1px solid #f0f2f5; display: flex; justify-content: space-between; align-items: center;
+        /* Center Alert */
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
         }
-        .modal-body .booking-list-item:last-child { border-bottom: none; }
-        .modal-body .booking-list-item .requester { font-weight: 600; font-size: 14px; color: var(--ink); }
-        .modal-body .booking-list-item .time-slot { font-size: 12px; color: #6c757d; }
-        .modal-body .slot-request-btn {
-            font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 1px solid #0dcaf0;
-            background: transparent; color: #0dcaf0; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
         }
-        .modal-body .slot-request-btn:hover { background: #0dcaf0; color: white; }
-
-        .alert {
-            border-radius: 12px !important;
-            border: none !important;
-            padding: 16px 20px !important;
-            margin-bottom: 20px !important;
-            font-weight: 500 !important;
-        }
-        .alert-success {
-            background: #e6f7ec !important;
-            color: #198754 !important;
-        }
-        .alert-danger {
-            background: #fdeeee !important;
-            color: #dc3545 !important;
-        }
-        .alert i {
-            font-size: 18px;
-        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
     </style>
 </div>
 
 <div layout:fragment="scripts">
-    <!-- FullCalendar (for the Room Bookings calendar view) -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-
-    <script>
-        // Current logged-in user id and role
+    <script th:inline="none">
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
         const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
 
         // ============================================
-        // Pagination
+        // Center Alert (success/error) - square box, center screen
         // ============================================
+        let centerAlertTimeout = null;
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const overlay = document.getElementById('centerAlertOverlay');
+            const box = document.getElementById('centerAlertBox');
+            const icon = document.getElementById('centerAlertIcon');
+            const msg = document.getElementById('centerAlertMessage');
+
+            icon.className = 'fas ' + (isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle');
+            box.classList.remove('center-alert-success', 'center-alert-error');
+            box.classList.add(isSuccess ? 'center-alert-success' : 'center-alert-error');
+            msg.textContent = message;
+
+            if (centerAlertTimeout) {
+                clearTimeout(centerAlertTimeout);
+                centerAlertTimeout = null;
+            }
+
+            overlay.classList.add('show');
+
+            centerAlertTimeout = setTimeout(function () {
+                overlay.classList.remove('show');
+                centerAlertTimeout = null;
+            }, 2000);
+        }
+
+        // ============================================
+        // In-page Confirm modal (replaces native confirm())
+        // ============================================
+        function showConfirm(message, onConfirm) {
+            document.getElementById('confirmActionMessage').textContent = message;
+            const modalEl = document.getElementById('confirmActionModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const oldBtn = document.getElementById('confirmActionBtn');
+            const newBtn = oldBtn.cloneNode(true);
+            oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+            newBtn.addEventListener('click', function () {
+                modal.hide();
+                onConfirm();
+            });
+            modal.show();
+        }
+
         function paginateList(listId, paginationId, pageSize) {
             const list = document.getElementById(listId);
             const paginationEl = document.getElementById(paginationId);
             if (!list || !paginationEl) return;
-
             const rows = Array.from(list.querySelectorAll(':scope > .booking-row'));
-            if (rows.length <= pageSize) {
-                paginationEl.innerHTML = '';
-                return;
-            }
-
+            if (rows.length <= pageSize) { paginationEl.innerHTML = ''; return; }
             const totalPages = Math.ceil(rows.length / pageSize);
             let currentPage = 1;
-
             function render() {
                 rows.forEach(function (row, idx) {
                     const page = Math.floor(idx / pageSize) + 1;
                     row.style.display = (page === currentPage) ? '' : 'none';
                 });
-                paginationEl.innerHTML =
-                    '<button type="button" class="page-btn" data-dir="prev"' + (currentPage === 1 ? ' disabled' : '') + '>' +
-                        '<i class="fas fa-chevron-left"></i>' +
-                    '</button>' +
-                    '<span class="page-indicator">Page ' + currentPage + ' of ' + totalPages + '</span>' +
-                    '<button type="button" class="page-btn" data-dir="next"' + (currentPage === totalPages ? ' disabled' : '') + '>' +
-                        '<i class="fas fa-chevron-right"></i>' +
-                    '</button>';
-
+                paginationEl.innerHTML = '<button type="button" class="page-btn" data-dir="prev"' + (currentPage === 1 ? ' disabled' : '') + '><i class="fas fa-chevron-left"></i></button><span class="page-indicator">Page ' + currentPage + ' of ' + totalPages + '</span><button type="button" class="page-btn" data-dir="next"' + (currentPage === totalPages ? ' disabled' : '') + '><i class="fas fa-chevron-right"></i></button>';
                 paginationEl.querySelectorAll('.page-btn').forEach(function (btn) {
                     btn.addEventListener('click', function () {
                         if (btn.dataset.dir === 'prev' && currentPage > 1) currentPage--;
@@ -778,22 +693,15 @@
                     });
                 });
             }
-
             render();
         }
 
-        // ============================================
-        // "IN USE" badge derivation (client-side, mirrors the modal's logic)
-        // Rooms whose status is BOOKED/ACTIVE and whose window contains "now"
-        // get visually upgraded to an IN USE badge without touching Thymeleaf date math.
-        // ============================================
         function refreshInUseBadges() {
             const now = new Date();
             document.querySelectorAll('#roomBookingsList .status-badge[data-status]').forEach(function (badge) {
                 const status = badge.dataset.status;
                 if (status !== 'BOOKED' && status !== 'ACTIVE') return;
                 if (!badge.dataset.start || !badge.dataset.end) return;
-
                 const start = new Date(badge.dataset.start);
                 const end = new Date(badge.dataset.end);
                 if (start <= now && end >= now) {
@@ -804,69 +712,47 @@
             });
         }
 
-        // ============================================
-        // Room Bookings: List / Calendar view toggle
-        // Builds calendar events straight from the already-rendered
-        // #roomBookingsList rows - no extra network calls needed.
-        // ============================================
         let roomCalendar = null;
-
         function statusColor(status) {
             if (status === 'PENDING') return '#fd7e14';
             if (status === 'CANCELLED') return '#dc3545';
             if (status === 'CONFIRMED') return '#6610f2';
-            return '#198754'; // BOOKED / ACTIVE
+            return '#198754';
         }
-
         function buildRoomBookingEvents() {
             const rows = document.querySelectorAll('#roomBookingsList > .booking-row');
             const events = [];
             rows.forEach(function (row) {
                 const badge = row.querySelector('.status-badge[data-status]');
                 if (!badge || !badge.dataset.start || !badge.dataset.end) return;
-
                 const status = badge.dataset.status;
                 const roomName = row.querySelector('.booking-row-title')?.textContent?.trim() || 'Room';
-
                 events.push({
                     title: roomName,
                     start: badge.dataset.start,
                     end: badge.dataset.end,
                     backgroundColor: statusColor(status),
                     borderColor: statusColor(status),
-                    extendedProps: {
-                        roomId: row.dataset.roomid,
-                        roomName: roomName,
-                        roomType: row.dataset.roomtype
-                    }
+                    extendedProps: { roomId: row.dataset.roomid, roomName: roomName, roomType: row.dataset.roomtype }
                 });
             });
             return events;
         }
-
         function initRoomCalendar() {
             const calendarEl = document.getElementById('roomBookingsCalendar');
             if (!calendarEl || roomCalendar || typeof FullCalendar === 'undefined') return;
-
             roomCalendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,listMonth'
-                },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth' },
                 height: 'auto',
                 events: buildRoomBookingEvents(),
                 eventClick: function (info) {
                     const props = info.event.extendedProps;
-                    if (props.roomId) {
-                        viewRoomDetails(props.roomId, props.roomName, props.roomType);
-                    }
+                    if (props.roomId) { viewRoomDetails(props.roomId, props.roomName, props.roomType); }
                 }
             });
             roomCalendar.render();
         }
-
         function setRoomBookingsView(view) {
             const listEl = document.getElementById('roomBookingsList');
             const paginationEl = document.getElementById('roomBookingsPagination');
@@ -875,9 +761,7 @@
             const legendEl = document.getElementById('roomBookingsLegend');
             const listBtn = document.getElementById('roomViewListBtn');
             const calBtn = document.getElementById('roomViewCalendarBtn');
-
             const showCalendar = view === 'calendar';
-
             if (listEl) listEl.style.display = showCalendar ? 'none' : '';
             if (paginationEl) paginationEl.style.display = showCalendar ? 'none' : '';
             if (emptyEl) emptyEl.style.display = showCalendar ? 'none' : '';
@@ -885,257 +769,93 @@
             if (legendEl) legendEl.style.display = showCalendar ? 'flex' : 'none';
             listBtn?.classList.toggle('active', !showCalendar);
             calBtn?.classList.toggle('active', showCalendar);
-
-            if (showCalendar) {
-                initRoomCalendar();
-                roomCalendar?.updateSize();
-            }
+            if (showCalendar) { initRoomCalendar(); roomCalendar?.updateSize(); }
         }
 
-        // Wire up click handlers
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.driver-item').forEach(function (el) {
-                el.addEventListener('click', function () {
-                    viewDriverDetails(el.dataset.driverid, el.dataset.drivername);
-                });
+                el.addEventListener('click', function () { viewDriverDetails(el.dataset.driverid, el.dataset.drivername); });
             });
             document.querySelectorAll('.room-item').forEach(function (el) {
-                el.addEventListener('click', function () {
-                    viewRoomDetails(el.dataset.roomid, el.dataset.roomname, el.dataset.roomtype);
-                });
+                el.addEventListener('click', function () { viewRoomDetails(el.dataset.roomid, el.dataset.roomname, el.dataset.roomtype); });
             });
-
             paginateList('driverRequestsList', 'driverRequestsPagination', 8);
             paginateList('roomBookingsList', 'roomBookingsPagination', 8);
             refreshInUseBadges();
-
-            // Keep the calendar sized correctly if the user switches away to the
-            // Drivers tab and back while Calendar view is active.
-            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () {
-                roomCalendar?.updateSize();
-            });
-
-            const bookRoomForm = document.getElementById('bookRoomForm');
-            if (bookRoomForm) {
-                console.log('✅ Book Room Form found');
-                bookRoomForm.addEventListener('submit', function(e) {
-                    console.log('📝 Book Room Form Submitted');
-                    console.log('  userId:', this.querySelector('input[name="userId"]')?.value);
-                    console.log('  roomId:', this.querySelector('select[name="roomId"]')?.value);
-                    console.log('  startTime:', this.querySelector('input[name="startTime"]')?.value);
-                    console.log('  endTime:', this.querySelector('input[name="endTime"]')?.value);
-                    console.log('  purpose:', this.querySelector('textarea[name="purpose"]')?.value);
-                });
-            } else {
-                console.warn('❌ Book Room Form NOT found');
-            }
+            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () { roomCalendar?.updateSize(); });
         });
 
-        // ============================================
-        // View Driver Details
-        // ============================================
         function viewDriverDetails(driverId, driverName) {
             const modal = new bootstrap.Modal(document.getElementById('driverDetailsModal'));
             const body = document.getElementById('driverDetailBody');
             const nameSpan = document.getElementById('driverDetailName');
             nameSpan.textContent = driverName || 'Driver';
-
-            body.innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            `;
-
+            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
             modal.show();
-
             fetch('/assetIQ-pro/bookings/driver/' + driverId + '/bookings')
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to load driver bookings');
-                    return response.json();
-                })
+                .then(response => { if (!response.ok) throw new Error('Failed to load driver bookings'); return response.json(); })
                 .then(bookings => {
                     const allBookings = bookings || [];
-
                     if (allBookings.length === 0) {
-                        body.innerHTML = `
-                            <div class="text-center py-4">
-                                <i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i>
-                                <p class="text-muted mt-2">No bookings found for this driver</p>
-                                <small class="text-muted">This driver is available for new bookings</small>
-                            </div>
-                        `;
+                        body.innerHTML = '<div class="text-center py-4"><i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i><p class="text-muted mt-2">No bookings found for this driver</p><small class="text-muted">This driver is available for new bookings</small></div>';
                         return;
                     }
-
-                    let html = `
-                        <div class="mb-3">
-                            <small class="text-muted">Total Bookings: <strong>${allBookings.length}</strong></small>
-                        </div>
-                        <div class="list-group">
-                    `;
-
+                    let html = '<div class="mb-3"><small class="text-muted">Total Bookings: <strong>' + allBookings.length + '</strong></small></div><div class="list-group">';
                     allBookings.forEach(booking => {
-                        const statusClass = booking.status === 'ACCEPTED' ? 'booked' :
-                                           booking.status === 'COMPLETED' ? 'completed' :
-                                           booking.status === 'PENDING' ? 'pending' : 'cancelled';
+                        const statusClass = booking.status === 'ACCEPTED' ? 'booked' : booking.status === 'COMPLETED' ? 'completed' : booking.status === 'PENDING' ? 'pending' : 'cancelled';
                         const bookingDate = new Date(booking.requestTime);
-                        html += `
-                            <div class="booking-list-item">
-                                <div>
-                                    <div class="requester">${booking.destination || 'N/A'}</div>
-                                    <div class="time-slot">${bookingDate.toLocaleString()}</div>
-                                    ${booking.requestedBy ? `<div class="time-slot">Requester: ${booking.requestedBy}</div>` : ''}
-                                </div>
-                                <span class="status-badge ${statusClass}">${booking.status || 'PENDING'}</span>
-                            </div>
-                        `;
+                        html += '<div class="booking-list-item"><div><div class="requester">' + (booking.destination || 'N/A') + '</div><div class="time-slot">' + bookingDate.toLocaleString() + '</div>' + (booking.requestedBy ? '<div class="time-slot">Requester: ' + booking.requestedBy + '</div>' : '') + '</div><span class="status-badge ' + statusClass + '">' + (booking.status || 'PENDING') + '</span></div>';
                     });
-
                     html += '</div>';
                     body.innerHTML = html;
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    body.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to load driver details.
-                        </div>
-                    `;
+                    body.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Failed to load driver details.</div>';
                 });
         }
 
-        // ============================================
-        // View Room Details
-        // ============================================
         function viewRoomDetails(roomId, roomName, roomType) {
             const modal = new bootstrap.Modal(document.getElementById('roomDetailsModal'));
             const body = document.getElementById('roomDetailBody');
             const nameSpan = document.getElementById('roomDetailName');
             nameSpan.textContent = roomName || 'Room';
-
-            body.innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            `;
-
+            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
             modal.show();
-
             fetch('/assetIQ-pro/bookings/room/' + roomId + '/bookings')
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to load room bookings');
-                    return response.json();
-                })
+                .then(response => { if (!response.ok) throw new Error('Failed to load room bookings'); return response.json(); })
                 .then(allBookings => {
                     const now = new Date();
-                    const bookings = (allBookings || [])
-                        .filter(b => !b.endTime || new Date(b.endTime) > now)
-                        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-
+                    const bookings = (allBookings || []).filter(b => !b.endTime || new Date(b.endTime) > now).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
                     if (bookings.length === 0) {
-                        body.innerHTML = `
-                            <div class="text-center py-4">
-                                <i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i>
-                                <p class="text-muted mt-2">No active or future bookings for this room</p>
-                                <small class="text-muted">Room Type: <strong>${roomType || 'N/A'}</strong></small>
-                            </div>
-                        `;
+                        body.innerHTML = '<div class="text-center py-4"><i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i><p class="text-muted mt-2">No active or future bookings for this room</p><small class="text-muted">Room Type: <strong>' + (roomType || 'N/A') + '</strong></small></div>';
                         return;
                     }
-
                     const isInfra = USER_ROLE === 'INFRA' || USER_ROLE === 'INFRASTRUCTURE';
                     const isServerRoom = roomName && (roomName.toLowerCase().includes('server') || roomType === 'Server Room');
-
-                    let html = `
-                        <div class="mb-3">
-                            <small class="text-muted">Active & Future Bookings: <strong>${bookings.length}</strong></small>
-                            <small class="text-muted d-block">Room Type: <strong>${roomType || 'N/A'}</strong></small>
-                        </div>
-                        <div class="list-group">
-                    `;
-
+                    let html = '<div class="mb-3"><small class="text-muted">Active & Future Bookings: <strong>' + bookings.length + '</strong></small><small class="text-muted d-block">Room Type: <strong>' + (roomType || 'N/A') + '</strong></small></div><div class="list-group">';
                     bookings.forEach(booking => {
                         const start = new Date(booking.startTime);
                         const end = new Date(booking.endTime);
-                        const isCurrentlyActive = (booking.status === 'ACTIVE' || booking.status === 'BOOKED') &&
-                                                  start <= now && end >= now;
+                        const isCurrentlyActive = (booking.status === 'ACTIVE' || booking.status === 'BOOKED') && start <= now && end >= now;
                         const isOwner = Number(booking.userId) === CURRENT_USER_ID;
-
                         let displayStatus = booking.status || 'BOOKED';
                         let statusClass = 'booked';
-
-                        if (isCurrentlyActive) {
-                            displayStatus = 'IN USE';
-                            statusClass = 'inuse';
-                        } else if (booking.status === 'PENDING') {
-                            statusClass = 'pending';
-                        } else if (booking.status === 'CANCELLED') {
-                            statusClass = 'cancelled';
-                        } else if (booking.status === 'CONFIRMED') {
-                            statusClass = 'completed';
-                            displayStatus = 'COMPLETED';
-                        }
-
-                        html += `
-                            <div class="booking-list-item">
-                                <div>
-                                    <div class="requester">${booking.bookedBy || 'User'}</div>
-                                    <div class="time-slot">${start.toLocaleString()} - ${end.toLocaleString()}</div>
-                                    ${booking.purpose ? `<div class="time-slot">Purpose: ${booking.purpose}</div>` : ''}
-                                    ${booking.notes ? `<div class="time-slot">Notes: ${booking.notes}</div>` : ''}
-                                    ${isCurrentlyActive ? `<div class="time-slot fw-bold text-primary">🟢 Currently In Use</div>` : ''}
-                                    ${booking.status === 'CONFIRMED' ? `<div class="time-slot text-success">✅ Signed Out</div>` : ''}
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge ${statusClass}">${displayStatus}</span>
-
-                                    ${booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom ? `
-                                        <button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(${booking.bookingId})">
-                                            <i class="fas fa-handshake me-1"></i>Request Slot
-                                        </button>
-                                    ` : ''}
-
-                                    ${isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE') ? `
-                                        <form action="/assetIQ-pro/bookings/server-room/${booking.bookingId}/signout-link" method="post" class="mt-1">
-                                            <input type="hidden" name="infraComment" value="Signing out user">
-                                            <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                <i class="fas fa-sign-out-alt me-1"></i>Sign Out
-                                            </button>
-                                        </form>
-                                    ` : ''}
-
-                                    ${isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING' || booking.status === 'ACTIVE') ? `
-                                        <button class="btn btn-sm btn-danger mt-1 w-100" onclick="adminCancelBooking(${booking.bookingId})">
-                                            <i class="fas fa-times me-1"></i>Cancel
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `;
+                        if (isCurrentlyActive) { displayStatus = 'IN USE'; statusClass = 'inuse'; }
+                        else if (booking.status === 'PENDING') { statusClass = 'pending'; }
+                        else if (booking.status === 'CANCELLED') { statusClass = 'cancelled'; }
+                        else if (booking.status === 'CONFIRMED') { statusClass = 'completed'; displayStatus = 'COMPLETED'; }
+                        html += '<div class="booking-list-item"><div><div class="requester">' + (booking.bookedBy || 'User') + '</div><div class="time-slot">' + start.toLocaleString() + ' - ' + end.toLocaleString() + '</div>' + (booking.purpose ? '<div class="time-slot">Purpose: ' + booking.purpose + '</div>' : '') + (booking.notes ? '<div class="time-slot">Notes: ' + booking.notes + '</div>' : '') + (isCurrentlyActive ? '<div class="time-slot fw-bold text-primary">🟢 Currently In Use</div>' : '') + (booking.status === 'CONFIRMED' ? '<div class="time-slot text-success">✅ Signed Out</div>' : '') + '</div><div class="text-end"><span class="status-badge ' + statusClass + '">' + displayStatus + '</span>' + (booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom ? '<button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(' + booking.bookingId + ')"><i class="fas fa-handshake me-1"></i>Request Slot</button>' : '') + (isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE') ? '<form action="/assetIQ-pro/bookings/server-room/' + booking.bookingId + '/signout-link" method="post" class="mt-1"><input type="hidden" name="infraComment" value="Signing out user"><button type="submit" class="btn btn-sm btn-primary w-100"><i class="fas fa-sign-out-alt me-1"></i>Sign Out</button></form>' : '') + (isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING' || booking.status === 'ACTIVE') ? '<button class="btn btn-sm btn-danger mt-1 w-100" onclick="adminCancelBooking(' + booking.bookingId + ')"><i class="fas fa-times me-1"></i>Cancel</button>' : '') + '</div></div>';
                     });
-
                     html += '</div>';
                     body.innerHTML = html;
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    body.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to load room details.
-                        </div>
-                    `;
+                    body.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Failed to load room details.</div>';
                 });
         }
 
-        // ============================================
-        // Slot Request
-        // ============================================
         function openSlotRequest(bookingId) {
             document.getElementById('slotRequestBookingId').value = bookingId;
             new bootstrap.Modal(document.getElementById('slotRequestModal')).show();
@@ -1144,62 +864,105 @@
         function confirmSlotRequest() {
             const id = document.getElementById('slotRequestBookingId').value;
             if (!id) return;
-
             fetch('/assetIQ-pro/bookings/room/' + id + '/request-slot', { method: 'POST' })
                 .then(response => {
                     if (response.ok) {
-                        alert('✅ Slot request sent successfully! The current booker will be notified.');
+                        showToast('Slot request sent successfully! The current booker will be notified.', 'success');
                         bootstrap.Modal.getInstance(document.getElementById('slotRequestModal')).hide();
-                        window.location.reload();
+                        setTimeout(() => window.location.reload(), 900);
                     } else {
-                        return response.text().then(text => {
-                            alert('❌ Failed to send slot request: ' + text);
-                        });
+                        return response.text().then(text => { showToast('Failed to send slot request: ' + text, 'error'); });
                     }
                 })
-                .catch(error => alert('❌ Error: ' + error.message));
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+        }
+
+        function adminCancelBooking(bookingId) {
+            showConfirm('Are you sure you want to cancel this booking?', function () {
+                fetch('/assetIQ-pro/bookings/admin/booking/' + bookingId + '/cancel', { method: 'POST' })
+                    .then(response => {
+                        if (response.ok) { showToast('Booking cancelled successfully!', 'success'); setTimeout(() => window.location.reload(), 900); }
+                        else { return response.text().then(text => { showToast('Failed to cancel booking: ' + text, 'error'); }); }
+                    })
+                    .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
+        }
+
+        function recallDriverRequest(id) {
+            showConfirm('Recall this driver request?', function () {
+                fetch('/assetIQ-pro/bookings/driver-request/' + id + '/recall', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => showToast('Failed: ' + err.message, 'error'));
+            });
+        }
+
+        function recallRoomBooking(id) {
+            showConfirm('Recall this room booking?', function () {
+                fetch('/assetIQ-pro/bookings/room/' + id + '/recall', { method: 'POST' })
+                    .then(() => window.location.reload())
+                    .catch(err => showToast('Failed: ' + err.message, 'error'));
+            });
         }
 
         // ============================================
-        // Admin / INFRA Cancel Booking
+        // DRIVER APPROVAL FUNCTIONS
         // ============================================
-        function adminCancelBooking(bookingId) {
-            if (confirm('Are you sure you want to cancel this booking?')) {
-                fetch('/assetIQ-pro/bookings/admin/booking/' + bookingId + '/cancel', {
+        function approveDriverRequest(requestId, driverId) {
+            showConfirm('Accept this driver request?', function () {
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/accept?driverId=' + driverId, {
                     method: 'POST'
                 })
                 .then(response => {
                     if (response.ok) {
-                        alert('✅ Booking cancelled successfully!');
-                        window.location.reload();
+                        showToast('Request accepted successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
                     } else {
-                        return response.text().then(text => {
-                            alert('❌ Failed to cancel booking: ' + text);
-                        });
+                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
                     }
                 })
-                .catch(error => alert('❌ Error: ' + error.message));
-            }
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
         }
 
-        // ============================================
-        // Recall Functions
-        // ============================================
-        function recallDriverRequest(id) {
-            if (confirm('Recall this driver request?')) {
-                fetch('/assetIQ-pro/bookings/driver-request/' + id + '/recall', { method: 'POST' })
-                    .then(() => window.location.reload())
-                    .catch(err => alert('Failed: ' + err.message));
-            }
-        }
+        function rejectDriverRequest(requestId, driverId) {
+            const reason = document.getElementById('rejectReason_' + requestId)?.value || 'No reason provided';
 
-        function recallRoomBooking(id) {
-            if (confirm('Recall this room booking?')) {
-                fetch('/assetIQ-pro/bookings/room/' + id + '/recall', { method: 'POST' })
-                    .then(() => window.location.reload())
-                    .catch(err => alert('Failed: ' + err.message));
-            }
+            showConfirm('Reject this driver request?', function () {
+                const formData = new FormData();
+                formData.append('driverId', driverId);
+                formData.append('reason', reason);
+
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Request rejected successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
         }
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- Flash-message alerts: separate th:inline="javascript" blocks  -->
+    <!-- so Thymeleaf inlining doesn't clash with the th:inline="none" -->
+    <!-- script above.                                                  -->
+    <!-- ============================================================ -->
+    <script th:if="${success != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${success}]]*/ 'Success', 'success');
+        });
+    </script>
+    <script th:if="${error != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${error}]]*/ 'Error', 'error');
+        });
     </script>
 </div>
 </body>

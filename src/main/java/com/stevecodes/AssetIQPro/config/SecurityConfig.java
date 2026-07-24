@@ -131,9 +131,6 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
-                                "/bookings/driver-dashboard",
-                                "/bookings/driver/**",
-                                "/bookings/driver-requests",
                                 "/uploads/**"
                         ).permitAll()
                         .requestMatchers(
