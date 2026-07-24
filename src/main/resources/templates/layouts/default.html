@@ -712,15 +712,6 @@
 
         <div class="nav-divider"></div>
 
-        <!-- Driver Dashboard - DRIVER role only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_DRIVER', 'DRIVER', 'DRIVER_VIEW')">
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'driver-dashboard'} ? 'active' : ''" href="/assetIQ-pro/bookings/driver-dashboard">
-                    <i class="fas fa-tachometer-alt"></i> Driver Dashboard
-                </a>
-            </div>
-        </div>
-
         <!-- Assets & Transfers - Admin only -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
             <div class="nav-item">
@@ -732,15 +723,6 @@
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
                     <i class="fas fa-exchange-alt"></i> Transfers
-                </a>
-            </div>
-        </div>
-
-        <!-- Infrastructure Dashboard - INFRA role only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_INFRA', 'INFRA', 'APPROVE_INFRA', 'REVIEW_INFRA')">
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'infra-dashboard'} ? 'active' : ''" href="/assetIQ-pro/infra-requests/dashboard">
-                    <i class="fas fa-server"></i> Infrastructure Dashboard
                 </a>
             </div>
         </div>
