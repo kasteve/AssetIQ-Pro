@@ -96,10 +96,10 @@ public class Asset {
     @JoinColumn(name = "department_id", insertable = false, updatable = false)
     private Department department;
 
-    /**
-     * Get the number of days until warranty expires
-     * @return number of days until expiry, or null if no warranty date
-     */
+    // ============================================
+    // FIXED: Helper Methods
+    // ============================================
+
     public Integer getDaysUntilWarrantyExpiry() {
         if (warrantyEndDate == null) {
             return null;
@@ -111,10 +111,6 @@ public class Asset {
         return (int) ChronoUnit.DAYS.between(today, warrantyEndDate);
     }
 
-    /**
-     * Get the number of days until EOL (End of Life)
-     * @return number of days until EOL, or null if no EOL date
-     */
     public Integer getDaysUntilEOL() {
         if (eolDate == null) {
             return null;
@@ -126,10 +122,6 @@ public class Asset {
         return (int) ChronoUnit.DAYS.between(today, eolDate);
     }
 
-    /**
-     * Check if warranty is expiring soon (within notification days)
-     * @return true if warranty is expiring within the notification window
-     */
     public boolean isWarrantyExpiringSoon() {
         Integer daysLeft = getDaysUntilWarrantyExpiry();
         if (daysLeft == null) {
@@ -139,10 +131,6 @@ public class Asset {
         return daysLeft <= notificationDays && daysLeft >= 0;
     }
 
-    /**
-     * Check if EOL is soon (within notification days)
-     * @return true if EOL is within the notification window
-     */
     public boolean isEOLSoon() {
         Integer daysLeft = getDaysUntilEOL();
         if (daysLeft == null) {
@@ -152,10 +140,6 @@ public class Asset {
         return daysLeft <= notificationDays && daysLeft >= 0;
     }
 
-    /**
-     * Check if warranty has expired
-     * @return true if warranty end date is in the past
-     */
     public boolean isWarrantyExpired() {
         if (warrantyEndDate == null) {
             return false;
@@ -163,10 +147,6 @@ public class Asset {
         return warrantyEndDate.isBefore(LocalDate.now());
     }
 
-    /**
-     * Check if EOL has passed
-     * @return true if EOL date is in the past
-     */
     public boolean isEOLExpired() {
         if (eolDate == null) {
             return false;
@@ -174,9 +154,6 @@ public class Asset {
         return eolDate.isBefore(LocalDate.now());
     }
 
-    /**
-     * Get the asset's status as a display string
-     */
     public String getStatusDisplay() {
         if (status == null) {
             return "UNKNOWN";
@@ -184,32 +161,45 @@ public class Asset {
         return status.name();
     }
 
-    /**
-     * Check if the asset is currently available
-     */
     public boolean isAvailable() {
         return status == AssetStatus.AVAILABLE;
     }
 
-    /**
-     * Check if the asset is currently assigned
-     */
     public boolean isAssigned() {
         return status == AssetStatus.ASSIGNED;
     }
 
-    /**
-     * Check if the asset is retired
-     */
     public boolean isRetired() {
         return status == AssetStatus.RETIRED;
     }
 
-    /**
-     * Check if the asset is in maintenance
-     */
     public boolean isInMaintenance() {
         return status == AssetStatus.MAINTENANCE;
+    }
+
+    // ============================================
+    // FIXED: These methods now return proper values
+    // ============================================
+
+    /**
+     * Returns the asset name
+     */
+    public String getAssetName() {
+        return name != null ? name : tag;
+    }
+
+    /**
+     * Returns the warranty start date (purchase date or warranty start)
+     */
+    public LocalDate getWarrantyStartDate() {
+        return purchaseDate;
+    }
+
+    /**
+     * Returns the cost as double
+     */
+    public double getCost() {
+        return purchaseCost != null ? purchaseCost.doubleValue() : 0.0;
     }
 
     public enum AssetStatus {

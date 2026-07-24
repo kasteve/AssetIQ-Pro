@@ -106,7 +106,7 @@ public class Transfer {
     private String financeRepresentativeStaffId;
 
     // ============================================
-    // Signer Names (populated from Employee table)
+    // Signer Names
     // ============================================
     @Column(name = "oldHandoverByName")
     private String oldHandoverByName;
@@ -160,7 +160,7 @@ public class Transfer {
     private Long companyId;
 
     // ============================================
-    // Legacy Signature Fields
+    // Signature Fields
     // ============================================
     @Column(name = "FromEmployeeSignature")
     private String fromEmployeeSignature;
@@ -174,9 +174,6 @@ public class Transfer {
     @Column(name = "ToEmployeeSignedAt")
     private LocalDateTime toEmployeeSignedAt;
 
-    // ============================================
-    // Signature Fields (Base64) - NVARCHAR(MAX)
-    // ============================================
     @Lob
     @Column(name = "OldHandoverBySignature", columnDefinition = "NVARCHAR(MAX)")
     private String oldHandoverBySignature;
@@ -237,7 +234,7 @@ public class Transfer {
     private Boolean isFullySigned = false;
 
     // ============================================
-    // Transient Fields (for display purposes)
+    // Transient Fields
     // ============================================
     @Transient
     private String oldDepartmentName;
@@ -252,7 +249,7 @@ public class Transfer {
     private String newEmployeeName;
 
     // ============================================
-    // Helper Methods
+    // FIXED: Helper Methods
     // ============================================
 
     public boolean isSignedForRole(String role) {
@@ -339,5 +336,67 @@ public class Transfer {
 
     public void setFullySignedPDF(String pdfBase64) {
         this.fullySignedPdf = pdfBase64;
+    }
+
+    // ============================================
+    // FIXED: These methods now return proper values
+    // ============================================
+
+    /**
+     * Returns the transfer status based on signature completion
+     */
+    public String getStatus() {
+        if (Boolean.TRUE.equals(isFullySigned)) {
+            return "COMPLETED";
+        }
+        // Check if any signatures are present
+        if (oldHandoverBySignedAt != null || oldReceivedBySignedAt != null ||
+                newHandoverBySignedAt != null || newReceivedBySignedAt != null ||
+                configuredBySignedAt != null || infraRepSignedAt != null || financeRepSignedAt != null) {
+            return "IN_PROGRESS";
+        }
+        return "PENDING";
+    }
+
+    /**
+     * Returns the transfer type (always ASSET for now)
+     */
+    public String getTransferType() {
+        return "ASSET";
+    }
+
+    /**
+     * Returns a placeholder asset (you can enhance this to fetch from DB)
+     */
+    public String getAsset() {
+        return assetTag != null ? assetTag : "N/A";
+    }
+
+    /**
+     * Returns amount (not applicable for asset transfers)
+     */
+    public String getAmount() {
+        return "N/A";
+    }
+
+    /**
+     * Returns from location (department name)
+     */
+    public String getFromLocation() {
+        return oldDepartmentName != null ? oldDepartmentName : "N/A";
+    }
+
+    /**
+     * Returns to location (department name)
+     */
+    public String getToLocation() {
+        return newDepartmentName != null ? newDepartmentName : "N/A";
+    }
+
+    /**
+     * Returns the created date (use transfer date)
+     */
+    public LocalDate getCreatedAt() {
+        return transferDate;
     }
 }
