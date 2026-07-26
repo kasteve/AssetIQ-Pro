@@ -3,6 +3,9 @@ package com.stevecodes.AssetIQPro.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -10,6 +13,7 @@ import java.time.LocalDateTime;
 @Table(name = "stock_items")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class StockItem {
 
     @Id
@@ -25,17 +29,29 @@ public class StockItem {
     private Integer quantity = 0;
 
     @Column(name = "low_stock_threshold")
-    private Integer lowStockThreshold = 5;   // default 5
+    private Integer lowStockThreshold = 5;
 
-    private String unit;                     // e.g., "pcs", "boxes", "liters"
+    private String unit;
 
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
-    // This can optionally link to a Category
-    // private Long categoryId;
-
-    // Whether low-stock alert was already sent (to avoid spamming)
     @Column(name = "alert_sent")
     private boolean alertSent = false;
+
+    // ✅ NEW: Category relationship
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id")
+    private StockCategory category;
+
+    @PrePersist
+    @PreUpdate
+    protected void onUpdate() {
+        lastUpdated = LocalDateTime.now();
+    }
+
+    // ✅ Helper method to get category name
+    public String getCategoryName() {
+        return category != null ? category.getName() : "Uncategorized";
+    }
 }

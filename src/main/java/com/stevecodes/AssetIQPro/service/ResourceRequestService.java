@@ -2,7 +2,9 @@ package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
 import com.stevecodes.AssetIQPro.entity.ResourceRequest;
+import com.stevecodes.AssetIQPro.entity.StockItem;
 import com.stevecodes.AssetIQPro.repository.ResourceRequestRepository;
+import com.stevecodes.AssetIQPro.repository.StockItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,11 +24,12 @@ import java.util.stream.Collectors;
 public class ResourceRequestService {
 
     private final ResourceRequestRepository resourceRequestRepository;
+    private final StockItemRepository stockItemRepository;  // ✅ ADDED
     private final EmailService emailService;
     private final AuditService auditService;
     private final AppUserService appUserService;
     private final PdfGenerationService pdfGenerationService;
-    private final BaseUrlService baseUrlService;  // ✅ ADDED
+    private final BaseUrlService baseUrlService;
 
     private static final String REPORT_DIR = "uploads/resources/reports/";
 
@@ -131,17 +134,33 @@ public class ResourceRequestService {
         request.setRequestTime(LocalDateTime.now());
         request.setStatus("PENDING");
 
+        // ✅ NEW: Set stock item link if provided
+        if (dto.getStockItemId() != null) {
+            request.setStockItemId(dto.getStockItemId());
+            StockItem stockItem = stockItemRepository.findById(dto.getStockItemId()).orElse(null);
+            if (stockItem != null) {
+                request.setStockItemName(stockItem.getName());
+                log.info("Linked request to stock item: {} (ID: {})", stockItem.getName(), stockItem.getId());
+            }
+        }
+
         ResourceRequest saved = resourceRequestRepository.save(request);
+
+        String stockInfo = request.getStockItemName() != null ?
+                "\nStock Item: " + request.getStockItemName() + "\n" : "";
 
         emailService.sendResourceRequestNotification(
                 "admin@company.com",
                 "New Resource Request Pending Approval",
                 "User " + dto.getRequestedBy() + " requested: " + dto.getResourceType() +
-                        " - " + dto.getDescription()
+                        " - " + dto.getDescription() + "\n" +
+                        "Quantity: " + request.getQuantity() + "\n" +
+                        stockInfo
         );
 
         auditService.logAction("RESOURCE_REQUEST_CREATED",
-                "Resource request created by user: " + dto.getUserId() + ", type: " + dto.getResourceType(),
+                "Resource request created by user: " + dto.getUserId() + ", type: " + dto.getResourceType() +
+                        (request.getStockItemId() != null ? ", stock item: " + request.getStockItemName() : ""),
                 dto.getUserId());
 
         return convertToDTO(saved);
@@ -160,6 +179,22 @@ public class ResourceRequestService {
         return createResourceRequest(dto);
     }
 
+    // ✅ NEW: Method with stockItemId parameter
+    @Transactional
+    public ResourceRequestDTO createResourceRequest(Long userId, String requestedBy, String description,
+                                                    String resourceType, Integer quantity, String justification,
+                                                    Long stockItemId) {
+        ResourceRequestDTO dto = new ResourceRequestDTO();
+        dto.setUserId(userId);
+        dto.setRequestedBy(requestedBy);
+        dto.setDescription(description);
+        dto.setResourceType(resourceType);
+        dto.setQuantity(quantity != null ? quantity : 1);
+        dto.setJustification(justification);
+        dto.setStockItemId(stockItemId);
+        return createResourceRequest(dto);
+    }
+
     @Transactional
     public ResourceRequestDTO acceptResourceRequest(Long requestId, String adminComment) {
         log.info("Admin accepting resource request: {}", requestId);
@@ -169,6 +204,20 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request is not pending approval. Current status: " + request.getStatus());
         }
 
+        // ✅ Check stock availability before accepting
+        if (request.getStockItemId() != null && request.getQuantity() != null && request.getQuantity() > 0) {
+            StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
+            if (stockItem != null) {
+                if (stockItem.getQuantity() < request.getQuantity()) {
+                    throw new IllegalStateException(
+                            "Insufficient stock for '" + stockItem.getName() + "'. " +
+                                    "Available: " + stockItem.getQuantity() + ", Requested: " + request.getQuantity()
+                    );
+                }
+                log.info("Stock check passed. Available: {}, Requested: {}", stockItem.getQuantity(), request.getQuantity());
+            }
+        }
+
         request.setStatus("ACCEPTED");
         request.setAcceptedAt(LocalDateTime.now());
         request.setAdminComment(adminComment);
@@ -176,10 +225,15 @@ public class ResourceRequestService {
         ResourceRequest saved = resourceRequestRepository.save(request);
 
         String requesterEmail = getEmailForUser(request.getUserId());
+        String stockInfo = request.getStockItemName() != null ?
+                "\nStock Item: " + request.getStockItemName() + "\n" : "";
+
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Accepted",
-                "Your request for " + request.getResourceType() + " has been accepted by the administrator."
+                "Your request for " + request.getResourceType() + " has been accepted by the administrator.\n" +
+                        stockInfo +
+                        "Quantity: " + request.getQuantity()
         );
 
         auditService.logAction("RESOURCE_REQUEST_ACCEPTED",
@@ -227,6 +281,45 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request must be ACCEPTED to complete. Current status: " + request.getStatus());
         }
 
+        // ============================================
+        // ✅ DEDUCT STOCK ON COMPLETION
+        // ============================================
+        if (request.getStockItemId() != null && request.getQuantity() != null && request.getQuantity() > 0) {
+            StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
+            if (stockItem != null) {
+                // Double-check stock again before deducting
+                if (stockItem.getQuantity() < request.getQuantity()) {
+                    throw new IllegalStateException(
+                            "Insufficient stock to complete request. " +
+                                    "Available: " + stockItem.getQuantity() + ", Requested: " + request.getQuantity() +
+                                    ". Please restock first."
+                    );
+                }
+
+                // Deduct the stock
+                int newQuantity = stockItem.getQuantity() - request.getQuantity();
+                stockItem.setQuantity(newQuantity);
+                stockItem.setLastUpdated(LocalDateTime.now());
+
+                // Reset alert flag if stock is now above threshold
+                if (newQuantity > stockItem.getLowStockThreshold()) {
+                    stockItem.setAlertSent(false);
+                }
+
+                stockItemRepository.save(stockItem);
+                log.info("✅ Stock deducted: {} - {} (new quantity: {})",
+                        stockItem.getName(), request.getQuantity(), newQuantity);
+
+                auditService.logAction("STOCK_DEDUCTED_RESOURCE_REQUEST",
+                        "Stock deducted for resource request #" + requestId +
+                                ": " + request.getQuantity() + " of " + stockItem.getName() +
+                                " (new quantity: " + newQuantity + ")",
+                        request.getUserId());
+            } else {
+                log.warn("Stock item not found for ID: {}, skipping stock deduction", request.getStockItemId());
+            }
+        }
+
         request.setStatus("COMPLETED");
         request.setCompletedAt(LocalDateTime.now());
         request.setDeliveryNotes(deliveryNotes);
@@ -248,19 +341,24 @@ public class ResourceRequestService {
             log.error("Failed to generate PDF for resource request {}: {}", requestId, e.getMessage());
         }
 
-        // ✅ DYNAMIC URL
         String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
 
         String requesterEmail = getEmailForUser(request.getUserId());
+        String stockInfo = request.getStockItemName() != null ?
+                "\nStock Item: " + request.getStockItemName() + "\n" : "";
+
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Completed - Please Sign",
-                "Your request for " + request.getResourceType() + " has been completed.\n\n" +
+                "Your request for " + request.getResourceType() + " has been completed.\n" +
+                        stockInfo +
+                        "Quantity: " + request.getQuantity() + "\n\n" +
                         "Please sign to acknowledge receipt: " + signatureLink
         );
 
         auditService.logAction("RESOURCE_REQUEST_COMPLETED",
-                "Resource request completed: " + requestId + " by admin",
+                "Resource request completed: " + requestId + " by admin" +
+                        (request.getStockItemId() != null ? " (Stock deducted)" : ""),
                 request.getUserId());
 
         return convertToDTO(saved);
@@ -338,7 +436,7 @@ public class ResourceRequestService {
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
         resourceRequestRepository.save(request);
 
-        // Resend email - ✅ DYNAMIC
+        // Resend email
         String requesterEmail = getEmailForUser(request.getUserId());
         String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
         emailService.sendResourceRequestStatusUpdate(
@@ -417,6 +515,34 @@ public class ResourceRequestService {
     }
 
     // ============================================
+    // Stock Check Helper
+    // ============================================
+
+    public boolean isStockAvailable(Long requestId) {
+        ResourceRequest request = validateRequest(requestId);
+        if (request.getStockItemId() == null || request.getQuantity() == null) {
+            return true;
+        }
+
+        StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
+        if (stockItem == null) {
+            return false;
+        }
+
+        return stockItem.getQuantity() >= request.getQuantity();
+    }
+
+    public Integer getAvailableStockForRequest(Long requestId) {
+        ResourceRequest request = validateRequest(requestId);
+        if (request.getStockItemId() == null) {
+            return null;
+        }
+
+        StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
+        return stockItem != null ? stockItem.getQuantity() : 0;
+    }
+
+    // ============================================
     // Email with PDF Attachment
     // ============================================
     private void sendSignedConfirmationEmail(ResourceRequest request) {
@@ -429,6 +555,7 @@ public class ResourceRequestService {
                     "- Resource Type: " + request.getResourceType() + "\n" +
                     "- Description: " + request.getDescription() + "\n" +
                     "- Quantity: " + request.getQuantity() + "\n" +
+                    (request.getStockItemName() != null ? "- Stock Item: " + request.getStockItemName() + "\n" : "") +
                     "- Signed by: " + request.getSignatoryName() + "\n" +
                     "- Signed on: " + request.getAcknowledgedAt() + "\n\n" +
                     "You can also download the PDF from the portal at any time.";
@@ -529,6 +656,17 @@ public class ResourceRequestService {
         dto.setSigningToken(request.getSigningToken());
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
         dto.setPdfReportPath(request.getPdfReportPath());
+
+        // ✅ NEW: Stock item fields
+        dto.setStockItemId(request.getStockItemId());
+        dto.setStockItemName(request.getStockItemName());
+
+        // Get current stock quantity
+        if (request.getStockItemId() != null) {
+            stockItemRepository.findById(request.getStockItemId())
+                    .ifPresent(item -> dto.setCurrentStockQuantity(item.getQuantity()));
+        }
+
         return dto;
     }
 }

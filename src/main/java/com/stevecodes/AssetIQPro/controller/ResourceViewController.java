@@ -3,9 +3,12 @@ package com.stevecodes.AssetIQPro.controller;
 import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.ResourceRequest;
+import com.stevecodes.AssetIQPro.entity.StockCategory;
+import com.stevecodes.AssetIQPro.entity.StockItem;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.ResourceRequestService;
+import com.stevecodes.AssetIQPro.service.StockService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +35,7 @@ public class ResourceViewController {
 
     private final ResourceRequestService resourceRequestService;
     private final AppUserService userService;
+    private final StockService stockService;
 
     @PostMapping("/request")
     public String createResourceRequest(@RequestParam Long userId,
@@ -40,6 +44,7 @@ public class ResourceViewController {
                                         @RequestParam String description,
                                         @RequestParam(required = false, defaultValue = "1") Integer quantity,
                                         @RequestParam(required = false) String justification,
+                                        @RequestParam(required = false) Long stockItemId,
                                         RedirectAttributes redirectAttributes) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
@@ -52,8 +57,9 @@ public class ResourceViewController {
                 throw new AccessDeniedException("You don't have permission to create resource requests.");
             }
 
-            log.info("Creating resource request for user: {}", userId);
-            resourceRequestService.createResourceRequest(userId, requestedBy, description, resourceType, quantity, justification);
+            log.info("Creating resource request for user: {}, stockItemId: {}", userId, stockItemId);
+            resourceRequestService.createResourceRequest(userId, requestedBy, description,
+                    resourceType, quantity, justification, stockItemId);
             redirectAttributes.addFlashAttribute("success", "✅ Resource request created successfully!");
         } catch (AccessDeniedException e) {
             log.warn("Access denied: {}", e.getMessage());
@@ -95,6 +101,15 @@ public class ResourceViewController {
 
         model.addAttribute("canApprove", currentUser.hasAnyPermission("RESOURCE_REQUEST_APPROVE", "ADMIN"));
         model.addAttribute("canCreate", currentUser.hasAnyPermission("RESOURCE_REQUEST_CREATE", "ADMIN"));
+
+        // ✅ Load categories and stock items for dropdowns
+        List<StockCategory> categories = stockService.getAllCategories();
+        log.info("Loaded {} categories for dropdown", categories != null ? categories.size() : 0);
+        model.addAttribute("categories", categories);
+
+        List<StockItem> stockItems = stockService.getAllStockItems();
+        log.info("Loaded {} stock items for dropdown", stockItems != null ? stockItems.size() : 0);
+        model.addAttribute("stockItems", stockItems);
 
         return "resources/list";
     }

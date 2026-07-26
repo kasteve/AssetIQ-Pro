@@ -92,35 +92,53 @@
                         <span th:if="${user.blocked}" class="status-badge blocked">Blocked</span>
                         <span th:if="${user.mustChangePassword}" class="status-badge warn">Change Password</span>
                     </td>
-                    <td>
-                        <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit User"
-                                    data-bs-toggle="modal" data-bs-target="#editUserModal"
-                                    th:data-userid="${user.userId}"
-                                    th:data-staffid="${user.staffId}"
-                                    th:data-username="${user.username}"
-                                    th:data-fullname="${user.fullName}"
-                                    th:data-email="${user.email}"
-                                    th:data-role="${user.role}"
-                                    th:data-departmentid="${user.departmentEntity != null ? user.departmentEntity.departmentId : ''}"
-                                    th:data-linemanagerid="${user.employee != null && user.employee.lineManager != null ? user.employee.lineManager.employeeId : ''}"
-                                    th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}">
-                                <i class="fas fa-edit"></i>
+                    <td class="text-center">
+                        <!-- 3-dot actions dropdown -->
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-ellipsis-vertical"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-warning" title="Reset Password"
-                                    data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
-                                    th:data-userid="${user.userId}" th:data-username="${user.username}">
-                                <i class="fas fa-key"></i>
-                            </button>
-                            <button type="button" th:if="${user.active}" class="btn btn-outline-danger" title="Block" th:onclick="'toggleUser(' + ${user.userId} + ')'">
-                                <i class="fas fa-ban"></i>
-                            </button>
-                            <button type="button" th:unless="${user.active}" class="btn btn-outline-success" title="Activate" th:onclick="'toggleUser(' + ${user.userId} + ')'">
-                                <i class="fas fa-check"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete" th:onclick="'deleteUser(' + ${user.userId} + ')'">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#editUserModal"
+                                       th:data-userid="${user.userId}"
+                                       th:data-staffid="${user.staffId}"
+                                       th:data-username="${user.username}"
+                                       th:data-fullname="${user.fullName}"
+                                       th:data-email="${user.email}"
+                                       th:data-role="${user.role}"
+                                       th:data-departmentid="${user.departmentEntity != null ? user.departmentEntity.departmentId : ''}"
+                                       th:data-linemanagerid="${user.employee != null && user.employee.lineManager != null ? user.employee.lineManager.employeeId : ''}"
+                                       th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit User
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
+                                       th:data-userid="${user.userId}" th:data-username="${user.username}">
+                                        <i class="fas fa-key me-2 text-warning"></i>Reset Password
+                                    </a>
+                                </li>
+                                <li>
+                                    <a th:if="${user.active}" class="dropdown-item" href="#"
+                                       th:onclick="'toggleUser(' + ${user.userId} + '); return false;'">
+                                        <i class="fas fa-ban me-2 text-danger"></i>Block
+                                    </a>
+                                    <a th:unless="${user.active}" class="dropdown-item" href="#"
+                                       th:onclick="'toggleUser(' + ${user.userId} + '); return false;'">
+                                        <i class="fas fa-check me-2 text-success"></i>Activate
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#"
+                                       th:onclick="'deleteUser(' + ${user.userId} + '); return false;'">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </td>
                 </tr>
@@ -376,8 +394,22 @@
         .status-badge.blocked { background: #e9ecef; color: #343a40; }
         .status-badge.warn { background: #fff4e0; color: #fd7e14; }
 
-        .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
-        .action-btn-group .btn:last-child { margin-right: 0; }
+        /* 3-dot actions */
+        .action-dots-btn {
+            width: 30px; height: 30px; padding: 0 !important;
+            border-radius: 8px !important; border: 1px solid #e9ecef !important;
+            background: white; color: #6c757d;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .action-dots-btn:hover { background: #f8f9fb; color: var(--ink); }
+        .action-dropdown-menu {
+            border-radius: 12px; border: none; padding: 6px;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16); min-width: 180px;
+        }
+        .action-dropdown-menu .dropdown-item {
+            border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 500;
+        }
+        .action-dropdown-menu .dropdown-item:hover { background: #f8f9fb; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }

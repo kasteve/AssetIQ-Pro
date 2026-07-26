@@ -22,15 +22,27 @@ public class ResourceRequestDTO {
     private Integer quantity = 1;
     private String justification;
 
+    // ✅ NEW: Stock Item Fields
+    private Long stockItemId;
+    private String stockItemName;
+    private Integer currentStockQuantity;
+
     // Admin response
     private LocalDateTime acceptedAt;
     private LocalDateTime declinedAt;
     private String declinedReason;
     private String adminComment;
 
+    // Line Manager fields
+    private Long lineManagerId;
+    private String lmApprovedBy;
+    private LocalDateTime lmApprovedAt;
+    private String lmComment;
+
     // Completion
     private LocalDateTime completedAt;
     private String deliveryNotes;
+    private String finalStatus;
 
     // Acknowledgment
     private LocalDateTime acknowledgedAt;
@@ -46,7 +58,10 @@ public class ResourceRequestDTO {
     // PDF report path
     private String pdfReportPath;
 
-    // Helper methods
+    // ============================================
+    // Helper Methods
+    // ============================================
+
     public String getStatusDisplay() {
         if (status == null) return "";
         switch (status) {
@@ -89,5 +104,17 @@ public class ResourceRequestDTO {
 
     public boolean isSigned() {
         return requesterSignature != null && !requesterSignature.isEmpty();
+    }
+
+    // ✅ Stock item helper methods
+    public boolean hasStockItem() {
+        return stockItemId != null;
+    }
+
+    public String getStockInfo() {
+        if (stockItemName != null) {
+            return stockItemName + (currentStockQuantity != null ? " (Available: " + currentStockQuantity + ")" : "");
+        }
+        return "No stock item linked";
     }
 }

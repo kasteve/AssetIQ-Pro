@@ -14,6 +14,15 @@
 
 <body>
 <div layout:fragment="content">
+
+    <!-- ===== CENTER ALERT BOX ===== -->
+    <div id="centerAlertOverlay" class="center-alert-overlay">
+        <div id="centerAlertBox" class="center-alert-box">
+            <div class="center-alert-icon"><i id="centerAlertIcon" class="fas fa-check-circle"></i></div>
+            <div class="center-alert-message" id="centerAlertMessage"></div>
+        </div>
+    </div>
+
     <div class="page-header-row">
         <h4><i class="fas fa-tags me-2"></i>Categories</h4>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCategoryModal">
@@ -32,21 +41,33 @@
                     <td class="cat-id" th:text="${cat.categoryId}">1</td>
                     <td class="cat-name" th:text="${cat.name}">Hardware</td>
                     <td class="cat-desc" th:text="${cat.description}">Physical hardware assets</td>
-                    <td>
-                        <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit"
-                                    data-bs-toggle="modal" data-bs-target="#editCategoryModal"
-                                    th:data-id="${cat.categoryId}"
-                                    th:data-name="${cat.name}"
-                                    th:data-description="${cat.description}"
-                                    onclick="openEditModal(this)">
-                                <i class="fas fa-edit"></i>
+                    <td class="text-center">
+                        <!-- 3-dot actions dropdown -->
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-ellipsis-vertical"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete"
-                                    th:data-id="${cat.categoryId}"
-                                    onclick="deleteCategory(this)">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#editCategoryModal"
+                                       th:data-id="${cat.categoryId}"
+                                       th:data-name="${cat.name}"
+                                       th:data-description="${cat.description}"
+                                       onclick="openEditModal(this)">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#"
+                                       th:data-id="${cat.categoryId}"
+                                       th:data-name="${cat.name}"
+                                       onclick="deleteCategory(this); return false;">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </td>
                 </tr>
@@ -87,6 +108,7 @@
         </div>
     </div>
 
+    <!-- Edit Category Modal -->
     <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -110,6 +132,28 @@
                         <button type="submit" class="btn btn-primary">Update Category</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Category Confirmation Modal -->
+    <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-trash me-2" style="color: #dc3545;"></i>Delete Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="deleteCategoryId">
+                    <p class="mb-0">Are you sure you want to delete <strong id="deleteCategoryName"></strong>? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="submitDeleteCategory()">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -142,10 +186,22 @@
         .cat-name { font-weight: 700; color: var(--ink); }
         .cat-desc { color: #6c757d; }
 
-        .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
-        .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
+        /* 3-dot actions */
+        .action-dots-btn {
+            width: 30px; height: 30px; padding: 0 !important;
+            border-radius: 8px !important; border: 1px solid #e9ecef !important;
+            background: white; color: #6c757d;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .action-dots-btn:hover { background: #f8f9fb; color: var(--ink); }
+        .action-dropdown-menu {
+            border-radius: 12px; border: none; padding: 6px;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16); min-width: 160px;
+        }
+        .action-dropdown-menu .dropdown-item {
+            border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 500;
+        }
+        .action-dropdown-menu .dropdown-item:hover { background: #f8f9fb; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
@@ -157,6 +213,31 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        /* Center Alert */
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
+        }
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
 
         /* DataTables overrides */
         .dataTables_wrapper .dataTables_filter input {
@@ -241,6 +322,36 @@
             });
         });
 
+        // ============================================
+        // Center Alert (success/error) - square box, center screen
+        // ============================================
+        let centerAlertTimeout = null;
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const overlay = document.getElementById('centerAlertOverlay');
+            const box = document.getElementById('centerAlertBox');
+            const icon = document.getElementById('centerAlertIcon');
+            const msg = document.getElementById('centerAlertMessage');
+
+            icon.className = 'fas ' + (isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle');
+            box.classList.remove('center-alert-success', 'center-alert-error');
+            box.classList.add(isSuccess ? 'center-alert-success' : 'center-alert-error');
+            msg.textContent = message;
+
+            if (centerAlertTimeout) {
+                clearTimeout(centerAlertTimeout);
+                centerAlertTimeout = null;
+            }
+
+            overlay.classList.add('show');
+
+            centerAlertTimeout = setTimeout(function () {
+                overlay.classList.remove('show');
+                centerAlertTimeout = null;
+            }, 2000);
+        }
+
         function openEditModal(button) {
             document.getElementById('editCategoryName').value = button.getAttribute('data-name');
             document.getElementById('editCategoryDescription').value = button.getAttribute('data-description');
@@ -248,11 +359,38 @@
             form.action = form.getAttribute('data-base') + '/' + button.getAttribute('data-id') + '/edit';
         }
 
+        // ============================================
+        // Delete Category - via confirmation modal
+        // ============================================
         function deleteCategory(button) {
-            const base = document.getElementById('categoriesTable').getAttribute('data-base');
             const id = button.getAttribute('data-id');
-            if (confirm('Delete this category?')) window.location.href = base + '/' + id + '/delete';
+            const name = button.getAttribute('data-name') || ('#' + id);
+            document.getElementById('deleteCategoryId').value = id;
+            document.getElementById('deleteCategoryName').textContent = name;
+            new bootstrap.Modal(document.getElementById('deleteCategoryModal')).show();
         }
+
+        function submitDeleteCategory() {
+            const base = document.getElementById('categoriesTable').getAttribute('data-base');
+            const id = document.getElementById('deleteCategoryId').value;
+            window.location.href = base + '/' + id + '/delete';
+        }
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- Flash-message toasts: separate th:inline="javascript" block   -->
+    <!-- so Thymeleaf inlining doesn't clash with the DataTables       -->
+    <!-- th:inline="none" script above.                                -->
+    <!-- ============================================================ -->
+    <script th:if="${success != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${success}]]*/ 'Success', 'success');
+        });
+    </script>
+    <script th:if="${error != null}" th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            showToast(/*[[${error}]]*/ 'Error', 'error');
+        });
     </script>
 </div>
 </body>

@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.StockCategory;
 import com.stevecodes.AssetIQPro.entity.StockItem;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.StockService;
@@ -28,11 +29,20 @@ public class StockController {
         if (currentUser == null) {
             return "redirect:/login";
         }
-        model.addAttribute("items", stockService.getAllStockItems());
+
+        // ✅ Get all stock items
+        List<StockItem> items = stockService.getAllStockItems();
+        model.addAttribute("items", items);
+
+        // ✅ Get all categories for the dropdown
+        List<StockCategory> categories = stockService.getAllCategories();
+        model.addAttribute("categories", categories);
+
         model.addAttribute("pageTitle", "Stock Management");
         model.addAttribute("currentPage", "stock");
         model.addAttribute("canEdit", currentUser.hasAnyPermission("MANAGE_INVENTORY", "ADMIN"));
         model.addAttribute("canDelete", currentUser.hasAnyPermission("MANAGE_INVENTORY", "ADMIN"));
+
         return "admin/stock";
     }
 
@@ -105,6 +115,20 @@ public class StockController {
         } catch (Exception e) {
             return "redirect:/admin/stock?error=" + e.getMessage();
         }
+    }
+
+    @GetMapping("/categories")
+    @ResponseBody
+    @PreAuthorize("hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<List<StockCategory>> getAllCategories() {
+        return ResponseEntity.ok(stockService.getAllCategories());
+    }
+
+    @GetMapping("/by-category/{categoryId}")
+    @ResponseBody
+    @PreAuthorize("hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<List<StockItem>> getItemsByCategory(@PathVariable Long categoryId) {
+        return ResponseEntity.ok(stockService.getStockItemsByCategory(categoryId));
     }
 
     @GetMapping("/api")

@@ -43,24 +43,35 @@
                     <td class="loc-address" th:text="${loc.address}">123 Main St</td>
                     <td><span class="loc-city" th:text="${loc.city}">Kampala</span></td>
                     <td><span class="loc-country" th:text="${loc.country}">Uganda</span></td>
-                    <td>
-                        <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit"
-                                    data-bs-toggle="modal" data-bs-target="#editLocationModal"
-                                    th:data-id="${loc.locationId}"
-                                    th:data-name="${loc.name}"
-                                    th:data-address="${loc.address}"
-                                    th:data-city="${loc.city}"
-                                    th:data-country="${loc.country}"
-                                    onclick="openEditModal(this)">
-                                <i class="fas fa-edit"></i>
+                    <td class="text-center">
+                        <!-- 3-dot actions dropdown -->
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-ellipsis-vertical"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete"
-                                    th:data-id="${loc.locationId}"
-                                    th:data-name="${loc.name}"
-                                    onclick="deleteLocation(this)">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal" data-bs-target="#editLocationModal"
+                                       th:data-id="${loc.locationId}"
+                                       th:data-name="${loc.name}"
+                                       th:data-address="${loc.address}"
+                                       th:data-city="${loc.city}"
+                                       th:data-country="${loc.country}"
+                                       onclick="openEditModal(this)">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#"
+                                       th:data-id="${loc.locationId}"
+                                       th:data-name="${loc.name}"
+                                       onclick="deleteLocation(this); return false;">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </td>
                 </tr>
@@ -201,10 +212,22 @@
         .loc-address { color: #6c757d; }
         .loc-city, .loc-country { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #e8eefc; color: #0d6efd; }
 
-        .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
-        .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
+        /* 3-dot actions */
+        .action-dots-btn {
+            width: 30px; height: 30px; padding: 0 !important;
+            border-radius: 8px !important; border: 1px solid #e9ecef !important;
+            background: white; color: #6c757d;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .action-dots-btn:hover { background: #f8f9fb; color: var(--ink); }
+        .action-dropdown-menu {
+            border-radius: 12px; border: none; padding: 6px;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16); min-width: 160px;
+        }
+        .action-dropdown-menu .dropdown-item {
+            border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 500;
+        }
+        .action-dropdown-menu .dropdown-item:hover { background: #f8f9fb; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }

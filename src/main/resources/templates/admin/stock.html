@@ -41,6 +41,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Name</th>
+                    <th>Category</th>
                     <th>Description</th>
                     <th>Quantity</th>
                     <th>Unit</th>
@@ -54,6 +55,7 @@
                 <tr th:each="item : ${items}">
                     <td th:text="${item.id}">1</td>
                     <td th:text="${item.name}">Pens</td>
+                    <td><span class="badge bg-info" th:text="${item.category != null ? item.category.name : 'Uncategorized'}">Stationery</span></td>
                     <td th:text="${item.description}">Blue ink pens</td>
                     <td th:text="${item.quantity}">100</td>
                     <td th:text="${item.unit}">pcs</td>
@@ -63,38 +65,54 @@
                         <span th:unless="${item.quantity <= item.lowStockThreshold}" class="badge bg-success">OK</span>
                     </td>
                     <td th:text="${#temporals.format(item.lastUpdated, 'dd/MM/yyyy HH:mm')}">-</td>
-                    <td>
-                        <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit"
-                                    th:data-id="${item.id}"
-                                    th:data-name="${item.name}"
-                                    th:data-description="${item.description}"
-                                    th:data-quantity="${item.quantity}"
-                                    th:data-unit="${item.unit}"
-                                    th:data-threshold="${item.lowStockThreshold}"
-                                    onclick="openEditModal(this)">
-                                <i class="fas fa-edit"></i>
+                    <td class="text-center">
+                        <!-- 3-dot actions dropdown -->
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-ellipsis-vertical"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-success" title="Deduct"
-                                    th:data-id="${item.id}"
-                                    th:data-name="${item.name}"
-                                    th:data-quantity="${item.quantity}"
-                                    onclick="openDeductModal(this)">
-                                <i class="fas fa-minus-circle"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-info" title="Restock"
-                                    th:data-id="${item.id}"
-                                    th:data-name="${item.name}"
-                                    th:data-quantity="${item.quantity}"
-                                    onclick="openRestockModal(this)">
-                                <i class="fas fa-plus-circle"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete"
-                                    th:data-id="${item.id}"
-                                    th:data-name="${item.name}"
-                                    onclick="deleteStockItem(this)">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       th:data-id="${item.id}"
+                                       th:data-name="${item.name}"
+                                       th:data-description="${item.description}"
+                                       th:data-quantity="${item.quantity}"
+                                       th:data-unit="${item.unit}"
+                                       th:data-threshold="${item.lowStockThreshold}"
+                                       th:data-category="${item.category != null ? item.category.id : ''}"
+                                       onclick="openEditModal(this); return false;">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       th:data-id="${item.id}"
+                                       th:data-name="${item.name}"
+                                       th:data-quantity="${item.quantity}"
+                                       onclick="openDeductModal(this); return false;">
+                                        <i class="fas fa-minus-circle me-2 text-success"></i>Deduct
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       th:data-id="${item.id}"
+                                       th:data-name="${item.name}"
+                                       th:data-quantity="${item.quantity}"
+                                       onclick="openRestockModal(this); return false;">
+                                        <i class="fas fa-plus-circle me-2 text-info"></i>Restock
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#"
+                                       th:data-id="${item.id}"
+                                       th:data-name="${item.name}"
+                                       onclick="deleteStockItem(this); return false;">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </td>
                 </tr>
@@ -124,6 +142,15 @@
                         <div class="mb-3">
                             <label class="form-label">Name *</label>
                             <input type="text" id="itemName" name="name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <select id="itemCategory" name="category.id" class="form-select">
+                                <option value="">Select Category</option>
+                                <option th:each="cat : ${categories}"
+                                        th:value="${cat.id}"
+                                        th:text="${cat.name}">Category</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
@@ -221,6 +248,27 @@
             </div>
         </div>
     </div>
+
+    <!-- Confirm Action Modal (replaces native browser confirm()) -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-question-circle me-2" style="color: #fd7e14;"></i>Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="confirmActionMessage">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionBtn">
+                        <i class="fas fa-check me-1"></i>Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ==================== Styles ==================== -->
@@ -252,18 +300,6 @@
             overflow: hidden;
             padding: 16px;
         }
-        .action-btn-group .btn {
-            border-radius: 8px !important;
-            padding: 6px 10px !important;
-            font-size: 12.5px !important;
-            margin-right: 4px;
-            border: 1px solid #e9ecef;
-        }
-        .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; color: white; border-color: #0d6efd; }
-        .action-btn-group .btn-outline-success:hover { background: #28a745; color: white; border-color: #28a745; }
-        .action-btn-group .btn-outline-info:hover { background: #17a2b8; color: white; border-color: #17a2b8; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; color: white; border-color: #dc3545; }
         .empty-state {
             text-align: center;
             padding: 50px 20px;
@@ -305,6 +341,24 @@
         }
         .badge.bg-danger { background: #dc3545; }
         .badge.bg-success { background: #28a745; }
+        .badge.bg-info { background: #0dcaf0; color: #000; }
+
+        /* 3-dot actions */
+        .action-dots-btn {
+            width: 30px; height: 30px; padding: 0 !important;
+            border-radius: 8px !important; border: 1px solid #e9ecef !important;
+            background: white; color: #6c757d;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .action-dots-btn:hover { background: #f8f9fb; color: var(--ink); }
+        .action-dropdown-menu {
+            border-radius: 12px; border: none; padding: 6px;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16); min-width: 160px;
+        }
+        .action-dropdown-menu .dropdown-item {
+            border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 500;
+        }
+        .action-dropdown-menu .dropdown-item:hover { background: #f8f9fb; }
 
         /* Center Alert */
         .center-alert-overlay {
@@ -340,9 +394,19 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
+    <!--
+        NOTE: the old "const categories = /*[[${categories}]]*/ [];" block was
+        removed. It was never actually used anywhere in this script (the edit
+        modal just sets the existing <select> value directly), and serializing
+        the Category entities to JSON was causing a java.lang.StackOverflowError
+        on the server — almost certainly a bidirectional entity relationship
+        (e.g. Category -> List<StockItem> -> Category -> ...) without @JsonIgnore.
+        That server error was crashing the whole request, which is why every
+        modal on the page appeared broken, not just Add Item.
+    -->
+
     <script th:inline="none">
         $(document).ready(function() {
-            // Initialize DataTable if table exists and has data
             if ($.fn.DataTable.isDataTable('#stockTable')) {
                 $('#stockTable').DataTable().destroy();
             }
@@ -352,7 +416,7 @@
                 lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
                 order: [[0, 'asc']],
                 columnDefs: [
-                    { orderable: false, targets: 8 }
+                    { orderable: false, targets: 9 }
                 ],
                 language: {
                     search: "Search:",
@@ -394,6 +458,23 @@
             }, 2000);
         }
 
+        // ============================================
+        // In-page Confirm modal (replaces native confirm())
+        // ============================================
+        function showConfirm(message, onConfirm) {
+            document.getElementById('confirmActionMessage').textContent = message;
+            const modalEl = document.getElementById('confirmActionModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const oldBtn = document.getElementById('confirmActionBtn');
+            const newBtn = oldBtn.cloneNode(true);
+            oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+            newBtn.addEventListener('click', function () {
+                modal.hide();
+                onConfirm();
+            });
+            modal.show();
+        }
+
         // ==================== Modal Handlers ====================
 
         // Reset form when Add Item modal opens
@@ -406,6 +487,7 @@
                     document.getElementById('stockForm').action = '/assetIQ-pro/admin/stock/api';
                     document.getElementById('editId').value = '';
                     document.getElementById('itemName').value = '';
+                    document.getElementById('itemCategory').value = '';
                     document.getElementById('itemDescription').value = '';
                     document.getElementById('itemQuantity').value = '';
                     document.getElementById('itemUnit').value = '';
@@ -421,18 +503,19 @@
             const quantity = btn.getAttribute('data-quantity');
             const unit = btn.getAttribute('data-unit');
             const threshold = btn.getAttribute('data-threshold');
+            const categoryId = btn.getAttribute('data-category');
 
             document.getElementById('stockModalTitle').textContent = 'Edit Stock Item';
             document.getElementById('stockModalSaveBtn').textContent = 'Update Item';
             document.getElementById('stockForm').action = '/assetIQ-pro/admin/stock/api/' + id;
             document.getElementById('editId').value = id;
             document.getElementById('itemName').value = name || '';
+            document.getElementById('itemCategory').value = categoryId || '';
             document.getElementById('itemDescription').value = description || '';
             document.getElementById('itemQuantity').value = quantity || 0;
             document.getElementById('itemUnit').value = unit || '';
             document.getElementById('itemThreshold').value = threshold || 5;
 
-            // Show the modal
             const modal = new bootstrap.Modal(document.getElementById('stockModal'));
             modal.show();
         }
@@ -470,7 +553,8 @@
         function deleteStockItem(btn) {
             const id = btn.getAttribute('data-id');
             const name = btn.getAttribute('data-name');
-            if (confirm('Are you sure you want to delete "' + name + '" ? This action cannot be undone.')) {
+
+            showConfirm('Are you sure you want to delete "' + name + '"? This action cannot be undone.', function () {
                 const tokenMeta = document.querySelector('meta[name="_csrf"]');
                 const headerMeta = document.querySelector('meta[name="_csrf_header"]');
                 const headers = {};
@@ -484,20 +568,19 @@
                 })
                 .then(response => {
                     if (response.ok) {
-                        window.location.reload();
+                        showToast('Item deleted successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
                     } else {
-                        response.text().then(msg => alert('Failed to delete: ' + msg));
+                        response.text().then(msg => showToast('Failed to delete: ' + msg, 'error'));
                     }
                 })
-                .catch(err => alert('Error: ' + err));
-            }
+                .catch(err => showToast('Error: ' + err, 'error'));
+            });
         }
     </script>
 
     <!-- ============================================================ -->
     <!-- Flash-message alerts (from ?success=...&error=... query params) -->
-    <!-- separate th:inline="javascript" blocks so Thymeleaf inlining  -->
-    <!-- doesn't clash with the DataTables th:inline="none" script above. -->
     <!-- ============================================================ -->
     <script th:if="${param.success}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {

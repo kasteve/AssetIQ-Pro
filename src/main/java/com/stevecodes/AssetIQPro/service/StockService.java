@@ -1,6 +1,8 @@
 package com.stevecodes.AssetIQPro.service;
 
+import com.stevecodes.AssetIQPro.entity.StockCategory;
 import com.stevecodes.AssetIQPro.entity.StockItem;
+import com.stevecodes.AssetIQPro.repository.StockCategoryRepository;
 import com.stevecodes.AssetIQPro.repository.StockItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,37 +19,102 @@ import java.util.List;
 public class StockService {
 
     private final StockItemRepository stockItemRepository;
+    private final StockCategoryRepository stockCategoryRepository;
     private final EmailService emailService;
     private final SystemSettingService settingService;
 
-    /**
-     * Retrieve all stock items
-     */
-    public List<StockItem> getAllStockItems() {
-        return stockItemRepository.findAll();
+    // ============================================
+    // Category Methods
+    // ============================================
+
+    public List<StockCategory> getAllCategories() {
+        return stockCategoryRepository.findAllByOrderByNameAsc();
     }
 
-    /**
-     * Get a single stock item by ID
-     */
+    public StockCategory getCategory(Long id) {
+        return stockCategoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+    }
+
+    @Transactional
+    public StockCategory createCategory(String name, String description) {
+        if (stockCategoryRepository.existsByName(name)) {
+            throw new RuntimeException("Category with name '" + name + "' already exists");
+        }
+        StockCategory category = new StockCategory(name, description);
+        return stockCategoryRepository.save(category);
+    }
+
+    @Transactional
+    public StockCategory updateCategory(Long id, String name, String description) {
+        StockCategory category = getCategory(id);
+        // Check if new name conflicts with existing (except itself)
+        if (!category.getName().equals(name) && stockCategoryRepository.existsByName(name)) {
+            throw new RuntimeException("Category with name '" + name + "' already exists");
+        }
+        category.setName(name);
+        category.setDescription(description);
+        return stockCategoryRepository.save(category);
+    }
+
+    @Transactional
+    public void deleteCategory(Long id) {
+        StockCategory category = getCategory(id);
+        // Check if category has items
+        if (!category.getItems().isEmpty()) {
+            throw new RuntimeException("Cannot delete category with existing stock items. Move or delete items first.");
+        }
+        stockCategoryRepository.delete(category);
+    }
+
+    // ============================================
+    // Stock Item Methods
+    // ============================================
+
+    public List<StockItem> getAllStockItems() {
+        return stockItemRepository.findAllOrderByCategoryAndName();
+    }
+
+    public List<StockItem> getStockItemsByCategory(Long categoryId) {
+        return stockItemRepository.findByCategoryIdOrderByNameAsc(categoryId);
+    }
+
     public StockItem getStockItem(Long id) {
         return stockItemRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stock item not found"));
     }
 
-    /**
-     * Create or update a stock item
-     */
     @Transactional
     public StockItem saveStockItem(StockItem item) {
         item.setLastUpdated(LocalDateTime.now());
-        item.setAlertSent(false); // reset alert flag on update
+        item.setAlertSent(false);
+
+        // Validate category if provided
+        if (item.getCategory() != null && item.getCategory().getId() != null) {
+            StockCategory category = getCategory(item.getCategory().getId());
+            item.setCategory(category);
+        }
+
         return stockItemRepository.save(item);
     }
 
-    /**
-     * Decrease stock quantity by a given amount (e.g., when an item is issued)
-     */
+    @Transactional
+    public StockItem createStockItem(String name, String description, Integer quantity,
+                                     String unit, Integer lowStockThreshold, Long categoryId) {
+        StockCategory category = categoryId != null ? getCategory(categoryId) : null;
+
+        StockItem item = new StockItem();
+        item.setName(name);
+        item.setDescription(description);
+        item.setQuantity(quantity != null ? quantity : 0);
+        item.setUnit(unit);
+        item.setLowStockThreshold(lowStockThreshold != null ? lowStockThreshold : 5);
+        item.setCategory(category);
+        item.setLastUpdated(LocalDateTime.now());
+
+        return stockItemRepository.save(item);
+    }
+
     @Transactional
     public StockItem deductStock(Long itemId, int amount, String reason) {
         StockItem item = getStockItem(itemId);
@@ -56,43 +123,31 @@ public class StockService {
         }
         item.setQuantity(item.getQuantity() - amount);
         item.setLastUpdated(LocalDateTime.now());
-        // If stock is now at or below threshold, reset alert flag so a new email can be sent
         if (item.getQuantity() <= item.getLowStockThreshold()) {
             item.setAlertSent(false);
         }
         StockItem saved = stockItemRepository.save(item);
         checkAndSendLowStockAlert(saved);
-        // Optionally create a transaction log (StockTransaction entity) – not implemented here for brevity
         return saved;
     }
 
-    /**
-     * Increase stock quantity (restock)
-     */
     @Transactional
     public StockItem restock(Long itemId, int amount) {
         StockItem item = getStockItem(itemId);
         item.setQuantity(item.getQuantity() + amount);
         item.setLastUpdated(LocalDateTime.now());
-        // When restocked above threshold, reset alert flag
         if (item.getQuantity() > item.getLowStockThreshold()) {
             item.setAlertSent(false);
         }
         return stockItemRepository.save(item);
     }
 
-    /**
-     * Delete a stock item
-     */
     @Transactional
     public void deleteStockItem(Long id) {
         stockItemRepository.deleteById(id);
     }
 
-    /**
-     * Check if a stock item is below its threshold and send email if not already alerted
-     */
-    private void checkAndSendLowStockAlert(StockItem item) {
+    public void checkAndSendLowStockAlert(StockItem item) {
         if (item.getQuantity() <= item.getLowStockThreshold() && !item.isAlertSent()) {
             sendLowStockAlert(item);
             item.setAlertSent(true);
@@ -100,17 +155,16 @@ public class StockService {
         }
     }
 
-    /**
-     * Send low‑stock email alert
-     */
     private void sendLowStockAlert(StockItem item) {
         String adminEmail = settingService.getString(SystemSettingService.KEY_REPORT_RECIPIENTS);
         if (adminEmail == null || adminEmail.isEmpty()) {
-            adminEmail = "admin@company.com"; // fallback
+            adminEmail = "admin@company.com";
         }
         String subject = "⚠️ Low Stock Alert: " + item.getName();
+        String categoryName = item.getCategory() != null ? item.getCategory().getName() : "Uncategorized";
         String body = String.format("""
                 Stock item "%s" is running low.
+                Category: %s
                 Current quantity: %d
                 Threshold: %d
                 Unit: %s
@@ -120,21 +174,19 @@ public class StockService {
                 Item ID: %d
                 """,
                 item.getName(),
+                categoryName,
                 item.getQuantity(),
                 item.getLowStockThreshold(),
                 item.getUnit() != null ? item.getUnit() : "N/A",
                 item.getId()
         );
         emailService.sendSimpleEmail(adminEmail, subject, body);
-        log.info("Low‑stock alert sent for item '{}' to {}", item.getName(), adminEmail);
+        log.info("Low-stock alert sent for item '{}' to {}", item.getName(), adminEmail);
     }
 
-    /**
-     * Scheduled task to check all items for low stock (runs every hour)
-     */
-    @Scheduled(cron = "0 0 * * * *") // every hour
+    @Scheduled(cron = "0 0 * * * *")
     public void scheduledLowStockCheck() {
-        log.info("Running scheduled low‑stock check...");
+        log.info("Running scheduled low-stock check...");
         List<StockItem> items = stockItemRepository.findItemsBelowThresholdWithoutAlert();
         for (StockItem item : items) {
             checkAndSendLowStockAlert(item);

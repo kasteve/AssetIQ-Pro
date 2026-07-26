@@ -330,6 +330,33 @@
                             <label class="form-label">Justification</label>
                             <textarea name="justification" class="form-control" rows="2" placeholder="Why do you need this resource?"></textarea>
                         </div>
+                        <!-- ============================================ -->
+                        <!-- Category and Stock Item Selection -->
+                        <!-- ============================================ -->
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <select id="requestCategory" class="form-select" onchange="loadStockItemsByCategory(this.value)">
+                                <option value="">Select Category (Optional)</option>
+                                <option th:each="cat : ${categories}"
+                                        th:value="${cat.id}"
+                                        th:text="${cat.name}">Category</option>
+                            </select>
+                            <div th:if="${categories == null or categories.isEmpty()}" class="text-muted small mt-1">
+                                <i class="fas fa-info-circle"></i> No categories available. Please add categories in Stock Management.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Stock Item</label>
+                            <select name="stockItemId" id="requestStockItem" class="form-select">
+                                <option value="">None - Generic Resource</option>
+                                <option th:each="item : ${stockItems}"
+                                        th:value="${item.id}"
+                                        th:text="${item.name} + ' (Available: ' + ${item.quantity} + ' ' + ${item.unit} + ')'">
+                                    Stock Item
+                                </option>
+                            </select>
+                            <small class="text-muted">If a stock item is selected, stock will be automatically deducted when this request is completed.</small>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -627,6 +654,92 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
+    <!-- ============================================ -->
+    <!-- Dynamic Stock Items by Category -->
+    <!-- ============================================ -->
+    <script>
+        // Store all stock items for filtering
+        let allStockItems = [];
+
+        // Load all stock items from the server
+        function loadAllStockItems() {
+            fetch('/assetIQ-pro/admin/stock/api')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(items => {
+                    allStockItems = items || [];
+                    console.log('Loaded ' + allStockItems.length + ' stock items');
+                    populateStockItemsDropdown('');
+                })
+                .catch(error => {
+                    console.error('Error loading stock items:', error);
+                    // Still show the dropdown with "None" option
+                    const dropdown = document.getElementById('requestStockItem');
+                    if (dropdown) {
+                        dropdown.innerHTML = '<option value="">None - Generic Resource</option>';
+                    }
+                });
+        }
+
+        // Populate stock items dropdown based on category
+        function populateStockItemsDropdown(categoryId) {
+            const dropdown = document.getElementById('requestStockItem');
+            if (!dropdown) return;
+
+            // Clear existing options (keep the first "None" option)
+            dropdown.innerHTML = '<option value="">None - Generic Resource</option>';
+
+            let filteredItems = allStockItems;
+            if (categoryId && categoryId !== '') {
+                filteredItems = allStockItems.filter(item =>
+                    item.category && item.category.id == categoryId
+                );
+                console.log('Filtered to ' + filteredItems.length + ' items for category ' + categoryId);
+            }
+
+            // Sort by name
+            filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+
+            filteredItems.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                const unit = item.unit || 'units';
+                option.textContent = `${item.name} (Available: ${item.quantity} ${unit})`;
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Called when category selection changes
+        function loadStockItemsByCategory(categoryId) {
+            console.log('Category changed to:', categoryId);
+            populateStockItemsDropdown(categoryId);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing stock item dropdowns...');
+            loadAllStockItems();
+
+            // Also load when modal opens
+            const createModal = document.getElementById('createResourceModal');
+            if (createModal) {
+                createModal.addEventListener('shown.bs.modal', function() {
+                    console.log('Modal opened, reloading stock items...');
+                    loadAllStockItems();
+                    // Reset category dropdown
+                    const categoryDropdown = document.getElementById('requestCategory');
+                    if (categoryDropdown) {
+                        categoryDropdown.value = '';
+                    }
+                });
+            }
+        });
+    </script>
+
     <script th:inline="none">
         $(document).ready(function() {
             const tableConfig = {
@@ -750,6 +863,11 @@
                                 <div class="detail-item">
                                     <span class="label">Justification</span>
                                     <span class="value">${request.justification}</span>
+                                </div>` : ''}
+                                ${request.stockItemName ? `
+                                <div class="detail-item">
+                                    <span class="label">Stock Item</span>
+                                    <span class="value">${request.stockItemName} (Available: ${request.currentStockQuantity || 'N/A'})</span>
                                 </div>` : ''}
                             </div>
                             <div class="col-md-6">
