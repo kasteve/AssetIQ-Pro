@@ -63,6 +63,23 @@ public class AppUserService {
     private SystemSettingService settingService;
 
     // ============================================
+    // Default Permissions for ALL New Users
+    // ============================================
+    private List<String> getDefaultPermissions() {
+        return List.of(
+                "GENERATE_VOUCHERS",      // Generate meal/break vouchers
+                "VIEW_OWN_TRANSACTIONS",  // View only own transactions
+                "MANAGE_BOOKINGS",        // Manage room and driver bookings
+                "INFRA_REQUEST_VIEW",     // View and manage infrastructure requests
+                "RESOURCE_REQUEST_VIEW",  // View and manage resource/administration requests
+                "ROOM_VIEW_ALL",          // View all rooms in the system
+                "ROOM_BOOK",              // Book rooms for meetings/events
+                "ROOM_CANCEL",            // Cancel room bookings
+                "DRIVER_VIEW"             // View driver dashboard and assignments
+        );
+    }
+
+    // ============================================
     // Authentication
     // ============================================
 
@@ -83,7 +100,7 @@ public class AppUserService {
             return null;
         }
 
-        // ---- Lockout check ----
+        // Lockout check
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
             long minutesLeft = ChronoUnit.MINUTES.between(LocalDateTime.now(), user.getLockedUntil()) + 1;
             log.warn("Account locked for user: {} ({} minute(s) remaining)", username, minutesLeft);
@@ -91,7 +108,6 @@ public class AppUserService {
                     "Account locked due to too many failed login attempts. Try again in " + minutesLeft + " minute(s).");
         }
 
-        // Lock window has passed -> clear stale lock/attempts
         if (user.getLockedUntil() != null && !user.getLockedUntil().isAfter(LocalDateTime.now())) {
             user.setLockedUntil(null);
             user.setFailedLoginAttempts(0);
@@ -103,7 +119,6 @@ public class AppUserService {
             user.setFailedLoginAttempts(attempts);
 
             if (maxAttempts > 0 && attempts >= maxAttempts) {
-                // Lock for 30 minutes (adjust as desired)
                 user.setLockedUntil(LocalDateTime.now().plusMinutes(30));
                 userRepository.save(user);
                 log.warn("Account locked after {} failed attempts: {}", attempts, username);
@@ -116,7 +131,6 @@ public class AppUserService {
             return null;
         }
 
-        // Successful login -> reset failed attempt counter
         if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
             user.setFailedLoginAttempts(0);
             user.setLockedUntil(null);
@@ -126,7 +140,6 @@ public class AppUserService {
         log.info("User authenticated successfully: {}", username);
         UserDTO dto = convertToDTO(user);
 
-        // ---- Password expiry check (transient flag only, not persisted) ----
         int expiryDays = settingService.getInt(SystemSettingService.KEY_PASSWORD_EXPIRY_DAYS);
         if (expiryDays > 0 && user.getLastPasswordChanged() != null) {
             long daysSinceChange = ChronoUnit.DAYS.between(user.getLastPasswordChanged(), LocalDateTime.now());
@@ -147,7 +160,6 @@ public class AppUserService {
     public AppUser createUser(UserDTO userDTO) {
         log.info("Creating new user: {}", userDTO.getUsername());
 
-        // Validation
         if (userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username '" + userDTO.getUsername() + "' is already taken.");
         }
@@ -160,7 +172,6 @@ public class AppUserService {
 
         String tempPassword = generateTemporaryPassword();
 
-        // 1. Create and save Employee
         Employee employee = new Employee();
         employee.setStaffId(userDTO.getStaffId());
         employee.setFirstName(getFirstName(userDTO.getFullName()));
@@ -180,11 +191,9 @@ public class AppUserService {
             employee.setLineManager(lineManager);
         }
 
-        // Save Employee – it is now persistent
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created with ID: {}", savedEmployee.getEmployeeId());
 
-        // 2. Create AppUser
         AppUser user = new AppUser();
         user.setStaffId(userDTO.getStaffId());
         user.setUsername(userDTO.getUsername());
@@ -208,29 +217,26 @@ public class AppUserService {
         user.setLastPasswordChanged(LocalDateTime.now());
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
-
-        // ✅ Link the persistent Employee (owning side)
         user.setEmployee(savedEmployee);
 
-        // Assign permissions
+        // ✅ Assign default permissions
+        List<String> defaultPermissions = getDefaultPermissions();
+        for (String permName : defaultPermissions) {
+            permissionRepository.findByPermissionName(permName)
+                    .ifPresent(user::addPermission);
+        }
+
+        // If user selected additional permissions, add them too
         if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
                         .ifPresent(user::addPermission);
             }
-        } else {
-            List<String> defaultPermissions = getDefaultPermissions(userDTO.getRole());
-            for (String permName : defaultPermissions) {
-                permissionRepository.findByPermissionName(permName)
-                        .ifPresent(user::addPermission);
-            }
         }
 
-        // ✅ Save AppUser – this will set the foreign key (employee_id)
         AppUser savedUser = userRepository.save(user);
         log.info("User created successfully: {}", savedUser.getUsername());
 
-        // Record initial password in history so it counts against future reuse checks
         passwordHistoryRepository.save(new PasswordHistory(savedUser.getUserId(), savedUser.getPasswordHash()));
 
         log.info("=========================================");
@@ -240,6 +246,7 @@ public class AppUserService {
         log.info("Role: {}", savedUser.getRole());
         log.info("Department: {}", savedUser.getDepartment());
         log.info("Temporary Password: {}", tempPassword);
+        log.info("Default Permissions: {}", defaultPermissions);
         log.info("Email: {}", savedUser.getEmail());
         log.info("=========================================");
 
@@ -262,83 +269,9 @@ public class AppUserService {
         return savedUser;
     }
 
-    private List<String> getDefaultPermissions(String role) {
-        if (role == null) return List.of();
-
-        return switch(role.toUpperCase()) {
-            case "SUPERADMIN" -> List.of(
-                    "VIEW_REPORTS", "DOWNLOAD_REPORTS", "VIEW_ALL_TRANSACTIONS",
-                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "APPROVE_LM", "APPROVE_FINANCE",
-                    "CREATE_USERS", "RESET_PASSWORDS", "MANAGE_ROLES", "MANAGE_CONFIG",
-                    "EDIT_ASSETS", "DELETE_ASSETS", "MANAGE_WARRANTY", "MANAGE_EOL",
-                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS", "MANAGE_BOOKINGS",
-                    "VIEW_AUDIT", "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_MOVE",
-                    "ASSET_ASSIGN", "TRANSFER_CREATE", "TRANSFER_VIEW", "TRANSFER_BULK_EXPORT",
-                    "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
-                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
-                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
-                    "ROOM_VIEW_ALL", "DRIVER_VIEW", "DRIVER_APPROVE",
-                    "CAB_REQUEST_APPROVE", "CAB_REQUEST_VIEW",
-                    "EMPLOYEE_VIEW", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT",
-                    "DEPARTMENT_VIEW", "LOCATION_VIEW", "CATEGORY_VIEW", "SUPPLIER_VIEW", "COMPANY_VIEW"
-            );
-            case "ADMIN" -> List.of(
-                    "VIEW_REPORTS", "DOWNLOAD_REPORTS", "VIEW_ALL_TRANSACTIONS",
-                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "APPROVE_LM", "APPROVE_FINANCE",
-                    "CREATE_USERS", "RESET_PASSWORDS", "MANAGE_ROLES", "MANAGE_CONFIG",
-                    "EDIT_ASSETS", "DELETE_ASSETS", "MANAGE_WARRANTY", "MANAGE_EOL",
-                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS", "MANAGE_BOOKINGS",
-                    "VIEW_AUDIT", "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_MOVE",
-                    "ASSET_ASSIGN", "TRANSFER_CREATE", "TRANSFER_VIEW", "TRANSFER_BULK_EXPORT",
-                    "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
-                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
-                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
-                    "ROOM_VIEW_ALL", "DRIVER_VIEW", "DRIVER_APPROVE",
-                    "CAB_REQUEST_APPROVE", "CAB_REQUEST_VIEW",
-                    "EMPLOYEE_VIEW", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT"
-            );
-            case "DRIVER" -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS",
-                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
-                    "DRIVER_APPROVE", "DRIVER_VIEW",
-                    "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_CREATE",
-                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW"
-            );
-            case "INFRA" -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
-                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "MANAGE_BOOKINGS",
-                    "VIEW_AUDIT", "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
-                    "DRIVER_REQUEST", "DRIVER_CANCEL",
-                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_APPROVE", "INFRA_REQUEST_ATTACH_QUOTATION",
-                    "RESOURCE_REQUEST_CREATE", "RESOURCE_REQUEST_VIEW",
-                    "SUPPLIER_VIEW", "COMPANY_VIEW"
-            );
-            case "FINANCE" -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
-                    "APPROVE_FINANCE", "VIEW_ALL_TRANSACTIONS",
-                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
-                    "DRIVER_REQUEST", "DRIVER_CANCEL",
-                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_APPROVE",
-                    "SUPPLIER_VIEW", "COMPANY_VIEW"
-            );
-            case "MANAGER" -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS", "DOWNLOAD_REPORTS",
-                    "APPROVE_LM", "MANAGE_BOOKINGS",
-                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
-                    "DRIVER_REQUEST", "DRIVER_CANCEL",
-                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW",
-                    "EMPLOYEE_VIEW"
-            );
-            default -> List.of(
-                    "VIEW_REPORTS", "VIEW_OWN_TRANSACTIONS",
-                    "ROOM_BOOK", "ROOM_CANCEL", "ROOM_VIEW_ALL",
-                    "DRIVER_REQUEST", "DRIVER_CANCEL",
-                    "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_CREATE",
-                    "INFRA_REQUEST_VIEW", "RESOURCE_REQUEST_VIEW"
-            );
-        };
-    }
-
+    // ============================================
+    // ✅ FIXED: updateUser - Does NOT force password change
+    // ============================================
     @Transactional
     public AppUser updateUser(Long userId, UserDTO userDTO) {
         log.info("Updating user: {}", userId);
@@ -346,13 +279,16 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
+        // Update basic fields
         if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName());
         if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
         if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
         if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
         if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
-        if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
-        if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
+
+        // ✅ REMOVED: These lines were forcing password change
+        // if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
+        // if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
 
         // Update department
         if (userDTO.getDepartmentId() != null) {
@@ -385,6 +321,7 @@ public class AppUserService {
             employeeRepository.save(employee);
         }
 
+        // Update permissions
         if (userDTO.getPermissions() != null) {
             user.getPermissions().clear();
             for (String permName : userDTO.getPermissions()) {
@@ -404,7 +341,7 @@ public class AppUserService {
     }
 
     // ============================================
-    // Password Helper Methods (SINGLE DEFINITION)
+    // Password Helper Methods
     // ============================================
 
     public String generateTemporaryPassword() {
@@ -435,11 +372,6 @@ public class AppUserService {
         return new String(chars);
     }
 
-    /**
-     * Checks the candidate new password against the user's stored password history,
-     * per the configured "History Count" policy setting. Throws PasswordReuseException
-     * if the candidate matches one of the last N passwords.
-     */
     private void enforcePasswordHistory(Long userId, String rawNewPassword) {
         int historyCount = settingService.getInt(SystemSettingService.KEY_PASSWORD_HISTORY_COUNT);
         if (historyCount <= 0) return;
@@ -455,15 +387,11 @@ public class AppUserService {
         }
     }
 
-    /**
-     * Records the new password hash in history and trims older entries beyond
-     * the configured history count (kept as a small buffer of +5 for safety).
-     */
     private void recordPasswordHistory(Long userId, String newHash) {
         passwordHistoryRepository.save(new PasswordHistory(userId, newHash));
 
         int historyCount = settingService.getInt(SystemSettingService.KEY_PASSWORD_HISTORY_COUNT);
-        int keep = Math.max(historyCount, 1) + 5; // small buffer
+        int keep = Math.max(historyCount, 1) + 5;
         List<PasswordHistory> all = passwordHistoryRepository.findByUserIdOrderByChangedAtDesc(userId);
         if (all.size() > keep) {
             List<Long> idsToKeep = all.stream().limit(keep).map(PasswordHistory::getHistoryId).collect(Collectors.toList());
@@ -481,7 +409,8 @@ public class AppUserService {
         user.setRole(role);
         user.getPermissions().clear();
 
-        List<String> defaultPermissions = getDefaultPermissions(role);
+        // ✅ Assign default permissions when role changes
+        List<String> defaultPermissions = getDefaultPermissions();
         for (String permName : defaultPermissions) {
             permissionRepository.findByPermissionName(permName)
                     .ifPresent(user::addPermission);
@@ -679,6 +608,9 @@ public class AppUserService {
                     .ifPresent(user::addPermission);
         }
 
+        // ✅ IMPORTANT: Do NOT force password change
+        // Do NOT set user.setMustChangePassword(true);
+
         userRepository.save(user);
         auditService.logAction("PERMISSIONS_SYNCED",
                 "Permissions synced for user: " + user.getUsername(),
@@ -791,9 +723,6 @@ public class AppUserService {
         auditService.logAction("USER_UNBLOCKED", "User unblocked: " + user.getUsername(), user.getUserId());
     }
 
-    /**
-     * Admin-triggered manual unlock (clears lockout independent of blocked/active flags).
-     */
     @Transactional
     public void unlockUser(Long userId) {
         AppUser user = userRepository.findById(userId)
@@ -813,7 +742,6 @@ public class AppUserService {
 
         auditService.logAction("USER_DELETED", "User deleted: " + user.getUsername(), userId);
 
-        // Delete employee if exists
         if (user.getEmployee() != null) {
             employeeRepository.delete(user.getEmployee());
         }

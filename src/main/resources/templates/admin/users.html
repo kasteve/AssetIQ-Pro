@@ -93,7 +93,6 @@
                         <span th:if="${user.mustChangePassword}" class="status-badge warn">Change Password</span>
                     </td>
                     <td class="text-center">
-                        <!-- 3-dot actions dropdown -->
                         <div class="dropdown">
                             <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-ellipsis-vertical"></i>
@@ -394,7 +393,6 @@
         .status-badge.blocked { background: #e9ecef; color: #343a40; }
         .status-badge.warn { background: #fff4e0; color: #fd7e14; }
 
-        /* 3-dot actions */
         .action-dots-btn {
             width: 30px; height: 30px; padding: 0 !important;
             border-radius: 8px !important; border: 1px solid #e9ecef !important;
@@ -450,7 +448,6 @@
             .perm-picker { grid-template-columns: 1fr; }
         }
 
-        /* DataTables overrides */
         .dataTables_wrapper .dataTables_filter input {
             border-radius: 10px !important;
             border: 1px solid #e2e8f0 !important;
@@ -489,9 +486,7 @@
 </div>
 
 <div layout:fragment="scripts">
-    <!-- jQuery (required for DataTables) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
@@ -545,19 +540,92 @@
                 });
             }
 
+            // ============================================
+            // EDIT USER MODAL - Load permissions when opened
+            // ============================================
             const editModal = document.getElementById('editUserModal');
             if (editModal) {
                 editModal.addEventListener('show.bs.modal', function(event) {
                     const button = event.relatedTarget;
-                    document.getElementById('editUserId').value = button.getAttribute('data-userid');
-                    document.getElementById('editStaffId').value = button.getAttribute('data-staffid');
-                    document.getElementById('editUsername').value = button.getAttribute('data-username');
-                    document.getElementById('editFullName').value = button.getAttribute('data-fullname');
-                    document.getElementById('editEmail').value = button.getAttribute('data-email');
-                    document.getElementById('editPhoneNumber').value = button.getAttribute('data-phonenumber');
-                    document.getElementById('editRole').value = button.getAttribute('data-role');
-                    document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid');
-                    document.getElementById('editLineManagerId').value = button.getAttribute('data-linemanagerid');
+                    const userId = button.getAttribute('data-userid');
+
+                    // Set basic fields
+                    document.getElementById('editUserId').value = userId;
+                    document.getElementById('editStaffId').value = button.getAttribute('data-staffid') || '';
+                    document.getElementById('editUsername').value = button.getAttribute('data-username') || '';
+                    document.getElementById('editFullName').value = button.getAttribute('data-fullname') || '';
+                    document.getElementById('editEmail').value = button.getAttribute('data-email') || '';
+                    document.getElementById('editPhoneNumber').value = button.getAttribute('data-phonenumber') || '';
+                    document.getElementById('editRole').value = button.getAttribute('data-role') || 'EMPLOYEE';
+                    document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid') || '';
+                    document.getElementById('editLineManagerId').value = button.getAttribute('data-linemanagerid') || '';
+
+                    // Uncheck all permissions first
+                    document.querySelectorAll('#editUserModal input[name="permissions"]').forEach(cb => {
+                        cb.checked = false;
+                    });
+
+                    // ✅ Fetch user permissions with better error handling
+                    const apiUrl = '/assetIQ-pro/api/admin/users/' + userId + '/permissions';
+                    console.log('Fetching permissions for user ' + userId + ' from: ' + apiUrl);
+
+                    fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(permissions => {
+                        console.log('Permissions received:', permissions);
+                        if (permissions && permissions.length > 0) {
+                            const checkboxes = document.querySelectorAll('#editUserModal input[name="permissions"]');
+                            checkboxes.forEach(cb => {
+                                if (permissions.includes(cb.value)) {
+                                    cb.checked = true;
+                                    console.log('Checked permission:', cb.value);
+                                }
+                            });
+                        } else {
+                            console.log('No permissions found for user');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading permissions:', error);
+                        // ✅ Fallback: Try alternative API endpoint
+                        console.log('Trying fallback API endpoint...');
+                        fetch('/assetIQ-pro/api/admin/users/' + userId, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            credentials: 'same-origin'
+                        })
+                        .then(res => res.json())
+                        .then(userData => {
+                            console.log('User data from fallback:', userData);
+                            if (userData && userData.permissions) {
+                                const permissions = userData.permissions.map(p =>
+                                    typeof p === 'string' ? p : p.permissionName
+                                );
+                                const checkboxes = document.querySelectorAll('#editUserModal input[name="permissions"]');
+                                checkboxes.forEach(cb => {
+                                    if (permissions.includes(cb.value)) {
+                                        cb.checked = true;
+                                    }
+                                });
+                                console.log('Permissions loaded from fallback');
+                            }
+                        })
+                        .catch(err2 => console.error('Both API endpoints failed:', err2));
+                    });
                 });
             }
         });

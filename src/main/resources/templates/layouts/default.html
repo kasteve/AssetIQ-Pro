@@ -637,8 +637,41 @@
             </a>
         </div>
 
-        <!-- ========== ADMIN DROPDOWN ========== -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS')">
+        <!-- Vouchers - Everyone -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
+                <i class="fas fa-ticket-alt"></i> Vouchers
+            </a>
+        </div>
+
+        <!-- Reports - Everyone -->
+        <div class="nav-item">
+            <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
+                <i class="fas fa-file-alt"></i> Reports
+            </a>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <!-- ========== BOTTOM SECTION: Assets, Transfers, Admin ========== -->
+        <!-- Assets & Transfers - Admin only -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                    <i class="fas fa-laptop"></i> Assets
+                    <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
+                    <i class="fas fa-exchange-alt"></i> Transfers
+                </a>
+            </div>
+        </div>
+
+        <!-- ========== ADMIN DROPDOWN - Moved to Bottom ========== -->
+        <!-- Only users with actual admin permissions can see this -->
+        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS', 'ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'USER_VIEW', 'EMPLOYEE_VIEW', 'DEPARTMENT_VIEW', 'CATEGORY_VIEW', 'LOCATION_VIEW', 'SUPPLIER_VIEW', 'COMPANY_VIEW', 'MANAGE_INVENTORY', 'VIEW_AUDIT')">
             <div class="nav-item">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-cog"></i> Admin
@@ -672,8 +705,8 @@
                     <li sec:authorize="hasAnyAuthority('COMPANY_VIEW', 'ADMIN')">
                         <a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
                     </li>
-                    <!-- Rooms - requires ROOM_VIEW_ALL or MANAGE_BOOKINGS -->
-                    <li sec:authorize="hasAnyAuthority('ROOM_VIEW_ALL', 'MANAGE_BOOKINGS', 'ADMIN')">
+                    <!-- Rooms - requires ROOM_CREATE, ROOM_EDIT, or ROOM_DELETE (NOT just ROOM_VIEW_ALL or ROOM_BOOK) -->
+                    <li sec:authorize="hasAnyAuthority('ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'MANAGE_BOOKINGS', 'ADMIN')">
                         <a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
                     </li>
                     <!-- Stock - requires MANAGE_INVENTORY -->
@@ -693,37 +726,6 @@
                         <a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
                     </li>
                 </ul>
-            </div>
-        </div>
-
-        <!-- Vouchers - Everyone -->
-        <div class="nav-item">
-            <a class="nav-link" th:classappend="${currentPage == 'vouchers'} ? 'active' : ''" href="/assetIQ-pro/vouchers">
-                <i class="fas fa-ticket-alt"></i> Vouchers
-            </a>
-        </div>
-
-        <!-- Reports - Everyone -->
-        <div class="nav-item">
-            <a class="nav-link" th:classappend="${currentPage == 'reports'} ? 'active' : ''" href="/assetIQ-pro/reports">
-                <i class="fas fa-file-alt"></i> Reports
-            </a>
-        </div>
-
-        <div class="nav-divider"></div>
-
-        <!-- Assets & Transfers - Admin only -->
-        <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
-                    <i class="fas fa-laptop"></i> Assets
-                    <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
-                </a>
-            </div>
-            <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
-                    <i class="fas fa-exchange-alt"></i> Transfers
-                </a>
             </div>
         </div>
 
