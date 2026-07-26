@@ -70,4 +70,9 @@ public interface DriverRequestRepository extends JpaRepository<DriverRequest, Lo
 
     @Query("SELECT AVG(d.rating) FROM DriverRequest d WHERE d.driverId = :driverId AND d.rating IS NOT NULL")
     Double findAverageRatingForDriver(@Param("driverId") Long driverId);
+
+    List<DriverRequest> findTop5ByOrderByRequestTimeDesc();
+
+    @Query("SELECT d FROM DriverRequest d WHERE d.userId = :userId ORDER BY d.requestTime DESC")
+    List<DriverRequest> findTop5ByUserId(@Param("userId") Long userId);
 }

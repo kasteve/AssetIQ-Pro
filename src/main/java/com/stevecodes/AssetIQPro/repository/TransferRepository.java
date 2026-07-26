@@ -44,4 +44,7 @@ public interface TransferRepository extends JpaRepository<Transfer, Integer> {
                                         @Param("excludeId") Integer excludeId);
 
     List<Transfer> findTop5ByOrderByTransferDateDesc();
+
+    @Query("SELECT t FROM Transfer t WHERE t.oldEmployeeId = :userId OR t.newEmployeeId = :userId ORDER BY t.transferDate DESC")
+    List<Transfer> findTop5ByUserId(@Param("userId") Long userId);
 }

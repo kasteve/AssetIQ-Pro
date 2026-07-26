@@ -10,7 +10,7 @@
 </head>
 
 <body>
-<div layout:fragment="content" th:attr="data-api-base=@{/api/dashboard}">
+<div layout:fragment="content" th:attr="data-api-base=@{/api/dashboard}" data-can-view-reports="${canViewReports}">
     <!-- Success/Error Messages -->
     <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fas fa-check-circle me-2"></i>
@@ -69,7 +69,7 @@
         </div>
     </div>
 
-    <!-- Charts -->
+    <!-- Charts - Show for all users -->
     <div class="row g-3">
         <div class="col-lg-8">
             <div class="card-premium">
@@ -108,8 +108,9 @@
         </div>
     </div>
 
-    <!-- Recent Activity -->
+    <!-- Recent Activity - Shows user-specific data -->
     <div class="row g-3">
+        <!-- Recent Transfers -->
         <div class="col-lg-6">
             <div class="card-premium">
                 <div class="card-header">
@@ -135,6 +136,7 @@
                 </div>
             </div>
         </div>
+        <!-- Recent Infrastructure Requests - Filtered by user -->
         <div class="col-lg-6">
             <div class="card-premium">
                 <div class="card-header">

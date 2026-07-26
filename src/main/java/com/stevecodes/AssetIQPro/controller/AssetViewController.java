@@ -2,6 +2,7 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Asset;
+import com.stevecodes.AssetIQPro.entity.Department;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.*;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -41,7 +44,44 @@ public class AssetViewController {
             return "redirect:/login";
         }
 
-        model.addAttribute("assets", assetService.getAllAssets());
+        // ✅ Get ALL assets first, then filter
+        List<Asset> allAssets = assetService.getAllAssets();
+        List<Asset> filteredAssets;
+
+        // ✅ If admin or has VIEW_ALL_TRANSACTIONS permission, show all
+        if (currentUser.isAdmin() || currentUser.hasPermission("VIEW_ALL_TRANSACTIONS")) {
+            filteredAssets = allAssets;
+            log.info("Admin user viewing all assets: {}", currentUser.getUsername());
+        } else {
+            // ✅ Filter assets by user's department
+            String userDepartment = currentUser.getDepartment();
+            Integer departmentId = currentUser.getDepartmentEntity() != null ?
+                    currentUser.getDepartmentEntity().getDepartmentId() : null;
+
+            if (userDepartment != null || departmentId != null) {
+                filteredAssets = allAssets.stream()
+                        .filter(asset -> {
+                            // Check by department name
+                            if (userDepartment != null && asset.getCurrentDepartment() != null) {
+                                return asset.getCurrentDepartment().equalsIgnoreCase(userDepartment);
+                            }
+                            // Check by department ID
+                            if (departmentId != null && asset.getDepartmentId() != null) {
+                                return asset.getDepartmentId().equals(departmentId);
+                            }
+                            return false;
+                        })
+                        .collect(Collectors.toList());
+                log.info("User {} viewing {} assets from department: {}",
+                        currentUser.getUsername(), filteredAssets.size(), userDepartment);
+            } else {
+                // No department assigned - show empty list
+                filteredAssets = List.of();
+                log.info("User {} has no department assigned, showing no assets", currentUser.getUsername());
+            }
+        }
+
+        model.addAttribute("assets", filteredAssets);
         model.addAttribute("categories", categoryService.getAllCategories());
         model.addAttribute("locations", locationService.getAllLocations());
         model.addAttribute("suppliers", supplierService.getAllSuppliers());
@@ -81,6 +121,11 @@ public class AssetViewController {
                 return "redirect:/login";
             }
 
+            // ✅ Check permission
+            if (!currentUser.hasAnyPermission("ASSET_CREATE", "EDIT_ASSETS", "ADMIN")) {
+                throw new AccessDeniedException("You don't have permission to create assets.");
+            }
+
             Asset asset = new Asset();
             asset.setTag(tag);
             asset.setName(name);
@@ -112,6 +157,13 @@ public class AssetViewController {
             }
             if (eolDate != null && !eolDate.isEmpty()) {
                 asset.setEolDate(LocalDate.parse(eolDate));
+            }
+
+            // ✅ Set department from current user if not specified (FIXED)
+            if (currentUser.getDepartmentEntity() != null) {
+                asset.setDepartmentId(currentUser.getDepartmentEntity().getDepartmentId());
+                // ✅ Use currentDepartment field instead of setDepartment
+                asset.setCurrentDepartment(currentUser.getDepartment());
             }
 
             Asset created = assetService.createAsset(asset);
@@ -157,6 +209,24 @@ public class AssetViewController {
             if (currentUser == null) {
                 redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
                 return "redirect:/login";
+            }
+
+            // ✅ Check permission
+            if (!currentUser.hasAnyPermission("ASSET_EDIT", "EDIT_ASSETS", "ADMIN")) {
+                throw new AccessDeniedException("You don't have permission to edit assets.");
+            }
+
+            // ✅ Check if user has access to this asset (department check)
+            Asset existingAsset = assetService.getAssetEntityById(id);
+            if (!currentUser.isAdmin() && !currentUser.hasPermission("VIEW_ALL_TRANSACTIONS")) {
+                String userDepartment = currentUser.getDepartment();
+                if (userDepartment != null && existingAsset.getCurrentDepartment() != null) {
+                    if (!existingAsset.getCurrentDepartment().equalsIgnoreCase(userDepartment)) {
+                        throw new AccessDeniedException("You don't have permission to edit assets in this department.");
+                    }
+                } else {
+                    throw new AccessDeniedException("You don't have permission to edit this asset.");
+                }
             }
 
             Asset asset = new Asset();
@@ -215,6 +285,19 @@ public class AssetViewController {
             if (currentUser == null) {
                 redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
                 return "redirect:/login";
+            }
+
+            // ✅ Check if user has access to this asset (department check)
+            if (!currentUser.isAdmin() && !currentUser.hasPermission("VIEW_ALL_TRANSACTIONS")) {
+                Asset existingAsset = assetService.getAssetEntityById(id);
+                String userDepartment = currentUser.getDepartment();
+                if (userDepartment != null && existingAsset.getCurrentDepartment() != null) {
+                    if (!existingAsset.getCurrentDepartment().equalsIgnoreCase(userDepartment)) {
+                        throw new AccessDeniedException("You don't have permission to delete assets in this department.");
+                    }
+                } else {
+                    throw new AccessDeniedException("You don't have permission to delete this asset.");
+                }
             }
 
             assetService.deleteAsset(id);

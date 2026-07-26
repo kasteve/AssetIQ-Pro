@@ -35,7 +35,7 @@ public class AssetService {
     private final AssetRepository assetRepository;
     private final AssetHistoryRepository historyRepository;
     private final CategoryRepository categoryRepository;
-    private final TransferRepository transferRepository;  // ADD THIS
+    private final TransferRepository transferRepository;
     private final AuditService auditService;
 
     private static final String UPLOAD_DIR = "./uploads/invoices/";
@@ -77,6 +77,11 @@ public class AssetService {
         Asset asset = assetRepository.findById(assetId)
                 .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
         return AssetDTO.fromEntity(asset);
+    }
+
+    public Asset getAssetEntityById(Integer assetId) {
+        return assetRepository.findById(assetId)
+                .orElseThrow(() -> new RuntimeException("Asset not found: " + assetId));
     }
 
     public AssetDTO getAssetByTag(String tag) {
@@ -149,6 +154,25 @@ public class AssetService {
         assetRepository.deleteById(assetId);
 
         auditService.logAction("ASSET_DELETED", "Asset deleted: " + asset.getTag(), null);
+    }
+
+    // ============================================
+    // Department-Based Asset Retrieval
+    // ============================================
+
+    public List<Asset> getAssetsByDepartment(Integer departmentId) {
+        log.info("Getting assets for department ID: {}", departmentId);
+        return assetRepository.findByDepartmentId(departmentId);
+    }
+
+    public List<Asset> getAssetsByDepartmentName(String departmentName) {
+        log.info("Getting assets for department: {}", departmentName);
+        return assetRepository.findByDepartment(departmentName);
+    }
+
+    public List<Asset> getAssetsByEmployeeDepartment(Long employeeId) {
+        log.info("Getting assets for employee department: {}", employeeId);
+        return assetRepository.findAssetsByEmployeeDepartment(employeeId);
     }
 
     // ============================================

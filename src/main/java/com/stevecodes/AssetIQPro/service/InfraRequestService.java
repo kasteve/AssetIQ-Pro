@@ -38,7 +38,7 @@ public class InfraRequestService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
-    private final BaseUrlService baseUrlService;  // ✅ ADDED
+    private final BaseUrlService baseUrlService;
 
     private static final String UPLOAD_DIR = "uploads/infra/quotations/";
     private static final String REPORT_DIR = "uploads/infra/reports/";
@@ -64,18 +64,21 @@ public class InfraRequestService {
     }
 
     public List<InfraRequestDTO> getRequestsForUser(Long userId) {
+        log.info("Getting infrastructure requests for user: {}", userId);
         return requestRepository.findRequestsForUser(userId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
     public List<InfraRequestDTO> getRequestsByStatus(RequestStatus status) {
+        log.info("Getting infrastructure requests by status: {}", status);
         return requestRepository.findByStatus(status).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
     public List<InfraRequestDTO> getAllRequests() {
+        log.info("Getting all infrastructure requests");
         return requestRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -89,6 +92,7 @@ public class InfraRequestService {
     }
 
     public List<InfraRequestDTO> getFinanceRequests() {
+        log.info("Getting finance requests");
         return requestRepository.findByStatusIn(List.of(
                         RequestStatus.PENDING_FINANCE_APPROVAL,
                         RequestStatus.PROCUREMENT,
@@ -106,21 +110,76 @@ public class InfraRequestService {
     public InfraRequestDTO createRequest(InfraRequestDTO dto, Long requesterId) {
         log.info("Creating infrastructure request for user: {}", requesterId);
 
+        // ✅ Get employee for the requester
         Employee employee = employeeRepository.findByUserId(requesterId)
                 .orElseThrow(() -> new RuntimeException("Employee not found for user ID: " + requesterId));
 
         Long lineManagerId = null;
+
         if (employee.getLineManager() != null) {
             Employee lineManager = employee.getLineManager();
-            if (lineManager.getUser() != null) {
-                lineManagerId = lineManager.getUser().getUserId();
+
+            // ✅ Try to get user ID from the employee's user_id field
+            // Use reflection or a custom query to get the user_id directly
+            try {
+                // First try: check if the employee has a user_id through the user relationship
+                if (lineManager.getUser() != null) {
+                    lineManagerId = lineManager.getUser().getUserId();
+                    log.info("Line manager found via user relationship: {}", lineManagerId);
+                }
+            } catch (Exception e) {
+                log.warn("Could not get user from relationship: {}", e.getMessage());
+            }
+
+            // ✅ If that fails, use a direct query to get the user_id
+            if (lineManagerId == null) {
+                try {
+                    // Use a direct query to get the user_id from the employee
+                    Long employeeUserId = employeeRepository.findUserIdByEmployeeId(lineManager.getEmployeeId());
+                    if (employeeUserId != null) {
+                        lineManagerId = employeeUserId;
+                        log.info("Line manager user_id found via direct query: {}", lineManagerId);
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not get user_id via direct query: {}", e.getMessage());
+                }
+            }
+
+            // ✅ If still null, fallback to admin
+            if (lineManagerId == null) {
+                log.warn("Line manager {} does not have a user account. Using admin fallback.",
+                        lineManager.getFirstName() + " " + lineManager.getSurName());
+
+                // Fallback: Find an admin user
+                AppUser adminUser = userRepository.findByRole("ADMIN").stream().findFirst()
+                        .orElse(null);
+                if (adminUser != null) {
+                    lineManagerId = adminUser.getUserId();
+                    log.info("Using admin user {} as fallback line manager", adminUser.getUsername());
+                } else {
+                    // Final fallback: use the first user with INFRA role
+                    adminUser = userRepository.findByRole("INFRA").stream().findFirst().orElse(null);
+                    if (adminUser != null) {
+                        lineManagerId = adminUser.getUserId();
+                        log.info("Using INFRA user {} as fallback line manager", adminUser.getUsername());
+                    } else {
+                        throw new RuntimeException("No line manager or admin found to approve request");
+                    }
+                }
             }
         }
 
         if (lineManagerId == null) {
-            throw new RuntimeException("Employee has no line manager assigned");
+            // Final fallback: assign to the first admin
+            AppUser adminUser = userRepository.findByRole("ADMIN").stream().findFirst()
+                    .orElseThrow(() -> new RuntimeException("No admin user found in system"));
+            lineManagerId = adminUser.getUserId();
+            log.info("Using admin user {} as final fallback line manager", adminUser.getUsername());
         }
 
+        log.info("Final line manager ID: {}", lineManagerId);
+
+        // Create the request
         InfraRequest request = new InfraRequest();
         request.setRequesterId(requesterId);
         request.setLineManagerId(lineManagerId);
@@ -133,6 +192,7 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
+        // Notify line manager
         try {
             notifyLineManager(saved);
             sendEmailNotification(lineManagerId,
@@ -412,7 +472,6 @@ public class InfraRequestService {
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
         requestRepository.save(request);
 
-        // ✅ DYNAMIC URL
         String signingLink = baseUrlService.buildUrl("/infra-requests/sign?token=%s", token);
 
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
@@ -609,7 +668,7 @@ public class InfraRequestService {
 
     private void notifyLineManager(InfraRequest request) {
         userRepository.findById(request.getLineManagerId()).ifPresent(manager -> {
-            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());  // ✅ DYNAMIC
+            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
             createNotification(
                     request.getLineManagerId(),
                     Notification.NotificationType.REQUEST_STATUS,
@@ -621,7 +680,7 @@ public class InfraRequestService {
     }
 
     private void notifyRequester(InfraRequest request, String message) {
-        String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());  // ✅ DYNAMIC
+        String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
         createNotification(
                 request.getRequesterId(),
                 Notification.NotificationType.REQUEST_STATUS,
@@ -633,6 +692,18 @@ public class InfraRequestService {
 
     private void notifyFinanceTeam(InfraRequest request) {
         log.info("Notifying finance team about request: {}", request.getRequestId());
+        // Get finance users and notify them
+        List<AppUser> financeUsers = userRepository.findUsersWithPermission("APPROVE_FINANCE");
+        for (AppUser user : financeUsers) {
+            String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
+            createNotification(
+                    user.getUserId(),
+                    Notification.NotificationType.REQUEST_STATUS,
+                    "Infrastructure Request Pending Finance Approval",
+                    "Request #" + request.getRequestId() + " for " + request.getResourceType() + " requires your approval.",
+                    requestLink
+            );
+        }
     }
 
     private void sendEmailNotification(Long userId, String subject, String body) {
@@ -643,6 +714,7 @@ public class InfraRequestService {
 
     private void sendCompletionReport(InfraRequest request) {
         log.info("Sending completion report for request: {}", request.getRequestId());
+        // Implement PDF generation and email sending if needed
     }
 
     private void createNotification(Long userId, Notification.NotificationType type,
@@ -652,7 +724,9 @@ public class InfraRequestService {
         notification.setType(type.name());
         notification.setTitle(title);
         notification.setMessage(message);
-        notification.setLink(link);
+        notification.setLink(link != null ? link : "/infra-requests");
+        notification.setRead(false);
+        notification.setCreatedAt(LocalDateTime.now());
         notificationRepository.save(notification);
     }
 

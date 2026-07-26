@@ -14,7 +14,9 @@ import java.util.Optional;
 @Repository
 public interface AssetRepository extends JpaRepository<Asset, Integer> {
 
+    // ============================================
     // Basic queries
+    // ============================================
     Optional<Asset> findByTag(String tag);
 
     Optional<Asset> findBySerialNumber(String serialNumber);
@@ -24,7 +26,21 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
 
     boolean existsByTag(String tag);
 
+    // ============================================
+    // Department-based queries
+    // ============================================
+    @Query("SELECT a FROM Asset a WHERE a.departmentId = :departmentId")
+    List<Asset> findByDepartmentId(@Param("departmentId") Integer departmentId);
+
+    @Query("SELECT a FROM Asset a WHERE a.currentDepartment = :department")
+    List<Asset> findByDepartment(@Param("department") String department);
+
+    @Query("SELECT a FROM Asset a WHERE a.departmentId IN (SELECT e.department.departmentId FROM Employee e WHERE e.employeeId = :employeeId)")
+    List<Asset> findAssetsByEmployeeDepartment(@Param("employeeId") Long employeeId);
+
+    // ============================================
     // Warranty/EOL queries
+    // ============================================
     List<Asset> findByWarrantyExpiryBetween(LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT a FROM Asset a WHERE a.warrantyExpiry IS NOT NULL AND a.warrantyExpiry <= :date")
@@ -41,7 +57,9 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     List<Asset> findAssetsWithEOLWithinDays(@Param("today") LocalDate today,
                                             @Param("threshold") LocalDate threshold);
 
+    // ============================================
     // Status queries
+    // ============================================
     List<Asset> findByStatus(AssetStatus status);
 
     long countByStatus(AssetStatus status);
@@ -49,34 +67,43 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     @Query("SELECT a.status, COUNT(a) FROM Asset a GROUP BY a.status")
     List<Object[]> countByStatusGrouped();
 
+    // ============================================
     // Category queries
+    // ============================================
     @Query("SELECT a.category.name, COUNT(a) FROM Asset a GROUP BY a.category.name")
     List<Object[]> countByCategoryGrouped();
 
     @Query("SELECT a FROM Asset a WHERE a.category.categoryId = :categoryId")
     List<Asset> findByCategoryId(@Param("categoryId") Integer categoryId);
 
+    // ============================================
     // Search
+    // ============================================
     @Query("SELECT a FROM Asset a WHERE LOWER(a.tag) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(a.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(a.serialNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<Asset> searchAssets(@Param("searchTerm") String searchTerm);
 
+    // ============================================
     // All tags for dropdown
+    // ============================================
     @Query("SELECT a.tag FROM Asset a WHERE a.tag IS NOT NULL ORDER BY a.tag")
     List<String> findAllAssetTags();
 
-    // Department distribution using department_id
+    // ============================================
+    // Department distribution
+    // ============================================
     @Query(value = "SELECT COALESCE(d.Name, 'Unassigned') as department, COUNT(a.asset_id) as count " +
             "FROM assets a " +
             "LEFT JOIN departments d ON a.department_id = d.department_id " +
             "GROUP BY d.Name", nativeQuery = true)
     List<Object[]> countByDepartmentGroupedNative();
 
-    // Alternative: If you want to use the current_department string field instead
     @Query("SELECT COALESCE(a.currentDepartment, 'Unassigned'), COUNT(a) FROM Asset a GROUP BY a.currentDepartment")
     List<Object[]> countByCurrentDepartmentGrouped();
 
+    // ============================================
     // Recent additions
+    // ============================================
     List<Asset> findTop10ByOrderByCreatedAtDesc();
 }

@@ -31,9 +31,18 @@ public class DashboardViewController {
         try {
             DashboardStatsDTO stats = dashboardService.getDashboardStats();
             model.addAttribute("stats", stats);
-            model.addAttribute("recentTransfers", dashboardService.getRecentTransfers());
-            model.addAttribute("recentRequests", dashboardService.getRecentRequests());
+
+            // ✅ Get user-specific recent data
+            Long userId = currentUser.getUserId();
+            model.addAttribute("recentTransfers", dashboardService.getRecentTransfers(userId));
+            model.addAttribute("recentRequests", dashboardService.getRecentRequests(userId));
+            model.addAttribute("recentDriverRequests", dashboardService.getRecentDriverRequests(userId));
+            model.addAttribute("recentBookings", dashboardService.getRecentBookings(userId));
+
+            // ✅ Check permissions for UI features
             model.addAttribute("canViewReports", currentUser.hasAnyPermission("VIEW_REPORTS", "ADMIN"));
+            model.addAttribute("isAdmin", currentUser.isAdmin());
+
         } catch (Exception e) {
             log.error("Error loading dashboard stats: {}", e.getMessage());
             model.addAttribute("error", "Could not load dashboard data");

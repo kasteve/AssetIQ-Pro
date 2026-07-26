@@ -35,4 +35,20 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.department.departmentId = :departmentId")
     long countByDepartmentId(@Param("departmentId") Integer departmentId);
+
+    // ✅ NEW: Get user_id directly from employee table (native query)
+    @Query(value = "SELECT user_id FROM dbo.Employees WHERE EmployeeId = :employeeId", nativeQuery = true)
+    Long findUserIdByEmployeeId(@Param("employeeId") Long employeeId);
+
+    // ✅ NEW: Get employee by user_id directly (native query)
+    @Query(value = "SELECT * FROM dbo.Employees WHERE user_id = :userId", nativeQuery = true)
+    Employee findByUserIdNative(@Param("userId") Long userId);
+
+    // ✅ NEW: Find employees with user_id NOT NULL (who have user accounts)
+    @Query("SELECT e FROM Employee e WHERE e.user IS NOT NULL")
+    List<Employee> findEmployeesWithUserAccounts();
+
+    // ✅ NEW: Count employees with user accounts
+    @Query("SELECT COUNT(e) FROM Employee e WHERE e.user IS NOT NULL")
+    long countEmployeesWithUserAccounts();
 }

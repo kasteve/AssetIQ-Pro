@@ -76,4 +76,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findBookingsForRoomByDateRange(@Param("roomId") Long roomId,
                                                  @Param("startDate") LocalDateTime startDate,
                                                  @Param("endDate") LocalDateTime endDate);
+
+    List<Booking> findTop5ByUserId(Long userId);
+
+    @Query("SELECT b FROM Booking b WHERE b.userId = :userId ORDER BY b.startTime DESC")
+    List<Booking> findTop5BookingsByUserId(@Param("userId") Long userId);
 }

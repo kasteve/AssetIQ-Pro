@@ -1,11 +1,7 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.DashboardStatsDTO;
-import com.stevecodes.AssetIQPro.entity.Asset;
-import com.stevecodes.AssetIQPro.entity.AssetHistory;
-import com.stevecodes.AssetIQPro.entity.Booking;
-import com.stevecodes.AssetIQPro.entity.InfraRequest;
-import com.stevecodes.AssetIQPro.entity.Transfer;
+import com.stevecodes.AssetIQPro.entity.*;
 import com.stevecodes.AssetIQPro.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +24,7 @@ public class DashboardService {
     private final BookingRepository bookingRepository;
     private final AppUserRepository userRepository;
     private final TransferRepository transferRepository;
+    private final DriverRequestRepository driverRequestRepository;
 
     // ============================================
     // Dashboard Statistics
@@ -111,7 +108,6 @@ public class DashboardService {
     public Map<String, Long> getAssetDistributionByDepartment() {
         Map<String, Long> distribution = new LinkedHashMap<>();
         try {
-            // First try using department_id (if it exists)
             List<Object[]> results = assetRepository.countByDepartmentGroupedNative();
             if (results != null && !results.isEmpty()) {
                 for (Object[] result : results) {
@@ -121,7 +117,6 @@ public class DashboardService {
                 }
             }
 
-            // If no results from department_id, try current_department field
             if (distribution.isEmpty()) {
                 List<Object[]> stringResults = assetRepository.countByCurrentDepartmentGrouped();
                 for (Object[] result : stringResults) {
@@ -131,13 +126,11 @@ public class DashboardService {
                 }
             }
 
-            // If still empty, return all assets as "Unassigned"
             if (distribution.isEmpty()) {
                 distribution.put("Unassigned", assetRepository.count());
             }
         } catch (Exception e) {
             log.warn("Error getting department distribution: {}", e.getMessage());
-            // Fallback: Return all assets as "Unassigned"
             distribution.put("Unassigned", assetRepository.count());
         }
         return distribution;
@@ -180,15 +173,12 @@ public class DashboardService {
             DashboardStatsDTO.TrendDTO trend = new DashboardStatsDTO.TrendDTO();
             trend.setMonth(monthStart.format(DateTimeFormatter.ofPattern("MMM yyyy")));
 
-            // Count requests in this month
             trend.setRequests(requestRepository.findByCreatedAtBetween(monthStart, monthEnd).size());
 
-            // Count completed in this month
             List<InfraRequest> completed = requestRepository.findByStatusAndDateRange(
                     InfraRequest.RequestStatus.COMPLETED, monthStart, monthEnd);
             trend.setCompleted(completed.size());
 
-            // Count assets added in this month (from AssetHistory)
             List<AssetHistory> added = historyRepository.findByEventTypeAndDateRange(
                     AssetHistory.EVENT_PROCUREMENT, monthStart, monthEnd);
             trend.setAssetsAdded(added.size());
@@ -224,26 +214,73 @@ public class DashboardService {
     }
 
     // ============================================
-    // Recent Activity Methods
+    // Recent Activity Methods - Filtered by User
     // ============================================
 
-    public List<Transfer> getRecentTransfers() {
+    public List<Transfer> getRecentTransfers(Long userId) {
         try {
-            return transferRepository.findTop5ByOrderByTransferDateDesc();
+            // For admin users, return all transfers
+            AppUser user = userRepository.findById(userId).orElse(null);
+            if (user != null && (user.isAdmin() || user.hasPermission("VIEW_ALL_TRANSACTIONS"))) {
+                return transferRepository.findTop5ByOrderByTransferDateDesc();
+            }
+
+            // For regular users, filter transfers where they are involved
+            return transferRepository.findTop5ByUserId(userId);
         } catch (Exception e) {
             log.error("Error getting recent transfers: {}", e.getMessage());
             return new ArrayList<>();
         }
     }
 
-    public List<InfraRequest> getRecentRequests() {
+    public List<InfraRequest> getRecentRequests(Long userId) {
         try {
-            return requestRepository.findTop5ByOrderByCreatedAtDesc();
+            // ✅ FIXED: Only true admins see everyone's requests.
+            // INFRA_REQUEST_VIEW is a default permission granted to ALL users just so
+            // they can access the infra requests feature at all - it must NOT be
+            // treated as a "view all users' requests" permission.
+            AppUser user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.isAdmin()) {
+                return requestRepository.findTop5ByOrderByCreatedAtDesc();
+            }
+
+            // For regular users, only their own requests
+            return requestRepository.findTop5ByRequesterId(userId);
         } catch (Exception e) {
             log.error("Error getting recent requests: {}", e.getMessage());
             return new ArrayList<>();
         }
     }
+
+    public List<DriverRequest> getRecentDriverRequests(Long userId) {
+        try {
+            AppUser user = userRepository.findById(userId).orElse(null);
+            if (user != null && (user.isAdmin() || user.hasPermission("DRIVER_VIEW"))) {
+                return driverRequestRepository.findTop5ByOrderByRequestTimeDesc();
+            }
+            return driverRequestRepository.findTop5ByUserId(userId);
+        } catch (Exception e) {
+            log.error("Error getting recent driver requests: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public List<Booking> getRecentBookings(Long userId) {
+        try {
+            AppUser user = userRepository.findById(userId).orElse(null);
+            if (user != null && (user.isAdmin() || user.hasPermission("MANAGE_BOOKINGS"))) {
+                return bookingRepository.findTop5ByOrderByStartTimeDesc();
+            }
+            return bookingRepository.findTop5ByUserId(userId);
+        } catch (Exception e) {
+            log.error("Error getting recent bookings: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // ============================================
+    // Daily and Weekly Trends
+    // ============================================
 
     public List<DashboardStatsDTO.TrendDTO> getDailyTrends(int days) {
         LocalDateTime now = LocalDateTime.now();

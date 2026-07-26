@@ -46,4 +46,8 @@ public class Department {
         this.name = name;
         this.manager = manager;
     }
+
+    public boolean equalsIgnoreCase(String userDepartment) {
+        return false;
+    }
 }

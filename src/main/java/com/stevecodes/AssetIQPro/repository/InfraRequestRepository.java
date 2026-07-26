@@ -43,7 +43,15 @@ public interface InfraRequestRepository extends JpaRepository<InfraRequest, Long
 
     List<InfraRequest> findTop10ByOrderByCreatedAtDesc();
 
-    Collection<Object> findByCreatedAtBetween(LocalDateTime monthStart, LocalDateTime monthEnd);
+    @Query("SELECT ir FROM InfraRequest ir WHERE ir.createdAt BETWEEN :startDate AND :endDate")
+    List<InfraRequest> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate,
+                                              @Param("endDate") LocalDateTime endDate);
 
     List<InfraRequest> findTop5ByOrderByCreatedAtDesc();
+
+    @Query("SELECT ir FROM InfraRequest ir WHERE ir.requesterId = :userId ORDER BY ir.createdAt DESC")
+    List<InfraRequest> findTop5ByRequesterId(@Param("userId") Long userId);
+
+    @Query("SELECT ir FROM InfraRequest ir WHERE ir.lineManagerId = :userId ORDER BY ir.createdAt DESC")
+    List<InfraRequest> findTop5ByLineManagerId(@Param("userId") Long userId);
 }

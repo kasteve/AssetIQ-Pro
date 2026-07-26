@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.BookingDTO;
+import com.stevecodes.AssetIQPro.dto.InfraRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Booking;
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
@@ -60,6 +61,7 @@ public class UserRequestController {
 
         log.info("Loading dashboard for user: {}", userId);
 
+        // Driver requests - filtered by userId
         model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
 
         List<AppUser> availableDrivers = driverService.getAvailableDrivers();
@@ -68,6 +70,7 @@ public class UserRequestController {
         List<AppUser> allDrivers = driverService.getAllDrivers();
         model.addAttribute("allDrivers", allDrivers);
 
+        // Room bookings - filtered by userId
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
         model.addAttribute("roomBookings", roomBookings);
 
@@ -90,9 +93,39 @@ public class UserRequestController {
         Set<Long> availableDriverIds = availableDrivers.stream().map(AppUser::getUserId).collect(Collectors.toSet());
         model.addAttribute("availableDriverIds", availableDriverIds);
 
-        model.addAttribute("infraRequests", infraRequestService.getRequestsByRequesterId(userId));
+        // ✅ Infrastructure requests - PROPERLY FILTERED
+        List<InfraRequestDTO> allInfraRequests = infraRequestService.getAllRequests();
+        List<InfraRequestDTO> filteredInfraRequests;
 
-        // ✅ NEW: Add pending approvals for drivers, admins, and super admins
+        // ✅ FIXED: Only true admins see everyone's requests.
+        // INFRA_REQUEST_VIEW is a default permission granted to ALL users just so
+        // they can access this feature at all - it must NOT be treated as a
+        // "view all users' requests" permission.
+        if (currentUser.isAdmin()) {
+            // Admin - see all
+            filteredInfraRequests = allInfraRequests;
+            log.info("Admin viewing all {} infra requests in bookings dashboard", filteredInfraRequests.size());
+        } else {
+            // Regular user - see only their requests
+            filteredInfraRequests = allInfraRequests.stream()
+                    .filter(r -> {
+                        // User is the requester
+                        if (r.getRequesterId() != null && r.getRequesterId().equals(userId)) {
+                            return true;
+                        }
+                        // User is the line manager
+                        if (r.getLineManagerId() != null && r.getLineManagerId().equals(userId)) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+            log.info("User {} viewing {} of {} total infra requests in bookings dashboard",
+                    currentUser.getUsername(), filteredInfraRequests.size(), allInfraRequests.size());
+        }
+        model.addAttribute("infraRequests", filteredInfraRequests);
+
+        // ✅ Pending approvals for drivers
         if (currentUser.isDriver() || currentUser.isAdmin()) {
             List<DriverRequest> pendingApprovals = driverService.getPendingRequestsForDriver(currentUser.getUserId());
             model.addAttribute("pendingDriverApprovals", pendingApprovals);

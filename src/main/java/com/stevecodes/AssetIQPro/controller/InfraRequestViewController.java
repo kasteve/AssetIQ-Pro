@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -39,12 +40,54 @@ public class InfraRequestViewController {
             return "redirect:/login";
         }
 
-        List<InfraRequestDTO> requests = requestService.getAllRequests();
-        model.addAttribute("requests", requests);
+        Long userId = currentUser.getUserId();
+        log.info("Current user ID: {}, Role: {}", userId, currentUser.getRole());
 
-        List<InfraRequestDTO> pendingLMRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_LM_APPROVAL);
-        List<InfraRequestDTO> pendingRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW);
-        List<InfraRequestDTO> pendingFinanceRequests = requestService.getFinanceRequests();
+        // ✅ Get filtered requests based on user role
+        List<InfraRequestDTO> allRequests = requestService.getAllRequests();
+        List<InfraRequestDTO> filteredRequests;
+
+        // ✅ FIXED: Only true admins see everyone's requests.
+        // INFRA_REQUEST_VIEW is a default permission granted to ALL users just so
+        // they can access this feature at all - it must NOT be treated as a
+        // "view all users' requests" permission.
+        if (currentUser.isAdmin()) {
+            // Admin - see all requests
+            filteredRequests = allRequests;
+            log.info("Admin user viewing all {} infra requests", filteredRequests.size());
+        } else {
+            // Regular user - see only their requests (as requester OR line manager)
+            filteredRequests = allRequests.stream()
+                    .filter(r -> {
+                        // User is the requester
+                        if (r.getRequesterId() != null && r.getRequesterId().equals(userId)) {
+                            return true;
+                        }
+                        // User is the line manager
+                        if (r.getLineManagerId() != null && r.getLineManagerId().equals(userId)) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+            log.info("Regular user {} viewing {} infra requests (out of {} total)",
+                    currentUser.getUsername(), filteredRequests.size(), allRequests.size());
+        }
+
+        model.addAttribute("requests", filteredRequests);
+
+        // ✅ Filter pending requests from the filtered list
+        List<InfraRequestDTO> pendingLMRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_LM_APPROVAL.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        List<InfraRequestDTO> pendingRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_INFRA_REVIEW.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        List<InfraRequestDTO> pendingFinanceRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
 
         model.addAttribute("pendingLMRequests", pendingLMRequests);
         model.addAttribute("pendingRequests", pendingRequests);
@@ -150,9 +193,42 @@ public class InfraRequestViewController {
             return "redirect:/login";
         }
 
-        List<InfraRequestDTO> pendingRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_INFRA_REVIEW);
-        List<InfraRequestDTO> pendingLMRequests = requestService.getRequestsByStatus(InfraRequest.RequestStatus.PENDING_LM_APPROVAL);
-        List<InfraRequestDTO> pendingFinanceRequests = requestService.getFinanceRequests();
+        Long userId = currentUser.getUserId();
+
+        // ✅ Get ALL requests first
+        List<InfraRequestDTO> allRequests = requestService.getAllRequests();
+        List<InfraRequestDTO> filteredRequests;
+
+        // ✅ FIXED: Only true admins see everyone's requests here too.
+        if (currentUser.isAdmin()) {
+            filteredRequests = allRequests;
+        } else {
+            // ✅ Filter requests by user (requester or line manager)
+            filteredRequests = allRequests.stream()
+                    .filter(r -> {
+                        if (r.getRequesterId() != null && r.getRequesterId().equals(userId)) {
+                            return true;
+                        }
+                        if (r.getLineManagerId() != null && r.getLineManagerId().equals(userId)) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // ✅ Filter pending requests from filtered list
+        List<InfraRequestDTO> pendingRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_INFRA_REVIEW.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        List<InfraRequestDTO> pendingLMRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_LM_APPROVAL.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        List<InfraRequestDTO> pendingFinanceRequests = filteredRequests.stream()
+                .filter(r -> InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL.name().equals(r.getStatus()))
+                .collect(Collectors.toList());
 
         model.addAttribute("pendingRequests", pendingRequests);
         model.addAttribute("pendingLMRequests", pendingLMRequests);

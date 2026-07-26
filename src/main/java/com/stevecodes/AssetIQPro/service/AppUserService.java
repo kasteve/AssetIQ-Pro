@@ -70,7 +70,8 @@ public class AppUserService {
                 "GENERATE_VOUCHERS",      // Generate meal/break vouchers
                 "VIEW_OWN_TRANSACTIONS",  // View only own transactions
                 "MANAGE_BOOKINGS",        // Manage room and driver bookings
-                "INFRA_REQUEST_VIEW",     // View and manage infrastructure requests
+                "INFRA_REQUEST_VIEW",     // View and manage infrastructure requests (own requests only)
+                "INFRA_REQUEST_CREATE",   // Create/submit new infrastructure requests
                 "RESOURCE_REQUEST_VIEW",  // View and manage resource/administration requests
                 "ROOM_VIEW_ALL",          // View all rooms in the system
                 "ROOM_BOOK",              // Book rooms for meetings/events
