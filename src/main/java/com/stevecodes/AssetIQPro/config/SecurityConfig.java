@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Permission;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
@@ -23,6 +24,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
@@ -67,7 +71,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                 AppUser user = userRepository.findByUsernameOrEmail(username, username).orElse(null);
 
                 if (user != null) {
-                    HttpSession session = request.getSession(true);  // ✅ true = create if not exists
+                    HttpSession session = request.getSession(true);
                     session.setAttribute("userId", user.getUserId());
                     session.setAttribute("username", user.getUsername());
                     session.setAttribute("fullName", user.getFullName());
@@ -85,7 +89,9 @@ public class SecurityConfig implements WebMvcConfigurer {
                     System.out.println("Session ID: " + session.getId());
                 }
 
-                response.sendRedirect("/assetIQ-pro/dashboard");
+                // ✅ Use request.getContextPath() dynamically
+                String contextPath = request.getContextPath();
+                response.sendRedirect(contextPath + "/dashboard");
             }
         };
     }
@@ -95,9 +101,36 @@ public class SecurityConfig implements WebMvcConfigurer {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
-                        .sessionFixation(sessionFixation -> sessionFixation.newSession())  // ✅ Create new session on login
-                        .maximumSessions(10)  // ✅ Allow up to 10 concurrent sessions
+                        .sessionFixation(sessionFixation -> sessionFixation.newSession())
+                        .maximumSessions(10)
                         .expiredUrl("/login?expired=true")
+                )
+                .exceptionHandling(exception -> exception
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            Map<String, Object> errorResponse = new HashMap<>();
+                            errorResponse.put("success", false);
+                            errorResponse.put("error", "access_denied");
+                            errorResponse.put("message", "You don't have permission to perform this action.");
+                            errorResponse.put("timestamp", System.currentTimeMillis());
+                            response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
+                        })
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            if (request.getRequestURI().startsWith("/api/")) {
+                                response.setContentType("application/json");
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                Map<String, Object> errorResponse = new HashMap<>();
+                                errorResponse.put("success", false);
+                                errorResponse.put("error", "unauthorized");
+                                errorResponse.put("message", "You must be logged in to perform this action.");
+                                errorResponse.put("timestamp", System.currentTimeMillis());
+                                response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
+                            } else {
+                                // ✅ Use request.getContextPath() for login redirect
+                                response.sendRedirect(request.getContextPath() + "/login");
+                            }
+                        })
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
