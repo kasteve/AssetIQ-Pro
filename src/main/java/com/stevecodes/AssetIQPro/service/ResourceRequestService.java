@@ -24,7 +24,8 @@ import java.util.stream.Collectors;
 public class ResourceRequestService {
 
     private final ResourceRequestRepository resourceRequestRepository;
-    private final StockItemRepository stockItemRepository;  // ✅ ADDED
+    private final StockItemRepository stockItemRepository;
+    private final StockService stockService;  // ✅ ADDED for low stock alerts
     private final EmailService emailService;
     private final AuditService auditService;
     private final AppUserService appUserService;
@@ -134,7 +135,7 @@ public class ResourceRequestService {
         request.setRequestTime(LocalDateTime.now());
         request.setStatus("PENDING");
 
-        // ✅ NEW: Set stock item link if provided
+        // ✅ Set stock item link if provided
         if (dto.getStockItemId() != null) {
             request.setStockItemId(dto.getStockItemId());
             StockItem stockItem = stockItemRepository.findById(dto.getStockItemId()).orElse(null);
@@ -179,7 +180,6 @@ public class ResourceRequestService {
         return createResourceRequest(dto);
     }
 
-    // ✅ NEW: Method with stockItemId parameter
     @Transactional
     public ResourceRequestDTO createResourceRequest(Long userId, String requestedBy, String description,
                                                     String resourceType, Integer quantity, String justification,
@@ -272,6 +272,9 @@ public class ResourceRequestService {
         return convertToDTO(saved);
     }
 
+    // ============================================
+    // ✅ COMPLETE REQUEST - STOCK IS DEDUCTED HERE
+    // ============================================
     @Transactional
     public ResourceRequestDTO completeResourceRequest(Long requestId, String deliveryNotes) {
         log.info("Admin completing resource request: {}", requestId);
@@ -296,7 +299,7 @@ public class ResourceRequestService {
                     );
                 }
 
-                // Deduct the stock
+                // ✅ Deduct the stock
                 int newQuantity = stockItem.getQuantity() - request.getQuantity();
                 stockItem.setQuantity(newQuantity);
                 stockItem.setLastUpdated(LocalDateTime.now());
@@ -315,11 +318,21 @@ public class ResourceRequestService {
                                 ": " + request.getQuantity() + " of " + stockItem.getName() +
                                 " (new quantity: " + newQuantity + ")",
                         request.getUserId());
+
+                // ✅ Send low stock alert if needed
+                if (newQuantity <= stockItem.getLowStockThreshold()) {
+                    stockService.checkAndSendLowStockAlert(stockItem);
+                }
             } else {
                 log.warn("Stock item not found for ID: {}, skipping stock deduction", request.getStockItemId());
             }
+        } else {
+            log.info("No stock item linked to request {}, skipping stock deduction", requestId);
         }
 
+        // ============================================
+        // Complete the request
+        // ============================================
         request.setStatus("COMPLETED");
         request.setCompletedAt(LocalDateTime.now());
         request.setDeliveryNotes(deliveryNotes);
@@ -657,7 +670,7 @@ public class ResourceRequestService {
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
         dto.setPdfReportPath(request.getPdfReportPath());
 
-        // ✅ NEW: Stock item fields
+        // ✅ Stock item fields
         dto.setStockItemId(request.getStockItemId());
         dto.setStockItemName(request.getStockItemName());
 

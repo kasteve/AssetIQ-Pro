@@ -811,26 +811,6 @@
 
     <!-- CONTENT -->
     <div class="content">
-        <!-- ============================================================ -->
-        <!-- EXPORT BUTTONS COMPONENT (Fragment) – can be used on any page -->
-        <!-- ============================================================ -->
-        <div th:fragment="exportButtons">
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                <button class="btn btn-sm btn-success" onclick="exportTable('csv')">
-                    <i class="fas fa-file-csv me-1"></i> CSV
-                </button>
-                <button class="btn btn-sm btn-primary" onclick="exportTable('excel')">
-                    <i class="fas fa-file-excel me-1"></i> Excel
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="exportTable('pdf')">
-                    <i class="fas fa-file-pdf me-1"></i> PDF
-                </button>
-                <button class="btn btn-sm btn-secondary" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i> Print
-                </button>
-            </div>
-        </div>
-
         <th:block layout:fragment="content">
             <!-- Child page content goes here -->
         </th:block>
@@ -1219,34 +1199,13 @@
     });
 
     // ============================================================
-    // GLOBAL EXPORT FUNCTION - Works with any DataTable on the page
-    // ============================================================
-    function exportTable(type) {
-        // Find the first DataTable on the page
-        var table = $('table.dataTable').DataTable();
-        if (!table) {
-            alert('No DataTable found on this page.');
-            return;
-        }
-
-        switch(type) {
-            case 'csv':
-                table.button('.buttons-csv').trigger();
-                break;
-            case 'excel':
-                table.button('.buttons-excel').trigger();
-                break;
-            case 'pdf':
-                table.button('.buttons-pdf').trigger();
-                break;
-            default:
-                alert('Unknown export type.');
-        }
-    }
-
-    // ============================================================
     // AUTO-INITIALIZE DATATABLES WITH EXPORT BUTTONS
     // ============================================================
+    // Each table.dataTable gets its OWN export/pagination toolbar via
+    // DataTables' Bfrtip "dom" (Buttons + filter + table + info + pagination).
+    // There is intentionally no separate global export button row in the
+    // layout anymore — it used to render on every page (including pages
+    // with no table at all) and duplicate these per-table buttons.
     document.addEventListener('DOMContentLoaded', function() {
         // Check if any data table exists without DataTable initialized
         var tables = document.querySelectorAll('table.dataTable');
