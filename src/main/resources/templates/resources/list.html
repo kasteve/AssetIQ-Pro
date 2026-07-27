@@ -663,10 +663,11 @@
 
         // Load all stock items from the server
         function loadAllStockItems() {
-            fetch('/assetIQ-pro/admin/stock/api')
+            // ✅ Use the public endpoint instead of admin endpoint
+            fetch('/assetIQ-pro/admin/stock/api/public')
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
+                        throw new Error('HTTP ' + response.status + ' - ' + response.statusText);
                     }
                     return response.json();
                 })

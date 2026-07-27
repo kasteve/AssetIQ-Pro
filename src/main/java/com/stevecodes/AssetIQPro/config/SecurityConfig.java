@@ -154,6 +154,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/resources/sign-error",
                                 "/bookings/slot-request/**",
                                 "/bookings/server-room/**",
+                                "/admin/stock/api/public",
                                 "/bookings/server-room/sign-out",
                                 "/bookings/server-room/signout-thankyou",
                                 "/bookings/server-room/signout-error",

@@ -14,16 +14,17 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/admin/stock")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN', 'SUPER_ADMIN')")
 public class StockController {
 
     private final StockService stockService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN', 'SUPER_ADMIN')")
     public String stockPage(Model model) {
         AppUser currentUser = SecurityUtils.getCurrentUser();
         if (currentUser == null) {
@@ -129,6 +130,28 @@ public class StockController {
     @PreAuthorize("hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<StockItem>> getItemsByCategory(@PathVariable Long categoryId) {
         return ResponseEntity.ok(stockService.getStockItemsByCategory(categoryId));
+    }
+
+    // ✅ Public endpoint - NO @PreAuthorize at method level
+    // This endpoint is accessible to users with RESOURCE_REQUEST_CREATE permission
+    @GetMapping("/api/public")
+    @ResponseBody
+    public ResponseEntity<?> getPublicStockItems() {
+        try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            }
+
+            // ✅ Check permission manually
+            if (!currentUser.hasAnyPermission("RESOURCE_REQUEST_CREATE", "ADMIN")) {
+                return ResponseEntity.status(403).body(Map.of("error", "You don't have permission to view stock items"));
+            }
+
+            return ResponseEntity.ok(stockService.getAllStockItems());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Error loading stock items: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/api")

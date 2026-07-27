@@ -53,6 +53,7 @@ public class ResourceViewController {
                 return "redirect:/login";
             }
 
+            // ✅ Check for RESOURCE_REQUEST_CREATE permission
             if (!currentUser.hasAnyPermission("RESOURCE_REQUEST_CREATE", "ADMIN")) {
                 throw new AccessDeniedException("You don't have permission to create resource requests.");
             }
@@ -80,7 +81,22 @@ public class ResourceViewController {
             return "redirect:/login";
         }
 
+        // ✅ Get filtered requests based on user role
         List<ResourceRequestDTO> allRequests = resourceRequestService.getAllResourceRequests();
+        List<ResourceRequestDTO> filteredRequests;
+
+        if (currentUser.isAdmin() || currentUser.hasPermission("RESOURCE_REQUEST_VIEW")) {
+            filteredRequests = allRequests;
+            log.info("Admin viewing all {} resource requests", filteredRequests.size());
+        } else {
+            // Regular users see only their own requests
+            filteredRequests = allRequests.stream()
+                    .filter(r -> r.getUserId() != null && r.getUserId().equals(currentUser.getUserId()))
+                    .collect(java.util.stream.Collectors.toList());
+            log.info("User {} viewing {} of {} total resource requests",
+                    currentUser.getUsername(), filteredRequests.size(), allRequests.size());
+        }
+
         List<ResourceRequestDTO> pendingRequests = resourceRequestService.getPendingResourceRequests();
         List<ResourceRequestDTO> acceptedRequests = resourceRequestService.getAcceptedResourceRequests();
         List<ResourceRequestDTO> completedRequests = resourceRequestService.getCompletedResourceRequests();
@@ -90,7 +106,7 @@ public class ResourceViewController {
         long declinedCount = resourceRequestService.countDeclinedRequests();
         long completedCount = resourceRequestService.countCompletedRequests();
 
-        model.addAttribute("resourceRequests", allRequests);
+        model.addAttribute("resourceRequests", filteredRequests);
         model.addAttribute("pendingRequests", pendingRequests);
         model.addAttribute("acceptedRequests", acceptedRequests);
         model.addAttribute("completedRequests", completedRequests);

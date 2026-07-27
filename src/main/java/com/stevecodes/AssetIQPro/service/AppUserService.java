@@ -73,6 +73,7 @@ public class AppUserService {
                 "INFRA_REQUEST_VIEW",     // View and manage infrastructure requests (own requests only)
                 "INFRA_REQUEST_CREATE",   // Create/submit new infrastructure requests
                 "RESOURCE_REQUEST_VIEW",  // View and manage resource/administration requests
+                "RESOURCE_REQUEST_CREATE", // ✅ NEW: Create resource/administration requests
                 "ROOM_VIEW_ALL",          // View all rooms in the system
                 "ROOM_BOOK",              // Book rooms for meetings/events
                 "ROOM_CANCEL",            // Cancel room bookings
