@@ -5,17 +5,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AssetIQ-Pro - Interswitch Asset Management System. Manage assets, transfers, bookings, and infrastructure requests.">
+    <meta name="description" th:content="${pageDescription} ?: 'AssetIQ-Pro - Interswitch Asset Management System. Manage assets, transfers, bookings, and infrastructure requests.'">
     <meta name="keywords" content="asset management, inventory, IT asset, Interswitch, AssetIQ-Pro">
     <meta name="author" content="Interswitch">
     <meta name="robots" content="index, follow">
 
-    <!-- Open Graph / Social Media -->
-    <meta property="og:title" content="AssetIQ-Pro - Asset Management System">
-    <meta property="og:description" content="Unified Asset Management System for Interswitch">
+    <!-- CSRF tokens (used by JS-built forms / fetch calls that bypass Thymeleaf's automatic CSRF injection) -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <!-- ============================================================ -->
+    <!-- Open Graph / Social Media Link Previews                       -->
+    <!-- Every attribute below falls back to a sensible default if the -->
+    <!-- controller doesn't put pageTitle/pageDescription/ogImage/ogUrl -->
+    <!-- into the model, so every page gets a preview card even if it   -->
+    <!-- wasn't customized for that specific page.                      -->
+    <!-- NOTE: link-preview crawlers (Slack, WhatsApp, Teams, etc.) are  -->
+    <!-- unauthenticated. Since this app sits behind Spring Security,   -->
+    <!-- a crawler hitting a protected URL will see the login page's    -->
+    <!-- meta tags, not the target page's. For per-item previews (e.g.  -->
+    <!-- a specific asset), expose a public, unauthenticated preview    -->
+    <!-- route/endpoint that serves just the meta tags + a redirect.    -->
+    <!-- ============================================================ -->
+    <meta property="og:title" th:content="${pageTitle} ?: 'AssetIQ-Pro - Asset Management System'">
+    <meta property="og:description" th:content="${pageDescription} ?: 'Unified Asset Management System for Interswitch'">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://assetiq-pro.interswitch.com">
-    <meta property="og:image" content="/assetIQ-pro/images/og-image.png">
+    <meta property="og:url" th:content="${ogUrl} ?: 'https://assetiq-pro.interswitch.com'">
+    <meta property="og:image" th:content="${ogImage} ?: 'https://assetiq-pro.interswitch.com/assetIQ-pro/images/og-image.png'">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="AssetIQ-Pro">
+
+    <!-- Twitter Card (X, and several other platforms honor these too) -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" th:content="${pageTitle} ?: 'AssetIQ-Pro - Asset Management System'">
+    <meta name="twitter:description" th:content="${pageDescription} ?: 'Unified Asset Management System for Interswitch'">
+    <meta name="twitter:image" th:content="${ogImage} ?: 'https://assetiq-pro.interswitch.com/assetIQ-pro/images/og-image.png'">
 
     <!-- Theme Color -->
     <meta name="theme-color" content="#0d6efd">

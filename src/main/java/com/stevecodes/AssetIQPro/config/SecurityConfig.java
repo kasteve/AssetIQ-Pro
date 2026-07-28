@@ -22,6 +22,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -99,7 +100,37 @@ public class SecurityConfig implements WebMvcConfigurer {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                // ============================================================
+                // CSRF PROTECTION
+                // Re-enabled (Spring's default, session-backed CsrfTokenRepository)
+                // instead of fully disabled. This is what populates the `_csrf`
+                // request attribute that layouts/default.html reads to render
+                // <meta name="_csrf" .../> for JS-built forms/fetch calls, and
+                // what Thymeleaf's spring-security dialect uses to auto-inject
+                // hidden CSRF fields into every th:action form.
+                //
+                // Only genuinely non-browser-session flows are exempted:
+                //   - stateless API auth entry points
+                //   - "sign" links opened directly from emailed/shared URLs,
+                //     which aren't a normal logged-in session and often carry
+                //     their own opaque/one-time token for authorization
+                //   - a declared public API endpoint for stock lookups
+                // Everything else (all authenticated pages, all admin forms,
+                // asset/transfer CRUD) is now CSRF-protected.
+                // ============================================================
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(
+                                new AntPathRequestMatcher("/api/auth/**"),
+                                new AntPathRequestMatcher("/api/public/**"),
+                                new AntPathRequestMatcher("/admin/stock/api/public"),
+                                new AntPathRequestMatcher("/transfer/sign/**"),
+                                new AntPathRequestMatcher("/transfers/sign/**"),
+                                new AntPathRequestMatcher("/infra-requests/sign"),
+                                new AntPathRequestMatcher("/resources/sign"),
+                                new AntPathRequestMatcher("/bookings/slot-request/**"),
+                                new AntPathRequestMatcher("/bookings/server-room/**")
+                        )
+                )
                 .sessionManagement(session -> session
                         .sessionFixation(sessionFixation -> sessionFixation.newSession())
                         .maximumSessions(10)

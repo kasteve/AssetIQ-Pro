@@ -1,33 +1,9 @@
 Include the favicon and meta headers
 
-Build a global reusable component for exports (csv, excel, pdf) then apply to all data tables
-
-Use toasts or dialogs to show success or error alerts
-
-On booking module, have the driver and room bookings to be separate tabs. The current view isn't scalable for many requests at a time
-
-For room booking let's introduce the calendar view
-
-For the lists with more that three actions, consider using the pop up menu for a clean UX
-
-On User management, place the add user button at the far right end of the screen
-
-Optional: Support for dark mode
-
-Categorize assets (Office assets (Laptops, Keyboards, mice, printer, etc), Data Center assets (MTN and Raxio) )
-
-Review the RBAC
-
-Reports module
-
-Settings module
-
 Asychronous trigger (form submission should not wait for th email to return success)
 
 
-COMPLETED ONES
-==================
-Moving the user creation button to the right
+ALTER TABLE dbo.Assets ADD lifespan_years INT NULL;   on production.
 
 
 
