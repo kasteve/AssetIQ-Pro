@@ -75,7 +75,6 @@ public class PdfGenerationService {
     // Watermark logo location on classpath (src/main/resources/static/bg-image/assetIQ-Pro_logo.png)
     private static final String WATERMARK_LOGO_PATH = "static/bg-image/assetIQ-Pro_logo.png";
     private static final float WATERMARK_OPACITY = 0.08f;
-    private static final float WATERMARK_SIZE = 300f; // width/height in pt, adjust as needed
 
     private final AppUserRepository userRepository;
     private final DepartmentRepository departmentRepository;
@@ -249,7 +248,8 @@ public class PdfGenerationService {
 
     /**
      * Registers a page event handler that stamps the AssetIQ-Pro logo as a faint,
-     * centered watermark behind all content on every page of the document.
+     * full-page background watermark behind all content on every page of the document.
+     * The image is scaled to fit the entire page (preserving aspect ratio, not tiled/repeated).
      * Must be called on the PdfDocument BEFORE any pages/content are added.
      */
     private void addWatermark(PdfDocument pdfDoc) {
@@ -271,15 +271,13 @@ public class PdfGenerationService {
                 // Draw on a content stream placed BEFORE existing content so it sits behind everything
                 PdfCanvas canvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
 
-                float width = WATERMARK_SIZE;
-                float height = WATERMARK_SIZE;
-                float x = (pageSize.getWidth() - width) / 2;
-                float y = (pageSize.getHeight() - height) / 2;
-
                 canvas.saveState();
                 PdfExtGState gState = new PdfExtGState().setFillOpacity(WATERMARK_OPACITY);
                 canvas.setExtGState(gState);
-                canvas.addImageFittedIntoRectangle(logoData, new Rectangle(x, y, width, height), false);
+                // Fit the image into the full page rectangle (single image, no tiling/repeat).
+                // Preserves aspect ratio - use canvas.addImage(logoData, pageSize, false) instead
+                // if you want it stretched edge-to-edge regardless of aspect ratio.
+                canvas.addImageFittedIntoRectangle(logoData, pageSize, false);
                 canvas.restoreState();
             } catch (Exception e) {
                 log.warn("Failed to draw watermark on page: {}", e.getMessage());

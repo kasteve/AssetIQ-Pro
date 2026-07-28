@@ -128,7 +128,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 new AntPathRequestMatcher("/infra-requests/sign"),
                                 new AntPathRequestMatcher("/resources/sign"),
                                 new AntPathRequestMatcher("/bookings/slot-request/**"),
-                                new AntPathRequestMatcher("/bookings/server-room/**")
+                                new AntPathRequestMatcher("/bookings/server-room/**"),
+                                new AntPathRequestMatcher("/api/resource-requests/**")
                         )
                 )
                 .sessionManagement(session -> session
