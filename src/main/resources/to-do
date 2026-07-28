@@ -5,7 +5,8 @@ Asychronous trigger (form submission should not wait for th email to return succ
 
 ALTER TABLE dbo.Assets ADD lifespan_years INT NULL;   on production.
 
-
+KNOWN ISSUES:
+Redirect to login page after password change fails.
 
 
 

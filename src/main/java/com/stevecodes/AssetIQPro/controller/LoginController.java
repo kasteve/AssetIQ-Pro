@@ -92,13 +92,11 @@ public class LoginController {
 
             if (user.isMustChangePassword() || user.isFirstLogin()) {
                 log.info("Password change required for user: {}", username);
-                // ✅ Use context path dynamically
-                return "redirect:" + request.getContextPath() + "/change-password?firstLogin=true";
+                return "redirect:/change-password?firstLogin=true";
             }
 
             log.info("Session created successfully for user: {}", username);
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/dashboard";
+            return "redirect:/dashboard";
 
         } catch (Exception ex) {
             log.error("Unexpected error during login for username: {}", username, ex);
@@ -108,26 +106,23 @@ public class LoginController {
     }
 
     @GetMapping("/logout")
-    public String logout(HttpSession session, HttpServletRequest request) {
+    public String logout(HttpSession session) {
         if (session != null) {
             session.invalidate();
             log.info("User logged out successfully.");
         }
-        // ✅ Use context path dynamically
-        return "redirect:" + request.getContextPath() + "/login?logout=true";
+        return "redirect:/login?logout=true";
     }
 
     @GetMapping("/change-password")
     public String showChangePasswordForm(@RequestParam(required = false) boolean firstLogin,
                                          HttpSession session,
-                                         HttpServletRequest request,
                                          Model model) {
         Long userId = (Long) session.getAttribute("userId");
 
         if (userId == null) {
             log.warn("No userId in session, redirecting to login");
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/login";
+            return "redirect:/login";
         }
 
         SystemSettingService.PasswordPolicy policy = settingService.getPasswordPolicy();
@@ -144,19 +139,16 @@ public class LoginController {
                                         @RequestParam("confirmPassword") String confirmPassword,
                                         @RequestParam(required = false) boolean firstLogin,
                                         RedirectAttributes redirectAttributes,
-                                        HttpSession session,
-                                        HttpServletRequest request) {
+                                        HttpSession session) {
         if (!newPassword.equals(confirmPassword)) {
             redirectAttributes.addFlashAttribute("error", "Passwords do not match.");
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/change-password?firstLogin=" + firstLogin;
+            return "redirect:/change-password?firstLogin=" + firstLogin;
         }
 
         String policyError = validatePasswordPolicy(newPassword);
         if (policyError != null) {
             redirectAttributes.addFlashAttribute("error", policyError);
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/change-password?firstLogin=" + firstLogin;
+            return "redirect:/change-password?firstLogin=" + firstLogin;
         }
 
         try {
@@ -169,22 +161,18 @@ public class LoginController {
             log.info("Password changed for user ID: {}", userId);
 
             if (firstLogin) {
-                // ✅ Use context path dynamically
-                return "redirect:" + request.getContextPath() + "/login?success=true";
+                return "redirect:/login?success=true";
             }
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/dashboard";
+            return "redirect:/dashboard";
 
         } catch (PasswordReuseException e) {
             log.warn("Password reuse attempt for user ID: {}", userId);
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/change-password?firstLogin=" + firstLogin;
+            return "redirect:/change-password?firstLogin=" + firstLogin;
         } catch (Exception e) {
             log.error("Error changing password for user ID: {}", userId, e);
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            // ✅ Use context path dynamically
-            return "redirect:" + request.getContextPath() + "/change-password?firstLogin=" + firstLogin;
+            return "redirect:/change-password?firstLogin=" + firstLogin;
         }
     }
 
