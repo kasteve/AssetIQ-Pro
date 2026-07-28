@@ -40,6 +40,7 @@ public class AssetDTO {
     private Integer daysUntilEOL;
     private boolean warrantyExpiringSoon;
     private boolean eolSoon;
+    private Integer lifespanYears;
 
     public static AssetDTO fromEntity(Asset asset) {
         AssetDTO dto = new AssetDTO();
@@ -62,6 +63,7 @@ public class AssetDTO {
         dto.setDaysUntilEOL(asset.getDaysUntilEOL());
         dto.setWarrantyExpiringSoon(asset.isWarrantyExpiringSoon());
         dto.setEolSoon(asset.isEOLSoon());
+        dto.setLifespanYears(asset.getLifespanYears()); // FIX: was missing, so lifespanYears never reached the client
 
         if (asset.getCategory() != null) {
             dto.setCategoryId(asset.getCategory().getCategoryId());

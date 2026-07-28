@@ -52,8 +52,14 @@ public class AssetService {
             throw new IllegalArgumentException("Asset tag already exists: " + asset.getTag());
         }
 
+        // Auto-calc warranty end date from purchase date + warranty years
         if (asset.getPurchaseDate() != null && asset.getWarrantyYears() != null) {
             asset.setWarrantyEndDate(asset.getPurchaseDate().plusYears(asset.getWarrantyYears()));
+        }
+
+        // NEW: Auto-calc EOL date from purchase date + lifespan years
+        if (asset.getPurchaseDate() != null && asset.getLifespanYears() != null) {
+            asset.setEolDate(asset.getPurchaseDate().plusYears(asset.getLifespanYears()));
         }
 
         if (asset.getEolNotificationDays() == null) {
@@ -121,9 +127,18 @@ public class AssetService {
                 existing.setWarrantyEndDate(existing.getPurchaseDate().plusYears(existing.getWarrantyYears()));
             }
         }
-        if (updatedAsset.getEolDate() != null) {
+
+        // NEW: recalc EOL date whenever lifespan years is supplied
+        if (updatedAsset.getLifespanYears() != null) {
+            existing.setLifespanYears(updatedAsset.getLifespanYears());
+            if (existing.getPurchaseDate() != null) {
+                existing.setEolDate(existing.getPurchaseDate().plusYears(existing.getLifespanYears()));
+            }
+        } else if (updatedAsset.getEolDate() != null) {
+            // Fallback: allow direct manual override when lifespan years isn't sent
             existing.setEolDate(updatedAsset.getEolDate());
         }
+
         if (updatedAsset.getEolNotificationDays() != null) {
             existing.setEolNotificationDays(updatedAsset.getEolNotificationDays());
         }

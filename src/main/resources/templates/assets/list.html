@@ -255,7 +255,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Purchase Date</label>
-                                <input type="date" name="purchaseDate" class="form-control">
+                                <input type="date" id="createPurchaseDate" name="purchaseDate" class="form-control">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Purchase Cost</label>
@@ -263,15 +263,19 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Warranty Years</label>
-                                <input type="number" name="warrantyYears" class="form-control" value="1" min="0">
+                                <input type="number" id="createWarrantyYears" name="warrantyYears" class="form-control" value="1" min="0">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Warranty End Date</label>
-                                <input type="date" name="warrantyEndDate" class="form-control">
+                                <input type="date" id="createWarrantyEndDate" name="warrantyEndDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Lifespan (Years)</label>
+                                <input type="number" id="createLifespanYears" name="lifespanYears" class="form-control" min="0" placeholder="e.g. 5">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">EOL Date</label>
-                                <input type="date" name="eolDate" class="form-control">
+                                <input type="date" id="createEolDate" name="eolDate" class="form-control">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Warranty Notification Days</label>
@@ -393,6 +397,10 @@
                             <div class="col-md-6">
                                 <label class="form-label">Warranty End Date</label>
                                 <input type="date" id="editWarrantyEndDate" name="warrantyEndDate" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Lifespan (Years)</label>
+                                <input type="number" id="editLifespanYears" name="lifespanYears" class="form-control" min="0">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">EOL Date</label>
@@ -904,6 +912,49 @@
             });
         }
 
+        // ============================================
+        // Lifecycle auto-calculation
+        // (Warranty End Date = Purchase Date + Warranty Years)
+        // (EOL Date = Purchase Date + Lifespan Years)
+        // ============================================
+        function attachLifecycleAutoCalc(prefix) {
+            const purchaseEl = document.getElementById(prefix + 'PurchaseDate');
+            const warrantyYearsEl = document.getElementById(prefix + 'WarrantyYears');
+            const warrantyEndEl = document.getElementById(prefix + 'WarrantyEndDate');
+            const lifespanEl = document.getElementById(prefix + 'LifespanYears');
+            const eolEl = document.getElementById(prefix + 'EolDate');
+            if (!purchaseEl || !warrantyYearsEl || !warrantyEndEl || !lifespanEl || !eolEl) return;
+
+            function addYears(dateStr, years) {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return '';
+                d.setFullYear(d.getFullYear() + parseInt(years, 10));
+                return d.toISOString().split('T')[0];
+            }
+            function recalcWarranty() {
+                if (purchaseEl.value && warrantyYearsEl.value) {
+                    warrantyEndEl.value = addYears(purchaseEl.value, warrantyYearsEl.value);
+                }
+            }
+            function recalcEol() {
+                if (purchaseEl.value && lifespanEl.value) {
+                    eolEl.value = addYears(purchaseEl.value, lifespanEl.value);
+                }
+            }
+
+            warrantyYearsEl.addEventListener('input', recalcWarranty);
+            lifespanEl.addEventListener('input', recalcEol);
+            purchaseEl.addEventListener('change', function () {
+                recalcWarranty();
+                recalcEol();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            attachLifecycleAutoCalc('create');
+            attachLifecycleAutoCalc('edit');
+        });
+
         let currentAssetId = null;
 
         // ============================================
@@ -1140,6 +1191,7 @@
                     document.getElementById('editPurchaseCost').value = asset.purchaseCost || '';
                     document.getElementById('editWarrantyYears').value = asset.warrantyYears != null ? asset.warrantyYears : 1;
                     document.getElementById('editWarrantyEndDate').value = asset.warrantyEndDate || '';
+                    document.getElementById('editLifespanYears').value = asset.lifespanYears != null ? asset.lifespanYears : '';
                     document.getElementById('editEolDate').value = asset.eolDate || '';
                     document.getElementById('editWarrantyNotificationDays').value = asset.warrantyNotificationDays != null ? asset.warrantyNotificationDays : 30;
                     document.getElementById('editEolNotificationDays').value = asset.eolNotificationDays != null ? asset.eolNotificationDays : 30;

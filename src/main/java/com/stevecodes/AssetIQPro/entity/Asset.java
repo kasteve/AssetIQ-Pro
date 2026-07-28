@@ -71,6 +71,11 @@ public class Asset {
     @Column(name = "warranty_years")
     private Integer warrantyYears;
 
+    // NEW: number of years the asset is expected to remain fit for use.
+    // Drives automatic calculation of eolDate = purchaseDate + lifespanYears.
+    @Column(name = "lifespan_years")
+    private Integer lifespanYears;
+
     @Column(name = "eol_date")
     private LocalDate eolDate;
 
@@ -97,7 +102,7 @@ public class Asset {
     private Department department;
 
     // ============================================
-    // FIXED: Helper Methods
+    // Helper Methods
     // ============================================
 
     public Integer getDaysUntilWarrantyExpiry() {
@@ -105,7 +110,6 @@ public class Asset {
             return null;
         }
         LocalDate today = LocalDate.now();
-        // Returns negative days if already expired
         return (int) ChronoUnit.DAYS.between(today, warrantyEndDate);
     }
 
@@ -114,39 +118,27 @@ public class Asset {
             return null;
         }
         LocalDate today = LocalDate.now();
-        // Returns negative days if already expired
         return (int) ChronoUnit.DAYS.between(today, eolDate);
     }
 
-    /**
-     * Check if warranty is expiring soon (future date within notification period)
-     */
     public boolean isWarrantyExpiringSoon() {
         Integer daysLeft = getDaysUntilWarrantyExpiry();
         if (daysLeft == null) {
             return false;
         }
         int notificationDays = warrantyNotificationDays != null ? warrantyNotificationDays : 30;
-        // Only show "soon" if the date is in the future AND within notification period
         return daysLeft > 0 && daysLeft <= notificationDays;
     }
 
-    /**
-     * Check if EOL is approaching soon (future date within notification period)
-     */
     public boolean isEOLSoon() {
         Integer daysLeft = getDaysUntilEOL();
         if (daysLeft == null) {
             return false;
         }
         int notificationDays = eolNotificationDays != null ? eolNotificationDays : 30;
-        // Only show "soon" if the date is in the future AND within notification period
         return daysLeft > 0 && daysLeft <= notificationDays;
     }
 
-    /**
-     * Check if warranty has expired
-     */
     public boolean isWarrantyExpired() {
         if (warrantyEndDate == null) {
             return false;
@@ -154,9 +146,6 @@ public class Asset {
         return warrantyEndDate.isBefore(LocalDate.now());
     }
 
-    /**
-     * Check if EOL has passed
-     */
     public boolean isEOLExpired() {
         if (eolDate == null) {
             return false;
