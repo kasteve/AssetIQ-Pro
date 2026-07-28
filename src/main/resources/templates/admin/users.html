@@ -122,18 +122,21 @@
                                 </li>
                                 <li>
                                     <a th:if="${user.active}" class="dropdown-item" href="#"
-                                       th:onclick="'toggleUser(' + ${user.userId} + '); return false;'">
+                                       th:attr="data-userid=${user.userId}"
+                                       onclick="toggleUser(this.getAttribute('data-userid')); return false;">
                                         <i class="fas fa-ban me-2 text-danger"></i>Block
                                     </a>
                                     <a th:unless="${user.active}" class="dropdown-item" href="#"
-                                       th:onclick="'toggleUser(' + ${user.userId} + '); return false;'">
+                                       th:attr="data-userid=${user.userId}"
+                                       onclick="toggleUser(this.getAttribute('data-userid')); return false;">
                                         <i class="fas fa-check me-2 text-success"></i>Activate
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item text-danger" href="#"
-                                       th:onclick="'deleteUser(' + ${user.userId} + '); return false;'">
+                                       th:attr="data-userid=${user.userId}"
+                                       onclick="deleteUser(this.getAttribute('data-userid')); return false;">
                                         <i class="fas fa-trash me-2"></i>Delete
                                     </a>
                                 </li>
@@ -349,6 +352,32 @@
             </div>
         </div>
     </div>
+
+    <!-- ============================================ -->
+    <!-- Toast Container (replaces window.alert)       -->
+    <!-- ============================================ -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;" id="toastContainer"></div>
+
+    <!-- ============================================ -->
+    <!-- Confirm Modal (replaces window.confirm)       -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmActionTitle"><i class="fas fa-question-circle me-2 text-warning"></i>Please Confirm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmActionMessage" class="mb-0">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionYesBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div layout:fragment="styles">
@@ -482,6 +511,32 @@
             font-size: 13px !important;
             margin-right: 4px !important;
         }
+
+        /* ============================================ */
+        /* Toast styling                                 */
+        /* ============================================ */
+        .app-toast {
+            min-width: 300px;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.18);
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .app-toast .toast-header {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 13.5px;
+            padding: 10px 14px;
+        }
+        .app-toast .toast-body {
+            font-size: 13.5px;
+            padding: 10px 14px 14px 14px;
+        }
+        .app-toast.toast-success .toast-header { background: #e6f7ec; color: #198754; }
+        .app-toast.toast-error .toast-header { background: #fdeeee; color: #dc3545; }
+        .app-toast.toast-warning .toast-header { background: #fff4e0; color: #fd7e14; }
+        .app-toast.toast-info .toast-header { background: #e8eefc; color: #0d6efd; }
     </style>
 </div>
 
@@ -498,6 +553,74 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
     <script th:inline="none">
+        // ============================================
+        // Toast helper (replaces window.alert)
+        // ============================================
+        const TOAST_ICONS = {
+            success: 'fa-circle-check',
+            error: 'fa-circle-exclamation',
+            warning: 'fa-triangle-exclamation',
+            info: 'fa-circle-info'
+        };
+        const TOAST_TITLES = {
+            success: 'Success',
+            error: 'Error',
+            warning: 'Warning',
+            info: 'Notice'
+        };
+
+        function showToast(message, type = 'info', delay = 4000) {
+            const container = document.getElementById('toastContainer');
+            const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
+            const title = TOAST_TITLES[type] || TOAST_TITLES.info;
+
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast app-toast toast-' + type;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.innerHTML =
+                '<div class="toast-header">' +
+                    '<i class="fas ' + icon + ' me-2"></i>' +
+                    '<strong class="me-auto">' + title + '</strong>' +
+                    '<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="toast-body">' + message + '</div>';
+
+            container.appendChild(toastEl);
+            const bsToast = new bootstrap.Toast(toastEl, { delay: delay });
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            bsToast.show();
+        }
+
+        // ============================================
+        // Confirm helper (replaces window.confirm)
+        // ============================================
+        function showConfirm(message, onConfirm, options = {}) {
+            const modalEl = document.getElementById('confirmActionModal');
+            const messageEl = document.getElementById('confirmActionMessage');
+            const titleEl = document.getElementById('confirmActionTitle');
+            const yesBtn = document.getElementById('confirmActionYesBtn');
+
+            messageEl.textContent = message;
+            titleEl.innerHTML = '<i class="fas fa-question-circle me-2 text-warning"></i>' + (options.title || 'Please Confirm');
+            yesBtn.textContent = options.confirmLabel || 'Confirm';
+            yesBtn.className = 'btn ' + (options.confirmClass || 'btn-danger');
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            // Replace button to clear any previously bound handlers
+            const newYesBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+
+            newYesBtn.addEventListener('click', function() {
+                modal.hide();
+                onConfirm();
+            }, { once: true });
+
+            modal.show();
+        }
+
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#usersTable')) {
                 $('#usersTable').DataTable().destroy();
@@ -624,45 +747,56 @@
                                 console.log('Permissions loaded from fallback');
                             }
                         })
-                        .catch(err2 => console.error('Both API endpoints failed:', err2));
+                        .catch(err2 => {
+                            console.error('Both API endpoints failed:', err2);
+                            showToast('Unable to load current permissions for this user.', 'error');
+                        });
                     });
                 });
             }
         });
 
         function toggleUser(id) {
-            if (confirm('Toggle user status?')) {
+            showConfirm('Are you sure you want to toggle this user\'s status?', function() {
                 fetch('/assetIQ-pro/admin/users/' + id + '/toggle', { method: 'POST' })
-                    .then(() => window.location.reload())
-                    .catch(err => alert('Failed: ' + err.message));
-            }
+                    .then(response => {
+                        if (!response.ok) throw new Error('Request failed');
+                        showToast('User status updated successfully.', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    })
+                    .catch(err => showToast('Failed to toggle user status: ' + err.message, 'error'));
+            }, { title: 'Toggle User Status', confirmLabel: 'Toggle', confirmClass: 'btn-primary' });
         }
 
         function deleteUser(id) {
-            if (confirm('Delete this user permanently?')) {
+            showConfirm('This will permanently delete the user. This action cannot be undone.', function() {
                 fetch('/assetIQ-pro/admin/users/' + id + '/delete', { method: 'POST' })
-                    .then(() => window.location.reload())
-                    .catch(err => alert('Failed: ' + err.message));
-            }
+                    .then(response => {
+                        if (!response.ok) throw new Error('Request failed');
+                        showToast('User deleted successfully.', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    })
+                    .catch(err => showToast('Failed to delete user: ' + err.message, 'error'));
+            }, { title: 'Delete User', confirmLabel: 'Delete', confirmClass: 'btn-danger' });
         }
 
         function resetUserPassword() {
             if (!resetUserId) {
-                alert('No user selected!');
+                showToast('No user selected!', 'warning');
                 return;
             }
-            if (confirm('Reset password for this user?')) {
+            showConfirm('Reset password for this user? A temporary password will be emailed to them.', function() {
                 fetch('/assetIQ-pro/admin/users/' + resetUserId + '/reset-password', { method: 'POST' })
                     .then(response => {
                         if (response.ok) {
-                            alert('Password reset email sent!');
+                            showToast('Password reset email sent!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
                         } else {
                             throw new Error('Failed');
                         }
                     })
-                    .catch(err => alert('Failed: ' + err.message));
-            }
+                    .catch(err => showToast('Failed to reset password: ' + err.message, 'error'));
+            }, { title: 'Reset Password', confirmLabel: 'Reset', confirmClass: 'btn-warning' });
         }
     </script>
 </div>
