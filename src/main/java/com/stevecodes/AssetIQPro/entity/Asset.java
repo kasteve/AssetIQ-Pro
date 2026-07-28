@@ -105,9 +105,7 @@ public class Asset {
             return null;
         }
         LocalDate today = LocalDate.now();
-        if (warrantyEndDate.isBefore(today)) {
-            return 0;
-        }
+        // Returns negative days if already expired
         return (int) ChronoUnit.DAYS.between(today, warrantyEndDate);
     }
 
@@ -116,30 +114,39 @@ public class Asset {
             return null;
         }
         LocalDate today = LocalDate.now();
-        if (eolDate.isBefore(today)) {
-            return 0;
-        }
+        // Returns negative days if already expired
         return (int) ChronoUnit.DAYS.between(today, eolDate);
     }
 
+    /**
+     * Check if warranty is expiring soon (future date within notification period)
+     */
     public boolean isWarrantyExpiringSoon() {
         Integer daysLeft = getDaysUntilWarrantyExpiry();
         if (daysLeft == null) {
             return false;
         }
         int notificationDays = warrantyNotificationDays != null ? warrantyNotificationDays : 30;
-        return daysLeft <= notificationDays && daysLeft >= 0;
+        // Only show "soon" if the date is in the future AND within notification period
+        return daysLeft > 0 && daysLeft <= notificationDays;
     }
 
+    /**
+     * Check if EOL is approaching soon (future date within notification period)
+     */
     public boolean isEOLSoon() {
         Integer daysLeft = getDaysUntilEOL();
         if (daysLeft == null) {
             return false;
         }
         int notificationDays = eolNotificationDays != null ? eolNotificationDays : 30;
-        return daysLeft <= notificationDays && daysLeft >= 0;
+        // Only show "soon" if the date is in the future AND within notification period
+        return daysLeft > 0 && daysLeft <= notificationDays;
     }
 
+    /**
+     * Check if warranty has expired
+     */
     public boolean isWarrantyExpired() {
         if (warrantyEndDate == null) {
             return false;
@@ -147,6 +154,9 @@ public class Asset {
         return warrantyEndDate.isBefore(LocalDate.now());
     }
 
+    /**
+     * Check if EOL has passed
+     */
     public boolean isEOLExpired() {
         if (eolDate == null) {
             return false;
@@ -177,27 +187,14 @@ public class Asset {
         return status == AssetStatus.MAINTENANCE;
     }
 
-    // ============================================
-    // FIXED: These methods now return proper values
-    // ============================================
-
-    /**
-     * Returns the asset name
-     */
     public String getAssetName() {
         return name != null ? name : tag;
     }
 
-    /**
-     * Returns the warranty start date (purchase date or warranty start)
-     */
     public LocalDate getWarrantyStartDate() {
         return purchaseDate;
     }
 
-    /**
-     * Returns the cost as double
-     */
     public double getCost() {
         return purchaseCost != null ? purchaseCost.doubleValue() : 0.0;
     }

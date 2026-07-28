@@ -103,8 +103,13 @@
                     <td>
                         <div th:if="${asset.warrantyEndDate}">
                             <span th:text="${#temporals.format(asset.warrantyEndDate, 'dd/MM/yyyy')}">2025-01-01</span>
+                            <!-- FIXED: Show "Expiring soon" only for future dates -->
                             <div th:if="${asset.warrantyExpiringSoon}" class="warning-flag">
                                 <i class="fas fa-exclamation-circle"></i> Expiring soon
+                            </div>
+                            <!-- Show "Expired" for past dates -->
+                            <div th:if="${asset.warrantyExpired}" class="warning-flag expired-flag">
+                                <i class="fas fa-exclamation-triangle"></i> Expired
                             </div>
                         </div>
                         <span th:unless="${asset.warrantyEndDate}" class="text-faint">N/A</span>
@@ -112,56 +117,76 @@
                     <td>
                         <div th:if="${asset.eolDate}">
                             <span th:text="${#temporals.format(asset.eolDate, 'dd/MM/yyyy')}">2026-01-01</span>
-                            <div th:if="${asset.EOLSoon}" class="warning-flag">
+                            <!-- FIXED: Show "EOL soon" only for future dates -->
+                            <div th:if="${asset.eOLSoon}" class="warning-flag">
                                 <i class="fas fa-exclamation-circle"></i> EOL soon
+                            </div>
+                            <!-- Show "EOL passed" for past dates -->
+                            <div th:if="${asset.eOLExpired}" class="warning-flag expired-flag">
+                                <i class="fas fa-exclamation-triangle"></i> EOL passed
                             </div>
                         </div>
                         <span th:unless="${asset.eolDate}" class="text-faint">N/A</span>
                     </td>
-                    <td>
-                        <div class="btn-group btn-group-sm action-btn-group">
-                            <button type="button" class="btn btn-outline-primary" title="Edit"
-                                    data-bs-toggle="modal" data-bs-target="#editAssetModal"
-                                    th:data-assetid="${asset.assetId}"
-                                    th:data-tag="${asset.tag}"
-                                    th:data-name="${asset.name}"
-                                    th:data-serial="${asset.serialNumber}"
-                                    th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
-                                    th:data-supplierid="${asset.supplier != null ? asset.supplier.supplierId : ''}"
-                                    th:data-locationid="${asset.location != null ? asset.location.locationId : ''}"
-                                    th:data-status="${asset.status}"
-                                    th:data-purchasedate="${asset.purchaseDate}"
-                                    th:data-purchasecost="${asset.purchaseCost}"
-                                    th:data-warrantyyears="${asset.warrantyYears}"
-                                    th:data-warrantyenddate="${asset.warrantyEndDate}"
-                                    th:data-eoldate="${asset.eolDate}"
-                                    th:data-warrantynotificationdays="${asset.warrantyNotificationDays}"
-                                    th:data-eolnotificationdays="${asset.eolNotificationDays}"
-                                    th:data-invoicepath="${asset.purchaseInvoicePath}"
-                                    onclick="editAsset(this)">
-                                <i class="fas fa-edit"></i>
+                    <td class="text-center">
+                        <div class="dropdown action-dropdown">
+                            <button type="button" class="btn btn-sm btn-outline-secondary action-dots-btn"
+                                    data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                <i class="fas fa-ellipsis-vertical"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-info" title="View"
-                                    th:data-assetid="${asset.assetId}"
-                                    onclick="viewAsset(this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-success" title="Transfer"
-                                    data-bs-toggle="modal" data-bs-target="#createTransferModal"
-                                    th:data-assetid="${asset.assetId}"
-                                    th:data-tag="${asset.tag}"
-                                    th:data-serial="${asset.serialNumber}"
-                                    th:data-name="${asset.name}"
-                                    th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
-                                    onclick="openTransferModal(this)">
-                                <i class="fas fa-exchange-alt"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" title="Delete"
-                                    th:data-assetid="${asset.assetId}"
-                                    th:data-tag="${asset.tag}"
-                                    onclick="deleteAsset(this)">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)"
+                                       data-bs-toggle="modal" data-bs-target="#editAssetModal"
+                                       th:data-assetid="${asset.assetId}"
+                                       th:data-tag="${asset.tag}"
+                                       th:data-name="${asset.name}"
+                                       th:data-serial="${asset.serialNumber}"
+                                       th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
+                                       th:data-supplierid="${asset.supplier != null ? asset.supplier.supplierId : ''}"
+                                       th:data-locationid="${asset.location != null ? asset.location.locationId : ''}"
+                                       th:data-status="${asset.status}"
+                                       th:data-purchasedate="${asset.purchaseDate}"
+                                       th:data-purchasecost="${asset.purchaseCost}"
+                                       th:data-warrantyyears="${asset.warrantyYears}"
+                                       th:data-warrantyenddate="${asset.warrantyEndDate}"
+                                       th:data-eoldate="${asset.eolDate}"
+                                       th:data-warrantynotificationdays="${asset.warrantyNotificationDays}"
+                                       th:data-eolnotificationdays="${asset.eolNotificationDays}"
+                                       th:data-invoicepath="${asset.purchaseInvoicePath}"
+                                       onclick="editAsset(this)">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)"
+                                       th:data-assetid="${asset.assetId}"
+                                       onclick="viewAsset(this)">
+                                        <i class="fas fa-eye me-2 text-info"></i>View
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)"
+                                       data-bs-toggle="modal" data-bs-target="#createTransferModal"
+                                       th:data-assetid="${asset.assetId}"
+                                       th:data-tag="${asset.tag}"
+                                       th:data-serial="${asset.serialNumber}"
+                                       th:data-name="${asset.name}"
+                                       th:data-categoryid="${asset.category != null ? asset.category.categoryId : ''}"
+                                       onclick="openTransferModal(this)">
+                                        <i class="fas fa-exchange-alt me-2 text-success"></i>Transfer
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="javascript:void(0)"
+                                       th:data-assetid="${asset.assetId}"
+                                       th:data-tag="${asset.tag}"
+                                       onclick="deleteAsset(this)">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </td>
                 </tr>
@@ -666,14 +691,55 @@
         .pill-retired { background: #ececec; color: #6c757d; }
 
         .warning-flag { font-size: 11px; font-weight: 600; color: #dc3545; display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; }
+        .warning-flag i { font-size: 10px; }
+        .expired-flag { color: #dc3545; background: #fbe9eb; padding: 2px 10px; border-radius: 12px; }
         .text-faint { color: #b0b5bb; font-size: 12.5px; }
 
-        .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
-        .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
-        .action-btn-group .btn-outline-info:hover { background: #17a2b8; border-color: #17a2b8; }
-        .action-btn-group .btn-outline-success:hover { background: #28a745; border-color: #28a745; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; }
+        /* ===== Actions: 3-dot dropdown ===== */
+        .action-dropdown { display: inline-block; }
+        .action-dots-btn {
+            border-radius: 8px !important;
+            width: 32px;
+            height: 32px;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e9ecef;
+            color: #6c757d;
+            background: #fff;
+        }
+        .action-dots-btn:hover,
+        .action-dots-btn:focus,
+        .action-dots-btn.show {
+            background: #f1f3f5;
+            color: var(--ink);
+            box-shadow: none;
+        }
+        .action-dots-btn::after { display: none; } /* hide default caret */
+        .action-dropdown-menu {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16);
+            padding: 6px;
+            min-width: 170px;
+        }
+        .action-dropdown-menu .dropdown-item {
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13.5px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        .action-dropdown-menu .dropdown-item:hover,
+        .action-dropdown-menu .dropdown-item:focus {
+            background: #f1f3f5;
+        }
+        .action-dropdown-menu .dropdown-item.text-danger:hover {
+            background: #fbe9eb;
+        }
+        .action-dropdown-menu .dropdown-divider { margin: 4px 0; }
 
         .assets-pagination .page-link { border-radius: 10px !important; margin: 0 3px; border: 1px solid #e9ecef; color: var(--ink); font-weight: 500; font-size: 13.5px; }
         .assets-pagination .page-item.active .page-link { background: var(--primary-color); border-color: var(--primary-color); }
@@ -807,9 +873,36 @@
                     info: "Showing _START_ to _END_ of _TOTAL_ assets",
                     infoEmpty: "No assets found",
                     infoFiltered: "(filtered from _MAX_ total assets)"
+                },
+                // Re-init action dropdowns whenever DataTables redraws (pagination/filter/sort)
+                drawCallback: function() {
+                    initActionDropdowns();
                 }
             });
+
+            // Initial dropdown init for rows already in the DOM
+            initActionDropdowns();
         });
+
+        // ============================================
+        // Action dropdown (3-dot menu) init
+        // Uses Popper "fixed" strategy so the menu is
+        // never clipped by the table-card's overflow:hidden
+        // or the table-responsive scroll container.
+        // ============================================
+        function initActionDropdowns() {
+            document.querySelectorAll('#assetsTable .action-dots-btn').forEach(function (btn) {
+                var existing = bootstrap.Dropdown.getInstance(btn);
+                if (existing) {
+                    existing.dispose();
+                }
+                new bootstrap.Dropdown(btn, {
+                    popperConfig: function (defaultConfig) {
+                        return Object.assign({}, defaultConfig, { strategy: 'fixed' });
+                    }
+                });
+            });
+        }
 
         let currentAssetId = null;
 
@@ -1012,7 +1105,7 @@
 
             viewModalEl.addEventListener('hidden.bs.modal', function onHidden() {
                 viewModalEl.removeEventListener('hidden.bs.modal', onHidden);
-                const btn = document.querySelector(`button[data-assetid="${currentAssetId}"]`);
+                const btn = document.querySelector(`a[data-assetid="${currentAssetId}"]`);
                 if (btn) editAsset(btn);
             }, { once: true });
 
