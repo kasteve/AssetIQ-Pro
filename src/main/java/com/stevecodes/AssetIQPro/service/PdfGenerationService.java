@@ -12,9 +12,16 @@ import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.canvas.draw.SolidLine;
+import com.itextpdf.kernel.events.Event;
+import com.itextpdf.kernel.events.IEventHandler;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
+import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
@@ -30,11 +37,13 @@ import com.stevecodes.AssetIQPro.repository.DepartmentRepository;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -63,6 +72,11 @@ public class PdfGenerationService {
     private static final DeviceRgb WHITE = new DeviceRgb(255, 255, 255);
     private static final DeviceRgb WATERMARK = new DeviceRgb(197, 205, 212);
 
+    // Watermark logo location on classpath (src/main/resources/static/bg-image/assetIQ-Pro_logo.png)
+    private static final String WATERMARK_LOGO_PATH = "static/bg-image/assetIQ-Pro_logo.png";
+    private static final float WATERMARK_OPACITY = 0.08f;
+    private static final float WATERMARK_SIZE = 300f; // width/height in pt, adjust as needed
+
     private final AppUserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeRepository employeeRepository;
@@ -77,6 +91,7 @@ public class PdfGenerationService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
+        addWatermark(pdfDoc);
         Document document = new Document(pdfDoc, PageSize.A4);
         document.setMargins(20, 20, 16, 20);
 
@@ -122,6 +137,7 @@ public class PdfGenerationService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
+        addWatermark(pdfDoc);
         Document document = new Document(pdfDoc, PageSize.A4);
         document.setMargins(20, 20, 16, 20);
 
@@ -170,6 +186,7 @@ public class PdfGenerationService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
+        addWatermark(pdfDoc);
         Document document = new Document(pdfDoc, PageSize.A4);
         document.setMargins(20, 20, 16, 20);
 
@@ -224,6 +241,58 @@ public class PdfGenerationService {
         document.close();
         log.info("Generated complete PDF for transfer {}", transfer.getTransferId());
         return outputStream.toByteArray();
+    }
+
+    // ============================================
+    // Watermark
+    // ============================================
+
+    /**
+     * Registers a page event handler that stamps the AssetIQ-Pro logo as a faint,
+     * centered watermark behind all content on every page of the document.
+     * Must be called on the PdfDocument BEFORE any pages/content are added.
+     */
+    private void addWatermark(PdfDocument pdfDoc) {
+        final ImageData logoData;
+        try {
+            logoData = loadWatermarkImage();
+        } catch (Exception e) {
+            // Don't fail PDF generation just because the watermark asset is missing/broken
+            log.warn("Could not load watermark logo from classpath [{}]: {}", WATERMARK_LOGO_PATH, e.getMessage());
+            return;
+        }
+
+        pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, event -> {
+            try {
+                PdfDocumentEvent docEvent = (PdfDocumentEvent) event;
+                PdfPage page = docEvent.getPage();
+                Rectangle pageSize = page.getPageSize();
+
+                // Draw on a content stream placed BEFORE existing content so it sits behind everything
+                PdfCanvas canvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+
+                float width = WATERMARK_SIZE;
+                float height = WATERMARK_SIZE;
+                float x = (pageSize.getWidth() - width) / 2;
+                float y = (pageSize.getHeight() - height) / 2;
+
+                canvas.saveState();
+                PdfExtGState gState = new PdfExtGState().setFillOpacity(WATERMARK_OPACITY);
+                canvas.setExtGState(gState);
+                canvas.addImageFittedIntoRectangle(logoData, new Rectangle(x, y, width, height), false);
+                canvas.restoreState();
+            } catch (Exception e) {
+                log.warn("Failed to draw watermark on page: {}", e.getMessage());
+            }
+        });
+    }
+
+    private ImageData loadWatermarkImage() throws Exception {
+        // Loaded via Spring's ClassPathResource so it also works when packaged inside a jar
+        try (InputStream is = new ClassPathResource(WATERMARK_LOGO_PATH).getInputStream()) {
+            byte[] bytes = is.readAllBytes();
+            return ImageDataFactory.create(bytes);
+        }
     }
 
     // ============================================
