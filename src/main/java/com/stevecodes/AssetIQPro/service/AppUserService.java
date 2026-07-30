@@ -24,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -67,17 +69,17 @@ public class AppUserService {
     // ============================================
     private List<String> getDefaultPermissions() {
         return List.of(
-                "GENERATE_VOUCHERS",      // Generate meal/break vouchers
-                "VIEW_OWN_TRANSACTIONS",  // View only own transactions
-                "MANAGE_BOOKINGS",        // Manage room and driver bookings
-                "INFRA_REQUEST_VIEW",     // View and manage infrastructure requests (own requests only)
-                "INFRA_REQUEST_CREATE",   // Create/submit new infrastructure requests
-                "RESOURCE_REQUEST_VIEW",  // View and manage resource/administration requests
-                "RESOURCE_REQUEST_CREATE", // ✅ NEW: Create resource/administration requests
-                "ROOM_VIEW_ALL",          // View all rooms in the system
-                "ROOM_BOOK",              // Book rooms for meetings/events
-                "ROOM_CANCEL",            // Cancel room bookings
-                "DRIVER_VIEW"             // View driver dashboard and assignments
+                "GENERATE_VOUCHERS",
+                "VIEW_OWN_TRANSACTIONS",
+                "MANAGE_BOOKINGS",
+                "INFRA_REQUEST_VIEW",
+                "INFRA_REQUEST_CREATE",
+                "RESOURCE_REQUEST_VIEW",
+                "RESOURCE_REQUEST_CREATE",
+                "ROOM_VIEW_ALL",
+                "ROOM_BOOK",
+                "ROOM_CANCEL",
+                "DRIVER_VIEW"
         );
     }
 
@@ -102,7 +104,6 @@ public class AppUserService {
             return null;
         }
 
-        // Lockout check
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
             long minutesLeft = ChronoUnit.MINUTES.between(LocalDateTime.now(), user.getLockedUntil()) + 1;
             log.warn("Account locked for user: {} ({} minute(s) remaining)", username, minutesLeft);
@@ -174,6 +175,7 @@ public class AppUserService {
 
         String tempPassword = generateTemporaryPassword();
 
+        // Create Employee
         Employee employee = new Employee();
         employee.setStaffId(userDTO.getStaffId());
         employee.setFirstName(getFirstName(userDTO.getFullName()));
@@ -196,6 +198,7 @@ public class AppUserService {
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created with ID: {}", savedEmployee.getEmployeeId());
 
+        // Create User
         AppUser user = new AppUser();
         user.setStaffId(userDTO.getStaffId());
         user.setUsername(userDTO.getUsername());
@@ -221,20 +224,26 @@ public class AppUserService {
         user.setLockedUntil(null);
         user.setEmployee(savedEmployee);
 
-        // ✅ Assign default permissions
+        // ✅ FIXED: Assign permissions using Set to avoid duplicates
+        Set<Permission> permissions = new HashSet<>();
+
+        // Add default permissions
         List<String> defaultPermissions = getDefaultPermissions();
         for (String permName : defaultPermissions) {
             permissionRepository.findByPermissionName(permName)
-                    .ifPresent(user::addPermission);
+                    .ifPresent(permissions::add);
         }
 
-        // If user selected additional permissions, add them too
+        // Add user-selected permissions (if any)
         if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
-                        .ifPresent(user::addPermission);
+                        .ifPresent(permissions::add);
             }
         }
+
+        // ✅ Set permissions (Set handles deduplication automatically)
+        user.setPermissions(permissions);
 
         AppUser savedUser = userRepository.save(user);
         log.info("User created successfully: {}", savedUser.getUsername());
@@ -272,7 +281,7 @@ public class AppUserService {
     }
 
     // ============================================
-    // ✅ FIXED: updateUser - Does NOT force password change
+    // Update User - Does NOT force password change
     // ============================================
     @Transactional
     public AppUser updateUser(Long userId, UserDTO userDTO) {
@@ -281,18 +290,12 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // Update basic fields
         if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName());
         if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
         if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
         if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
         if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
 
-        // ✅ REMOVED: These lines were forcing password change
-        // if (userDTO.isMustChangePassword() != user.isMustChangePassword()) user.setMustChangePassword(userDTO.isMustChangePassword());
-        // if (userDTO.isFirstLogin() != user.isFirstLogin()) user.setFirstLogin(userDTO.isFirstLogin());
-
-        // Update department
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
@@ -323,13 +326,14 @@ public class AppUserService {
             employeeRepository.save(employee);
         }
 
-        // Update permissions
+        // ✅ FIXED: Update permissions using Set to avoid duplicates
         if (userDTO.getPermissions() != null) {
-            user.getPermissions().clear();
+            Set<Permission> newPermissions = new HashSet<>();
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
-                        .ifPresent(user::addPermission);
+                        .ifPresent(newPermissions::add);
             }
+            user.setPermissions(newPermissions);
         }
 
         user.setUpdatedAt(LocalDateTime.now());
@@ -409,14 +413,15 @@ public class AppUserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         user.setRole(role);
-        user.getPermissions().clear();
 
-        // ✅ Assign default permissions when role changes
+        // ✅ FIXED: Re-assign default permissions with Set
+        Set<Permission> permissions = new HashSet<>();
         List<String> defaultPermissions = getDefaultPermissions();
         for (String permName : defaultPermissions) {
             permissionRepository.findByPermissionName(permName)
-                    .ifPresent(user::addPermission);
+                    .ifPresent(permissions::add);
         }
+        user.setPermissions(permissions);
 
         userRepository.save(user);
         log.info("Role updated to {} for user: {}", role, user.getUsername());
@@ -570,6 +575,7 @@ public class AppUserService {
         Permission permission = permissionRepository.findByPermissionName(permissionName)
                 .orElseThrow(() -> new ResourceNotFoundException("Permission not found: " + permissionName));
 
+        // ✅ Check if already has the permission
         if (!user.getPermissions().contains(permission)) {
             user.addPermission(permission);
             userRepository.save(user);
@@ -577,6 +583,8 @@ public class AppUserService {
                     "Permission '" + permissionName + "' added to user: " + user.getUsername(),
                     user.getUserId());
             log.info("Permission '{}' added to user: {}", permissionName, userId);
+        } else {
+            log.info("Permission '{}' already exists for user: {}", permissionName, userId);
         }
     }
 
@@ -603,17 +611,15 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        user.getPermissions().clear();
-
+        // ✅ FIXED: Use Set to avoid duplicates
+        Set<Permission> newPermissions = new HashSet<>();
         for (String permName : permissionNames) {
             permissionRepository.findByPermissionName(permName)
-                    .ifPresent(user::addPermission);
+                    .ifPresent(newPermissions::add);
         }
-
-        // ✅ IMPORTANT: Do NOT force password change
-        // Do NOT set user.setMustChangePassword(true);
-
+        user.setPermissions(newPermissions);
         userRepository.save(user);
+
         auditService.logAction("PERMISSIONS_SYNCED",
                 "Permissions synced for user: " + user.getUsername(),
                 user.getUserId());

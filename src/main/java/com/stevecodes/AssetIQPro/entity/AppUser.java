@@ -9,8 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "app_users")
@@ -89,21 +89,31 @@ public class AppUser {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
+    // ✅ FIXED: Use Set instead of List to prevent duplicates
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_permissions",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
-    private List<Permission> permissions = new ArrayList<>();
+    private Set<Permission> permissions = new HashSet<>();
 
     // ============================================
-    // Permission Helper Methods
+    // ✅ FIXED: Permission Helper Methods
     // ============================================
 
     public void addPermission(Permission permission) {
-        if (!permissions.contains(permission)) {
+        if (permission != null) {
             permissions.add(permission);
+        }
+    }
+
+    /**
+     * ✅ FIXED: Add multiple permissions at once with deduplication
+     */
+    public void addPermissions(Set<Permission> newPermissions) {
+        if (newPermissions != null && !newPermissions.isEmpty()) {
+            permissions.addAll(newPermissions);
         }
     }
 
