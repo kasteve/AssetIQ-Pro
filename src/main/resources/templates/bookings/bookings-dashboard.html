@@ -483,7 +483,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-info" onclick="confirmSlotRequest()">
+                    <button type="button" class="btn btn-info" id="sendSlotRequestBtn" onclick="confirmSlotRequest()">
                         <i class="fas fa-paper-plane me-1"></i>Send Request
                     </button>
                 </div>
@@ -532,6 +532,7 @@
         .btn-danger { background: #dc3545 !important; }
         .btn-info { background: #0dcaf0 !important; color: white !important; }
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
+        .btn:disabled { opacity: 0.65 !important; cursor: not-allowed !important; }
         .booking-tabs { border-bottom: 2px solid #eef0f3; gap: 6px; margin-bottom: 22px; }
         .booking-tabs .nav-link { display: flex; align-items: center; gap: 8px; border: none !important; border-radius: 10px 10px 0 0 !important; padding: 12px 20px !important; font-weight: 700; font-size: 14.5px; color: #6c757d; background: transparent; position: relative; top: 2px; }
         .booking-tabs .nav-link i { font-size: 15px; }
@@ -664,12 +665,70 @@
             const oldBtn = document.getElementById('confirmActionBtn');
             const newBtn = oldBtn.cloneNode(true);
             oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+            // Lock the confirm button itself the instant it's tapped so a
+            // fast double-tap on "Confirm" can't fire the action twice.
             newBtn.addEventListener('click', function () {
+                if (newBtn.disabled) return;
+                newBtn.disabled = true;
+                const originalHtml = newBtn.innerHTML;
+                newBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Please wait...';
                 modal.hide();
                 onConfirm();
+                // Restore once the modal is fully hidden so it's ready for next use
+                modalEl.addEventListener('hidden.bs.modal', function restore() {
+                    newBtn.disabled = false;
+                    newBtn.innerHTML = originalHtml;
+                    modalEl.removeEventListener('hidden.bs.modal', restore);
+                });
             });
             modal.show();
         }
+
+        // ============================================
+        // Disable submit buttons instantly on form submit
+        // (prevents duplicate driver requests / room bookings
+        // from double-tapping while the page reloads)
+        // ============================================
+        function lockSubmitButton(form) {
+            const btn = form.querySelector('button[type="submit"]');
+            if (!btn || btn.disabled) return;
+
+            btn.dataset.originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Please wait...';
+
+            // Safety net: re-enable after 15s in case of network stall,
+            // back navigation, or a validation error that doesn't reload the page
+            setTimeout(function () {
+                if (btn.disabled) {
+                    btn.disabled = false;
+                    btn.innerHTML = btn.dataset.originalHtml;
+                }
+            }, 15000);
+        }
+
+        document.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (form.tagName !== 'FORM') return;
+
+            // Skip if HTML5 validation is about to block submission
+            if (form.checkValidity && !form.checkValidity()) return;
+
+            lockSubmitButton(form);
+        }, true);
+
+        // Restore buttons if the page is restored from bfcache (back button)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                document.querySelectorAll('button[type="submit"][disabled]').forEach(function (btn) {
+                    if (btn.dataset.originalHtml) {
+                        btn.disabled = false;
+                        btn.innerHTML = btn.dataset.originalHtml;
+                    }
+                });
+            }
+        });
 
         function paginateList(listId, paginationId, pageSize) {
             const list = document.getElementById(listId);
@@ -858,12 +917,20 @@
 
         function openSlotRequest(bookingId) {
             document.getElementById('slotRequestBookingId').value = bookingId;
+            const sendBtn = document.getElementById('sendSlotRequestBtn');
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Request'; }
             new bootstrap.Modal(document.getElementById('slotRequestModal')).show();
         }
 
         function confirmSlotRequest() {
             const id = document.getElementById('slotRequestBookingId').value;
             if (!id) return;
+            const sendBtn = document.getElementById('sendSlotRequestBtn');
+            if (sendBtn) {
+                if (sendBtn.disabled) return;
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Sending...';
+            }
             fetch('/assetIQ-pro/bookings/room/' + id + '/request-slot', { method: 'POST' })
                 .then(response => {
                     if (response.ok) {
@@ -871,10 +938,16 @@
                         bootstrap.Modal.getInstance(document.getElementById('slotRequestModal')).hide();
                         setTimeout(() => window.location.reload(), 900);
                     } else {
-                        return response.text().then(text => { showToast('Failed to send slot request: ' + text, 'error'); });
+                        return response.text().then(text => {
+                            showToast('Failed to send slot request: ' + text, 'error');
+                            if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Request'; }
+                        });
                     }
                 })
-                .catch(error => showToast('Error: ' + error.message, 'error'));
+                .catch(error => {
+                    showToast('Error: ' + error.message, 'error');
+                    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Request'; }
+                });
         }
 
         function adminCancelBooking(bookingId) {
