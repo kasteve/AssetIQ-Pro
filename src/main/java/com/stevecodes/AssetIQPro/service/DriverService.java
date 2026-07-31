@@ -31,7 +31,7 @@ public class DriverService {
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
     private final AuditService auditService;
-    private final BaseUrlService baseUrlService;  // ✅ ADDED
+    private final BaseUrlService baseUrlService;
 
     private static final int MAX_DAYS = 7;
 
@@ -42,10 +42,8 @@ public class DriverService {
     public List<AppUser> getAvailableDrivers() {
         log.info("Getting available drivers");
 
-        // Get all drivers
         List<AppUser> allDrivers = userRepository.findByRole("DRIVER");
 
-        // Filter only available drivers
         return allDrivers.stream()
                 .filter(driver -> {
                     Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
@@ -95,12 +93,10 @@ public class DriverService {
                                              String reason, String requestedBy) {
         log.info("Creating driver request for user: {}", userId);
 
-        // Check if "Cab" option is selected (driverId = -1 means Cab)
         if (driverId != null && driverId == -1) {
             return createCabRequest(userId, destination, reason, requestedBy);
         }
 
-        // Check if specific driver is available
         if (driverId != null) {
             Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
             if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
@@ -120,10 +116,8 @@ public class DriverService {
         DriverRequest saved = driverRequestRepository.save(request);
 
         if (driverId != null) {
-            // Notify specific driver
             notifyDriver(driverId, saved);
         } else {
-            // Notify all available drivers
             notifyAvailableDrivers(saved);
         }
 
@@ -141,15 +135,14 @@ public class DriverService {
         DriverRequest request = new DriverRequest();
         request.setUserId(userId);
         request.setDestination(destination);
-        request.setDriverId(-1L); // -1 indicates Cab
+        request.setDriverId(-1L);
         request.setReason(reason);
         request.setRequestTime(LocalDateTime.now());
-        request.setStatus("PENDING_ADMIN"); // Goes to admin
+        request.setStatus("PENDING_ADMIN");
         request.setRequestedBy(requestedBy);
 
         DriverRequest saved = driverRequestRepository.save(request);
 
-        // Notify admin
         notifyAdminOfCabRequest(saved);
 
         auditService.logAction("CAB_REQUEST_CREATED",
@@ -180,10 +173,9 @@ public class DriverService {
 
         request.setStatus("ACCEPTED");
         request.setDriverDecisionTime(LocalDateTime.now());
-        request.setDeclineReason(notes); // Store admin notes
+        request.setDeclineReason(notes);
         DriverRequest saved = driverRequestRepository.save(request);
 
-        // Notify requester
         emailService.sendSimpleEmail(
                 getUserEmail(request.getUserId()),
                 "Cab Request Processed",
@@ -215,9 +207,22 @@ public class DriverService {
             throw new IllegalStateException("Request is no longer pending");
         }
 
-        // Check if driver is available
+        // ✅ FIXED: Check if driver is available - if no availability record, consider them available
         if (!isDriverAvailable(driverId, request.getRequestTime())) {
-            throw new IllegalStateException("Driver is not available at the requested time");
+            // If driver has no availability record, create one with AVAILABLE status
+            Optional<DriverAvailability> existing = availabilityRepository.findByDriverId(driverId);
+            if (existing.isEmpty()) {
+                log.info("No availability record found for driver {}, creating one with AVAILABLE status", driverId);
+                DriverAvailability newAvailability = new DriverAvailability();
+                newAvailability.setDriverId(driverId);
+                newAvailability.setUserId(driverId);
+                newAvailability.setStatus("AVAILABLE");
+                newAvailability.setStartTime(LocalDateTime.now());
+                newAvailability.setEndTime(LocalDateTime.now().plusHours(8));
+                availabilityRepository.save(newAvailability);
+            } else {
+                throw new IllegalStateException("Driver is not available at the requested time");
+            }
         }
 
         request.setStatus("ACCEPTED");
@@ -231,7 +236,6 @@ public class DriverService {
 
         String driverName = getDriverName(driverId);
 
-        // Notify requester
         emailService.sendSimpleEmail(
                 getUserEmail(request.getUserId()),
                 "Driver Request Accepted",
@@ -246,7 +250,7 @@ public class DriverService {
                 "DRIVER_REQUEST_ACCEPTED",
                 "Driver Request Accepted",
                 "Your driver request has been accepted by " + driverName,
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("DRIVER_REQUEST_ACCEPTED",
@@ -274,7 +278,6 @@ public class DriverService {
 
         DriverRequest saved = driverRequestRepository.save(request);
 
-        // Notify requester
         emailService.sendSimpleEmail(
                 getUserEmail(request.getUserId()),
                 "Driver Request Declined",
@@ -289,7 +292,7 @@ public class DriverService {
                 "DRIVER_REQUEST_DECLINED",
                 "Driver Request Declined",
                 "Your driver request has been declined. Reason: " + reason,
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("DRIVER_REQUEST_DECLINED",
@@ -317,7 +320,6 @@ public class DriverService {
 
         updateDriverAvailability(driverId, "AVAILABLE");
 
-        // Notify requester for rating - ✅ DYNAMIC
         String requesterEmail = getUserEmail(request.getUserId());
         String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s", requestId);
 
@@ -429,14 +431,23 @@ public class DriverService {
         availabilityRepository.save(availability);
     }
 
+    // ✅ FIXED: isDriverAvailable now handles empty availability table
     public boolean isDriverAvailable(Long driverId, LocalDateTime requestTime) {
-        // Check if driver is available in availability table
         Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
-        if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
+
+        // If no availability record exists, driver is considered available
+        if (availability.isEmpty()) {
+            log.info("No availability record for driver {}, considering them available", driverId);
+            return true;
+        }
+
+        // If availability exists but status is not AVAILABLE, driver is busy
+        if (!"AVAILABLE".equals(availability.get().getStatus())) {
+            log.info("Driver {} is not available. Status: {}", driverId, availability.get().getStatus());
             return false;
         }
 
-        // Check if driver already has an accepted request at that time
+        // Check if driver already has an accepted or pending request at that time
         List<DriverRequest> existing = driverRequestRepository.findByDriverIdAndStatusIn(
                 driverId, List.of("ACCEPTED", "PENDING")
         );
@@ -488,11 +499,9 @@ public class DriverService {
     private void notifyAvailableDrivers(DriverRequest request) {
         List<AppUser> drivers = userRepository.findByRole("DRIVER");
 
-        // ✅ DYNAMIC
         String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
 
         for (AppUser driver : drivers) {
-            // Check if driver is available
             Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
             if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
                 continue;
@@ -525,7 +534,6 @@ public class DriverService {
     private void notifyDriver(Long driverId, DriverRequest request) {
         Optional<AppUser> driver = userRepository.findById(driverId);
         if (driver.isPresent()) {
-            // ✅ DYNAMIC
             String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
 
             emailService.sendSimpleEmail(
@@ -553,7 +561,6 @@ public class DriverService {
     private void notifyAdminOfCabRequest(DriverRequest request) {
         List<AppUser> admins = userRepository.findByRole("ADMIN");
 
-        // ✅ DYNAMIC
         String dashboardLink = baseUrlService.buildUrl("/bookings/cab-requests");
 
         for (AppUser admin : admins) {
@@ -576,7 +583,6 @@ public class DriverService {
         notification.setType(type);
         notification.setTitle(title);
         notification.setMessage(message);
-        // ✅ Use baseUrlService for links in notifications
         notification.setLink(link.startsWith("/") ? baseUrlService.buildUrl(link) : link);
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
