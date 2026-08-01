@@ -5,7 +5,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "tbl_driver_requests")
@@ -26,6 +28,22 @@ public class DriverRequest {
 
     @Column(name = "request_time", nullable = false)
     private LocalDateTime requestTime;
+
+    // ✅ NEW: Request Date (separate from time)
+    @Column(name = "request_date")
+    private LocalDate requestDate;
+
+    // ✅ NEW: Request Time Only (separate from date)
+    @Column(name = "request_time_only")
+    private LocalTime requestTimeOnly;
+
+    // ✅ NEW: Pickup Datetime (full datetime for pickup)
+    @Column(name = "pickup_datetime")
+    private LocalDateTime pickupDatetime;
+
+    // ✅ NEW: Dropoff Datetime (full datetime for dropoff)
+    @Column(name = "dropoff_datetime")
+    private LocalDateTime dropoffDatetime;
 
     @Column(nullable = false)
     private String status; // PENDING, ACCEPTED, DECLINED, RECALLED, COMPLETED, PENDING_ADMIN
@@ -92,9 +110,55 @@ public class DriverRequest {
         if (requestTime == null) {
             requestTime = LocalDateTime.now();
         }
+        // ✅ Auto-populate requestDate and requestTimeOnly from requestTime
+        if (requestDate == null && requestTime != null) {
+            requestDate = requestTime.toLocalDate();
+        }
+        if (requestTimeOnly == null && requestTime != null) {
+            requestTimeOnly = requestTime.toLocalTime();
+        }
+        // Auto-populate pickupDatetime from requestTime if not set
+        if (pickupDatetime == null && requestTime != null) {
+            pickupDatetime = requestTime;
+        }
     }
 
     public boolean isCabRequest() {
         return driverId != null && driverId == -1L;
+    }
+
+    // ✅ Helper method to get formatted date
+    public String getFormattedDate() {
+        if (requestDate != null) {
+            return requestDate.toString();
+        }
+        return requestTime != null ? requestTime.toLocalDate().toString() : "";
+    }
+
+    // ✅ Helper method to get formatted time
+    public String getFormattedTime() {
+        if (requestTimeOnly != null) {
+            return requestTimeOnly.toString();
+        }
+        return requestTime != null ? requestTime.toLocalTime().toString() : "";
+    }
+
+    // ✅ Helper method to check if booking is in the future
+    public boolean isFutureBooking() {
+        if (requestDate == null) {
+            return false;
+        }
+        return requestDate.isAfter(LocalDate.now()) ||
+                (requestDate.isEqual(LocalDate.now()) &&
+                        requestTimeOnly != null &&
+                        requestTimeOnly.isAfter(LocalTime.now()));
+    }
+
+    // ✅ Helper method to check if booking is today
+    public boolean isToday() {
+        if (requestDate == null) {
+            return false;
+        }
+        return requestDate.isEqual(LocalDate.now());
     }
 }

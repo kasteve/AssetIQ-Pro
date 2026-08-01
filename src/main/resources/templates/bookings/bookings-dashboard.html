@@ -49,15 +49,15 @@
                 <span class="badge bg-success" th:text="${roomBookings != null ? roomBookings.size() : 0}">0</span>
             </button>
         </li>
-        <!-- ============ NEW: DRIVER APPROVALS TAB ============ -->
+        <!-- Pending Approvals Tab -->
         <li class="nav-item" role="presentation"
-            th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver}">
+            th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver or isInfra}">
             <button class="nav-link" id="approvals-tab-btn" data-bs-toggle="tab"
                     data-bs-target="#approvals-pane" type="button" role="tab"
                     aria-controls="approvals-pane" aria-selected="false">
                 <i class="fas fa-check-double"></i>
                 <span>Pending Approvals</span>
-                <span class="badge bg-warning" th:text="${pendingDriverApprovals != null ? pendingDriverApprovals.size() : 0}">0</span>
+                <span class="badge bg-warning" th:text="${pendingCount}">0</span>
             </button>
         </li>
     </ul>
@@ -122,6 +122,15 @@
                                                               (${req.status} == 'ACCEPTED' ? 'accepted' :
                                                               (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
                                               th:text="${req.status}">PENDING</span>
+
+                                        <!-- Complete Trip button for ACCEPTED requests -->
+                                        <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
+                                            <button class="btn btn-sm btn-success mt-1 w-100"
+                                                    th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                <i class="fas fa-check-circle"></i> Complete Trip
+                                            </button>
+                                        </div>
+
                                         <div th:if="${req.status} == 'PENDING'">
                                             <button class="btn btn-sm btn-warning mt-1 recall-btn"
                                                     th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
@@ -267,64 +276,193 @@
             </div>
         </div>
 
-        <!-- ================= DRIVER APPROVALS TAB ================= -->
+        <!-- ================= PENDING APPROVALS TAB ================= -->
         <div class="tab-pane fade" id="approvals-pane" role="tabpanel"
              aria-labelledby="approvals-tab-btn"
-             th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver}">
+             th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver or isInfra}">
 
             <div class="row">
-                <div class="col-12">
+                <!-- My Accepted Trips (Driver) - Complete Trip -->
+                <div class="col-12" th:if="${myAcceptedTrips != null and !myAcceptedTrips.isEmpty()}">
                     <div class="booking-panel">
                         <div class="panel-header">
-                            <h6><i class="fas fa-tasks"></i>Driver Requests Pending Your Approval</h6>
-                            <span class="badge bg-warning" th:text="${pendingDriverApprovals != null ? pendingDriverApprovals.size() : 0}">0</span>
+                            <h6><i class="fas fa-route me-2"></i>My Accepted Trips</h6>
+                            <span class="badge bg-success" th:text="${myAcceptedTrips.size()}">0</span>
                         </div>
                         <div class="panel-body">
-                            <div th:if="${pendingDriverApprovals != null and !pendingDriverApprovals.isEmpty()}">
-                                <div th:each="req : ${pendingDriverApprovals}" class="booking-row">
-                                    <div>
-                                        <div class="booking-row-title">
-                                            <i class="fas fa-user me-2"></i>
-                                            <span th:text="${req.requestedBy}">Requester</span>
-                                        </div>
-                                        <small class="text-muted">
-                                            Destination: <strong th:text="${req.destination}">Destination</strong>
-                                        </small>
-                                        <br>
-                                        <small class="text-muted">
-                                            Requested: <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                        </small>
-                                        <div th:if="${req.reason}" class="mt-1">
-                                            <small class="text-muted">Reason: <span th:text="${req.reason}">Reason</span></small>
-                                        </div>
+                            <div th:each="trip : ${myAcceptedTrips}" class="booking-row">
+                                <div>
+                                    <div class="booking-row-title" th:text="${trip.destination}">Destination</div>
+                                    <small class="text-muted">
+                                        Requested by: <strong th:text="${trip.requestedBy}">Requester</strong>
+                                    </small>
+                                    <br>
+                                    <small class="text-muted" th:text="${#temporals.format(trip.requestTime, 'dd/MM/yyyy HH:mm')}">Time</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge accepted">ACCEPTED</span>
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-success"
+                                                th:onclick="'completeDriverTrip(' + ${trip.requestId} + ', ' + ${trip.driverId} + ')'">
+                                            <i class="fas fa-check-circle"></i> Complete Trip
+                                        </button>
                                     </div>
-                                    <div class="text-end">
-                                        <span class="status-badge pending">PENDING</span>
-                                        <div class="mt-2">
-                                            <textarea class="form-control form-control-sm mb-1"
-                                                      th:id="'rejectReason_' + ${req.requestId}"
-                                                      rows="1"
-                                                      placeholder="Rejection reason (optional)"
-                                                      style="width: 180px; font-size: 12px;"></textarea>
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-success"
-                                                        th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                    <i class="fas fa-check"></i> Accept
-                                                </button>
-                                                <button class="btn btn-sm btn-danger"
-                                                        th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                    <i class="fas fa-times"></i> Reject
-                                                </button>
-                                            </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Driver Requests Pending Approval -->
+                <div class="col-12" th:if="${pendingDriverApprovals != null and !pendingDriverApprovals.isEmpty()}">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-car me-2"></i>Driver Requests Pending Your Approval</h6>
+                            <span class="badge bg-warning" th:text="${pendingDriverApprovals.size()}">0</span>
+                        </div>
+                        <div class="panel-body">
+                            <div th:each="req : ${pendingDriverApprovals}" class="booking-row">
+                                <div>
+                                    <div class="booking-row-title">
+                                        <i class="fas fa-user me-2"></i>
+                                        <span th:text="${req.requestedBy}">Requester</span>
+                                    </div>
+                                    <small class="text-muted">
+                                        Destination: <strong th:text="${req.destination}">Destination</strong>
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        Requested: <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
+                                    </small>
+                                    <div th:if="${req.reason}" class="mt-1">
+                                        <small class="text-muted">Reason: <span th:text="${req.reason}">Reason</span></small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge pending">PENDING</span>
+                                    <div class="mt-2">
+                                        <textarea class="form-control form-control-sm mb-1"
+                                                  th:id="'rejectReason_' + ${req.requestId}"
+                                                  rows="1"
+                                                  placeholder="Rejection reason"
+                                                  style="width: 180px; font-size: 12px;"></textarea>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-success"
+                                                    th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                <i class="fas fa-check"></i> Accept
+                                            </button>
+                                            <button class="btn btn-sm btn-danger"
+                                                    th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                <i class="fas fa-times"></i> Reject
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
 
-                            <div th:if="${pendingDriverApprovals == null or pendingDriverApprovals.isEmpty()}"
-                                 class="empty-state-sm">
-                                <i class="fas fa-check-circle" style="color: #198754;"></i>
-                                <p class="mt-2">No pending driver requests to approve</p>
+                <!-- Server Room Bookings Pending Approval -->
+                <div class="col-12" th:if="${pendingServerRooms != null and !pendingServerRooms.isEmpty()}">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-server me-2"></i>Server Room Bookings Pending Approval</h6>
+                            <span class="badge bg-warning" th:text="${pendingServerRooms.size()}">0</span>
+                        </div>
+                        <div class="panel-body">
+                            <div th:each="booking : ${pendingServerRooms}" class="booking-row">
+                                <div>
+                                    <div class="booking-row-title">
+                                        <i class="fas fa-door-open me-2"></i>
+                                        <span th:text="${booking.roomName}">Room</span>
+                                    </div>
+                                    <small class="text-muted">
+                                        Booked by: <strong th:text="${booking.bookedBy}">User</strong>
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        Time: <span th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</span>
+                                    </small>
+                                    <div th:if="${booking.purpose}" class="mt-1">
+                                        <small class="text-muted">Purpose: <span th:text="${booking.purpose}">Purpose</span></small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge pending">PENDING</span>
+                                    <div class="mt-2">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-success"
+                                                    th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                            <button class="btn btn-sm btn-danger"
+                                                    th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
+                                                <i class="fas fa-times"></i> Decline
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Infrastructure Requests Pending Approval -->
+                <div class="col-12" th:if="${pendingInfraRequests != null and !pendingInfraRequests.isEmpty()}">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-tools me-2"></i>Infrastructure Requests Pending Your Approval</h6>
+                            <span class="badge bg-warning" th:text="${pendingInfraRequests.size()}">0</span>
+                        </div>
+                        <div class="panel-body">
+                            <div th:each="req : ${pendingInfraRequests}" class="booking-row">
+                                <div>
+                                    <div class="booking-row-title">
+                                        <i class="fas fa-user me-2"></i>
+                                        <span th:text="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}">Requester</span>
+                                    </div>
+                                    <small class="text-muted">
+                                        Resource: <strong th:text="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}">Resource</strong>
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        Status: <span th:text="${req.statusDisplay}">Status</span>
+                                    </small>
+                                    <div th:if="${req.specification}" class="mt-1">
+                                        <small class="text-muted">Specification: <span th:text="${req.specification}">Specification</span></small>
+                                    </div>
+                                    <div th:if="${req.justification}" class="mt-1">
+                                        <small class="text-muted">Justification: <span th:text="${req.justification}">Justification</span></small>
+                                    </div>
+                                    <div th:if="${req.quantity}" class="mt-1">
+                                        <small class="text-muted">Quantity: <strong th:text="${req.quantity}">1</strong></small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge pending" th:text="${req.statusDisplay}">PENDING</span>
+                                    <div class="mt-2">
+                                        <a th:href="'/assetIQ-pro/infra-requests/' + ${req.requestId}"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="col-12"
+                     th:if="${(pendingDriverApprovals == null or pendingDriverApprovals.isEmpty()) and
+                             (pendingServerRooms == null or pendingServerRooms.isEmpty()) and
+                             (pendingInfraRequests == null or pendingInfraRequests.isEmpty())}">
+                    <div class="booking-panel">
+                        <div class="panel-body">
+                            <div class="empty-state-sm">
+                                <i class="fas fa-check-circle" style="color: #198754; font-size: 32px;"></i>
+                                <p class="mt-2">No pending approvals</p>
                                 <small class="text-muted">All requests have been processed</small>
                             </div>
                         </div>
@@ -336,7 +474,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODALS (Same as before) -->
+    <!-- MODALS -->
     <!-- ============================================================ -->
 
     <!-- Request Driver Modal -->
@@ -347,21 +485,31 @@
                     <h5 class="modal-title"><i class="fas fa-car me-2" style="color: #0d6efd;"></i>Request Driver</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/bookings/driver-request}" method="post">
+                <form th:action="@{/bookings/driver-request}" method="post" id="requestDriverForm" data-ajax-form="true">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
+
                         <div class="mb-3">
                             <label for="destinationInput" class="form-label">Destination *</label>
                             <input type="text" id="destinationInput" name="destination" class="form-control" required>
                         </div>
+
+                        <!-- ✅ NEW: Request Time field -->
+                        <div class="mb-3">
+                            <label for="requestTimeInput" class="form-label">Request Time *</label>
+                            <input type="datetime-local" id="requestTimeInput" name="requestTime" class="form-control" required>
+                            <small class="text-muted">Bookings are allowed within 5 days from today</small>
+                        </div>
+
                         <div class="mb-3">
                             <label for="driverSelect" class="form-label">Driver (Optional)</label>
                             <select id="driverSelect" name="driverId" class="form-select">
                                 <option value="">Any Available Driver</option>
-                                <option th:each="driver : ${availableDrivers}" th:value="${driver.userId}" th:text="${driver.fullName}"></option>
+                                <option th:each="driver : ${allDrivers}" th:value="${driver.userId}" th:text="${driver.fullName}"></option>
                                 <option value="-1" class="text-primary fw-bold">🚕 Cab (External)</option>
                             </select>
                         </div>
+
                         <div class="mb-3">
                             <label for="reasonInput" class="form-label">Reason</label>
                             <textarea id="reasonInput" name="reason" class="form-control" rows="2"></textarea>
@@ -384,7 +532,7 @@
                     <h5 class="modal-title"><i class="fas fa-calendar-plus me-2" style="color: #28a745;"></i>Book Room</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/bookings/room}" method="post" id="bookRoomForm">
+                <form th:action="@{/bookings/room}" method="post" id="bookRoomForm" data-ajax-form="true">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
                         <div class="mb-3">
@@ -491,7 +639,7 @@
         </div>
     </div>
 
-    <!-- Confirm Action Modal (replaces native browser confirm()) -->
+    <!-- Confirm Action Modal -->
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -514,7 +662,7 @@
 
 </div>
 
-<!-- Styles and Scripts (same as before, with added approval functions) -->
+<!-- Styles -->
 <div layout:fragment="styles">
     <style>
         .content { padding: 28px 32px; width: 100%; }
@@ -592,7 +740,6 @@
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
 
-        /* Center Alert */
         .center-alert-overlay {
             position: fixed; inset: 0; z-index: 1080;
             display: flex; align-items: center; justify-content: center;
@@ -619,6 +766,7 @@
     </style>
 </div>
 
+<!-- Scripts -->
 <div layout:fragment="scripts">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script th:inline="none">
@@ -626,7 +774,7 @@
         const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
 
         // ============================================
-        // Center Alert (success/error) - square box, center screen
+        // Center Alert
         // ============================================
         let centerAlertTimeout = null;
         function showToast(message, type) {
@@ -656,7 +804,7 @@
         }
 
         // ============================================
-        // In-page Confirm modal (replaces native confirm())
+        // Confirm Modal
         // ============================================
         function showConfirm(message, onConfirm) {
             document.getElementById('confirmActionMessage').textContent = message;
@@ -666,8 +814,6 @@
             const newBtn = oldBtn.cloneNode(true);
             oldBtn.parentNode.replaceChild(newBtn, oldBtn);
 
-            // Lock the confirm button itself the instant it's tapped so a
-            // fast double-tap on "Confirm" can't fire the action twice.
             newBtn.addEventListener('click', function () {
                 if (newBtn.disabled) return;
                 newBtn.disabled = true;
@@ -675,7 +821,6 @@
                 newBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Please wait...';
                 modal.hide();
                 onConfirm();
-                // Restore once the modal is fully hidden so it's ready for next use
                 modalEl.addEventListener('hidden.bs.modal', function restore() {
                     newBtn.disabled = false;
                     newBtn.innerHTML = originalHtml;
@@ -686,50 +831,68 @@
         }
 
         // ============================================
-        // Disable submit buttons instantly on form submit
-        // (prevents duplicate driver requests / room bookings
-        // from double-tapping while the page reloads)
+        // Form Locking
         // ============================================
-        function lockSubmitButton(form) {
-            const btn = form.querySelector('button[type="submit"]');
+        function lockSubmitButton(btn) {
             if (!btn || btn.disabled) return;
-
             btn.dataset.originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Please wait...';
-
-            // Safety net: re-enable after 15s in case of network stall,
-            // back navigation, or a validation error that doesn't reload the page
-            setTimeout(function () {
-                if (btn.disabled) {
-                    btn.disabled = false;
-                    btn.innerHTML = btn.dataset.originalHtml;
-                }
-            }, 15000);
+        }
+        function unlockSubmitButton(btn) {
+            if (!btn) return;
+            btn.disabled = false;
+            if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
         }
 
+        // ============================================
+        // AJAX Form Submission
+        // ============================================
         document.addEventListener('submit', function (e) {
             const form = e.target;
             if (form.tagName !== 'FORM') return;
+            if (form.dataset.ajaxForm !== 'true') return;
 
-            // Skip if HTML5 validation is about to block submission
             if (form.checkValidity && !form.checkValidity()) return;
+            e.preventDefault();
 
-            lockSubmitButton(form);
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn && btn.disabled) return;
+            lockSubmitButton(btn);
+
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+                if (value !== '') params.append(key, value);
+            }
+
+            fetch(form.getAttribute('action'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            })
+            .then(function (response) {
+                if (response.ok || response.redirected) {
+                    showToast('Request submitted successfully!', 'success');
+                    const modalEl = form.closest('.modal');
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    setTimeout(function () { window.location.reload(); }, 900);
+                } else {
+                    return response.text().then(function (text) {
+                        showToast('Failed to submit: ' + (text || response.statusText), 'error');
+                        unlockSubmitButton(btn);
+                    });
+                }
+            })
+            .catch(function (err) {
+                showToast('Error: ' + err.message, 'error');
+                unlockSubmitButton(btn);
+            });
         }, true);
 
-        // Restore buttons if the page is restored from bfcache (back button)
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                document.querySelectorAll('button[type="submit"][disabled]').forEach(function (btn) {
-                    if (btn.dataset.originalHtml) {
-                        btn.disabled = false;
-                        btn.innerHTML = btn.dataset.originalHtml;
-                    }
-                });
-            }
-        });
-
+        // ============================================
+        // Pagination
+        // ============================================
         function paginateList(listId, paginationId, pageSize) {
             const list = document.getElementById(listId);
             const paginationEl = document.getElementById(paginationId);
@@ -755,22 +918,42 @@
             render();
         }
 
-        function refreshInUseBadges() {
-            const now = new Date();
-            document.querySelectorAll('#roomBookingsList .status-badge[data-status]').forEach(function (badge) {
-                const status = badge.dataset.status;
-                if (status !== 'BOOKED' && status !== 'ACTIVE') return;
-                if (!badge.dataset.start || !badge.dataset.end) return;
-                const start = new Date(badge.dataset.start);
-                const end = new Date(badge.dataset.end);
-                if (start <= now && end >= now) {
-                    badge.classList.remove('booked');
-                    badge.classList.add('inuse');
-                    badge.textContent = 'IN USE';
-                }
-            });
-        }
+        // Set default request time to current time + 1 hour
+        document.addEventListener('DOMContentLoaded', function() {
+            const requestTimeInput = document.getElementById('requestTimeInput');
+            if (requestTimeInput) {
+                const now = new Date();
+                now.setHours(now.getHours() + 1); // Add 1 hour
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const dateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+                requestTimeInput.value = dateTimeString;
 
+                // Set min and max attributes
+                const minDate = new Date();
+                minDate.setHours(minDate.getHours() + 1);
+                const minYear = minDate.getFullYear();
+                const minMonth = String(minDate.getMonth() + 1).padStart(2, '0');
+                const minDay = String(minDate.getDate()).padStart(2, '0');
+                const minHours = String(minDate.getHours()).padStart(2, '0');
+                const minMinutes = String(minDate.getMinutes()).padStart(2, '0');
+                requestTimeInput.min = `${minYear}-${minMonth}-${minDay}T${minHours}:${minMinutes}`;
+
+                const maxDate = new Date();
+                maxDate.setDate(maxDate.getDate() + 5);
+                const maxYear = maxDate.getFullYear();
+                const maxMonth = String(maxDate.getMonth() + 1).padStart(2, '0');
+                const maxDay = String(maxDate.getDate()).padStart(2, '0');
+                requestTimeInput.max = `${maxYear}-${maxMonth}-${maxDay}T23:59`;
+            }
+        });
+
+        // ============================================
+        // Room Calendar
+        // ============================================
         let roomCalendar = null;
         function statusColor(status) {
             if (status === 'PENDING') return '#fd7e14';
@@ -831,19 +1014,9 @@
             if (showCalendar) { initRoomCalendar(); roomCalendar?.updateSize(); }
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.driver-item').forEach(function (el) {
-                el.addEventListener('click', function () { viewDriverDetails(el.dataset.driverid, el.dataset.drivername); });
-            });
-            document.querySelectorAll('.room-item').forEach(function (el) {
-                el.addEventListener('click', function () { viewRoomDetails(el.dataset.roomid, el.dataset.roomname, el.dataset.roomtype); });
-            });
-            paginateList('driverRequestsList', 'driverRequestsPagination', 8);
-            paginateList('roomBookingsList', 'roomBookingsPagination', 8);
-            refreshInUseBadges();
-            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () { roomCalendar?.updateSize(); });
-        });
-
+        // ============================================
+        // View Functions
+        // ============================================
         function viewDriverDetails(driverId, driverName) {
             const modal = new bootstrap.Modal(document.getElementById('driverDetailsModal'));
             const body = document.getElementById('driverDetailBody');
@@ -915,6 +1088,9 @@
                 });
         }
 
+        // ============================================
+        // Action Functions
+        // ============================================
         function openSlotRequest(bookingId) {
             document.getElementById('slotRequestBookingId').value = bookingId;
             const sendBtn = document.getElementById('sendSlotRequestBtn');
@@ -1020,13 +1196,96 @@
                 .catch(error => showToast('Error: ' + error.message, 'error'));
             });
         }
+
+        // ============================================
+        // COMPLETE DRIVER TRIP
+        // ============================================
+        function completeDriverTrip(requestId, driverId) {
+            showConfirm('Mark this trip as completed? The requester will be notified to rate the driver.', function () {
+                const formData = new FormData();
+                formData.append('driverId', driverId);
+
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/complete', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Trip completed successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
+        }
+
+        // ============================================
+        // SERVER ROOM APPROVAL FUNCTIONS
+        // ============================================
+        function approveServerRoom(bookingId) {
+            showConfirm('Approve this server room booking?', function () {
+                const formData = new FormData();
+                formData.append('infraComment', 'Approved by infrastructure');
+
+                fetch('/assetIQ-pro/bookings/server-room/' + bookingId + '/approve', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Server room booking approved successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
+        }
+
+        function declineServerRoom(bookingId) {
+            showConfirm('Decline this server room booking?', function () {
+                const reason = prompt('Please provide a reason for declining:');
+                if (reason === null) return;
+
+                const formData = new FormData();
+                formData.append('declinedReason', reason || 'No reason provided');
+
+                fetch('/assetIQ-pro/bookings/server-room/' + bookingId + '/decline', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Server room booking declined successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
+        }
+
+        // ============================================
+        // DOM Ready
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.driver-item').forEach(function (el) {
+                el.addEventListener('click', function () { viewDriverDetails(el.dataset.driverid, el.dataset.drivername); });
+            });
+            document.querySelectorAll('.room-item').forEach(function (el) {
+                el.addEventListener('click', function () { viewRoomDetails(el.dataset.roomid, el.dataset.roomname, el.dataset.roomtype); });
+            });
+            paginateList('driverRequestsList', 'driverRequestsPagination', 8);
+            paginateList('roomBookingsList', 'roomBookingsPagination', 8);
+            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () { roomCalendar?.updateSize(); });
+        });
     </script>
 
-    <!-- ============================================================ -->
-    <!-- Flash-message alerts: separate th:inline="javascript" blocks  -->
-    <!-- so Thymeleaf inlining doesn't clash with the th:inline="none" -->
-    <!-- script above.                                                  -->
-    <!-- ============================================================ -->
+    <!-- Flash Messages -->
     <script th:if="${success != null}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {
             showToast(/*[[${success}]]*/ 'Success', 'success');

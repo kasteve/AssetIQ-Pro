@@ -50,6 +50,14 @@ public class Booking {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // ✅ ADDED: Room Type field
+    @Column(name = "room_type")
+    private String roomType;
+
+    // ✅ ADDED: Room Name field (for denormalization or query)
+    @Column(name = "room_name")
+    private String roomName;
+
     // Server Room specific fields
     @Column(name = "approved_by")
     private Long approvedBy;
@@ -101,6 +109,11 @@ public class Booking {
     @Column(name = "slot_request_status")
     private String slotRequestStatus; // PENDING, APPROVED, DECLINED
 
+    // ✅ FIXED: getRoomName() now returns roomName
+    public String getRoomName() {
+        return roomName != null ? roomName : "Room " + roomId;
+    }
+
     public enum BookingStatus {
         PENDING,      // Waiting for approval (Server Room)
         BOOKED,       // Confirmed booking
@@ -116,6 +129,10 @@ public class Booking {
         }
         if (status == null) {
             status = BookingStatus.BOOKED;
+        }
+        // Set roomType from room if not set
+        if (roomType == null && roomId != null) {
+            // This will be set by the service when saving
         }
     }
 

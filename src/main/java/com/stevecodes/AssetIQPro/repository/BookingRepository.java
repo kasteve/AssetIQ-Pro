@@ -66,10 +66,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findUpcomingBookingsForRoom(@Param("roomId") Long roomId,
                                               @Param("startDate") LocalDateTime startDate);
 
-    @Query("SELECT b FROM Booking b WHERE b.roomId IN (SELECT r.roomId FROM Room r WHERE r.roomType = 'Server Room') AND b.status = 'PENDING'")
+    // ✅ ADDED: Find pending server room bookings
+    @Query("SELECT b FROM Booking b WHERE b.roomType = 'Server Room' AND b.status = 'PENDING' ORDER BY b.createdAt DESC")
     List<Booking> findPendingServerRoomBookings();
 
-    @Query("SELECT b FROM Booking b WHERE b.roomId IN (SELECT r.roomId FROM Room r WHERE r.roomType = 'Server Room') AND b.status = 'BOOKED'")
+    // ✅ ADDED: Find approved server room bookings
+    @Query("SELECT b FROM Booking b WHERE b.roomType = 'Server Room' AND b.status = 'BOOKED' ORDER BY b.startTime ASC")
     List<Booking> findApprovedServerRoomBookings();
 
     @Query("SELECT b FROM Booking b WHERE b.roomId = :roomId AND b.startTime BETWEEN :startDate AND :endDate")

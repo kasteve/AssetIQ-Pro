@@ -3,10 +3,12 @@ package com.stevecodes.AssetIQPro.service;
 import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.DriverAvailability;
+import com.stevecodes.AssetIQPro.entity.DriverRating;
 import com.stevecodes.AssetIQPro.entity.DriverRequest;
 import com.stevecodes.AssetIQPro.entity.Notification;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import com.stevecodes.AssetIQPro.repository.DriverAvailabilityRepository;
+import com.stevecodes.AssetIQPro.repository.DriverRatingRepository;
 import com.stevecodes.AssetIQPro.repository.DriverRequestRepository;
 import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,10 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,6 +32,7 @@ public class DriverService {
 
     private final DriverRequestRepository driverRequestRepository;
     private final DriverAvailabilityRepository availabilityRepository;
+    private final DriverRatingRepository ratingRepository;
     private final AppUserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
@@ -40,17 +46,8 @@ public class DriverService {
     // ============================================
 
     public List<AppUser> getAvailableDrivers() {
-        log.info("Getting available drivers");
-
-        List<AppUser> allDrivers = userRepository.findByRole("DRIVER");
-
-        return allDrivers.stream()
-                .filter(driver -> {
-                    Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
-                    return availability.isEmpty() ||
-                            "AVAILABLE".equals(availability.get().getStatus());
-                })
-                .collect(Collectors.toList());
+        log.info("Getting all drivers (regardless of availability status)");
+        return userRepository.findByRole("DRIVER");
     }
 
     public List<AppUser> getAllDrivers() {
@@ -77,11 +74,13 @@ public class DriverService {
     }
 
     public List<DriverRequest> getDriverBookingsLast7Days(Long driverId) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime startDate = now.minusDays(MAX_DAYS);
-        return driverRequestRepository.findByDriverIdAndRequestTimeBetweenAndStatusIn(
-                driverId, startDate, now, List.of("PENDING", "ACCEPTED", "COMPLETED")
-        );
+        log.info("Getting ALL bookings for driver: {}", driverId);
+        return driverRequestRepository.findByDriverId(driverId);
+    }
+
+    public List<DriverRequest> getAcceptedRequestsForDriver(Long driverId) {
+        log.info("Getting accepted requests for driver: {}", driverId);
+        return driverRequestRepository.findByDriverIdAndStatus(driverId, "ACCEPTED");
     }
 
     // ============================================
@@ -90,18 +89,29 @@ public class DriverService {
 
     @Transactional
     public DriverRequest createDriverRequest(Long userId, String destination, Long driverId,
-                                             String reason, String requestedBy) {
-        log.info("Creating driver request for user: {}", userId);
+                                             String reason, String requestedBy, LocalDateTime requestTime) {
+        log.info("Creating driver request for user: {}, request time: {}", userId, requestTime);
 
         if (driverId != null && driverId == -1) {
-            return createCabRequest(userId, destination, reason, requestedBy);
+            return createCabRequest(userId, destination, reason, requestedBy, requestTime);
         }
 
         if (driverId != null) {
             Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
             if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
-                throw new IllegalStateException("Driver is currently not available. Please choose another driver or select Cab.");
+                log.warn("Driver {} is currently busy, but booking is still allowed", driverId);
             }
+        }
+
+        // Validate request time is not in the past
+        if (requestTime.isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Cannot book a driver for a past time. Please select a future time.");
+        }
+
+        // Validate request time is not more than 5 days in advance
+        LocalDateTime maxDate = LocalDateTime.now().plusDays(5);
+        if (requestTime.isAfter(maxDate)) {
+            throw new IllegalStateException("Bookings are only allowed within 5 days from today. Please select a date within the next 5 days.");
         }
 
         DriverRequest request = new DriverRequest();
@@ -109,7 +119,10 @@ public class DriverService {
         request.setDestination(destination);
         request.setDriverId(driverId);
         request.setReason(reason);
-        request.setRequestTime(LocalDateTime.now());
+        request.setRequestTime(requestTime);
+        request.setRequestDate(requestTime.toLocalDate());
+        request.setRequestTimeOnly(requestTime.toLocalTime());
+        request.setPickupDatetime(requestTime);
         request.setStatus("PENDING");
         request.setRequestedBy(requestedBy);
 
@@ -122,14 +135,14 @@ public class DriverService {
         }
 
         auditService.logAction("DRIVER_REQUEST_CREATED",
-                "Driver request created by user: " + userId + " to: " + destination,
+                "Driver request created by user: " + userId + " to: " + destination + " at: " + requestTime,
                 userId);
 
         return saved;
     }
 
     @Transactional
-    public DriverRequest createCabRequest(Long userId, String destination, String reason, String requestedBy) {
+    public DriverRequest createCabRequest(Long userId, String destination, String reason, String requestedBy, LocalDateTime requestTime) {
         log.info("Creating CAB request for user: {}", userId);
 
         DriverRequest request = new DriverRequest();
@@ -137,7 +150,7 @@ public class DriverService {
         request.setDestination(destination);
         request.setDriverId(-1L);
         request.setReason(reason);
-        request.setRequestTime(LocalDateTime.now());
+        request.setRequestTime(requestTime != null ? requestTime : LocalDateTime.now());
         request.setStatus("PENDING_ADMIN");
         request.setRequestedBy(requestedBy);
 
@@ -207,22 +220,37 @@ public class DriverService {
             throw new IllegalStateException("Request is no longer pending");
         }
 
-        // ✅ FIXED: Check if driver is available - if no availability record, consider them available
-        if (!isDriverAvailable(driverId, request.getRequestTime())) {
-            // If driver has no availability record, create one with AVAILABLE status
-            Optional<DriverAvailability> existing = availabilityRepository.findByDriverId(driverId);
-            if (existing.isEmpty()) {
-                log.info("No availability record found for driver {}, creating one with AVAILABLE status", driverId);
-                DriverAvailability newAvailability = new DriverAvailability();
-                newAvailability.setDriverId(driverId);
-                newAvailability.setUserId(driverId);
-                newAvailability.setStatus("AVAILABLE");
-                newAvailability.setStartTime(LocalDateTime.now());
-                newAvailability.setEndTime(LocalDateTime.now().plusHours(8));
-                availabilityRepository.save(newAvailability);
-            } else {
-                throw new IllegalStateException("Driver is not available at the requested time");
+        // Get request date and time
+        LocalDate requestDate = request.getRequestDate() != null ? request.getRequestDate() : request.getRequestTime().toLocalDate();
+        LocalTime requestTime = request.getRequestTimeOnly() != null ? request.getRequestTimeOnly() : request.getRequestTime().toLocalTime();
+
+        // Check for conflicting trips
+        List<DriverRequest> existingTrips = driverRequestRepository.findByDriverIdAndStatusIn(
+                driverId, List.of("ACCEPTED", "PENDING")
+        );
+
+        boolean hasConflict = existingTrips.stream().anyMatch(existing -> {
+            if (existing.getRequestId().equals(requestId)) {
+                return false;
             }
+
+            LocalDate existingDate = existing.getRequestDate() != null ? existing.getRequestDate() : existing.getRequestTime().toLocalDate();
+            LocalTime existingTime = existing.getRequestTimeOnly() != null ? existing.getRequestTimeOnly() : existing.getRequestTime().toLocalTime();
+
+            if (!requestDate.equals(existingDate)) {
+                return false;
+            }
+
+            LocalTime existingStart = existingTime;
+            LocalTime existingEnd = existingTime.plusHours(2);
+            LocalTime newStart = requestTime;
+            LocalTime newEnd = requestTime.plusHours(2);
+
+            return !(newEnd.isBefore(existingStart) || newStart.isAfter(existingEnd));
+        });
+
+        if (hasConflict) {
+            throw new IllegalStateException("Driver already has a booking at this time. Please choose a different time.");
         }
 
         request.setStatus("ACCEPTED");
@@ -232,7 +260,10 @@ public class DriverService {
 
         DriverRequest saved = driverRequestRepository.save(request);
 
-        updateDriverAvailability(driverId, "BUSY");
+        // Only update availability to BUSY if the trip is for today
+        if (requestDate.equals(LocalDate.now())) {
+            updateDriverAvailability(driverId, "BUSY");
+        }
 
         String driverName = getDriverName(driverId);
 
@@ -241,7 +272,9 @@ public class DriverService {
                 "Driver Request Accepted",
                 "Your driver request has been accepted by " + driverName + ".\n\n" +
                         "Destination: " + request.getDestination() + "\n" +
-                        "Driver: " + driverName + "\n\n" +
+                        "Driver: " + driverName + "\n" +
+                        "Date: " + requestDate + "\n" +
+                        "Time: " + requestTime + "\n\n" +
                         "Please be ready at the pickup location."
         );
 
@@ -249,12 +282,12 @@ public class DriverService {
                 request.getUserId(),
                 "DRIVER_REQUEST_ACCEPTED",
                 "Driver Request Accepted",
-                "Your driver request has been accepted by " + driverName,
+                "Your driver request has been accepted by " + driverName + " for " + requestDate + " at " + requestTime,
                 baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("DRIVER_REQUEST_ACCEPTED",
-                "Driver request accepted: " + requestId + " by driver: " + driverId,
+                "Driver request accepted: " + requestId + " by driver: " + driverId + " for " + requestDate,
                 driverId);
 
         return saved;
@@ -304,12 +337,19 @@ public class DriverService {
 
     @Transactional
     public DriverRequest completeTrip(Long requestId, Long driverId) {
+        log.info("===== COMPLETE TRIP START =====");
         log.info("Driver {} completing trip for request: {}", driverId, requestId);
 
         DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
+                .orElseThrow(() -> {
+                    log.error("Driver request not found: {}", requestId);
+                    return new RuntimeException("Driver request not found: " + requestId);
+                });
+
+        log.info("Current request status: {}", request.getStatus());
 
         if (!"ACCEPTED".equals(request.getStatus())) {
+            log.error("Invalid status for completion: {}", request.getStatus());
             throw new IllegalStateException("Request must be accepted to complete. Current: " + request.getStatus());
         }
 
@@ -317,17 +357,24 @@ public class DriverService {
         request.setResponseTime(LocalDateTime.now());
 
         DriverRequest saved = driverRequestRepository.save(request);
+        log.info("Request saved with status: {}", saved.getStatus());
 
         updateDriverAvailability(driverId, "AVAILABLE");
 
-        String requesterEmail = getUserEmail(request.getUserId());
-        String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s", requestId);
+        String ratingToken = UUID.randomUUID().toString();
+        request.setNotes(ratingToken);
+        driverRequestRepository.save(request);
 
+        String requesterEmail = getUserEmail(request.getUserId());
+        String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s?token=%s", requestId, ratingToken);
+
+        log.info("Sending email to: {}", requesterEmail);
         emailService.sendSimpleEmail(
                 requesterEmail,
                 "Trip Completed - Please Rate Your Driver",
                 "Your trip to " + request.getDestination() + " has been completed.\n\n" +
-                        "Please rate your driver: " + ratingLink + "\n\n" +
+                        "Please rate your driver using the link below:\n" +
+                        ratingLink + "\n\n" +
                         "Thank you for using AssetIQ-Pro."
         );
 
@@ -343,12 +390,21 @@ public class DriverService {
                 "Trip completed for request: " + requestId + " by driver: " + driverId,
                 driverId);
 
+        log.info("===== COMPLETE TRIP END =====");
         return saved;
     }
+
+    // ============================================
+    // Rating Methods using DriverRating entity
+    // ============================================
 
     @Transactional
     public void rateDriver(Long requestId, Long userId, int rating, String feedback) {
         log.info("User {} rating driver for request: {} - Rating: {}", userId, requestId, rating);
+
+        if (ratingRepository.findByRequestId(requestId).isPresent()) {
+            throw new IllegalStateException("You have already rated this driver.");
+        }
 
         DriverRequest request = driverRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
@@ -357,6 +413,14 @@ public class DriverService {
             throw new IllegalStateException("You are not authorized to rate this trip.");
         }
 
+        DriverRating driverRating = new DriverRating();
+        driverRating.setRequestId(requestId);
+        driverRating.setDriverId(request.getDriverId());
+        driverRating.setUserId(userId);
+        driverRating.setRating(rating);
+        driverRating.setFeedback(feedback);
+        ratingRepository.save(driverRating);
+
         request.setNotes("Rating: " + rating + "/5 | Feedback: " + (feedback != null ? feedback : "N/A"));
         driverRequestRepository.save(request);
 
@@ -364,6 +428,22 @@ public class DriverService {
                 "Driver rated for request: " + requestId + " - Rating: " + rating + "/5",
                 userId);
     }
+
+    public boolean hasUserRated(Long requestId) {
+        return ratingRepository.findByRequestId(requestId).isPresent();
+    }
+
+    public Double getDriverAverageRating(Long driverId) {
+        return ratingRepository.getAverageRatingForDriver(driverId);
+    }
+
+    public Long getDriverRatingCount(Long driverId) {
+        return ratingRepository.getRatingCountForDriver(driverId);
+    }
+
+    // ============================================
+    // Recall Request
+    // ============================================
 
     @Transactional
     public void recallRequest(Long requestId) {
@@ -382,6 +462,16 @@ public class DriverService {
         auditService.logAction("DRIVER_REQUEST_RECALLED",
                 "Driver request recalled: " + requestId,
                 request.getUserId());
+    }
+
+    // ============================================
+    // Save Request
+    // ============================================
+
+    @Transactional
+    public void saveRequest(DriverRequest request) {
+        log.info("Saving driver request: {}", request.getRequestId());
+        driverRequestRepository.save(request);
     }
 
     // ============================================
@@ -431,23 +521,19 @@ public class DriverService {
         availabilityRepository.save(availability);
     }
 
-    // ✅ FIXED: isDriverAvailable now handles empty availability table
     public boolean isDriverAvailable(Long driverId, LocalDateTime requestTime) {
         Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
 
-        // If no availability record exists, driver is considered available
         if (availability.isEmpty()) {
             log.info("No availability record for driver {}, considering them available", driverId);
             return true;
         }
 
-        // If availability exists but status is not AVAILABLE, driver is busy
         if (!"AVAILABLE".equals(availability.get().getStatus())) {
             log.info("Driver {} is not available. Status: {}", driverId, availability.get().getStatus());
             return false;
         }
 
-        // Check if driver already has an accepted or pending request at that time
         List<DriverRequest> existing = driverRequestRepository.findByDriverIdAndStatusIn(
                 driverId, List.of("ACCEPTED", "PENDING")
         );
@@ -495,6 +581,12 @@ public class DriverService {
     // ============================================
     // Helper Methods
     // ============================================
+
+    public String getDriverName(Long driverId) {
+        return userRepository.findById(driverId)
+                .map(AppUser::getFullName)
+                .orElse("Driver #" + driverId);
+    }
 
     private void notifyAvailableDrivers(DriverRequest request) {
         List<AppUser> drivers = userRepository.findByRole("DRIVER");
@@ -593,12 +685,6 @@ public class DriverService {
         return userRepository.findById(userId)
                 .map(AppUser::getEmail)
                 .orElse("user@company.com");
-    }
-
-    private String getDriverName(Long driverId) {
-        return userRepository.findById(driverId)
-                .map(AppUser::getFullName)
-                .orElse("Driver #" + driverId);
     }
 
     public DriverRequestDTO convertToDTO(DriverRequest request) {

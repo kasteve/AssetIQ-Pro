@@ -3,7 +3,9 @@ package com.stevecodes.AssetIQPro.dto;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @NoArgsConstructor
@@ -15,6 +17,13 @@ public class DriverRequestDTO {
     private Long driverId;
     private String driverName;
     private LocalDateTime requestTime;
+
+    // ✅ NEW: Date and Time fields
+    private LocalDate requestDate;
+    private LocalTime requestTimeOnly;
+    private LocalDateTime pickupDatetime;
+    private LocalDateTime dropoffDatetime;
+
     private String status;
     private String destination;
     private String reason;
@@ -73,5 +82,32 @@ public class DriverRequestDTO {
     public String getRatingDisplay() {
         if (rating == null) return "Not rated";
         return rating + "/5";
+    }
+
+    // ✅ Helper method to get formatted date
+    public String getFormattedDate() {
+        if (requestDate != null) {
+            return requestDate.toString();
+        }
+        return requestTime != null ? requestTime.toLocalDate().toString() : "";
+    }
+
+    // ✅ Helper method to get formatted time
+    public String getFormattedTime() {
+        if (requestTimeOnly != null) {
+            return requestTimeOnly.toString();
+        }
+        return requestTime != null ? requestTime.toLocalTime().toString() : "";
+    }
+
+    // ✅ Helper method to check if booking is in the future
+    public boolean isFutureBooking() {
+        if (requestDate == null) {
+            return false;
+        }
+        return requestDate.isAfter(LocalDate.now()) ||
+                (requestDate.isEqual(LocalDate.now()) &&
+                        requestTimeOnly != null &&
+                        requestTimeOnly.isAfter(LocalTime.now()));
     }
 }

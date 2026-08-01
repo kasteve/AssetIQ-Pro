@@ -27,6 +27,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -64,11 +65,14 @@ public class UserRequestController {
         // Driver requests - filtered by userId
         model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
 
-        List<AppUser> availableDrivers = driverService.getAvailableDrivers();
-        model.addAttribute("availableDrivers", availableDrivers);
-
         List<AppUser> allDrivers = driverService.getAllDrivers();
         model.addAttribute("allDrivers", allDrivers);
+
+        // ✅ Get available driver IDs for status display
+        Set<Long> availableDriverIds = driverService.getAvailableDrivers().stream()
+                .map(AppUser::getUserId)
+                .collect(Collectors.toSet());
+        model.addAttribute("availableDriverIds", availableDriverIds);
 
         // Room bookings - filtered by userId
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
@@ -90,30 +94,19 @@ public class UserRequestController {
                 .collect(Collectors.toSet());
         model.addAttribute("availableRoomIds", availableRoomIds);
 
-        Set<Long> availableDriverIds = availableDrivers.stream().map(AppUser::getUserId).collect(Collectors.toSet());
-        model.addAttribute("availableDriverIds", availableDriverIds);
-
         // ✅ Infrastructure requests - PROPERLY FILTERED
         List<InfraRequestDTO> allInfraRequests = infraRequestService.getAllRequests();
         List<InfraRequestDTO> filteredInfraRequests;
 
-        // ✅ FIXED: Only true admins see everyone's requests.
-        // INFRA_REQUEST_VIEW is a default permission granted to ALL users just so
-        // they can access this feature at all - it must NOT be treated as a
-        // "view all users' requests" permission.
         if (currentUser.isAdmin()) {
-            // Admin - see all
             filteredInfraRequests = allInfraRequests;
             log.info("Admin viewing all {} infra requests in bookings dashboard", filteredInfraRequests.size());
         } else {
-            // Regular user - see only their requests
             filteredInfraRequests = allInfraRequests.stream()
                     .filter(r -> {
-                        // User is the requester
                         if (r.getRequesterId() != null && r.getRequesterId().equals(userId)) {
                             return true;
                         }
-                        // User is the line manager
                         if (r.getLineManagerId() != null && r.getLineManagerId().equals(userId)) {
                             return true;
                         }
@@ -125,17 +118,81 @@ public class UserRequestController {
         }
         model.addAttribute("infraRequests", filteredInfraRequests);
 
-        // ✅ Pending approvals for drivers
+        // ============================================
+        // ✅ PENDING APPROVALS - ALL TYPES
+        // ============================================
+        List<Object> allPendingApprovals = new ArrayList<>();
+
+        // 1. Driver requests pending approval (for drivers)
         if (currentUser.isDriver() || currentUser.isAdmin()) {
-            List<DriverRequest> pendingApprovals = driverService.getPendingRequestsForDriver(currentUser.getUserId());
-            model.addAttribute("pendingDriverApprovals", pendingApprovals);
-            log.info("Found {} pending approvals for driver: {}", pendingApprovals.size(), currentUser.getUsername());
+            List<DriverRequest> pendingDriverApprovals = driverService.getPendingRequestsForDriver(currentUser.getUserId());
+            model.addAttribute("pendingDriverApprovals", pendingDriverApprovals);
+            allPendingApprovals.addAll(pendingDriverApprovals);
+            log.info("Found {} pending driver approvals for user: {}", pendingDriverApprovals.size(), currentUser.getUsername());
         }
+
+        if (currentUser.isDriver()) {
+            List<DriverRequest> myAcceptedTrips = driverService.getDriverBookingsLast7Days(currentUser.getUserId())
+                    .stream()
+                    .filter(r -> "ACCEPTED".equals(r.getStatus()))
+                    .collect(Collectors.toList());
+            model.addAttribute("myAcceptedTrips", myAcceptedTrips);
+            log.info("Driver {} has {} accepted trips awaiting completion", currentUser.getUsername(), myAcceptedTrips.size());
+        }
+
+        // 2. Server room bookings pending approval (for INFRA/ADMIN users)
+        if (currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA", "ADMIN", "SUPER_ADMIN")) {
+            List<Booking> pendingServerRooms = bookingRepository.findPendingServerRoomBookings();
+
+            List<BookingDTO> pendingServerRoomDTOs = pendingServerRooms.stream()
+                    .map(booking -> {
+                        BookingDTO dto = new BookingDTO();
+                        dto.setBookingId(booking.getBookingId());
+                        dto.setRoomId(booking.getRoomId());
+                        dto.setRoomName(booking.getRoomName());
+                        dto.setUserId(booking.getUserId());
+                        dto.setStartTime(booking.getStartTime());
+                        dto.setEndTime(booking.getEndTime());
+                        dto.setPurpose(booking.getPurpose());
+                        dto.setStatus(booking.getStatus().name());
+                        userService.getUserById(booking.getUserId()).ifPresent(u -> dto.setBookedBy(u.getFullName()));
+                        return dto;
+                    })
+                    .collect(Collectors.toList());
+
+            model.addAttribute("pendingServerRooms", pendingServerRoomDTOs);
+            allPendingApprovals.addAll(pendingServerRoomDTOs);
+            log.info("Found {} pending server room approvals for user: {}", pendingServerRoomDTOs.size(), currentUser.getUsername());
+        }
+
+        // 3. Infrastructure requests pending approval (for LM, INFRA, FINANCE)
+        if (currentUser.isAdmin() || currentUser.hasAnyPermission("APPROVE_LM", "APPROVE_INFRA", "REVIEW_INFRA", "APPROVE_FINANCE")) {
+            List<InfraRequestDTO> pendingInfraRequests = new ArrayList<>();
+
+            for (InfraRequestDTO req : filteredInfraRequests) {
+                String status = req.getStatus();
+                if ("PENDING_LM_APPROVAL".equals(status) && currentUser.hasAnyPermission("APPROVE_LM", "ADMIN")) {
+                    pendingInfraRequests.add(req);
+                } else if ("PENDING_INFRA_REVIEW".equals(status) && currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA", "ADMIN")) {
+                    pendingInfraRequests.add(req);
+                } else if ("PENDING_FINANCE_APPROVAL".equals(status) && currentUser.hasAnyPermission("APPROVE_FINANCE", "ADMIN")) {
+                    pendingInfraRequests.add(req);
+                }
+            }
+
+            model.addAttribute("pendingInfraRequests", pendingInfraRequests);
+            allPendingApprovals.addAll(pendingInfraRequests);
+            log.info("Found {} pending infra requests for user: {}", pendingInfraRequests.size(), currentUser.getUsername());
+        }
+
+        model.addAttribute("allPendingApprovals", allPendingApprovals);
+        model.addAttribute("pendingCount", allPendingApprovals.size());
 
         model.addAttribute("canManageBookings", currentUser.canManageBookings());
         model.addAttribute("canViewAllRooms", currentUser.hasPermission("ROOM_VIEW_ALL"));
         model.addAttribute("canBookRoom", currentUser.hasPermission("ROOM_BOOK"));
         model.addAttribute("isDriver", currentUser.isDriver());
+        model.addAttribute("isInfra", currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA"));
 
         return "bookings/bookings-dashboard";
     }
@@ -183,12 +240,36 @@ public class UserRequestController {
     public String viewDriverDetails(@PathVariable Long driverId, Model model) {
         log.info("Viewing driver details for: {}", driverId);
         AppUser driver = userService.getUserById(driverId).orElse(null);
-        int bookingCount = driverService.getDriverBookingCountLast7Days(driverId);
-        List<DriverRequest> bookings = driverService.getDriverBookingsLast7Days(driverId);
+
+        // ✅ Get ALL bookings for this driver
+        List<DriverRequest> allBookings = driverService.getDriverBookingsLast7Days(driverId);
+
+        // ✅ Separate by status
+        List<DriverRequest> pendingBookings = allBookings.stream()
+                .filter(b -> "PENDING".equals(b.getStatus()))
+                .collect(Collectors.toList());
+
+        List<DriverRequest> acceptedBookings = allBookings.stream()
+                .filter(b -> "ACCEPTED".equals(b.getStatus()))
+                .collect(Collectors.toList());
+
+        List<DriverRequest> completedBookings = allBookings.stream()
+                .filter(b -> "COMPLETED".equals(b.getStatus()))
+                .collect(Collectors.toList());
+
+        List<DriverRequest> declinedBookings = allBookings.stream()
+                .filter(b -> "DECLINED".equals(b.getStatus()) || "RECALLED".equals(b.getStatus()))
+                .collect(Collectors.toList());
+
+        int bookingCount = allBookings.size();
 
         model.addAttribute("driver", driver);
         model.addAttribute("bookingCount", bookingCount);
-        model.addAttribute("bookings", bookings);
+        model.addAttribute("allBookings", allBookings);
+        model.addAttribute("pendingBookings", pendingBookings);
+        model.addAttribute("acceptedBookings", acceptedBookings);
+        model.addAttribute("completedBookings", completedBookings);
+        model.addAttribute("declinedBookings", declinedBookings);
         return "bookings/driver-details-modal";
     }
 
@@ -198,6 +279,7 @@ public class UserRequestController {
                                       @RequestParam String destination,
                                       @RequestParam(required = false) Long driverId,
                                       @RequestParam(required = false) String reason,
+                                      @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime requestTime,
                                       RedirectAttributes redirectAttributes) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
@@ -206,14 +288,19 @@ public class UserRequestController {
                 return "redirect:/login";
             }
 
+            // If no request time provided, use current time + 1 hour
+            if (requestTime == null) {
+                requestTime = LocalDateTime.now().plusHours(1);
+            }
+
             log.info("=== CREATE DRIVER REQUEST ===");
-            log.info("userId: {}, destination: {}, driverId: {}", userId, destination, driverId);
+            log.info("userId: {}, destination: {}, driverId: {}, requestTime: {}", userId, destination, driverId, requestTime);
 
             String requestedBy = userService.getUserById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"))
                     .getUsername();
 
-            driverService.createDriverRequest(userId, destination, driverId, reason, requestedBy);
+            driverService.createDriverRequest(userId, destination, driverId, reason, requestedBy, requestTime);
             redirectAttributes.addFlashAttribute("success", "Driver requested successfully!");
         } catch (IllegalStateException e) {
             log.error("Driver request validation error: {}", e.getMessage());
