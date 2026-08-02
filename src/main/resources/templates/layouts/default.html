@@ -293,6 +293,12 @@
             color: white;
         }
 
+        .sidebar .dropdown-item.active {
+            background: var(--sidebar-active);
+            color: white;
+        }
+        .sidebar .dropdown-item.active i { color: white; }
+
         .sidebar .dropdown-item i {
             width: 18px;
             margin-right: 10px;
@@ -681,11 +687,26 @@
         <!-- ========== BOTTOM SECTION: Assets, Transfers, Admin ========== -->
         <!-- Assets & Transfers - Admin only -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
+            <!-- Assets - now a dropdown: Asset Mgt / Disposal Mgt -->
             <div class="nav-item">
-                <a class="nav-link" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                <a class="nav-link dropdown-toggle"
+                   th:classappend="${currentPage == 'assets' or currentPage == 'disposal-dashboard'} ? 'active' : ''"
+                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-laptop"></i> Assets
                     <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
                 </a>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                            <i class="fas fa-laptop"></i> Asset Mgt
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" th:classappend="${currentPage == 'disposal-dashboard'} ? 'active' : ''" href="/assetIQ-pro/admin/disposal">
+                            <i class="fas fa-trash-alt"></i> Disposal Mgt
+                        </a>
+                    </li>
+                </ul>
             </div>
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">

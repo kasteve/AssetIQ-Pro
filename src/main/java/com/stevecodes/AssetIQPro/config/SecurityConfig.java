@@ -199,6 +199,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/transfers/error",
                                 "/swagger-ui/**",
                                 "/bookings/driver-rating/**",
+                                "/admin/disposal/**",
                                 "/v3/api-docs/**",
                                 "/actuator/**",
                                 "/uploads/**"

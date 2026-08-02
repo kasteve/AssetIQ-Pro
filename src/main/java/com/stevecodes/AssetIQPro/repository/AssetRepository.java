@@ -57,6 +57,14 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     List<Asset> findAssetsWithEOLWithinDays(@Param("today") LocalDate today,
                                             @Param("threshold") LocalDate threshold);
 
+    @Query("SELECT a FROM Asset a WHERE a.eolDate IS NOT NULL AND a.eolDate <= :date AND a.disposalStatus = 'ACTIVE'")
+    List<Asset> findByEolDateBeforeAndDisposalStatus(@Param("date") LocalDate date,
+                                                     @Param("disposalStatus") String disposalStatus);
+
+    @Query("SELECT a FROM Asset a WHERE a.retentionPeriodEndDate IS NOT NULL AND a.retentionPeriodEndDate <= :date AND a.disposalStatus = 'ACTIVE'")
+    List<Asset> findByRetentionPeriodEndDateBeforeAndDisposalStatus(@Param("date") LocalDate date,
+                                                                    @Param("disposalStatus") String disposalStatus);
+
     // ============================================
     // Status queries
     // ============================================
@@ -106,4 +114,7 @@ public interface AssetRepository extends JpaRepository<Asset, Integer> {
     // Recent additions
     // ============================================
     List<Asset> findTop10ByOrderByCreatedAtDesc();
+
+    // ✅ FIXED: Remove the incorrect method - Asset uses Integer, not Long
+    // The JpaRepository already provides findById(Integer id) method
 }

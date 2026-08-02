@@ -101,6 +101,54 @@ public class Asset {
     @JoinColumn(name = "department_id", insertable = false, updatable = false)
     private Department department;
 
+    @Column(name = "disposal_status")
+    private String disposalStatus = "ACTIVE";
+
+    @Column(name = "disposal_date")
+    private LocalDate disposalDate;
+
+    @Column(name = "disposal_method")
+    private String disposalMethod;
+
+    @Column(name = "disposal_authorized_by")
+    private Long disposalAuthorizedBy;
+
+    @Column(name = "disposal_authorized_at")
+    private LocalDateTime disposalAuthorizedAt;
+
+    @Column(name = "disposal_completed_by")
+    private Long disposalCompletedBy;
+
+    @Column(name = "disposal_completed_at")
+    private LocalDateTime disposalCompletedAt;
+
+    @Column(name = "disposal_approval_reference")
+    private String disposalApprovalReference;
+
+    @Column(name = "disposal_notes")
+    private String disposalNotes;
+
+    @Column(name = "data_wipe_status")
+    private String dataWipeStatus;
+
+    @Column(name = "data_wipe_method")
+    private String dataWipeMethod;
+
+    @Column(name = "data_wipe_verified_by")
+    private Long dataWipeVerifiedBy;
+
+    @Column(name = "data_wipe_verified_at")
+    private LocalDateTime dataWipeVerifiedAt;
+
+    @Column(name = "disposal_certificate_path")
+    private String disposalCertificatePath;
+
+    @Column(name = "retention_period_end_date")
+    private LocalDate retentionPeriodEndDate;
+
+    @Column(name = "asset_lifecycle_status")
+    private String assetLifecycleStatus = "ACTIVE";
+
     // ============================================
     // Helper Methods
     // ============================================
