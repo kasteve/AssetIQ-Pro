@@ -339,7 +339,7 @@
                                 </div>
                             </div>
 
-                            <!-- Escalation Levels Builder (replaces raw JSON input) -->
+                            <!-- Escalation Levels Builder -->
                             <div class="col-md-12">
                                 <label class="form-label">Escalation Levels</label>
                                 <div class="escalation-builder">
@@ -373,7 +373,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- GENERIC CONFIRMATION MODAL (replaces native confirm() popups) -->
+    <!-- GENERIC CONFIRMATION MODAL -->
     <!-- ============================================================ -->
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -388,6 +388,154 @@
                 <div class="modal-footer border-0 justify-content-center pb-4">
                     <button type="button" class="btn btn-secondary" id="confirmModalCancelBtn" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-danger" id="confirmModalConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SLA TRACKING DETAIL MODAL -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="trackingDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-chart-line me-2" style="color: #0d6efd;"></i>
+                        SLA Tracking Details
+                        <span id="trackingDetailStatus" class="badge ms-2"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="trackingDetailBody">
+                    <!-- Loading state -->
+                    <div id="trackingDetailLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading tracking details...</p>
+                    </div>
+
+                    <!-- Content state -->
+                    <div id="trackingDetailContent" style="display: none;">
+                        <!-- Header Info -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="detail-card">
+                                    <div class="detail-label">Request ID</div>
+                                    <div class="detail-value" id="detailRequestId">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-card">
+                                    <div class="detail-label">Request Type</div>
+                                    <div class="detail-value" id="detailRequestType">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">SLA Configuration</div>
+                                    <div class="detail-value" id="detailConfigName">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">SLA Hours</div>
+                                    <div class="detail-value" id="detailSlaHours">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">Status</div>
+                                    <div class="detail-value" id="detailStatus">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timeline -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">Started At</div>
+                                    <div class="detail-value" id="detailStartedAt">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">Due At</div>
+                                    <div class="detail-value" id="detailDueAt">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="detail-card">
+                                    <div class="detail-label">Completed At</div>
+                                    <div class="detail-value" id="detailCompletedAt">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-12">
+                                <div class="detail-card">
+                                    <div class="detail-label">Progress</div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="progress flex-grow-1" style="height: 25px;">
+                                            <div id="detailProgressBar" class="progress-bar" role="progressbar" style="width: 0%;">
+                                                0%
+                                            </div>
+                                        </div>
+                                        <span id="detailPercentage" class="fw-bold">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Breach Info -->
+                        <div class="row g-3 mb-4" id="breachInfo" style="display: none;">
+                            <div class="col-12">
+                                <div class="detail-card border-danger">
+                                    <div class="detail-label text-danger">
+                                        <i class="fas fa-exclamation-triangle me-1"></i> Breach Information
+                                    </div>
+                                    <div class="detail-value">
+                                        <div>Breaches Count: <span id="detailBreachesCount" class="fw-bold">0</span></div>
+                                        <div>Escalation Count: <span id="detailEscalationCount" class="fw-bold">0</span></div>
+                                        <div id="detailBreachedAt" style="display: none;">
+                                            Breached At: <span id="detailBreachedAtValue"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Escalations -->
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="detail-card">
+                                    <div class="detail-label">Escalation History</div>
+                                    <div id="escalationList">
+                                        <p class="text-muted text-center" id="noEscalations">No escalations recorded</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error state -->
+                    <div id="trackingDetailError" style="display: none;">
+                        <div class="text-center py-4">
+                            <i class="fas fa-exclamation-circle text-danger" style="font-size: 48px;"></i>
+                            <h5 class="mt-3 text-danger">Failed to Load Details</h5>
+                            <p class="text-muted" id="trackingDetailErrorMessage">An error occurred while loading tracking details.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="refreshTrackingDetails()">
+                        <i class="fas fa-sync me-2"></i>Refresh
+                    </button>
                 </div>
             </div>
         </div>
@@ -696,6 +844,45 @@
             min-width: 110px;
         }
 
+        /* SLA Tracking Detail Modal */
+        .detail-card {
+            background: #f8f9fb;
+            border-radius: 10px;
+            padding: 12px 16px;
+            border: 1px solid #eef0f3;
+            height: 100%;
+        }
+        .detail-card.border-danger {
+            border-color: #dc3545 !important;
+            background: #fff5f5;
+        }
+        .detail-label {
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9aa0a6;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+        .detail-value .badge {
+            font-size: 11px;
+        }
+        .escalation-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eef0f3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .escalation-item:last-child {
+            border-bottom: none;
+        }
+
         #toastContainer {
             max-width: 380px;
             z-index: 1080;
@@ -759,6 +946,12 @@
                 border-radius: 10px;
                 padding: 10px;
             }
+            .detail-card {
+                padding: 10px 12px;
+            }
+            .detail-value {
+                font-size: 13px;
+            }
         }
     </style>
 </div>
@@ -803,7 +996,7 @@
         }
 
         // ============================================================
-        // Generic Confirmation Modal (replaces native confirm() popups)
+        // Generic Confirmation Modal
         // ============================================================
         let _confirmModalCallback = null;
         let _confirmModalInstance = null;
@@ -854,7 +1047,7 @@
             // SLA Config Table
             $('#slaConfigTable').DataTable({
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
                 order: [[0, 'asc']],
                 columnDefs: [
                     { orderable: false, targets: 7 }
@@ -868,18 +1061,18 @@
                     { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
                 ],
                 language: {
-                    search: "Search:",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                    infoEmpty: "No records found",
-                    infoFiltered: "(filtered from _MAX_ total records)"
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                    infoEmpty: 'No records found',
+                    infoFiltered: '(filtered from _MAX_ total records)'
                 }
             });
 
             // SLA Tracking Table
             $('#slaTrackingTable').DataTable({
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
                 order: [[2, 'desc']],
                 dom: 'Bfrtip',
                 buttons: [
@@ -890,18 +1083,18 @@
                     { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
                 ],
                 language: {
-                    search: "Search:",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                    infoEmpty: "No records found",
-                    infoFiltered: "(filtered from _MAX_ total records)"
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                    infoEmpty: 'No records found',
+                    infoFiltered: '(filtered from _MAX_ total records)'
                 }
             });
 
             // Escalation Table
             $('#escalationTable').DataTable({
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
                 order: [[5, 'desc']],
                 dom: 'Bfrtip',
                 buttons: [
@@ -912,17 +1105,17 @@
                     { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
                 ],
                 language: {
-                    search: "Search:",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                    infoEmpty: "No records found",
-                    infoFiltered: "(filtered from _MAX_ total records)"
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                    infoEmpty: 'No records found',
+                    infoFiltered: '(filtered from _MAX_ total records)'
                 }
             });
         });
 
         // ============================================================
-        // Escalation Levels Builder (replaces raw JSON textbox)
+        // Escalation Levels Builder
         // ============================================================
         const ESCALATION_ROLES = ['MANAGER', 'ADMIN', 'SUPER_ADMIN', 'DEPARTMENT_HEAD', 'IT_LEAD'];
 
@@ -994,7 +1187,7 @@
         }
 
         // ============================================================
-        // Modal Functions
+        // SLA CRUD Functions
         // ============================================================
         function openCreateModal() {
             document.getElementById('slaConfigId').value = '';
@@ -1059,21 +1252,164 @@
             });
         }
 
+        // ============================================================
+        // SLA Tracking Detail Modal
+        // ============================================================
+        let currentTrackingId = null;
+
         function viewTracking(trackingId) {
-            window.location.href = '/assetIQ-pro/admin/sla/tracking/' + trackingId;
+            currentTrackingId = trackingId;
+            console.log('📊 Viewing tracking details for ID:', trackingId);
+
+            document.getElementById('trackingDetailLoading').style.display = 'block';
+            document.getElementById('trackingDetailContent').style.display = 'none';
+            document.getElementById('trackingDetailError').style.display = 'none';
+
+            const modal = new bootstrap.Modal(document.getElementById('trackingDetailModal'));
+            modal.show();
+
+            loadTrackingDetails(trackingId);
         }
 
-        // Reset modal when closed
-        document.addEventListener('DOMContentLoaded', function() {
-            const modal = document.getElementById('createSLAModal');
-            if (modal) {
-                modal.addEventListener('hidden.bs.modal', function() {
-                    // Reset form but keep it clean
-                });
-            }
-        });
+        function loadTrackingDetails(trackingId) {
+            console.log('📡 Fetching tracking details for ID:', trackingId);
 
-        // Form submission handler with spinner
+            fetch('/assetIQ-pro/admin/sla/api/tracking/' + trackingId)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load tracking details');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('✅ Tracking data received:', data);
+                    renderTrackingDetails(data);
+                })
+                .catch(error => {
+                    console.error('❌ Error loading tracking details:', error);
+                    document.getElementById('trackingDetailLoading').style.display = 'none';
+                    document.getElementById('trackingDetailContent').style.display = 'none';
+                    document.getElementById('trackingDetailError').style.display = 'block';
+                    document.getElementById('trackingDetailErrorMessage').textContent = error.message || 'An error occurred while loading tracking details.';
+                });
+        }
+
+        function renderTrackingDetails(data) {
+            // Data is now the DTO directly (no nested 'tracking' object)
+            console.log('📊 Rendering tracking details:', data);
+
+            document.getElementById('trackingDetailLoading').style.display = 'none';
+            document.getElementById('trackingDetailContent').style.display = 'block';
+            document.getElementById('trackingDetailError').style.display = 'none';
+
+            // Basic Info - using data directly
+            document.getElementById('detailRequestId').textContent = data.requestId || 'N/A';
+            document.getElementById('detailRequestType').textContent = data.requestType || 'N/A';
+            document.getElementById('detailConfigName').textContent = data.configName || 'N/A';
+            document.getElementById('detailSlaHours').textContent = data.slaHours ? data.slaHours + ' hours' : 'N/A';
+
+            // Status with badge
+            const statusMap = {
+                'IN_PROGRESS': { class: 'bg-primary', text: 'In Progress' },
+                'COMPLETED': { class: 'bg-success', text: 'Completed' },
+                'BREACHED': { class: 'bg-danger', text: 'Breached' },
+                'ESCALATED': { class: 'bg-warning', text: 'Escalated' }
+            };
+            const statusInfo = statusMap[data.status] || { class: 'bg-secondary', text: data.status || 'Unknown' };
+            const statusHtml = '<span class="badge ' + statusInfo.class + '">' + statusInfo.text + '</span>';
+            document.getElementById('detailStatus').innerHTML = statusHtml;
+            document.getElementById('trackingDetailStatus').className = 'badge ms-2 ' + statusInfo.class;
+            document.getElementById('trackingDetailStatus').textContent = statusInfo.text;
+
+            // Dates
+            document.getElementById('detailStartedAt').textContent = formatDate(data.slaStartedAt);
+            document.getElementById('detailDueAt').textContent = formatDate(data.slaDueAt);
+            document.getElementById('detailCompletedAt').textContent = data.completedAt ? formatDate(data.completedAt) : 'Not completed';
+
+            // Progress
+            const progressBar = document.getElementById('detailProgressBar');
+            const progressText = document.getElementById('detailPercentage');
+            const percentage = data.percentageComplete || 0;
+            const roundedPercentage = Math.round(percentage);
+            progressBar.style.width = roundedPercentage + '%';
+            progressBar.textContent = roundedPercentage + '%';
+            progressText.textContent = roundedPercentage + '%';
+
+            if (percentage > 90) {
+                progressBar.className = 'progress-bar bg-danger';
+            } else if (percentage > 75) {
+                progressBar.className = 'progress-bar bg-warning';
+            } else {
+                progressBar.className = 'progress-bar bg-success';
+            }
+
+            // Breach Info
+            const breachInfo = document.getElementById('breachInfo');
+            if (data.status === 'BREACHED' || (data.breachesCount && data.breachesCount > 0)) {
+                breachInfo.style.display = 'block';
+                document.getElementById('detailBreachesCount').textContent = data.breachesCount || 0;
+                document.getElementById('detailEscalationCount').textContent = data.escalationCount || 0;
+            } else {
+                breachInfo.style.display = 'none';
+            }
+
+            // Escalations - using data.escalations directly
+            const escalations = data.escalations || [];
+            const escalationList = document.getElementById('escalationList');
+            if (escalations && escalations.length > 0) {
+                let html = '';
+                escalations.forEach(function(esc) {
+                    const levelClass = esc.escalationLevel === 1 ? 'bg-info' :
+                                      esc.escalationLevel === 2 ? 'bg-warning' : 'bg-danger';
+                    const escalatedToName = esc.escalatedToName || 'User #' + esc.escalatedTo;
+                    html += `
+                        <div class="escalation-item">
+                            <div>
+                                <span class="badge ${levelClass} me-2">Level ${esc.escalationLevel}</span>
+                                <span>Escalated to ${escalatedToName}</span>
+                                ${esc.reason ? '<br><small class="text-muted">Reason: ' + esc.reason + '</small>' : ''}
+                            </div>
+                            <div class="text-muted small">
+                                ${esc.escalatedAt ? formatDate(esc.escalatedAt) : 'N/A'}
+                                ${esc.actionTaken ? '<span class="badge bg-success ms-2">Resolved</span>' : '<span class="badge bg-warning ms-2">Pending</span>'}
+                            </div>
+                        </div>
+                    `;
+                });
+                escalationList.innerHTML = html;
+            } else {
+                escalationList.innerHTML = '<p class="text-muted text-center">No escalations recorded</p>';
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function refreshTrackingDetails() {
+            if (currentTrackingId) {
+                document.getElementById('trackingDetailLoading').style.display = 'block';
+                document.getElementById('trackingDetailContent').style.display = 'none';
+                document.getElementById('trackingDetailError').style.display = 'none';
+                loadTrackingDetails(currentTrackingId);
+            }
+        }
+
+        // ============================================================
+        // Form Submission Handler
+        // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             const slaForm = document.getElementById('slaForm');
             if (slaForm) {
@@ -1083,6 +1419,17 @@
                     if (btn) {
                         btn.disabled = true;
                         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Saving...';
+                    }
+                });
+            }
+
+            const modal = document.getElementById('createSLAModal');
+            if (modal) {
+                modal.addEventListener('hidden.bs.modal', function() {
+                    const btn = document.querySelector('#slaForm button[type="submit"]');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-save me-2"></i>Save SLA';
                     }
                 });
             }

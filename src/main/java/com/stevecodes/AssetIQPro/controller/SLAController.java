@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.controller;
 
+import com.stevecodes.AssetIQPro.dto.SlaTrackingDetailDTO;
 import com.stevecodes.AssetIQPro.entity.SLAConfiguration;
 import com.stevecodes.AssetIQPro.entity.RequestSLATracking;
 import com.stevecodes.AssetIQPro.entity.AppUser;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -318,6 +321,50 @@ public class SLAController {
         }
 
         return "admin/sla";
+    }
+
+    // Add this to SLAController.java
+
+    // In SLAController.java - update the API endpoint
+
+    @GetMapping("/api/tracking/{trackingId}")
+    @ResponseBody
+    @PreAuthorize("hasAnyAuthority('MANAGE_CONFIG', 'ADMIN', 'SUPER_ADMIN')")
+    public SlaTrackingDetailDTO getTrackingDetails(@PathVariable Long trackingId) {
+        log.info("📡 API: Fetching SLA tracking details for ID: {}", trackingId);
+
+        try {
+            // Get the tracking record - use the service method that returns the entity
+            RequestSLATracking tracking = slaService.getTrackingById(trackingId);
+            if (tracking == null) {
+                log.warn("⚠️ Tracking not found for ID: {}", trackingId);
+                throw new RuntimeException("SLA tracking not found");
+            }
+            log.info("✅ Found tracking for request: {}", tracking.getRequestId());
+
+            // Get SLA configuration
+            SLAConfiguration config = slaService.getSLAConfigurationById(tracking.getSlaConfigId());
+            if (config != null) {
+                log.info("✅ Found config: {}", config.getConfigName());
+            }
+
+            // Get escalation history for this request
+            List<SLAEscalationHistory> escalations = slaService.getEscalationHistory(
+                    tracking.getRequestId(),
+                    tracking.getRequestType()
+            );
+            log.info("✅ Found {} escalations", escalations.size());
+
+            // Build DTO
+            SlaTrackingDetailDTO dto = SlaTrackingDetailDTO.fromTracking(tracking, config, escalations);
+            log.info("✅ API: Tracking details fetched successfully for ID: {}", trackingId);
+
+            return dto;
+
+        } catch (Exception e) {
+            log.error("❌ API: Error fetching tracking details: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     // ============================================

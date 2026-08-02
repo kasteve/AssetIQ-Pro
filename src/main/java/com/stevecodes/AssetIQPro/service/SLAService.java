@@ -640,4 +640,14 @@ public class SLAService {
     public long countBreachedByRequestType(String requestType) {
         return trackingRepository.countBreachedByRequestType(requestType);
     }
+
+    public RequestSLATracking getTrackingById(Long trackingId) {
+        return trackingRepository.findById(trackingId)
+                .orElse(null);
+    }
+
+    public SLAConfiguration getSLAConfigurationById(Integer configId) {
+        return slaConfigRepository.findById(configId)
+                .orElse(null);
+    }
 }
