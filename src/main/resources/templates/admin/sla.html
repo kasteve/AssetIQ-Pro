@@ -372,6 +372,27 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- GENERIC CONFIRMATION MODAL (replaces native confirm() popups) -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content confirm-modal-content">
+                <div class="modal-body text-center pt-4 pb-2">
+                    <div class="confirm-icon-wrap" id="confirmModalIconWrap">
+                        <i class="fas fa-exclamation-triangle" id="confirmModalIcon"></i>
+                    </div>
+                    <h5 class="mt-3 mb-2" id="confirmModalTitle">Are you sure?</h5>
+                    <p class="text-muted mb-0" id="confirmModalMessage">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <button type="button" class="btn btn-secondary" id="confirmModalCancelBtn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmModalConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <div layout:fragment="styles">
@@ -645,6 +666,36 @@
             padding: 6px 2px;
         }
 
+        /* Generic Confirmation Modal */
+        .confirm-modal-content {
+            border-radius: 18px;
+        }
+        .confirm-icon-wrap {
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            background: #fdeeee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .confirm-icon-wrap i {
+            font-size: 26px;
+            color: #dc3545;
+        }
+        #confirmModalTitle {
+            font-weight: 700;
+            font-size: 17px;
+            color: var(--ink);
+        }
+        #confirmModalMessage {
+            font-size: 13.5px;
+        }
+        #confirmActionModal .modal-footer .btn {
+            min-width: 110px;
+        }
+
         #toastContainer {
             max-width: 380px;
             z-index: 1080;
@@ -750,6 +801,51 @@
             toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
             toast.show();
         }
+
+        // ============================================================
+        // Generic Confirmation Modal (replaces native confirm() popups)
+        // ============================================================
+        let _confirmModalCallback = null;
+        let _confirmModalInstance = null;
+
+        function showConfirmModal(options) {
+            const opts = Object.assign({
+                title: 'Are you sure?',
+                message: 'This action cannot be undone.',
+                confirmText: 'Confirm',
+                confirmClass: 'btn-danger',
+                icon: 'fa-exclamation-triangle',
+                onConfirm: null
+            }, options || {});
+
+            document.getElementById('confirmModalTitle').textContent = opts.title;
+            document.getElementById('confirmModalMessage').textContent = opts.message;
+            document.getElementById('confirmModalIcon').className = 'fas ' + opts.icon;
+
+            const confirmBtn = document.getElementById('confirmModalConfirmBtn');
+            confirmBtn.textContent = opts.confirmText;
+            confirmBtn.className = 'btn ' + opts.confirmClass;
+
+            _confirmModalCallback = opts.onConfirm;
+
+            const modalEl = document.getElementById('confirmActionModal');
+            _confirmModalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            _confirmModalInstance.show();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmBtn = document.getElementById('confirmModalConfirmBtn');
+            confirmBtn.addEventListener('click', function() {
+                const callback = _confirmModalCallback;
+                _confirmModalCallback = null;
+                if (_confirmModalInstance) {
+                    _confirmModalInstance.hide();
+                }
+                if (typeof callback === 'function') {
+                    callback();
+                }
+            });
+        });
 
         // ============================================================
         // DataTables Initialization
@@ -934,26 +1030,33 @@
             const configId = button.getAttribute('data-configid');
             const name = button.getAttribute('data-name') || 'this SLA';
 
-            if (confirm('Are you sure you want to delete SLA configuration "' + name + '"?')) {
-                fetch('/assetIQ-pro/admin/sla/delete/' + configId, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    }
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showToast('SLA configuration deleted successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
-                    } else {
-                        showToast('Failed to delete SLA configuration.', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('Error deleting SLA configuration.', 'error');
-                });
-            }
+            showConfirmModal({
+                title: 'Delete SLA Configuration?',
+                message: 'Are you sure you want to delete "' + name + '"? This action cannot be undone.',
+                confirmText: 'Delete',
+                confirmClass: 'btn-danger',
+                icon: 'fa-trash-alt',
+                onConfirm: function() {
+                    fetch('/assetIQ-pro/admin/sla/delete/' + configId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            showToast('SLA configuration deleted successfully!', 'success');
+                            setTimeout(() => window.location.reload(), 900);
+                        } else {
+                            showToast('Failed to delete SLA configuration.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showToast('Error deleting SLA configuration.', 'error');
+                    });
+                }
+            });
         }
 
         function viewTracking(trackingId) {
