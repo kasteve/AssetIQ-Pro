@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>SLA Management - AssetIQ-Pro</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+</head>
+
+<body>
+<div layout:fragment="content">
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080;"></div>
+
+    <div class="page-header-row">
+        <h4><i class="fas fa-clock me-2" style="color: #0d6efd;"></i>SLA Management</h4>
+        <div>
+            <button type="button" class="btn btn-primary" onclick="openCreateModal()">
+                <i class="fas fa-plus me-2"></i>Create SLA
+            </button>
+            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+        </div>
+    </div>
+
+    <!-- SLA Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary"><i class="fas fa-list"></i></div>
+                <div class="stat-info">
+                    <h6>Total SLA Configs</h6>
+                    <h3 th:text="${totalConfigs}">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <h6>Active SLAs</h6>
+                    <h3 th:text="${activeConfigs}">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning"><i class="fas fa-hourglass-half"></i></div>
+                <div class="stat-info">
+                    <h6>In Progress SLAs</h6>
+                    <h3 th:text="${activeSLACount}">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-danger"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="stat-info">
+                    <h6>Breached SLAs</h6>
+                    <h3 th:text="${breachedSLACount}">0</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs sla-tabs" id="slaTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-configs-btn" data-bs-toggle="tab" data-bs-target="#tab-configs" type="button" role="tab">
+                <i class="fas fa-cog me-2"></i>SLA Configurations
+                <span class="badge bg-primary ms-1" th:text="${totalConfigs}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-trackings-btn" data-bs-toggle="tab" data-bs-target="#tab-trackings" type="button" role="tab">
+                <i class="fas fa-chart-line me-2"></i>SLA Tracking
+                <span class="badge bg-warning ms-1" th:text="${activeSLACount}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-escalations-btn" data-bs-toggle="tab" data-bs-target="#tab-escalations" type="button" role="tab">
+                <i class="fas fa-arrow-up me-2"></i>Escalations
+                <span class="badge bg-danger ms-1" th:text="${escalationCount}">0</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content sla-tab-content">
+
+        <!-- ============================================================ -->
+        <!-- TAB 1: SLA Configurations -->
+        <!-- ============================================================ -->
+        <div class="tab-pane fade show active" id="tab-configs" role="tabpanel">
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table id="slaConfigTable" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Request Type</th>
+                            <th>SLA (Hours)</th>
+                            <th>Reminder Interval</th>
+                            <th>Status</th>
+                            <th>Default</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="config : ${slaConfigs}">
+                            <td th:text="${config.configId}">1</td>
+                            <td>
+                                <strong th:text="${config.configName}">Config Name</strong>
+                                <div class="text-muted small" th:text="${config.description}">Description</div>
+                            </td>
+                            <td>
+                                    <span class="badge" th:class="${config.requestType == 'ASSET_DISPOSAL' ? 'bg-danger' :
+                                                                  config.requestType == 'DRIVER_REQUEST' ? 'bg-primary' :
+                                                                  config.requestType == 'INFRA_REQUEST' ? 'bg-warning' :
+                                                                  config.requestType == 'RESOURCE_REQUEST' ? 'bg-info' :
+                                                                  config.requestType == 'BOOKING' ? 'bg-success' :
+                                                                  config.requestType == 'TRANSFER' ? 'bg-secondary' : 'bg-dark'}"
+                                          th:text="${config.requestType}">DRIVER_REQUEST</span>
+                            </td>
+                            <td th:text="${config.slaHours + 'h'}">24h</td>
+                            <td th:text="${config.reminderIntervalHours + 'h'}">24h</td>
+                            <td>
+                                    <span class="badge" th:class="${config.isActive ? 'bg-success' : 'bg-secondary'}"
+                                          th:text="${config.isActive ? 'Active' : 'Inactive'}">Active</span>
+                            </td>
+                            <td>
+                                <span th:if="${config.isDefault}" class="badge bg-info">Default</span>
+                                <span th:unless="${config.isDefault}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" title="Edit"
+                                            th:data-configid="${config.configId}"
+                                            th:data-name="${config.configName}"
+                                            th:data-description="${config.description}"
+                                            th:data-requesttype="${config.requestType}"
+                                            th:data-slahours="${config.slaHours}"
+                                            th:data-reminderinterval="${config.reminderIntervalHours}"
+                                            th:data-isactive="${config.isActive}"
+                                            th:data-isdefault="${config.isDefault}"
+                                            th:data-escalationlevels="${config.escalationLevels}"
+                                            onclick="editSLA(this)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" title="Delete"
+                                            th:data-configid="${config.configId}"
+                                            th:data-name="${config.configName}"
+                                            onclick="deleteSLA(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 2: SLA Tracking -->
+        <!-- ============================================================ -->
+        <div class="tab-pane fade" id="tab-trackings" role="tabpanel">
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table id="slaTrackingTable" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Request Type</th>
+                            <th>Started</th>
+                            <th>Due</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="tracking : ${slaTrackings}">
+                            <td th:text="${tracking.requestId}">1</td>
+                            <td>
+                                    <span class="badge" th:class="${tracking.requestType == 'ASSET_DISPOSAL' ? 'bg-danger' :
+                                                                  tracking.requestType == 'DRIVER_REQUEST' ? 'bg-primary' :
+                                                                  tracking.requestType == 'INFRA_REQUEST' ? 'bg-warning' :
+                                                                  tracking.requestType == 'RESOURCE_REQUEST' ? 'bg-info' :
+                                                                  tracking.requestType == 'BOOKING' ? 'bg-success' :
+                                                                  tracking.requestType == 'TRANSFER' ? 'bg-secondary' : 'bg-dark'}"
+                                          th:text="${tracking.requestType}">DRIVER_REQUEST</span>
+                            </td>
+                            <td th:text="${#temporals.format(tracking.slaStartedAt, 'dd/MM/yyyy HH:mm')}">Start</td>
+                            <td th:text="${#temporals.format(tracking.slaDueAt, 'dd/MM/yyyy HH:mm')}">Due</td>
+                            <td>
+                                    <span class="badge" th:class="${tracking.status == 'IN_PROGRESS' ? 'bg-primary' :
+                                                                  tracking.status == 'COMPLETED' ? 'bg-success' :
+                                                                  tracking.status == 'BREACHED' ? 'bg-danger' :
+                                                                  tracking.status == 'ESCALATED' ? 'bg-warning' : 'bg-secondary'}"
+                                          th:text="${tracking.statusDisplay}">IN_PROGRESS</span>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px; min-width: 100px;">
+                                    <div class="progress-bar"
+                                         th:class="${tracking.percentageComplete > 90 ? 'bg-danger' :
+                                                       tracking.percentageComplete > 75 ? 'bg-warning' : 'bg-success'}"
+                                         th:style="'width: ' + ${tracking.percentageComplete} + '%;'"
+                                         th:text="${#numbers.formatDecimal(tracking.percentageComplete, 0, 0)} + '%'">
+                                        0%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        th:onclick="'viewTracking(' + ${tracking.trackingId} + ')'">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 3: Escalations -->
+        <!-- ============================================================ -->
+        <div class="tab-pane fade" id="tab-escalations" role="tabpanel">
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table id="escalationTable" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Request Type</th>
+                            <th>Escalated To</th>
+                            <th>Escalated By</th>
+                            <th>Level</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="esc : ${escalations}">
+                            <td th:text="${esc.requestId}">1</td>
+                            <td>
+                                    <span class="badge" th:class="${esc.requestType == 'ASSET_DISPOSAL' ? 'bg-danger' :
+                                                                  esc.requestType == 'DRIVER_REQUEST' ? 'bg-primary' :
+                                                                  esc.requestType == 'INFRA_REQUEST' ? 'bg-warning' :
+                                                                  esc.requestType == 'RESOURCE_REQUEST' ? 'bg-info' :
+                                                                  esc.requestType == 'BOOKING' ? 'bg-success' :
+                                                                  esc.requestType == 'TRANSFER' ? 'bg-secondary' : 'bg-dark'}"
+                                          th:text="${esc.requestType}">DRIVER_REQUEST</span>
+                            </td>
+                            <td th:text="${esc.escalatedToUser != null ? esc.escalatedToUser.fullName : 'User #' + esc.escalatedTo}">Manager</td>
+                            <td th:text="${esc.escalatedByUser != null ? esc.escalatedByUser.fullName : 'User #' + esc.escalatedBy}">System</td>
+                            <td>
+                                    <span class="badge" th:class="${esc.escalationLevel == 1 ? 'bg-info' :
+                                                                  esc.escalationLevel == 2 ? 'bg-warning' :
+                                                                  esc.escalationLevel == 3 ? 'bg-danger' : 'bg-secondary'}"
+                                          th:text="'Level ' + ${esc.escalationLevel}">Level 1</span>
+                            </td>
+                            <td th:text="${#temporals.format(esc.escalatedAt, 'dd/MM/yyyy HH:mm')}">Date</td>
+                            <td>
+                                    <span class="badge" th:class="${esc.actionTaken ? 'bg-success' : 'bg-warning'}"
+                                          th:text="${esc.actionTaken ? 'Resolved' : 'Pending'}">Pending</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CREATE/EDIT SLA MODAL -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="createSLAModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-clock me-2" style="color: #0d6efd;"></i>
+                        <span id="slaModalTitle">Create SLA Configuration</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/sla/save}" method="post" id="slaForm">
+                    <input type="hidden" id="slaConfigId" name="configId">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Configuration Name *</label>
+                                <input type="text" id="slaConfigName" name="configName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Request Type *</label>
+                                <select id="slaRequestType" name="requestType" class="form-select" required>
+                                    <option value="">Select Request Type</option>
+                                    <option value="ASSET_DISPOSAL">Asset Disposal</option>
+                                    <option value="DRIVER_REQUEST">Driver Request</option>
+                                    <option value="INFRA_REQUEST">Infrastructure Request</option>
+                                    <option value="RESOURCE_REQUEST">Resource Request</option>
+                                    <option value="BOOKING">Room Booking</option>
+                                    <option value="TRANSFER">Asset Transfer</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Description</label>
+                                <input type="text" id="slaDescription" name="description" class="form-control" placeholder="Brief description of this SLA">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">SLA Duration (Hours) *</label>
+                                <input type="number" id="slaHours" name="slaHours" class="form-control" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Reminder Interval (Hours)</label>
+                                <input type="number" id="slaReminderInterval" name="reminderIntervalHours" class="form-control" value="24" min="1">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" id="slaIsDefault" name="isDefault" class="form-check-input" value="true">
+                                    <label class="form-check-label" for="slaIsDefault">Set as Default</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="slaIsActive" name="isActive" class="form-check-input" value="true" checked>
+                                    <label class="form-check-label" for="slaIsActive">Active</label>
+                                </div>
+                            </div>
+
+                            <!-- Escalation Levels Builder (replaces raw JSON input) -->
+                            <div class="col-md-12">
+                                <label class="form-label">Escalation Levels</label>
+                                <div class="escalation-builder">
+                                    <div class="escalation-header-row">
+                                        <span>Level</span>
+                                        <span>Hours After Due</span>
+                                        <span>Escalate To Role</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="escalationRows"></div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addEscalationRow()">
+                                        <i class="fas fa-plus me-1"></i>Add Escalation Level
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Each level defines how many hours past the SLA due date this request should escalate, and to which role.
+                                </small>
+                                <input type="hidden" id="slaEscalationLevels" name="escalationLevels">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save SLA
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .page-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .page-header-row h4 {
+            font-weight: 700;
+            font-size: 19px;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+        .page-header-row h4 i {
+            color: var(--primary-color);
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #eef0f3;
+        }
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .stat-icon.bg-primary { background: #0d6efd; }
+        .stat-icon.bg-success { background: #198754; }
+        .stat-icon.bg-warning { background: #fd7e14; }
+        .stat-icon.bg-danger { background: #dc3545; }
+        .stat-info h6 {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-info h3 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+            color: var(--ink);
+        }
+
+        .sla-tabs {
+            border-bottom: 1px solid #eef0f3;
+            margin-bottom: 0;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .sla-tabs .nav-link {
+            border: none;
+            border-radius: 10px 10px 0 0;
+            color: #6c757d;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 10px 16px;
+            background: transparent;
+        }
+        .sla-tabs .nav-link .badge {
+            font-size: 10px;
+            vertical-align: middle;
+        }
+        .sla-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: white;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        .sla-tab-content {
+            background: transparent;
+        }
+        .sla-tab-content .table-card {
+            border-radius: 0 14px 14px 14px;
+            border-top: none;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid #eef0f3;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+            padding: 16px;
+        }
+        .table thead th {
+            background: #f8f9fb;
+            color: #6c757d;
+            border-bottom: 1px solid #eef0f3;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 13px 16px;
+            white-space: nowrap;
+        }
+        .table tbody td {
+            padding: 14px 16px;
+            vertical-align: middle;
+            font-size: 13.5px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .table tbody tr:hover {
+            background: #f8f9fc;
+        }
+
+        .btn {
+            border-radius: 10px !important;
+            padding: 9px 20px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            border: none !important;
+        }
+        .btn-primary {
+            background: var(--primary-color) !important;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark) !important;
+        }
+        .btn-sm {
+            padding: 6px 12px !important;
+            font-size: 12px !important;
+            border-radius: 8px !important;
+        }
+        .btn-outline-primary {
+            border: 1px solid var(--primary-color) !important;
+            color: var(--primary-color) !important;
+            background: transparent !important;
+        }
+        .btn-outline-primary:hover {
+            background: var(--primary-color) !important;
+            color: white !important;
+        }
+        .btn-outline-danger {
+            border: 1px solid #dc3545 !important;
+            color: #dc3545 !important;
+            background: transparent !important;
+        }
+        .btn-outline-danger:hover {
+            background: #dc3545 !important;
+            color: white !important;
+        }
+
+        .progress {
+            border-radius: 10px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+        .progress-bar {
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: width 0.5s ease;
+        }
+
+        .badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 70px rgba(15,23,42,0.28);
+        }
+        .modal-header {
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 20px 24px;
+        }
+        .modal-footer {
+            border-top: 1px solid rgba(0,0,0,0.06);
+            padding: 16px 24px;
+        }
+        .modal-title {
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .modal-body .form-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--ink);
+            margin-bottom: 5px;
+        }
+        .modal-body .form-control, .modal-body .form-select {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            padding: 10px 14px;
+            font-size: 14px;
+        }
+        .modal-body .form-control:focus, .modal-body .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(13,110,253,0.08);
+        }
+        .form-check {
+            padding-top: 8px;
+        }
+
+        /* Escalation Levels Builder */
+        .escalation-builder {
+            background: #f8f9fb;
+            border: 1px solid #eef0f3;
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .escalation-header-row {
+            display: grid;
+            grid-template-columns: 70px 1fr 1fr 34px;
+            gap: 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9aa0a6;
+            padding: 0 2px 6px 2px;
+        }
+        .escalation-row {
+            display: grid;
+            grid-template-columns: 70px 1fr 1fr 34px;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .escalation-row .level-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-color);
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+            border-radius: 8px;
+            height: 36px;
+        }
+        .escalation-row .form-control,
+        .escalation-row .form-select {
+            font-size: 13px;
+            padding: 7px 10px;
+        }
+        .escalation-row .remove-row-btn {
+            width: 34px;
+            height: 34px;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .escalation-empty-note {
+            font-size: 12.5px;
+            color: #adb5bd;
+            padding: 6px 2px;
+        }
+
+        #toastContainer {
+            max-width: 380px;
+            z-index: 1080;
+        }
+        .app-toast {
+            border-radius: 12px !important;
+            border: none !important;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important;
+            overflow: hidden;
+        }
+        .app-toast .toast-header {
+            border-bottom: none !important;
+            padding: 12px 14px 4px 14px;
+            font-weight: 700;
+            font-size: 13.5px;
+        }
+        .app-toast .toast-body {
+            padding: 4px 14px 14px 14px;
+            font-size: 13.5px;
+            color: var(--ink);
+        }
+        .app-toast.toast-success .toast-header {
+            color: #198754;
+            background: #fff !important;
+        }
+        .app-toast.toast-success .toast-header i {
+            color: #198754;
+        }
+        .app-toast.toast-error .toast-header {
+            color: #dc3545;
+            background: #fff !important;
+        }
+        .app-toast.toast-error .toast-header i {
+            color: #dc3545;
+        }
+        .app-toast .btn-close {
+            font-size: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .stat-card {
+                padding: 16px;
+            }
+            .stat-info h3 {
+                font-size: 22px;
+            }
+            .sla-tabs .nav-link {
+                font-size: 12px;
+                padding: 8px 10px;
+            }
+            .table-responsive {
+                font-size: 12px;
+            }
+            .escalation-header-row {
+                display: none;
+            }
+            .escalation-row {
+                grid-template-columns: 1fr;
+                background: white;
+                border: 1px solid #eef0f3;
+                border-radius: 10px;
+                padding: 10px;
+            }
+        }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+
+    <script th:inline="none">
+        // ============================================================
+        // Toast Notifications
+        // ============================================================
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success';
+            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
+            const label = isSuccess ? 'Success' : 'Error';
+            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
+                    <div class="toast-header">
+                        <i class="fas ${icon} me-2"></i>
+                        <strong class="me-auto">${label}</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">${message}</div>
+                </div>
+            `;
+
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl);
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            toast.show();
+        }
+
+        // ============================================================
+        // DataTables Initialization
+        // ============================================================
+        $(document).ready(function() {
+            // SLA Config Table
+            $('#slaConfigTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                order: [[0, 'asc']],
+                columnDefs: [
+                    { orderable: false, targets: 7 }
+                ],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No records found",
+                    infoFiltered: "(filtered from _MAX_ total records)"
+                }
+            });
+
+            // SLA Tracking Table
+            $('#slaTrackingTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                order: [[2, 'desc']],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No records found",
+                    infoFiltered: "(filtered from _MAX_ total records)"
+                }
+            });
+
+            // Escalation Table
+            $('#escalationTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                order: [[5, 'desc']],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    infoEmpty: "No records found",
+                    infoFiltered: "(filtered from _MAX_ total records)"
+                }
+            });
+        });
+
+        // ============================================================
+        // Escalation Levels Builder (replaces raw JSON textbox)
+        // ============================================================
+        const ESCALATION_ROLES = ['MANAGER', 'ADMIN', 'SUPER_ADMIN', 'DEPARTMENT_HEAD', 'IT_LEAD'];
+
+        function addEscalationRow(hours, role) {
+            const container = document.getElementById('escalationRows');
+            const rowIndex = container.children.length;
+            const level = rowIndex + 1;
+
+            const row = document.createElement('div');
+            row.className = 'escalation-row';
+            row.innerHTML = `
+                <span class="level-badge">L${level}</span>
+                <input type="number" class="form-control esc-hours" placeholder="e.g. 24" min="1" value="${hours != null ? hours : ''}">
+                <select class="form-select esc-role">
+                    ${ESCALATION_ROLES.map(r => `<option value="${r}" ${r === role ? 'selected' : ''}>${r}</option>`).join('')}
+                </select>
+                <button type="button" class="btn btn-outline-danger remove-row-btn" onclick="removeEscalationRow(this)" title="Remove level">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeEscalationRow(button) {
+            button.closest('.escalation-row').remove();
+            renumberEscalationRows();
+        }
+
+        function renumberEscalationRows() {
+            document.querySelectorAll('#escalationRows .escalation-row').forEach((row, i) => {
+                row.querySelector('.level-badge').textContent = 'L' + (i + 1);
+            });
+        }
+
+        function clearEscalationRows() {
+            document.getElementById('escalationRows').innerHTML = '';
+        }
+
+        function loadEscalationRows(jsonStr) {
+            clearEscalationRows();
+            if (!jsonStr) {
+                addEscalationRow();
+                return;
+            }
+            try {
+                const levels = JSON.parse(jsonStr);
+                if (Array.isArray(levels) && levels.length > 0) {
+                    levels.forEach(l => addEscalationRow(l.hours, l.role));
+                } else {
+                    addEscalationRow();
+                }
+            } catch (e) {
+                console.warn('Could not parse existing escalation levels, starting fresh:', jsonStr);
+                addEscalationRow();
+            }
+        }
+
+        function buildEscalationJson() {
+            const rows = document.querySelectorAll('#escalationRows .escalation-row');
+            const levels = [];
+            rows.forEach((row, i) => {
+                const hours = row.querySelector('.esc-hours').value;
+                const role = row.querySelector('.esc-role').value;
+                if (hours) {
+                    levels.push({ level: i + 1, hours: parseInt(hours, 10), role: role });
+                }
+            });
+            document.getElementById('slaEscalationLevels').value = levels.length ? JSON.stringify(levels) : '';
+        }
+
+        // ============================================================
+        // Modal Functions
+        // ============================================================
+        function openCreateModal() {
+            document.getElementById('slaConfigId').value = '';
+            document.getElementById('slaModalTitle').textContent = 'Create SLA Configuration';
+            document.getElementById('slaForm').reset();
+            document.getElementById('slaForm').action = '/assetIQ-pro/admin/sla/save';
+            document.getElementById('slaIsDefault').checked = false;
+            document.getElementById('slaIsActive').checked = true;
+            clearEscalationRows();
+            addEscalationRow();
+
+            new bootstrap.Modal(document.getElementById('createSLAModal')).show();
+        }
+
+        function editSLA(button) {
+            const configId = button.getAttribute('data-configid');
+            document.getElementById('slaConfigId').value = configId;
+            document.getElementById('slaModalTitle').textContent = 'Edit SLA Configuration';
+            document.getElementById('slaConfigName').value = button.getAttribute('data-name') || '';
+            document.getElementById('slaDescription').value = button.getAttribute('data-description') || '';
+            document.getElementById('slaRequestType').value = button.getAttribute('data-requesttype') || '';
+            document.getElementById('slaHours').value = button.getAttribute('data-slahours') || '';
+            document.getElementById('slaReminderInterval').value = button.getAttribute('data-reminderinterval') || 24;
+            document.getElementById('slaIsDefault').checked = button.getAttribute('data-isdefault') === 'true';
+            document.getElementById('slaIsActive').checked = button.getAttribute('data-isactive') !== 'false';
+            loadEscalationRows(button.getAttribute('data-escalationlevels'));
+            document.getElementById('slaForm').action = '/assetIQ-pro/admin/sla/update/' + configId;
+
+            new bootstrap.Modal(document.getElementById('createSLAModal')).show();
+        }
+
+        function deleteSLA(button) {
+            const configId = button.getAttribute('data-configid');
+            const name = button.getAttribute('data-name') || 'this SLA';
+
+            if (confirm('Are you sure you want to delete SLA configuration "' + name + '"?')) {
+                fetch('/assetIQ-pro/admin/sla/delete/' + configId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('SLA configuration deleted successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 900);
+                    } else {
+                        showToast('Failed to delete SLA configuration.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error deleting SLA configuration.', 'error');
+                });
+            }
+        }
+
+        function viewTracking(trackingId) {
+            window.location.href = '/assetIQ-pro/admin/sla/tracking/' + trackingId;
+        }
+
+        // Reset modal when closed
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('createSLAModal');
+            if (modal) {
+                modal.addEventListener('hidden.bs.modal', function() {
+                    // Reset form but keep it clean
+                });
+            }
+        });
+
+        // Form submission handler with spinner
+        document.addEventListener('DOMContentLoaded', function() {
+            const slaForm = document.getElementById('slaForm');
+            if (slaForm) {
+                slaForm.addEventListener('submit', function(e) {
+                    buildEscalationJson();
+                    const btn = this.querySelector('button[type="submit"]');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Saving...';
+                    }
+                });
+            }
+        });
+    </script>
+</div>
+</body>
+</html>

@@ -45,6 +45,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByPasswordResetToken(String token);
 
     Optional<AppUser> findByStaffId(String staffId);
+
     boolean existsByStaffId(String staffId);
 
     List<AppUser> findByDepartmentEntity_DepartmentId(Integer departmentId);
@@ -52,4 +53,12 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     long countByBlockedTrue();
 
     long countByMustChangePasswordTrue();
+
+    // ✅ FIXED: Use @Query with explicit JPQL path
+    @Query("SELECT u FROM AppUser u WHERE u.employee.employeeId = :employeeId")
+    Optional<AppUser> findByEmployeeId(@Param("employeeId") Long employeeId);
+
+    // ✅ Alternative: Use native query if the JPQL doesn't work
+    @Query(value = "SELECT * FROM app_users WHERE employee_id = :employeeId", nativeQuery = true)
+    Optional<AppUser> findByEmployeeIdNative(@Param("employeeId") Long employeeId);
 }

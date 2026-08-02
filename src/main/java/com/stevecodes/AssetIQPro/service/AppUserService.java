@@ -686,6 +686,10 @@ public class AppUserService {
         return userRepository.countByMustChangePasswordTrue();
     }
 
+    public Optional<AppUser> getUserByEmployeeId(Long employeeId) {
+        log.info("Getting user by employee ID: {}", employeeId);
+        return userRepository.findByEmployeeId(employeeId);
+    }
     @Transactional
     public void toggleUserStatus(Long userId) {
         log.info("Toggling user status: {}", userId);

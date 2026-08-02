@@ -763,6 +763,12 @@
                     <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN')">
                         <a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a>
                     </li>
+                    <!-- SLA Management - requires MANAGE_CONFIG or ADMIN -->
+                    <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN', 'SUPER_ADMIN')">
+                        <a class="dropdown-item" th:classappend="${currentPage == 'sla-config'} ? 'active' : ''" href="/assetIQ-pro/admin/sla">
+                            <i class="fas fa-clock"></i> SLA Management
+                        </a>
+                    </li>
                     <!-- Audit - requires VIEW_AUDIT -->
                     <li sec:authorize="hasAnyAuthority('VIEW_AUDIT', 'ADMIN')">
                         <a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
