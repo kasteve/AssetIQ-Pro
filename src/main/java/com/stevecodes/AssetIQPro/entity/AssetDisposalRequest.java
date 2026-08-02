@@ -19,7 +19,6 @@ public class AssetDisposalRequest {
     @Column(name = "disposal_request_id")
     private Long disposalRequestId;
 
-    // ✅ FIXED: Use Integer to match Asset's assetId
     @Column(name = "asset_id", nullable = false)
     private Integer assetId;
 
@@ -63,6 +62,10 @@ public class AssetDisposalRequest {
     @Column(name = "approval_comment")
     private String approvalComment;
 
+    // ✅ ADDED: Missing field for approval reference
+    @Column(name = "approval_reference")
+    private String approvalReference;
+
     @Column(name = "completed_by")
     private Long completedBy;
 
@@ -100,7 +103,22 @@ public class AssetDisposalRequest {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // ============================================
+    // Helper Methods
+    // ============================================
+
+    public void setApprovalReference(String approvalReference) {
+        this.approvalReference = approvalReference;
+    }
+
+    public String getApprovalReference() {
+        return approvalReference;
+    }
+
+    // ============================================
     // Enums
+    // ============================================
+
     public enum DisposalStatus {
         PENDING, APPROVED, REJECTED, IN_PROGRESS, COMPLETED
     }
@@ -112,6 +130,10 @@ public class AssetDisposalRequest {
     public enum DisposalMethod {
         PHYSICAL_DESTRUCTION, DEGAUSSING, OVERWRITE, SHREDDED, RECYCLED, INCINERATION
     }
+
+    // ============================================
+    // Display Helpers
+    // ============================================
 
     public String getStatusDisplay() {
         if (status == null) return "";
@@ -134,6 +156,39 @@ public class AssetDisposalRequest {
             case "IN_PROGRESS": return "primary";
             case "COMPLETED": return "success";
             default: return "secondary";
+        }
+    }
+
+    public String getPriorityDisplay() {
+        if (priority == null) return "Normal";
+        switch (priority.toUpperCase()) {
+            case "URGENT": return "🔴 Urgent";
+            case "HIGH": return "🟠 High";
+            case "NORMAL": return "🟢 Normal";
+            default: return priority;
+        }
+    }
+
+    public String getPriorityColor() {
+        if (priority == null) return "secondary";
+        switch (priority.toUpperCase()) {
+            case "URGENT": return "danger";
+            case "HIGH": return "warning";
+            case "NORMAL": return "success";
+            default: return "secondary";
+        }
+    }
+
+    public String getDisposalMethodDisplay() {
+        if (disposalMethod == null) return "";
+        switch (disposalMethod.toUpperCase()) {
+            case "PHYSICAL_DESTRUCTION": return "Physical Destruction";
+            case "DEGAUSSING": return "Degaussing";
+            case "OVERWRITE": return "Overwrite";
+            case "SHREDDED": return "Shredded";
+            case "RECYCLED": return "Recycled";
+            case "INCINERATION": return "Incineration";
+            default: return disposalMethod;
         }
     }
 }

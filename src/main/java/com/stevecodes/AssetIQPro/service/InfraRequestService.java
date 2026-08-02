@@ -39,6 +39,7 @@ public class InfraRequestService {
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
     private final BaseUrlService baseUrlService;
+    private final SLAService slaService;  // ✅ ADDED
 
     private static final String UPLOAD_DIR = "uploads/infra/quotations/";
     private static final String REPORT_DIR = "uploads/infra/reports/";
@@ -191,6 +192,14 @@ public class InfraRequestService {
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
+
+        // ✅ START SLA TRACKING FOR INFRA REQUEST
+        try {
+            slaService.startSLATracking(saved.getRequestId(), "INFRA_REQUEST", requesterId);
+            log.info("SLA tracking started for infra request: {}", saved.getRequestId());
+        } catch (Exception e) {
+            log.error("Failed to start SLA tracking for infra request: {}", e.getMessage());
+        }
 
         // Notify line manager
         try {
@@ -504,6 +513,14 @@ public class InfraRequestService {
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
 
+        // ✅ Complete SLA tracking
+        try {
+            slaService.completeSLATracking(requestId, "INFRA_REQUEST");
+            log.info("SLA tracking completed for infra request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to complete SLA tracking for infra request: {}", e.getMessage());
+        }
+
         // Generate PDF with signature
         try {
             byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
@@ -529,6 +546,14 @@ public class InfraRequestService {
 
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
+
+        // ✅ Complete SLA tracking
+        try {
+            slaService.completeSLATracking(requestId, "INFRA_REQUEST");
+            log.info("SLA tracking completed for infra request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to complete SLA tracking for infra request: {}", e.getMessage());
+        }
 
         // Generate PDF on completion
         try {
@@ -558,7 +583,6 @@ public class InfraRequestService {
 
         return result;
     }
-
     @Transactional
     public InfraRequestDTO acknowledgeReceipt(Long requestId, Long acknowledgedBy) {
         log.info("User {} acknowledging receipt for request: {}", acknowledgedBy, requestId);

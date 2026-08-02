@@ -25,12 +25,13 @@ public class ResourceRequestService {
 
     private final ResourceRequestRepository resourceRequestRepository;
     private final StockItemRepository stockItemRepository;
-    private final StockService stockService;  // ✅ ADDED for low stock alerts
+    private final StockService stockService;
     private final EmailService emailService;
     private final AuditService auditService;
     private final AppUserService appUserService;
     private final PdfGenerationService pdfGenerationService;
     private final BaseUrlService baseUrlService;
+    private final SLAService slaService;  // ✅ ADDED
 
     private static final String REPORT_DIR = "uploads/resources/reports/";
 
@@ -135,7 +136,6 @@ public class ResourceRequestService {
         request.setRequestTime(LocalDateTime.now());
         request.setStatus("PENDING");
 
-        // ✅ Set stock item link if provided
         if (dto.getStockItemId() != null) {
             request.setStockItemId(dto.getStockItemId());
             StockItem stockItem = stockItemRepository.findById(dto.getStockItemId()).orElse(null);
@@ -146,6 +146,14 @@ public class ResourceRequestService {
         }
 
         ResourceRequest saved = resourceRequestRepository.save(request);
+
+        // ✅ START SLA TRACKING FOR RESOURCE REQUEST
+        try {
+            slaService.startSLATracking(saved.getRequestId(), "RESOURCE_REQUEST", dto.getUserId());
+            log.info("SLA tracking started for resource request: {}", saved.getRequestId());
+        } catch (Exception e) {
+            log.error("Failed to start SLA tracking for resource request: {}", e.getMessage());
+        }
 
         String stockInfo = request.getStockItemName() != null ?
                 "\nStock Item: " + request.getStockItemName() + "\n" : "";
@@ -204,7 +212,6 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request is not pending approval. Current status: " + request.getStatus());
         }
 
-        // ✅ Check stock availability before accepting
         if (request.getStockItemId() != null && request.getQuantity() != null && request.getQuantity() > 0) {
             StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
             if (stockItem != null) {
@@ -272,9 +279,6 @@ public class ResourceRequestService {
         return convertToDTO(saved);
     }
 
-    // ============================================
-    // ✅ COMPLETE REQUEST - STOCK IS DEDUCTED HERE
-    // ============================================
     @Transactional
     public ResourceRequestDTO completeResourceRequest(Long requestId, String deliveryNotes) {
         log.info("Admin completing resource request: {}", requestId);
@@ -284,13 +288,10 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request must be ACCEPTED to complete. Current status: " + request.getStatus());
         }
 
-        // ============================================
-        // ✅ DEDUCT STOCK ON COMPLETION
-        // ============================================
+        // Deduct stock
         if (request.getStockItemId() != null && request.getQuantity() != null && request.getQuantity() > 0) {
             StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
             if (stockItem != null) {
-                // Double-check stock again before deducting
                 if (stockItem.getQuantity() < request.getQuantity()) {
                     throw new IllegalStateException(
                             "Insufficient stock to complete request. " +
@@ -299,18 +300,16 @@ public class ResourceRequestService {
                     );
                 }
 
-                // ✅ Deduct the stock
                 int newQuantity = stockItem.getQuantity() - request.getQuantity();
                 stockItem.setQuantity(newQuantity);
                 stockItem.setLastUpdated(LocalDateTime.now());
 
-                // Reset alert flag if stock is now above threshold
                 if (newQuantity > stockItem.getLowStockThreshold()) {
                     stockItem.setAlertSent(false);
                 }
 
                 stockItemRepository.save(stockItem);
-                log.info("✅ Stock deducted: {} - {} (new quantity: {})",
+                log.info("Stock deducted: {} - {} (new quantity: {})",
                         stockItem.getName(), request.getQuantity(), newQuantity);
 
                 auditService.logAction("STOCK_DEDUCTED_RESOURCE_REQUEST",
@@ -319,23 +318,25 @@ public class ResourceRequestService {
                                 " (new quantity: " + newQuantity + ")",
                         request.getUserId());
 
-                // ✅ Send low stock alert if needed
                 if (newQuantity <= stockItem.getLowStockThreshold()) {
                     stockService.checkAndSendLowStockAlert(stockItem);
                 }
             } else {
                 log.warn("Stock item not found for ID: {}, skipping stock deduction", request.getStockItemId());
             }
-        } else {
-            log.info("No stock item linked to request {}, skipping stock deduction", requestId);
         }
 
-        // ============================================
-        // Complete the request
-        // ============================================
         request.setStatus("COMPLETED");
         request.setCompletedAt(LocalDateTime.now());
         request.setDeliveryNotes(deliveryNotes);
+
+        // ✅ Complete SLA tracking
+        try {
+            slaService.completeSLATracking(requestId, "RESOURCE_REQUEST");
+            log.info("SLA tracking completed for resource request: {}", requestId);
+        } catch (Exception e) {
+            log.error("Failed to complete SLA tracking for resource request: {}", e.getMessage());
+        }
 
         String token = UUID.randomUUID().toString();
         request.setSigningToken(token);

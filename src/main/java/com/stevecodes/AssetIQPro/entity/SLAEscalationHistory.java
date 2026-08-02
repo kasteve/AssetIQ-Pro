@@ -23,8 +23,9 @@ public class SLAEscalationHistory {
     @Column(name = "request_type", nullable = false, length = 50)
     private String requestType;
 
-    @Column(name = "sla_rule_id", nullable = false)
-    private Integer slaRuleId;
+    // ✅ FIXED: Use sla_config_id instead of sla_rule_id
+    @Column(name = "sla_config_id", nullable = false)
+    private Integer slaConfigId;
 
     @Column(name = "escalation_level")
     private Integer escalationLevel = 1;
@@ -47,6 +48,9 @@ public class SLAEscalationHistory {
     @Column(name = "action_taken_at")
     private LocalDateTime actionTakenAt;
 
+    @Column(name = "reason")
+    private String reason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "escalated_to", insertable = false, updatable = false)
     private AppUser escalatedToUser;
@@ -56,9 +60,22 @@ public class SLAEscalationHistory {
     private AppUser escalatedByUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sla_rule_id", insertable = false, updatable = false)
-    private DisposalSLARule slaRule;
+    @JoinColumn(name = "sla_config_id", insertable = false, updatable = false)
+    private SLAConfiguration slaConfig;
 
-    public void setReason(String s) {
+    // ✅ Helper method to set slaConfigId from SLAConfiguration
+    public void setSlaConfig(SLAConfiguration config) {
+        if (config != null) {
+            this.slaConfigId = config.getConfigId();
+        }
+    }
+
+    public void setSlaRuleId(Integer slaRuleId) {
+        // This is deprecated - use setSlaConfigId instead
+        this.slaConfigId = slaRuleId;
+    }
+
+    public Integer getSlaRuleId() {
+        return this.slaConfigId;
     }
 }

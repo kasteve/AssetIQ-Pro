@@ -38,6 +38,7 @@ public class DriverService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final BaseUrlService baseUrlService;
+    private final SLAService slaService;
 
     private static final int MAX_DAYS = 7;
 
@@ -90,79 +91,131 @@ public class DriverService {
     @Transactional
     public DriverRequest createDriverRequest(Long userId, String destination, Long driverId,
                                              String reason, String requestedBy, LocalDateTime requestTime) {
-        log.info("Creating driver request for user: {}, request time: {}", userId, requestTime);
+        log.info("=== CREATE DRIVER REQUEST START ===");
+        log.info("📝 Creating driver request for user: {}, request time: {}", userId, requestTime);
+        log.info("📝 Destination: {}, Driver: {}, Reason: {}", destination, driverId, reason);
 
-        if (driverId != null && driverId == -1) {
-            return createCabRequest(userId, destination, reason, requestedBy, requestTime);
-        }
-
-        if (driverId != null) {
-            Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
-            if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
-                log.warn("Driver {} is currently busy, but booking is still allowed", driverId);
+        try {
+            if (driverId != null && driverId == -1) {
+                log.info("📝 This is a CAB request (driverId = -1)");
+                return createCabRequest(userId, destination, reason, requestedBy, requestTime);
             }
+
+            if (driverId != null) {
+                Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
+                if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
+                    log.warn("⚠️ Driver {} is currently busy, but booking is still allowed", driverId);
+                }
+            }
+
+            // Validate request time is not in the past
+            if (requestTime.isBefore(LocalDateTime.now())) {
+                log.error("❌ Request time is in the past: {}", requestTime);
+                throw new IllegalStateException("Cannot book a driver for a past time. Please select a future time.");
+            }
+
+            // Validate request time is not more than 5 days in advance
+            LocalDateTime maxDate = LocalDateTime.now().plusDays(5);
+            if (requestTime.isAfter(maxDate)) {
+                log.error("❌ Request time is too far in the future: {}", requestTime);
+                throw new IllegalStateException("Bookings are only allowed within 5 days from today. Please select a date within the next 5 days.");
+            }
+            log.info("✅ Time validation passed");
+
+            DriverRequest request = new DriverRequest();
+            request.setUserId(userId);
+            request.setDestination(destination);
+            request.setDriverId(driverId);
+            request.setReason(reason);
+            request.setRequestTime(requestTime);
+            request.setRequestDate(requestTime.toLocalDate());
+            request.setRequestTimeOnly(requestTime.toLocalTime());
+            request.setPickupDatetime(requestTime);
+            request.setStatus("PENDING");
+            request.setRequestedBy(requestedBy);
+
+            log.info("💾 Saving driver request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Driver request saved with ID: {}", saved.getRequestId());
+
+            // ✅ START SLA TRACKING
+            log.info("📊 Starting SLA tracking for driver request: {}", saved.getRequestId());
+            try {
+                slaService.startSLATracking(saved.getRequestId(), "DRIVER_REQUEST", userId);
+                log.info("✅ SLA tracking started for driver request: {}", saved.getRequestId());
+            } catch (Exception e) {
+                log.error("❌ Failed to start SLA tracking for driver request: {}", e.getMessage(), e);
+                // Don't re-throw - the request is already saved
+            }
+
+            // Notify drivers
+            if (driverId != null) {
+                log.info("📧 Notifying specific driver: {}", driverId);
+                notifyDriver(driverId, saved);
+            } else {
+                log.info("📧 Notifying all available drivers");
+                notifyAvailableDrivers(saved);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_REQUEST_CREATED",
+                        "Driver request created by user: " + userId + " to: " + destination + " at: " + requestTime,
+                        userId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== CREATE DRIVER REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error creating driver request: {}", e.getMessage(), e);
+            throw e;
         }
-
-        // Validate request time is not in the past
-        if (requestTime.isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot book a driver for a past time. Please select a future time.");
-        }
-
-        // Validate request time is not more than 5 days in advance
-        LocalDateTime maxDate = LocalDateTime.now().plusDays(5);
-        if (requestTime.isAfter(maxDate)) {
-            throw new IllegalStateException("Bookings are only allowed within 5 days from today. Please select a date within the next 5 days.");
-        }
-
-        DriverRequest request = new DriverRequest();
-        request.setUserId(userId);
-        request.setDestination(destination);
-        request.setDriverId(driverId);
-        request.setReason(reason);
-        request.setRequestTime(requestTime);
-        request.setRequestDate(requestTime.toLocalDate());
-        request.setRequestTimeOnly(requestTime.toLocalTime());
-        request.setPickupDatetime(requestTime);
-        request.setStatus("PENDING");
-        request.setRequestedBy(requestedBy);
-
-        DriverRequest saved = driverRequestRepository.save(request);
-
-        if (driverId != null) {
-            notifyDriver(driverId, saved);
-        } else {
-            notifyAvailableDrivers(saved);
-        }
-
-        auditService.logAction("DRIVER_REQUEST_CREATED",
-                "Driver request created by user: " + userId + " to: " + destination + " at: " + requestTime,
-                userId);
-
-        return saved;
     }
 
     @Transactional
     public DriverRequest createCabRequest(Long userId, String destination, String reason, String requestedBy, LocalDateTime requestTime) {
-        log.info("Creating CAB request for user: {}", userId);
+        log.info("=== CREATE CAB REQUEST START ===");
+        log.info("📝 Creating CAB request for user: {}", userId);
 
-        DriverRequest request = new DriverRequest();
-        request.setUserId(userId);
-        request.setDestination(destination);
-        request.setDriverId(-1L);
-        request.setReason(reason);
-        request.setRequestTime(requestTime != null ? requestTime : LocalDateTime.now());
-        request.setStatus("PENDING_ADMIN");
-        request.setRequestedBy(requestedBy);
+        try {
+            DriverRequest request = new DriverRequest();
+            request.setUserId(userId);
+            request.setDestination(destination);
+            request.setDriverId(-1L);
+            request.setReason(reason);
+            request.setRequestTime(requestTime != null ? requestTime : LocalDateTime.now());
+            request.setStatus("PENDING_ADMIN");
+            request.setRequestedBy(requestedBy);
 
-        DriverRequest saved = driverRequestRepository.save(request);
+            log.info("💾 Saving CAB request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ CAB request saved with ID: {}", saved.getRequestId());
 
-        notifyAdminOfCabRequest(saved);
+            // Notify admins
+            log.info("📧 Notifying admins about CAB request");
+            notifyAdminOfCabRequest(saved);
 
-        auditService.logAction("CAB_REQUEST_CREATED",
-                "Cab request created by user: " + userId + " to: " + destination,
-                userId);
+            // Log audit
+            try {
+                auditService.logAction("CAB_REQUEST_CREATED",
+                        "Cab request created by user: " + userId + " to: " + destination,
+                        userId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
 
-        return saved;
+            log.info("=== CREATE CAB REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error creating CAB request: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     // ============================================
@@ -175,34 +228,62 @@ public class DriverService {
 
     @Transactional
     public DriverRequest assignCabRequest(Long requestId, String notes) {
-        log.info("Admin assigning cab request: {}", requestId);
+        log.info("=== ASSIGN CAB REQUEST START ===");
+        log.info("📝 Admin assigning cab request: {}", requestId);
 
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Cab request not found: " + requestId));
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Cab request not found: {}", requestId);
+                        return new RuntimeException("Cab request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
 
-        if (!"PENDING_ADMIN".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is not pending admin approval");
+            if (!"PENDING_ADMIN".equals(request.getStatus())) {
+                log.error("❌ Invalid status: {}", request.getStatus());
+                throw new IllegalStateException("Request is not pending admin approval");
+            }
+
+            request.setStatus("ACCEPTED");
+            request.setDriverDecisionTime(LocalDateTime.now());
+            request.setDeclineReason(notes);
+
+            log.info("💾 Saving updated request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Cab request assigned");
+
+            // Send email
+            try {
+                emailService.sendSimpleEmail(
+                        getUserEmail(request.getUserId()),
+                        "Cab Request Processed",
+                        "Your cab request to " + request.getDestination() + " has been processed.\n\n" +
+                                "Your cab has been arranged and will arrive shortly.\n" +
+                                "Admin Notes: " + (notes != null ? notes : "N/A") + "\n\n" +
+                                "Thank you for using AssetIQ-Pro."
+                );
+                log.info("✅ Email sent to requester");
+            } catch (Exception e) {
+                log.error("❌ Failed to send email: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("CAB_REQUEST_ASSIGNED",
+                        "Cab request assigned: " + requestId,
+                        request.getUserId());
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== ASSIGN CAB REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error assigning cab request: {}", e.getMessage(), e);
+            throw e;
         }
-
-        request.setStatus("ACCEPTED");
-        request.setDriverDecisionTime(LocalDateTime.now());
-        request.setDeclineReason(notes);
-        DriverRequest saved = driverRequestRepository.save(request);
-
-        emailService.sendSimpleEmail(
-                getUserEmail(request.getUserId()),
-                "Cab Request Processed",
-                "Your cab request to " + request.getDestination() + " has been processed.\n\n" +
-                        "Your cab has been arranged and will arrive shortly.\n" +
-                        "Admin Notes: " + (notes != null ? notes : "N/A") + "\n\n" +
-                        "Thank you for using AssetIQ-Pro."
-        );
-
-        auditService.logAction("CAB_REQUEST_ASSIGNED",
-                "Cab request assigned: " + requestId,
-                request.getUserId());
-
-        return saved;
     }
 
     // ============================================
@@ -211,187 +292,292 @@ public class DriverService {
 
     @Transactional
     public DriverRequest acceptRequest(Long requestId, Long driverId) {
-        log.info("Driver {} accepting request: {}", driverId, requestId);
+        log.info("=== ACCEPT REQUEST START ===");
+        log.info("📝 Driver {} accepting request: {}", driverId, requestId);
 
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Driver request not found: {}", requestId);
+                        return new RuntimeException("Driver request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
 
-        if (!"PENDING".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is no longer pending");
-        }
-
-        // Get request date and time
-        LocalDate requestDate = request.getRequestDate() != null ? request.getRequestDate() : request.getRequestTime().toLocalDate();
-        LocalTime requestTime = request.getRequestTimeOnly() != null ? request.getRequestTimeOnly() : request.getRequestTime().toLocalTime();
-
-        // Check for conflicting trips
-        List<DriverRequest> existingTrips = driverRequestRepository.findByDriverIdAndStatusIn(
-                driverId, List.of("ACCEPTED", "PENDING")
-        );
-
-        boolean hasConflict = existingTrips.stream().anyMatch(existing -> {
-            if (existing.getRequestId().equals(requestId)) {
-                return false;
+            if (!"PENDING".equals(request.getStatus())) {
+                log.error("❌ Invalid status: {}", request.getStatus());
+                throw new IllegalStateException("Request is no longer pending");
             }
 
-            LocalDate existingDate = existing.getRequestDate() != null ? existing.getRequestDate() : existing.getRequestTime().toLocalDate();
-            LocalTime existingTime = existing.getRequestTimeOnly() != null ? existing.getRequestTimeOnly() : existing.getRequestTime().toLocalTime();
+            // Get request date and time
+            LocalDate requestDate = request.getRequestDate() != null ? request.getRequestDate() : request.getRequestTime().toLocalDate();
+            LocalTime requestTime = request.getRequestTimeOnly() != null ? request.getRequestTimeOnly() : request.getRequestTime().toLocalTime();
 
-            if (!requestDate.equals(existingDate)) {
-                return false;
+            // Check for conflicting trips
+            List<DriverRequest> existingTrips = driverRequestRepository.findByDriverIdAndStatusIn(
+                    driverId, List.of("ACCEPTED", "PENDING")
+            );
+
+            boolean hasConflict = existingTrips.stream().anyMatch(existing -> {
+                if (existing.getRequestId().equals(requestId)) {
+                    return false;
+                }
+
+                LocalDate existingDate = existing.getRequestDate() != null ? existing.getRequestDate() : existing.getRequestTime().toLocalDate();
+                LocalTime existingTime = existing.getRequestTimeOnly() != null ? existing.getRequestTimeOnly() : existing.getRequestTime().toLocalTime();
+
+                if (!requestDate.equals(existingDate)) {
+                    return false;
+                }
+
+                LocalTime existingStart = existingTime;
+                LocalTime existingEnd = existingTime.plusHours(2);
+                LocalTime newStart = requestTime;
+                LocalTime newEnd = requestTime.plusHours(2);
+
+                return !(newEnd.isBefore(existingStart) || newStart.isAfter(existingEnd));
+            });
+
+            if (hasConflict) {
+                log.warn("⚠️ Conflict detected for driver {} at time {}", driverId, requestTime);
+                throw new IllegalStateException("Driver already has a booking at this time. Please choose a different time.");
+            }
+            log.info("✅ No conflicts found");
+
+            request.setStatus("ACCEPTED");
+            request.setDriverId(driverId);
+            request.setAcceptedAt(LocalDateTime.now());
+            request.setDriverDecisionTime(LocalDateTime.now());
+
+            log.info("💾 Saving accepted request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Request accepted");
+
+            // Only update availability to BUSY if the trip is for today
+            if (requestDate.equals(LocalDate.now())) {
+                updateDriverAvailability(driverId, "BUSY");
+                log.info("📝 Driver availability set to BUSY for today");
             }
 
-            LocalTime existingStart = existingTime;
-            LocalTime existingEnd = existingTime.plusHours(2);
-            LocalTime newStart = requestTime;
-            LocalTime newEnd = requestTime.plusHours(2);
+            String driverName = getDriverName(driverId);
 
-            return !(newEnd.isBefore(existingStart) || newStart.isAfter(existingEnd));
-        });
+            // Send email
+            try {
+                emailService.sendSimpleEmail(
+                        getUserEmail(request.getUserId()),
+                        "Driver Request Accepted",
+                        "Your driver request has been accepted by " + driverName + ".\n\n" +
+                                "Destination: " + request.getDestination() + "\n" +
+                                "Driver: " + driverName + "\n" +
+                                "Date: " + requestDate + "\n" +
+                                "Time: " + requestTime + "\n\n" +
+                                "Please be ready at the pickup location."
+                );
+                log.info("✅ Email sent to requester");
+            } catch (Exception e) {
+                log.error("❌ Failed to send email: {}", e.getMessage(), e);
+            }
 
-        if (hasConflict) {
-            throw new IllegalStateException("Driver already has a booking at this time. Please choose a different time.");
+            // Create notification
+            try {
+                createNotification(
+                        request.getUserId(),
+                        "DRIVER_REQUEST_ACCEPTED",
+                        "Driver Request Accepted",
+                        "Your driver request has been accepted by " + driverName + " for " + requestDate + " at " + requestTime,
+                        baseUrlService.buildUrl("/bookings/bookings-dashboard")
+                );
+                log.info("✅ Notification created");
+            } catch (Exception e) {
+                log.error("❌ Failed to create notification: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_REQUEST_ACCEPTED",
+                        "Driver request accepted: " + requestId + " by driver: " + driverId + " for " + requestDate,
+                        driverId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== ACCEPT REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error accepting request: {}", e.getMessage(), e);
+            throw e;
         }
-
-        request.setStatus("ACCEPTED");
-        request.setDriverId(driverId);
-        request.setAcceptedAt(LocalDateTime.now());
-        request.setDriverDecisionTime(LocalDateTime.now());
-
-        DriverRequest saved = driverRequestRepository.save(request);
-
-        // Only update availability to BUSY if the trip is for today
-        if (requestDate.equals(LocalDate.now())) {
-            updateDriverAvailability(driverId, "BUSY");
-        }
-
-        String driverName = getDriverName(driverId);
-
-        emailService.sendSimpleEmail(
-                getUserEmail(request.getUserId()),
-                "Driver Request Accepted",
-                "Your driver request has been accepted by " + driverName + ".\n\n" +
-                        "Destination: " + request.getDestination() + "\n" +
-                        "Driver: " + driverName + "\n" +
-                        "Date: " + requestDate + "\n" +
-                        "Time: " + requestTime + "\n\n" +
-                        "Please be ready at the pickup location."
-        );
-
-        createNotification(
-                request.getUserId(),
-                "DRIVER_REQUEST_ACCEPTED",
-                "Driver Request Accepted",
-                "Your driver request has been accepted by " + driverName + " for " + requestDate + " at " + requestTime,
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")
-        );
-
-        auditService.logAction("DRIVER_REQUEST_ACCEPTED",
-                "Driver request accepted: " + requestId + " by driver: " + driverId + " for " + requestDate,
-                driverId);
-
-        return saved;
     }
 
     @Transactional
     public DriverRequest declineRequest(Long requestId, Long driverId, String reason) {
-        log.info("Driver {} declining request: {} - Reason: {}", driverId, requestId, reason);
+        log.info("=== DECLINE REQUEST START ===");
+        log.info("📝 Driver {} declining request: {} - Reason: {}", driverId, requestId, reason);
 
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Driver request not found: {}", requestId);
+                        return new RuntimeException("Driver request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
 
-        if (!"PENDING".equals(request.getStatus())) {
-            throw new IllegalStateException("Request is no longer pending");
+            if (!"PENDING".equals(request.getStatus())) {
+                log.error("❌ Invalid status: {}", request.getStatus());
+                throw new IllegalStateException("Request is no longer pending");
+            }
+
+            request.setStatus("DECLINED");
+            request.setDeclinedReason(reason);
+            request.setDriverDecisionTime(LocalDateTime.now());
+            request.setDriverId(driverId);
+
+            log.info("💾 Saving declined request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Request declined");
+
+            // Send email
+            try {
+                emailService.sendSimpleEmail(
+                        getUserEmail(request.getUserId()),
+                        "Driver Request Declined",
+                        "Your driver request has been declined.\n\n" +
+                                "Driver: " + getDriverName(driverId) + "\n" +
+                                "Reason: " + reason + "\n\n" +
+                                "Please try requesting another driver or select Cab."
+                );
+                log.info("✅ Email sent to requester");
+            } catch (Exception e) {
+                log.error("❌ Failed to send email: {}", e.getMessage(), e);
+            }
+
+            // Create notification
+            try {
+                createNotification(
+                        request.getUserId(),
+                        "DRIVER_REQUEST_DECLINED",
+                        "Driver Request Declined",
+                        "Your driver request has been declined. Reason: " + reason,
+                        baseUrlService.buildUrl("/bookings/bookings-dashboard")
+                );
+                log.info("✅ Notification created");
+            } catch (Exception e) {
+                log.error("❌ Failed to create notification: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_REQUEST_DECLINED",
+                        "Driver request declined: " + requestId + " by driver: " + driverId,
+                        driverId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== DECLINE REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error declining request: {}", e.getMessage(), e);
+            throw e;
         }
-
-        request.setStatus("DECLINED");
-        request.setDeclinedReason(reason);
-        request.setDriverDecisionTime(LocalDateTime.now());
-        request.setDriverId(driverId);
-
-        DriverRequest saved = driverRequestRepository.save(request);
-
-        emailService.sendSimpleEmail(
-                getUserEmail(request.getUserId()),
-                "Driver Request Declined",
-                "Your driver request has been declined.\n\n" +
-                        "Driver: " + getDriverName(driverId) + "\n" +
-                        "Reason: " + reason + "\n\n" +
-                        "Please try requesting another driver or select Cab."
-        );
-
-        createNotification(
-                request.getUserId(),
-                "DRIVER_REQUEST_DECLINED",
-                "Driver Request Declined",
-                "Your driver request has been declined. Reason: " + reason,
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")
-        );
-
-        auditService.logAction("DRIVER_REQUEST_DECLINED",
-                "Driver request declined: " + requestId + " by driver: " + driverId,
-                driverId);
-
-        return saved;
     }
 
     @Transactional
     public DriverRequest completeTrip(Long requestId, Long driverId) {
-        log.info("===== COMPLETE TRIP START =====");
-        log.info("Driver {} completing trip for request: {}", driverId, requestId);
+        log.info("=== COMPLETE TRIP START ===");
+        log.info("📝 Driver {} completing trip for request: {}", driverId, requestId);
 
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> {
-                    log.error("Driver request not found: {}", requestId);
-                    return new RuntimeException("Driver request not found: " + requestId);
-                });
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Driver request not found: {}", requestId);
+                        return new RuntimeException("Driver request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
 
-        log.info("Current request status: {}", request.getStatus());
+            if (!"ACCEPTED".equals(request.getStatus())) {
+                log.error("❌ Invalid status for completion: {}", request.getStatus());
+                throw new IllegalStateException("Request must be accepted to complete. Current: " + request.getStatus());
+            }
 
-        if (!"ACCEPTED".equals(request.getStatus())) {
-            log.error("Invalid status for completion: {}", request.getStatus());
-            throw new IllegalStateException("Request must be accepted to complete. Current: " + request.getStatus());
+            request.setStatus("COMPLETED");
+            request.setResponseTime(LocalDateTime.now());
+
+            log.info("💾 Saving completed request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Request completed");
+
+            // Update driver availability
+            updateDriverAvailability(driverId, "AVAILABLE");
+            log.info("📝 Driver availability set to AVAILABLE");
+
+            // ✅ Complete SLA tracking
+            log.info("📊 Completing SLA tracking for driver request: {}", requestId);
+            try {
+                slaService.completeSLATracking(requestId, "DRIVER_REQUEST");
+                log.info("✅ SLA tracking completed for driver request: {}", requestId);
+            } catch (Exception e) {
+                log.error("❌ Failed to complete SLA tracking for driver request: {}", e.getMessage(), e);
+            }
+
+            // Generate rating token
+            String ratingToken = UUID.randomUUID().toString();
+            request.setNotes(ratingToken);
+            driverRequestRepository.save(request);
+
+            String requesterEmail = getUserEmail(request.getUserId());
+            String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s?token=%s", requestId, ratingToken);
+
+            // Send rating email
+            try {
+                log.info("📧 Sending rating email to: {}", requesterEmail);
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Trip Completed - Please Rate Your Driver",
+                        "Your trip to " + request.getDestination() + " has been completed.\n\n" +
+                                "Please rate your driver using the link below:\n" +
+                                ratingLink + "\n\n" +
+                                "Thank you for using AssetIQ-Pro."
+                );
+                log.info("✅ Rating email sent");
+            } catch (Exception e) {
+                log.error("❌ Failed to send rating email: {}", e.getMessage(), e);
+            }
+
+            // Create notification
+            try {
+                createNotification(
+                        request.getUserId(),
+                        "TRIP_COMPLETED",
+                        "Trip Completed",
+                        "Your trip to " + request.getDestination() + " has been completed. Please rate your driver.",
+                        ratingLink
+                );
+                log.info("✅ Notification created");
+            } catch (Exception e) {
+                log.error("❌ Failed to create notification: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("TRIP_COMPLETED",
+                        "Trip completed for request: " + requestId + " by driver: " + driverId,
+                        driverId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== COMPLETE TRIP END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error completing trip: {}", e.getMessage(), e);
+            throw e;
         }
-
-        request.setStatus("COMPLETED");
-        request.setResponseTime(LocalDateTime.now());
-
-        DriverRequest saved = driverRequestRepository.save(request);
-        log.info("Request saved with status: {}", saved.getStatus());
-
-        updateDriverAvailability(driverId, "AVAILABLE");
-
-        String ratingToken = UUID.randomUUID().toString();
-        request.setNotes(ratingToken);
-        driverRequestRepository.save(request);
-
-        String requesterEmail = getUserEmail(request.getUserId());
-        String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s?token=%s", requestId, ratingToken);
-
-        log.info("Sending email to: {}", requesterEmail);
-        emailService.sendSimpleEmail(
-                requesterEmail,
-                "Trip Completed - Please Rate Your Driver",
-                "Your trip to " + request.getDestination() + " has been completed.\n\n" +
-                        "Please rate your driver using the link below:\n" +
-                        ratingLink + "\n\n" +
-                        "Thank you for using AssetIQ-Pro."
-        );
-
-        createNotification(
-                request.getUserId(),
-                "TRIP_COMPLETED",
-                "Trip Completed",
-                "Your trip to " + request.getDestination() + " has been completed. Please rate your driver.",
-                ratingLink
-        );
-
-        auditService.logAction("TRIP_COMPLETED",
-                "Trip completed for request: " + requestId + " by driver: " + driverId,
-                driverId);
-
-        log.info("===== COMPLETE TRIP END =====");
-        return saved;
     }
 
     // ============================================
@@ -400,33 +586,56 @@ public class DriverService {
 
     @Transactional
     public void rateDriver(Long requestId, Long userId, int rating, String feedback) {
-        log.info("User {} rating driver for request: {} - Rating: {}", userId, requestId, rating);
+        log.info("=== RATE DRIVER START ===");
+        log.info("📝 User {} rating driver for request: {} - Rating: {}", userId, requestId, rating);
 
-        if (ratingRepository.findByRequestId(requestId).isPresent()) {
-            throw new IllegalStateException("You have already rated this driver.");
+        try {
+            if (ratingRepository.findByRequestId(requestId).isPresent()) {
+                log.warn("⚠️ User has already rated this request: {}", requestId);
+                throw new IllegalStateException("You have already rated this driver.");
+            }
+
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Driver request not found: {}", requestId);
+                        return new RuntimeException("Driver request not found: " + requestId);
+                    });
+
+            if (request.getUserId() == null || !request.getUserId().equals(userId)) {
+                log.error("❌ User {} not authorized to rate this request", userId);
+                throw new IllegalStateException("You are not authorized to rate this trip.");
+            }
+
+            DriverRating driverRating = new DriverRating();
+            driverRating.setRequestId(requestId);
+            driverRating.setDriverId(request.getDriverId());
+            driverRating.setUserId(userId);
+            driverRating.setRating(rating);
+            driverRating.setFeedback(feedback);
+
+            log.info("💾 Saving driver rating");
+            ratingRepository.save(driverRating);
+            log.info("✅ Rating saved");
+
+            request.setNotes("Rating: " + rating + "/5 | Feedback: " + (feedback != null ? feedback : "N/A"));
+            driverRequestRepository.save(request);
+
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_RATED",
+                        "Driver rated for request: " + requestId + " - Rating: " + rating + "/5",
+                        userId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== RATE DRIVER END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Error rating driver: {}", e.getMessage(), e);
+            throw e;
         }
-
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
-
-        if (request.getUserId() == null || !request.getUserId().equals(userId)) {
-            throw new IllegalStateException("You are not authorized to rate this trip.");
-        }
-
-        DriverRating driverRating = new DriverRating();
-        driverRating.setRequestId(requestId);
-        driverRating.setDriverId(request.getDriverId());
-        driverRating.setUserId(userId);
-        driverRating.setRating(rating);
-        driverRating.setFeedback(feedback);
-        ratingRepository.save(driverRating);
-
-        request.setNotes("Rating: " + rating + "/5 | Feedback: " + (feedback != null ? feedback : "N/A"));
-        driverRequestRepository.save(request);
-
-        auditService.logAction("DRIVER_RATED",
-                "Driver rated for request: " + requestId + " - Rating: " + rating + "/5",
-                userId);
     }
 
     public boolean hasUserRated(Long requestId) {
@@ -447,21 +656,42 @@ public class DriverService {
 
     @Transactional
     public void recallRequest(Long requestId) {
-        log.info("Recalling driver request: {}", requestId);
+        log.info("=== RECALL REQUEST START ===");
+        log.info("📝 Recalling driver request: {}", requestId);
 
-        DriverRequest request = driverRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Driver request not found: " + requestId));
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Driver request not found: {}", requestId);
+                        return new RuntimeException("Driver request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
 
-        if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
-            throw new IllegalStateException("Cannot recall - request already processed");
+            if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
+                log.error("❌ Cannot recall - request already processed with status: {}", request.getStatus());
+                throw new IllegalStateException("Cannot recall - request already processed");
+            }
+
+            request.setStatus("RECALLED");
+            driverRequestRepository.save(request);
+            log.info("✅ Request recalled");
+
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_REQUEST_RECALLED",
+                        "Driver request recalled: " + requestId,
+                        request.getUserId());
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== RECALL REQUEST END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Error recalling request: {}", e.getMessage(), e);
+            throw e;
         }
-
-        request.setStatus("RECALLED");
-        driverRequestRepository.save(request);
-
-        auditService.logAction("DRIVER_REQUEST_RECALLED",
-                "Driver request recalled: " + requestId,
-                request.getUserId());
     }
 
     // ============================================
@@ -470,7 +700,7 @@ public class DriverService {
 
     @Transactional
     public void saveRequest(DriverRequest request) {
-        log.info("Saving driver request: {}", request.getRequestId());
+        log.debug("💾 Saving driver request: {}", request.getRequestId());
         driverRequestRepository.save(request);
     }
 
@@ -480,25 +710,40 @@ public class DriverService {
 
     @Transactional
     public DriverAvailability toggleDriverAvailability(Long driverId) {
-        log.info("Toggling availability for driver: {}", driverId);
+        log.info("=== TOGGLE DRIVER AVAILABILITY START ===");
+        log.info("📝 Toggling availability for driver: {}", driverId);
 
-        DriverAvailability availability = availabilityRepository.findByDriverId(driverId)
-                .orElse(new DriverAvailability());
+        try {
+            DriverAvailability availability = availabilityRepository.findByDriverId(driverId)
+                    .orElse(new DriverAvailability());
 
-        String newStatus = "AVAILABLE".equals(availability.getStatus()) ? "BUSY" : "AVAILABLE";
-        availability.setStatus(newStatus);
-        availability.setDriverId(driverId);
-        availability.setUserId(driverId);
-        availability.setStartTime(LocalDateTime.now());
-        availability.setEndTime(LocalDateTime.now().plusHours(8));
+            String newStatus = "AVAILABLE".equals(availability.getStatus()) ? "BUSY" : "AVAILABLE";
+            availability.setStatus(newStatus);
+            availability.setDriverId(driverId);
+            availability.setUserId(driverId);
+            availability.setStartTime(LocalDateTime.now());
+            availability.setEndTime(LocalDateTime.now().plusHours(8));
 
-        DriverAvailability saved = availabilityRepository.save(availability);
+            DriverAvailability saved = availabilityRepository.save(availability);
+            log.info("✅ Driver availability toggled to: {}", newStatus);
 
-        auditService.logAction("DRIVER_AVAILABILITY_TOGGLED",
-                "Driver availability toggled to: " + newStatus + " for driver: " + driverId,
-                driverId);
+            // Log audit
+            try {
+                auditService.logAction("DRIVER_AVAILABILITY_TOGGLED",
+                        "Driver availability toggled to: " + newStatus + " for driver: " + driverId,
+                        driverId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
 
-        return saved;
+            log.info("=== TOGGLE DRIVER AVAILABILITY END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error toggling driver availability: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     public Optional<DriverAvailability> getDriverAvailability(Long driverId) {
@@ -507,30 +752,36 @@ public class DriverService {
 
     @Transactional
     public void updateDriverAvailability(Long driverId, String status) {
-        log.info("Updating driver {} availability to: {}", driverId, status);
+        log.debug("📝 Updating driver {} availability to: {}", driverId, status);
 
-        DriverAvailability availability = availabilityRepository.findByDriverId(driverId)
-                .orElse(new DriverAvailability());
+        try {
+            DriverAvailability availability = availabilityRepository.findByDriverId(driverId)
+                    .orElse(new DriverAvailability());
 
-        availability.setDriverId(driverId);
-        availability.setUserId(driverId);
-        availability.setStatus(status);
-        availability.setStartTime(LocalDateTime.now());
-        availability.setEndTime(LocalDateTime.now().plusHours(8));
+            availability.setDriverId(driverId);
+            availability.setUserId(driverId);
+            availability.setStatus(status);
+            availability.setStartTime(LocalDateTime.now());
+            availability.setEndTime(LocalDateTime.now().plusHours(8));
 
-        availabilityRepository.save(availability);
+            availabilityRepository.save(availability);
+            log.debug("✅ Driver availability updated to: {}", status);
+
+        } catch (Exception e) {
+            log.error("❌ Error updating driver availability: {}", e.getMessage(), e);
+        }
     }
 
     public boolean isDriverAvailable(Long driverId, LocalDateTime requestTime) {
         Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driverId);
 
         if (availability.isEmpty()) {
-            log.info("No availability record for driver {}, considering them available", driverId);
+            log.debug("ℹ️ No availability record for driver {}, considering them available", driverId);
             return true;
         }
 
         if (!"AVAILABLE".equals(availability.get().getStatus())) {
-            log.info("Driver {} is not available. Status: {}", driverId, availability.get().getStatus());
+            log.debug("ℹ️ Driver {} is not available. Status: {}", driverId, availability.get().getStatus());
             return false;
         }
 
@@ -589,96 +840,139 @@ public class DriverService {
     }
 
     private void notifyAvailableDrivers(DriverRequest request) {
-        List<AppUser> drivers = userRepository.findByRole("DRIVER");
+        log.info("📧 Notifying available drivers about request: {}", request.getRequestId());
 
-        String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
+        try {
+            List<AppUser> drivers = userRepository.findByRole("DRIVER");
+            String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
 
-        for (AppUser driver : drivers) {
-            Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
-            if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
-                continue;
+            int notifiedCount = 0;
+            for (AppUser driver : drivers) {
+                Optional<DriverAvailability> availability = availabilityRepository.findByDriverId(driver.getUserId());
+                if (availability.isPresent() && !"AVAILABLE".equals(availability.get().getStatus())) {
+                    continue;
+                }
+
+                try {
+                    emailService.sendSimpleEmail(
+                            driver.getEmail(),
+                            "New Driver Request - Action Required",
+                            "A new driver request has been created.\n\n" +
+                                    "Requester: " + request.getRequestedBy() + "\n" +
+                                    "Destination: " + request.getDestination() + "\n" +
+                                    "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
+                                    "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
+                                    "Please login to accept or decline: " + dashboardLink
+                    );
+                    notifiedCount++;
+                } catch (Exception e) {
+                    log.error("❌ Failed to send email to driver {}: {}", driver.getUserId(), e.getMessage());
+                }
+
+                try {
+                    createNotification(
+                            driver.getUserId(),
+                            "DRIVER_REQUEST_NEW",
+                            "New Driver Request",
+                            "A new driver request has been created by " + request.getRequestedBy() +
+                                    " for " + request.getDestination(),
+                            "/bookings/driver-dashboard"
+                    );
+                } catch (Exception e) {
+                    log.error("❌ Failed to create notification for driver {}: {}", driver.getUserId(), e.getMessage());
+                }
             }
 
-            emailService.sendSimpleEmail(
-                    driver.getEmail(),
-                    "New Driver Request - Action Required",
-                    "A new driver request has been created.\n\n" +
-                            "Requester: " + request.getRequestedBy() + "\n" +
-                            "Destination: " + request.getDestination() + "\n" +
-                            "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                            "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                            "Please login to accept or decline: " + dashboardLink
-            );
+            log.info("✅ Notified {} available drivers", notifiedCount);
 
-            createNotification(
-                    driver.getUserId(),
-                    "DRIVER_REQUEST_NEW",
-                    "New Driver Request",
-                    "A new driver request has been created by " + request.getRequestedBy() +
-                            " for " + request.getDestination(),
-                    "/bookings/driver-dashboard"
-            );
+        } catch (Exception e) {
+            log.error("❌ Failed to notify available drivers: {}", e.getMessage(), e);
         }
-
-        log.info("Notified available drivers about request: {}", request.getRequestId());
     }
 
     private void notifyDriver(Long driverId, DriverRequest request) {
-        Optional<AppUser> driver = userRepository.findById(driverId);
-        if (driver.isPresent()) {
-            String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
+        log.info("📧 Notifying specific driver: {}", driverId);
 
-            emailService.sendSimpleEmail(
-                    driver.get().getEmail(),
-                    "New Driver Request - Action Required",
-                    "You have been requested as a driver.\n\n" +
-                            "Requester: " + request.getRequestedBy() + "\n" +
-                            "Destination: " + request.getDestination() + "\n" +
-                            "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                            "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                            "Please login to accept or decline: " + dashboardLink
-            );
+        try {
+            Optional<AppUser> driver = userRepository.findById(driverId);
+            if (driver.isPresent()) {
+                String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
 
-            createNotification(
-                    driverId,
-                    "DRIVER_REQUEST_SPECIFIC",
-                    "New Driver Request - You've Been Requested",
-                    "You have been requested as a driver by " + request.getRequestedBy() +
-                            " for " + request.getDestination(),
-                    "/bookings/driver-dashboard"
-            );
+                emailService.sendSimpleEmail(
+                        driver.get().getEmail(),
+                        "New Driver Request - Action Required",
+                        "You have been requested as a driver.\n\n" +
+                                "Requester: " + request.getRequestedBy() + "\n" +
+                                "Destination: " + request.getDestination() + "\n" +
+                                "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
+                                "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
+                                "Please login to accept or decline: " + dashboardLink
+                );
+
+                createNotification(
+                        driverId,
+                        "DRIVER_REQUEST_SPECIFIC",
+                        "New Driver Request - You've Been Requested",
+                        "You have been requested as a driver by " + request.getRequestedBy() +
+                                " for " + request.getDestination(),
+                        "/bookings/driver-dashboard"
+                );
+
+                log.info("✅ Driver notified: {}", driverId);
+            } else {
+                log.warn("⚠️ Driver not found with ID: {}", driverId);
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to notify driver {}: {}", driverId, e.getMessage(), e);
         }
     }
 
     private void notifyAdminOfCabRequest(DriverRequest request) {
-        List<AppUser> admins = userRepository.findByRole("ADMIN");
+        log.info("📧 Notifying admins about CAB request: {}", request.getRequestId());
 
-        String dashboardLink = baseUrlService.buildUrl("/bookings/cab-requests");
+        try {
+            List<AppUser> admins = userRepository.findByRole("ADMIN");
+            String dashboardLink = baseUrlService.buildUrl("/bookings/cab-requests");
 
-        for (AppUser admin : admins) {
-            emailService.sendSimpleEmail(
-                    admin.getEmail(),
-                    "New Cab Request - Action Required",
-                    "A new cab request has been created.\n\n" +
-                            "Requester: " + request.getRequestedBy() + "\n" +
-                            "Destination: " + request.getDestination() + "\n" +
-                            "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                            "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                            "Please arrange for an external cab: " + dashboardLink
-            );
+            for (AppUser admin : admins) {
+                try {
+                    emailService.sendSimpleEmail(
+                            admin.getEmail(),
+                            "New Cab Request - Action Required",
+                            "A new cab request has been created.\n\n" +
+                                    "Requester: " + request.getRequestedBy() + "\n" +
+                                    "Destination: " + request.getDestination() + "\n" +
+                                    "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
+                                    "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
+                                    "Please arrange for an external cab: " + dashboardLink
+                    );
+                    log.info("✅ Email sent to admin: {}", admin.getEmail());
+                } catch (Exception e) {
+                    log.error("❌ Failed to send email to admin {}: {}", admin.getUserId(), e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to notify admins: {}", e.getMessage(), e);
         }
     }
 
     private void createNotification(Long userId, String type, String title, String message, String link) {
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setType(type);
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setLink(link.startsWith("/") ? baseUrlService.buildUrl(link) : link);
-        notification.setCreatedAt(LocalDateTime.now());
-        notification.setRead(false);
-        notificationRepository.save(notification);
+        try {
+            Notification notification = new Notification();
+            notification.setUserId(userId);
+            notification.setType(type);
+            notification.setTitle(title);
+            notification.setMessage(message);
+            notification.setLink(link.startsWith("/") ? baseUrlService.buildUrl(link) : link);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setRead(false);
+            notificationRepository.save(notification);
+            log.debug("✅ Notification created for user: {}", userId);
+        } catch (Exception e) {
+            log.error("❌ Failed to create notification for user {}: {}", userId, e.getMessage(), e);
+        }
     }
 
     private String getUserEmail(Long userId) {

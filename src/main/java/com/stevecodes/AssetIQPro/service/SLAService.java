@@ -35,43 +35,83 @@ public class SLAService {
     // SLA TRACKING MANAGEMENT
     // ============================================
 
-    @Transactional
+    /**
+     * Start SLA tracking for a request.
+     * IMPORTANT: This method is NOT @Transactional to prevent rollback propagation.
+     * The calling service manages its own transaction.
+     */
     public RequestSLATracking startSLATracking(Long requestId, String requestType, Long userId) {
-        log.info("Starting SLA tracking for request: {} (Type: {})", requestId, requestType);
+        log.info("=== START SLA TRACKING (NO TRANSACTION) ===");
+        log.info("📝 Starting SLA tracking for request: {} (Type: {})", requestId, requestType);
 
-        SLAConfiguration slaConfig = getSLAConfigurationForRequest(requestType);
+        try {
+            // Get SLA configuration
+            SLAConfiguration slaConfig = getSLAConfigurationForRequest(requestType);
+            log.info("✅ Found SLA config: {} ({} hours)", slaConfig.getConfigName(), slaConfig.getSlaHours());
 
-        RequestSLATracking tracking = new RequestSLATracking();
-        tracking.setRequestId(requestId);
-        tracking.setRequestType(requestType);
-        tracking.setSlaConfigId(slaConfig.getConfigId());
-        tracking.setSlaStartedAt(LocalDateTime.now());
-        tracking.setSlaDueAt(LocalDateTime.now().plusHours(slaConfig.getSlaHours()));
-        tracking.setStatus("IN_PROGRESS");
-        tracking.setBreachesCount(0);
-        tracking.setEscalationCount(0);
-        tracking.setCreatedAt(LocalDateTime.now());
+            // Check if tracking already exists
+            Optional<RequestSLATracking> existing = trackingRepository
+                    .findByRequestIdAndRequestType(requestId, requestType);
+            if (existing.isPresent()) {
+                log.info("⚠️ SLA tracking already exists for request: {}", requestId);
+                return existing.get();
+            }
 
-        RequestSLATracking saved = trackingRepository.save(tracking);
+            // Create tracking record
+            RequestSLATracking tracking = new RequestSLATracking();
+            tracking.setRequestId(requestId);
+            tracking.setRequestType(requestType);
+            tracking.setSlaConfigId(slaConfig.getConfigId());
+            tracking.setSlaStartedAt(LocalDateTime.now());
+            tracking.setSlaDueAt(LocalDateTime.now().plusHours(slaConfig.getSlaHours()));
+            tracking.setStatus("IN_PROGRESS");
+            tracking.setBreachesCount(0);
+            tracking.setEscalationCount(0);
+            tracking.setCreatedAt(LocalDateTime.now());
+            tracking.setUpdatedAt(LocalDateTime.now());
 
-        sendSLANotification(
-                userId,
-                "SLA_STARTED",
-                "SLA Started",
-                "Your request (ID: " + requestId + ") has been created. SLA: " + slaConfig.getSlaHours() + " hours.",
-                "/" + getRequestTypePath(requestType) + "/" + requestId
-        );
+            // Save tracking record
+            RequestSLATracking saved = trackingRepository.save(tracking);
+            log.info("✅ SLA tracking saved with ID: {}", saved.getTrackingId());
 
-        auditService.logAction("SLA_STARTED",
-                "SLA started for " + requestType + " request #" + requestId + " with SLA of " + slaConfig.getSlaHours() + " hours",
-                userId);
+            // Send notifications (non-critical - don't let them fail the operation)
+            try {
+                sendSLANotification(
+                        userId,
+                        "SLA_STARTED",
+                        "SLA Started",
+                        "Your request (ID: " + requestId + ") has been created. SLA: " + slaConfig.getSlaHours() + " hours.",
+                        "/" + getRequestTypePath(requestType) + "/" + requestId
+                );
+                log.info("✅ SLA notification sent to user: {}", userId);
+            } catch (Exception e) {
+                log.error("❌ Failed to send SLA notification: {}", e.getMessage(), e);
+            }
 
-        return saved;
+            // Log audit (non-critical - don't let it fail the operation)
+            try {
+                auditService.logAction("SLA_STARTED",
+                        "SLA started for " + requestType + " request #" + requestId + " with SLA of " + slaConfig.getSlaHours() + " hours",
+                        userId);
+                log.info("✅ SLA audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log SLA audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== START SLA TRACKING END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Failed to start SLA tracking for request {}: {}", requestId, e.getMessage(), e);
+            throw e;
+        }
     }
 
-    private SLAConfiguration getSLAConfigurationForRequest(String requestType) {
+    public SLAConfiguration getSLAConfigurationForRequest(String requestType) {
+        log.debug("📋 Getting SLA configuration for request type: {}", requestType);
         return slaConfigRepository.findByRequestTypeAndIsDefaultTrue(requestType)
                 .orElseGet(() -> {
+                    log.warn("⚠️ No default SLA config found for {}, looking for any active config", requestType);
                     return slaConfigRepository.findFirstByRequestTypeAndIsActiveTrue(requestType)
                             .orElseThrow(() -> new RuntimeException("No SLA configuration found for request type: " + requestType));
                 });
@@ -82,16 +122,29 @@ public class SLAService {
                 .orElse(null);
     }
 
-    @Transactional
+    /**
+     * Complete SLA tracking for a request.
+     * IMPORTANT: This method is NOT @Transactional to prevent rollback propagation.
+     */
     public void completeSLATracking(Long requestId, String requestType) {
-        log.info("Completing SLA tracking for request: {} (Type: {})", requestId, requestType);
+        log.info("=== COMPLETE SLA TRACKING (NO TRANSACTION) ===");
+        log.info("📝 Completing SLA tracking for request: {} (Type: {})", requestId, requestType);
 
-        trackingRepository.findByRequestIdAndRequestType(requestId, requestType)
-                .ifPresent(tracking -> {
-                    tracking.setStatus("COMPLETED");
-                    tracking.setCompletedAt(LocalDateTime.now());
-                    trackingRepository.save(tracking);
-                });
+        try {
+            trackingRepository.findByRequestIdAndRequestType(requestId, requestType)
+                    .ifPresentOrElse(
+                            tracking -> {
+                                tracking.setStatus("COMPLETED");
+                                tracking.setCompletedAt(LocalDateTime.now());
+                                trackingRepository.save(tracking);
+                                log.info("✅ SLA tracking completed for request: {}", requestId);
+                            },
+                            () -> log.warn("⚠️ No SLA tracking found for request: {} (Type: {})", requestId, requestType)
+                    );
+        } catch (Exception e) {
+            log.error("❌ Failed to complete SLA tracking: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     // ============================================
@@ -101,12 +154,25 @@ public class SLAService {
     @Scheduled(cron = "0 0/30 * * * *")
     @Transactional
     public void checkAllSLAs() {
-        log.info("Running SLA check for all request types");
+        log.info("=== RUNNING SLA CHECK ===");
+        log.info("📊 Running SLA check for all request types");
 
-        List<RequestSLATracking> trackings = trackingRepository.findByStatus("IN_PROGRESS");
+        try {
+            List<RequestSLATracking> trackings = trackingRepository.findByStatus("IN_PROGRESS");
+            log.info("📊 Found {} active SLA trackings", trackings.size());
 
-        for (RequestSLATracking tracking : trackings) {
-            processSLACheck(tracking);
+            for (RequestSLATracking tracking : trackings) {
+                try {
+                    processSLACheck(tracking);
+                } catch (Exception e) {
+                    log.error("❌ Error processing SLA for request {}: {}", tracking.getRequestId(), e.getMessage(), e);
+                }
+            }
+
+            log.info("✅ SLA check completed");
+
+        } catch (Exception e) {
+            log.error("❌ Error running SLA check: {}", e.getMessage(), e);
         }
     }
 
@@ -117,7 +183,10 @@ public class SLAService {
         long elapsedHours = ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), now);
         double percentageElapsed = totalHours > 0 ? (double) elapsedHours / totalHours * 100 : 0;
 
+        log.debug("📊 Request {}: {}% elapsed, Due: {}", tracking.getRequestId(), percentageElapsed, dueAt);
+
         if (now.isAfter(dueAt)) {
+            log.warn("⚠️ SLA is past due for request: {}", tracking.getRequestId());
             handleSLABreach(tracking);
             return;
         }
@@ -139,58 +208,88 @@ public class SLAService {
     // ============================================
 
     private void handleSLABreach(RequestSLATracking tracking) {
-        log.warn("SLA BREACHED! Request: {} (Type: {})", tracking.getRequestId(), tracking.getRequestType());
+        log.warn("🚨 SLA BREACHED! Request: {} (Type: {})", tracking.getRequestId(), tracking.getRequestType());
 
-        tracking.setStatus("BREACHED");
-        tracking.setBreachesCount(tracking.getBreachesCount() + 1);
-        trackingRepository.save(tracking);
+        try {
+            tracking.setStatus("BREACHED");
+            tracking.setBreachesCount(tracking.getBreachesCount() + 1);
+            trackingRepository.save(tracking);
+            log.info("✅ SLA marked as BREACHED for request: {}", tracking.getRequestId());
 
-        Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
-        AppUser owner = userService.getUserById(ownerId).orElse(null);
-        AppUser manager = getLineManager(ownerId);
+            Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
+            AppUser owner = userService.getUserById(ownerId).orElse(null);
+            AppUser manager = getLineManager(ownerId);
 
-        String breachMessage = String.format(
-                "SLA BREACHED! Request #%d (%s) has exceeded its SLA of %d hours.",
-                tracking.getRequestId(),
-                tracking.getRequestType(),
-                getSLAHoursForConfig(tracking.getSlaConfigId())
-        );
-
-        if (owner != null) {
-            sendSLANotification(
-                    owner.getUserId(),
-                    "SLA_BREACHED",
-                    "SLA Breached",
-                    breachMessage + " Please take immediate action.",
-                    "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+            String breachMessage = String.format(
+                    "SLA BREACHED! Request #%d (%s) has exceeded its SLA of %d hours.",
+                    tracking.getRequestId(),
+                    tracking.getRequestType(),
+                    getSLAHoursForConfig(tracking.getSlaConfigId())
             );
+
+            // Notify owner
+            if (owner != null) {
+                try {
+                    sendSLANotification(
+                            owner.getUserId(),
+                            "SLA_BREACHED",
+                            "SLA Breached",
+                            breachMessage + " Please take immediate action.",
+                            "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                    );
+                    log.info("✅ Owner notified: {}", owner.getUserId());
+                } catch (Exception e) {
+                    log.error("❌ Failed to notify owner: {}", e.getMessage(), e);
+                }
+            }
+
+            // Notify manager
+            if (manager != null) {
+                try {
+                    sendSLANotification(
+                            manager.getUserId(),
+                            "SLA_BREACHED_ESCALATED",
+                            "SLA Breached - Employee Alert",
+                            "Employee: " + (owner != null ? owner.getFullName() : "Unknown") + "\n" + breachMessage,
+                            "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                    );
+                    log.info("✅ Manager notified: {}", manager.getUserId());
+                } catch (Exception e) {
+                    log.error("❌ Failed to notify manager: {}", e.getMessage(), e);
+                }
+            }
+
+            // Create escalation record
+            try {
+                SLAEscalationHistory escalation = new SLAEscalationHistory();
+                escalation.setRequestId(tracking.getRequestId());
+                escalation.setRequestType(tracking.getRequestType());
+                escalation.setSlaConfigId(tracking.getSlaConfigId());
+                escalation.setEscalationLevel(tracking.getEscalationCount() + 1);
+                escalation.setEscalatedTo(manager != null ? manager.getUserId() : ownerId);
+                escalation.setEscalatedBy(1L);
+                escalation.setEscalatedAt(LocalDateTime.now());
+                escalation.setNotificationSent(true);
+                escalation.setReason("SLA Breached after " + getSLAHoursForConfig(tracking.getSlaConfigId()) + " hours");
+                escalationHistoryRepository.save(escalation);
+                log.info("✅ Escalation record created for request: {}", tracking.getRequestId());
+            } catch (Exception e) {
+                log.error("❌ Failed to create escalation record: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("SLA_BREACHED",
+                        "SLA breached for " + tracking.getRequestType() + " request #" + tracking.getRequestId(),
+                        ownerId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Error handling SLA breach: {}", e.getMessage(), e);
         }
-
-        if (manager != null) {
-            sendSLANotification(
-                    manager.getUserId(),
-                    "SLA_BREACHED_ESCALATED",
-                    "SLA Breached - Employee Alert",
-                    "Employee: " + (owner != null ? owner.getFullName() : "Unknown") + "\n" + breachMessage,
-                    "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
-            );
-        }
-
-        SLAEscalationHistory escalation = new SLAEscalationHistory();
-        escalation.setRequestId(tracking.getRequestId());
-        escalation.setRequestType(tracking.getRequestType());
-        escalation.setSlaRuleId(tracking.getSlaConfigId());
-        escalation.setEscalationLevel(tracking.getEscalationCount() + 1);
-        escalation.setEscalatedTo(manager != null ? manager.getUserId() : ownerId);
-        escalation.setEscalatedBy(1L);
-        escalation.setEscalatedAt(LocalDateTime.now());
-        escalation.setNotificationSent(true);
-        escalation.setReason("SLA Breached after " + getSLAHoursForConfig(tracking.getSlaConfigId()) + " hours");
-        escalationHistoryRepository.save(escalation);
-
-        auditService.logAction("SLA_BREACHED",
-                "SLA breached for " + tracking.getRequestType() + " request #" + tracking.getRequestId(),
-                ownerId);
     }
 
     // ============================================
@@ -198,51 +297,71 @@ public class SLAService {
     // ============================================
 
     private void escalateSLA(RequestSLATracking tracking) {
-        log.info("Escalating SLA for request: {} (Type: {})", tracking.getRequestId(), tracking.getRequestType());
+        log.info("📈 Escalating SLA for request: {} (Type: {})", tracking.getRequestId(), tracking.getRequestType());
 
-        Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
-        AppUser manager = getLineManager(ownerId);
+        try {
+            Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
+            AppUser manager = getLineManager(ownerId);
 
-        if (manager == null) {
-            log.warn("No manager found for escalation. Request: {}", tracking.getRequestId());
-            return;
+            if (manager == null) {
+                log.warn("⚠️ No manager found for escalation. Request: {}", tracking.getRequestId());
+                return;
+            }
+
+            tracking.setEscalatedTo(manager.getUserId());
+            tracking.setEscalationCount(tracking.getEscalationCount() + 1);
+            trackingRepository.save(tracking);
+            log.info("✅ Escalation count updated to: {}", tracking.getEscalationCount());
+
+            // Create escalation record
+            SLAEscalationHistory escalation = new SLAEscalationHistory();
+            escalation.setRequestId(tracking.getRequestId());
+            escalation.setRequestType(tracking.getRequestType());
+            escalation.setSlaConfigId(tracking.getSlaConfigId());
+            escalation.setEscalationLevel(tracking.getEscalationCount());
+            escalation.setEscalatedTo(manager.getUserId());
+            escalation.setEscalatedBy(1L);
+            escalation.setEscalatedAt(LocalDateTime.now());
+            escalation.setNotificationSent(true);
+            escalation.setReason("SLA approaching breach. Request pending for " +
+                    ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now()) + " hours");
+            escalationHistoryRepository.save(escalation);
+            log.info("✅ Escalation record created");
+
+            String escalationMessage = String.format(
+                    "SLA Escalation: Request #%d (%s) has been pending for %d hours. Please review and take action.",
+                    tracking.getRequestId(),
+                    tracking.getRequestType(),
+                    ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now())
+            );
+
+            // Notify manager
+            try {
+                sendSLANotification(
+                        manager.getUserId(),
+                        "SLA_ESCALATED",
+                        "SLA Escalated - Action Required",
+                        escalationMessage,
+                        "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                );
+                log.info("✅ Escalation notification sent to manager: {}", manager.getUserId());
+            } catch (Exception e) {
+                log.error("❌ Failed to send escalation notification: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("SLA_ESCALATED",
+                        "SLA escalated for " + tracking.getRequestType() + " request #" + tracking.getRequestId() + " to " + manager.getUsername(),
+                        ownerId);
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Error escalating SLA: {}", e.getMessage(), e);
         }
-
-        tracking.setEscalatedTo(manager.getUserId());
-        tracking.setEscalationCount(tracking.getEscalationCount() + 1);
-        trackingRepository.save(tracking);
-
-        SLAEscalationHistory escalation = new SLAEscalationHistory();
-        escalation.setRequestId(tracking.getRequestId());
-        escalation.setRequestType(tracking.getRequestType());
-        escalation.setSlaRuleId(tracking.getSlaConfigId());
-        escalation.setEscalationLevel(tracking.getEscalationCount());
-        escalation.setEscalatedTo(manager.getUserId());
-        escalation.setEscalatedBy(1L);
-        escalation.setEscalatedAt(LocalDateTime.now());
-        escalation.setNotificationSent(true);
-        escalation.setReason("SLA approaching breach. Request pending for " +
-                ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now()) + " hours");
-        escalationHistoryRepository.save(escalation);
-
-        String escalationMessage = String.format(
-                "SLA Escalation: Request #%d (%s) has been pending for %d hours. Please review and take action.",
-                tracking.getRequestId(),
-                tracking.getRequestType(),
-                ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now())
-        );
-
-        sendSLANotification(
-                manager.getUserId(),
-                "SLA_ESCALATED",
-                "SLA Escalated - Action Required",
-                escalationMessage,
-                "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
-        );
-
-        auditService.logAction("SLA_ESCALATED",
-                "SLA escalated for " + tracking.getRequestType() + " request #" + tracking.getRequestId() + " to " + manager.getUsername(),
-                ownerId);
     }
 
     // ============================================
@@ -250,42 +369,62 @@ public class SLAService {
     // ============================================
 
     private void sendSLAReminder(RequestSLATracking tracking, String percentage) {
-        Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
-        AppUser owner = userService.getUserById(ownerId).orElse(null);
+        try {
+            Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
+            AppUser owner = userService.getUserById(ownerId).orElse(null);
 
-        if (owner == null) return;
+            if (owner == null) {
+                log.warn("⚠️ Owner not found for request: {}", tracking.getRequestId());
+                return;
+            }
 
-        String reminderMessage = String.format(
-                "SLA Reminder: Request #%d (%s) has used %s%% of its SLA time. Due at: %s",
-                tracking.getRequestId(),
-                tracking.getRequestType(),
-                percentage,
-                tracking.getSlaDueAt().toString()
-        );
+            String reminderMessage = String.format(
+                    "SLA Reminder: Request #%d (%s) has used %s%% of its SLA time. Due at: %s",
+                    tracking.getRequestId(),
+                    tracking.getRequestType(),
+                    percentage,
+                    tracking.getSlaDueAt().toString()
+            );
 
-        sendSLANotification(
-                owner.getUserId(),
-                "SLA_REMINDER",
-                "SLA Reminder - " + percentage + "% Elapsed",
-                reminderMessage,
-                "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
-        );
-
-        if ("75".equals(percentage) || "90".equals(percentage)) {
-            AppUser manager = getLineManager(ownerId);
-            if (manager != null) {
+            // Notify owner
+            try {
                 sendSLANotification(
-                        manager.getUserId(),
-                        "SLA_REMINDER_MANAGER",
-                        "SLA Reminder - Employee Request at " + percentage + "%",
-                        "Employee: " + owner.getFullName() + "\n" + reminderMessage,
+                        owner.getUserId(),
+                        "SLA_REMINDER",
+                        "SLA Reminder - " + percentage + "% Elapsed",
+                        reminderMessage,
                         "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
                 );
+                log.info("✅ Reminder sent to owner: {} at {}%", owner.getUserId(), percentage);
+            } catch (Exception e) {
+                log.error("❌ Failed to send reminder to owner: {}", e.getMessage(), e);
             }
-        }
 
-        tracking.setLastReminderSentAt(LocalDateTime.now());
-        trackingRepository.save(tracking);
+            // Notify manager at 75% and 90%
+            if ("75".equals(percentage) || "90".equals(percentage)) {
+                AppUser manager = getLineManager(ownerId);
+                if (manager != null) {
+                    try {
+                        sendSLANotification(
+                                manager.getUserId(),
+                                "SLA_REMINDER_MANAGER",
+                                "SLA Reminder - Employee Request at " + percentage + "%",
+                                "Employee: " + owner.getFullName() + "\n" + reminderMessage,
+                                "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                        );
+                        log.info("✅ Reminder sent to manager: {} at {}%", manager.getUserId(), percentage);
+                    } catch (Exception e) {
+                        log.error("❌ Failed to send reminder to manager: {}", e.getMessage(), e);
+                    }
+                }
+            }
+
+            tracking.setLastReminderSentAt(LocalDateTime.now());
+            trackingRepository.save(tracking);
+
+        } catch (Exception e) {
+            log.error("❌ Error sending SLA reminder: {}", e.getMessage(), e);
+        }
     }
 
     // ============================================
@@ -293,9 +432,8 @@ public class SLAService {
     // ============================================
 
     private Long getRequestOwner(Long requestId, String requestType) {
-        // This should be extended for each request type
-        // For now, return admin as fallback
-        log.warn("getRequestOwner not fully implemented for request type: {}. Using admin fallback.", requestType);
+        // TODO: Implement proper owner lookup for each request type
+        log.warn("⚠️ getRequestOwner not fully implemented for request type: {}. Using admin fallback.", requestType);
         return 1L;
     }
 
@@ -340,18 +478,32 @@ public class SLAService {
     }
 
     private void sendSLANotification(Long userId, String type, String title, String message, String link) {
-        // Create in-app notification
-        notificationService.createNotification(userId, type, title, message, link);
+        try {
+            // Create in-app notification
+            notificationService.createNotification(userId, type, title, message, link);
+            log.debug("✅ In-app notification created for user: {}", userId);
+        } catch (Exception e) {
+            log.error("❌ Failed to create in-app notification: {}", e.getMessage(), e);
+        }
 
-        // Send email
-        userService.getUserById(userId).ifPresent(user -> {
-            String fullLink = baseUrlService.buildUrl(link);
-            emailService.sendSimpleEmail(
-                    user.getEmail(),
-                    title + " - AssetIQ-Pro",
-                    message + "\n\nView details: " + fullLink + "\n\nRegards,\nAssetIQ-Pro Team"
-            );
-        });
+        try {
+            // Send email
+            userService.getUserById(userId).ifPresent(user -> {
+                try {
+                    String fullLink = baseUrlService.buildUrl(link);
+                    emailService.sendSimpleEmail(
+                            user.getEmail(),
+                            title + " - AssetIQ-Pro",
+                            message + "\n\nView details: " + fullLink + "\n\nRegards,\nAssetIQ-Pro Team"
+                    );
+                    log.debug("✅ Email sent to: {}", user.getEmail());
+                } catch (Exception e) {
+                    log.error("❌ Failed to send email to {}: {}", user.getEmail(), e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            log.error("❌ Failed to send email notification: {}", e.getMessage(), e);
+        }
     }
 
     // ============================================
@@ -360,13 +512,13 @@ public class SLAService {
 
     @Transactional
     public SLAConfiguration createSLAConfiguration(SLAConfiguration config) {
-        log.info("Creating SLA configuration: {}", config.getConfigName());
+        log.info("📝 Creating SLA configuration: {}", config.getConfigName());
         return slaConfigRepository.save(config);
     }
 
     @Transactional
     public void deleteSLAConfiguration(Integer configId) {
-        log.info("Deleting SLA configuration: {}", configId);
+        log.info("🗑️ Deleting SLA configuration: {}", configId);
 
         SLAConfiguration config = slaConfigRepository.findById(configId)
                 .orElseThrow(() -> new RuntimeException("SLA configuration not found: " + configId));
@@ -377,16 +529,17 @@ public class SLAService {
             // Instead of deleting, mark as inactive
             config.setIsActive(false);
             slaConfigRepository.save(config);
-            log.warn("SLA configuration {} has active trackings. Marked as inactive instead of deleting.", configId);
+            log.warn("⚠️ SLA configuration {} has active trackings. Marked as inactive instead of deleting.", configId);
             return;
         }
 
         slaConfigRepository.delete(config);
+        log.info("✅ SLA configuration deleted: {}", configId);
     }
 
     @Transactional
     public SLAConfiguration updateSLAConfiguration(Integer configId, SLAConfiguration config) {
-        log.info("Updating SLA configuration: {}", configId);
+        log.info("📝 Updating SLA configuration: {}", configId);
         SLAConfiguration existing = slaConfigRepository.findById(configId)
                 .orElseThrow(() -> new RuntimeException("SLA configuration not found: " + configId));
 
@@ -397,7 +550,9 @@ public class SLAService {
         existing.setEscalationLevels(config.getEscalationLevels());
         existing.setIsActive(config.getIsActive());
 
-        return slaConfigRepository.save(existing);
+        SLAConfiguration updated = slaConfigRepository.save(existing);
+        log.info("✅ SLA configuration updated: {}", configId);
+        return updated;
     }
 
     public List<SLAConfiguration> getAllSLAConfigurations() {
