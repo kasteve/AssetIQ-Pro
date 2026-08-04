@@ -64,7 +64,12 @@ public class DisposalSLARule {
     @JoinColumn(name = "asset_category_id", insertable = false, updatable = false)
     private Category category;
 
+    // ============================================
+    // Helper Methods
+    // ============================================
+
     public Integer getSlaHoursForLevel(String levelName) {
+        if (levelName == null) return 48;
         switch (levelName.toUpperCase()) {
             case "FINANCE":
                 return financeSlaHours != null ? financeSlaHours : 48;
@@ -81,5 +86,9 @@ public class DisposalSLARule {
 
     public String getStatusDisplay() {
         return isActive ? "Active" : "Inactive";
+    }
+
+    public boolean isActive() {
+        return isActive != null && isActive;
     }
 }

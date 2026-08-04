@@ -65,6 +65,10 @@ public class DisposalApproval {
     @JoinColumn(name = "approver_id", insertable = false, updatable = false)
     private AppUser approver;
 
+    // ============================================
+    // Helper Methods
+    // ============================================
+
     public String getStatusDisplay() {
         if (status == null) return "";
         switch (status) {
@@ -97,5 +101,9 @@ public class DisposalApproval {
 
     public boolean isRejected() {
         return "REJECTED".equals(status);
+    }
+
+    public boolean isEscalated() {
+        return "ESCALATED".equals(status);
     }
 }

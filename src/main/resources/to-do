@@ -3,296 +3,78 @@ Include the favicon and meta headers
 Asychronous trigger (form submission should not wait for th email to return success)
 
 
-KNOWN ISSUES:
-Add a button for the driver to complete the ride or delivery so that they are available to pick more bookigs from the users . (Trigger an acknowledgement email to the requester to sign out or even rate.)
-
-Add a button to display pending server room requests for the users with APPROVE_INFRA to approve the room request.
-
-
-
-Run this on prod
-=================
-
--- Step 1: Add room_type column
-IF NOT EXISTS (
-    SELECT * FROM sys.columns
-    WHERE object_id = OBJECT_ID('tbl_bookings')
-    AND name = 'room_type'
-)
-BEGIN
-    ALTER TABLE tbl_bookings
-    ADD room_type NVARCHAR(100) NULL;
-END
-GO
-
--- Step 2: Add room_name column
-IF NOT EXISTS (
-    SELECT * FROM sys.columns
-    WHERE object_id = OBJECT_ID('tbl_bookings')
-    AND name = 'room_name'
-)
-BEGIN
-    ALTER TABLE tbl_bookings
-    ADD room_name NVARCHAR(255) NULL;
-END
-GO
-
--- Step 3: Update existing bookings with room_type and room_name from rooms table
-UPDATE b
-SET
-    b.room_type = r.room_type,
-    b.room_name = r.room_name
-FROM
-    tbl_bookings b
-    INNER JOIN tbl_rooms r ON b.room_id = r.room_id
-WHERE
-    b.room_type IS NULL
-    OR b.room_name IS NULL;
-GO
-
--- Step 4: Verify the update
-SELECT TOP 10
-    b.booking_id,
-    b.room_id,
-    b.room_name,
-    b.room_type,
-    r.room_name as room_name_from_rooms,
-    r.room_type as room_type_from_rooms
-FROM
-    tbl_bookings b
-    INNER JOIN tbl_rooms r ON b.room_id = r.room_id;
-GO
+Known Issues:
+Disposal request taking long to submit because it is not asynchronous. Keeps listening from backend
+Soln: make it async and introduce a bg job to do that.
+when the asset disposal is completed, that asset's status in the portal should immediately change to DISPOSED OF and Edit button,
+Transfer, delete and Request Disposal options should become inactive after the asset disposal has been completed. The moment the
+asset status changes to disposed, those options should become inactive so that only view is active.
 
 
 
-=====================
+Review the SLA breached link
 
+2026-08-04 15:00:00 - 📧 EMAIL CONTENT
+2026-08-04 15:00:00 - Type: Simple Email
+2026-08-04 15:00:00 - To: admin@company.com
+2026-08-04 15:00:00 - Subject: SLA Breached - AssetIQ-Pro
+2026-08-04 15:00:00 - -----------------------------------------
+2026-08-04 15:00:00 - Body:
+2026-08-04 15:00:00 - SLA BREACHED! Request #19 (INFRA_REQUEST) has exceeded its SLA of 120 hours. Please take immediate action.
 
--- ============================================
--- 1. CREATE DRIVER RATINGS TABLE
--- ============================================
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[driver_ratings]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[driver_ratings] (
-        [rating_id] BIGINT IDENTITY(1,1) NOT NULL,
-        [request_id] BIGINT NOT NULL,
-        [driver_id] BIGINT NOT NULL,
-        [user_id] BIGINT NOT NULL,
-        [rating] INT NOT NULL,
-        [feedback] NVARCHAR(MAX) NULL,
-        [token] NVARCHAR(255) NULL,
-        [created_at] DATETIME2 DEFAULT GETDATE() NOT NULL,
-        CONSTRAINT PK_driver_ratings PRIMARY KEY ([rating_id])
-    );
-    PRINT '✅ Table driver_ratings created successfully';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ Table driver_ratings already exists';
-END
-GO
+View details: http://localhost:8091/assetIQ-pro/infra-requests/19   >>> Returns a json instead of opening the page to view details
 
--- ============================================
--- 2. ADD FOREIGN KEY CONSTRAINTS
--- ============================================
--- Foreign key to driver_requests
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_driver_ratings_driver_request')
-BEGIN
-    ALTER TABLE [dbo].[driver_ratings]
-    ADD CONSTRAINT FK_driver_ratings_driver_request
-    FOREIGN KEY ([request_id]) REFERENCES [dbo].[tbl_driver_requests]([request_id]);
-    PRINT '✅ Added FK_driver_ratings_driver_request';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ FK_driver_ratings_driver_request already exists';
-END
-GO
+{
+  "lineManagerId": 16,
+  "resourceType": "Monitor",
+  "specification": "lenovo",
+  "quantity": 1,
+  "justification": "Not sure",
+  "requestId": 19,
+  "requesterId": 10,
+  "requesterName": "Normal Employee",
+  "requesterDepartment": "Operations",
+  "requesterStaffId": "STAFF00006",
+  "lineManagerStaffId": "04343",
+  "status": "PROCUREMENT",
+  "createdAt": "2026-08-02T18:19:46.780022",
+  "updatedAt": "2026-08-02T18:25:20.615528",
+  "assetId": null,
+  "supplierId": null,
+  "supplierName": null,
+  "purchaseCost": null,
+  "procurementOrderRef": null,
+  "lmComment": "approved",
+  "infraComment": "sasa",
+  "financeComment": "sasa",
+  "lmApprovedByStaffId": "04343",
+  "infraReviewedByStaffId": "04343",
+  "financeApprovedByStaffId": "04343",
+  "deliveryNotes": null,
+  "deliveredAt": null,
+  "deliveredBy": null,
+  "deliveredByName": null,
+  "acknowledgedAt": null,
+  "acknowledgedBy": null,
+  "acknowledgedByName": null,
+  "pdfReportPath": null,
+  "lmApprovedAt": "2026-08-02T18:23:53.513748",
+  "infraReviewedAt": "2026-08-02T18:24:35.4404684",
+  "financeApprovedAt": "2026-08-02T18:25:13.3894559",
+  "completedAt": null,
+  "lmApprovedBy": 16,
+  "infraReviewedBy": 16,
+  "financeApprovedBy": 16,
+  "lmApprovedByName": "Festo Driver Snr",
+  "infraReviewedByName": "Festo Driver Snr",
+  "financeApprovedByName": "Festo Driver Snr",
+  "quotationPath": "uploads\\infra\\quotations\\cb255044-42a9-4621-8eb2-a920f3ece416_transfer_15.pdf",
+  "requesterSignature": null,
+  "requesterSignedAt": null,
+  "signingToken": null,
+  "signingTokenExpiry": null,
+  "statusColor": "primary",
+  "statusDisplay": "In Procurement"
+}
 
--- Foreign key to app_users (driver)
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_driver_ratings_driver')
-BEGIN
-    ALTER TABLE [dbo].[driver_ratings]
-    ADD CONSTRAINT FK_driver_ratings_driver
-    FOREIGN KEY ([driver_id]) REFERENCES [dbo].[app_users]([user_id]);
-    PRINT '✅ Added FK_driver_ratings_driver';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ FK_driver_ratings_driver already exists';
-END
-GO
-
--- Foreign key to app_users (user)
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_driver_ratings_user')
-BEGIN
-    ALTER TABLE [dbo].[driver_ratings]
-    ADD CONSTRAINT FK_driver_ratings_user
-    FOREIGN KEY ([user_id]) REFERENCES [dbo].[app_users]([user_id]);
-    PRINT '✅ Added FK_driver_ratings_user';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ FK_driver_ratings_user already exists';
-END
-GO
-
--- ============================================
--- 3. CREATE INDEXES FOR PERFORMANCE
--- ============================================
--- Index for finding ratings by request
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_driver_ratings_request_id' AND object_id = OBJECT_ID('driver_ratings'))
-BEGIN
-    CREATE INDEX IX_driver_ratings_request_id ON [dbo].[driver_ratings] ([request_id]);
-    PRINT '✅ Created IX_driver_ratings_request_id';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ IX_driver_ratings_request_id already exists';
-END
-GO
-
--- Index for finding ratings by driver
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_driver_ratings_driver_id' AND object_id = OBJECT_ID('driver_ratings'))
-BEGIN
-    CREATE INDEX IX_driver_ratings_driver_id ON [dbo].[driver_ratings] ([driver_id]);
-    PRINT '✅ Created IX_driver_ratings_driver_id';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ IX_driver_ratings_driver_id already exists';
-END
-GO
-
--- Index for finding ratings by user
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_driver_ratings_user_id' AND object_id = OBJECT_ID('driver_ratings'))
-BEGIN
-    CREATE INDEX IX_driver_ratings_user_id ON [dbo].[driver_ratings] ([user_id]);
-    PRINT '✅ Created IX_driver_ratings_user_id';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ IX_driver_ratings_user_id already exists';
-END
-GO
-
--- ============================================
--- 4. CREATE UNIQUE CONSTRAINT (optional - prevents duplicate ratings per request)
--- ============================================
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UQ_driver_ratings_request_id' AND object_id = OBJECT_ID('driver_ratings'))
-BEGIN
-    ALTER TABLE [dbo].[driver_ratings]
-    ADD CONSTRAINT UQ_driver_ratings_request_id UNIQUE ([request_id]);
-    PRINT '✅ Created UQ_driver_ratings_request_id (prevents duplicate ratings)';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ UQ_driver_ratings_request_id already exists';
-END
-GO
-
--- ============================================
--- 5. ADD RATING COLUMNS TO DRIVER TABLE (if you want to store average rating)
--- ============================================
--- Check if average_rating column exists in app_users
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('app_users') AND name = 'average_rating')
-BEGIN
-    ALTER TABLE [dbo].[app_users]
-    ADD [average_rating] DECIMAL(3,2) NULL DEFAULT 0;
-    PRINT '✅ Added average_rating column to app_users';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ average_rating column already exists in app_users';
-END
-GO
-
--- Check if rating_count column exists in app_users
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('app_users') AND name = 'rating_count')
-BEGIN
-    ALTER TABLE [dbo].[app_users]
-    ADD [rating_count] INT NULL DEFAULT 0;
-    PRINT '✅ Added rating_count column to app_users';
-END
-ELSE
-BEGIN
-    PRINT 'ℹ️ rating_count column already exists in app_users';
-END
-GO
-
--- ============================================
--- 6. VERIFY ALL TABLES AND COLUMNS
--- ============================================
--- Check driver_ratings table structure
-SELECT
-    COLUMN_NAME,
-    DATA_TYPE,
-    IS_NULLABLE,
-    COLUMN_DEFAULT
-FROM
-    INFORMATION_SCHEMA.COLUMNS
-WHERE
-    TABLE_NAME = 'driver_ratings'
-ORDER BY
-    ORDINAL_POSITION;
-GO
-
--- Check all constraints on driver_ratings
-SELECT
-    tc.CONSTRAINT_NAME,
-    tc.CONSTRAINT_TYPE,
-    kcu.COLUMN_NAME
-FROM
-    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-WHERE
-    tc.TABLE_NAME = 'driver_ratings'
-ORDER BY
-    tc.CONSTRAINT_TYPE, kcu.ORDINAL_POSITION;
-GO
-
--- Check indexes on driver_ratings
-SELECT
-    i.name AS IndexName,
-    i.type_desc AS IndexType,
-    c.name AS ColumnName
-FROM
-    sys.indexes i
-    INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
-    INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-WHERE
-    i.object_id = OBJECT_ID('driver_ratings')
-ORDER BY
-    i.name, ic.key_ordinal;
-GO
-
--- ============================================
--- 7. SAMPLE DATA (Optional - for testing)
--- ============================================
--- Uncomment to insert sample ratings
-/*
-INSERT INTO [dbo].[driver_ratings] (request_id, driver_id, user_id, rating, feedback, token, created_at)
-VALUES
-    (10017, 13, 12, 5, 'Excellent driver! Very professional and punctual.', 'sample-token-1', GETDATE()),
-    (10018, 13, 14, 4, 'Good driver, arrived on time.', 'sample-token-2', GETDATE()),
-    (10019, 15, 12, 3, 'Average experience.', 'sample-token-3', GETDATE());
-*/
-
--- ============================================
--- 8. VERIFY TABLE EXISTS
--- ============================================
-IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[driver_ratings]') AND type in (N'U'))
-BEGIN
-    PRINT '✅ All done! driver_ratings table is ready to use.';
-    PRINT '📊 Table structure:';
-    EXEC sp_help 'driver_ratings';
-END
-ELSE
-BEGIN
-    PRINT '❌ ERROR: driver_ratings table was not created. Please check the script.';
-END
-GO
-
-
-
+2. server room booking >> Infra approver does not see the booking to approve. instead only sees the option to cancel the bookoing.

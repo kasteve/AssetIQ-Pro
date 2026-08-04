@@ -1,9 +1,6 @@
 package com.stevecodes.AssetIQPro.service;
 
-import com.stevecodes.AssetIQPro.entity.Asset;
-import com.stevecodes.AssetIQPro.entity.AssetDisposalRequest;
-import com.stevecodes.AssetIQPro.entity.AppUser;
-import com.stevecodes.AssetIQPro.entity.Notification;
+import com.stevecodes.AssetIQPro.entity.*;
 import com.stevecodes.AssetIQPro.repository.AssetDisposalRequestRepository;
 import com.stevecodes.AssetIQPro.repository.AssetRepository;
 import com.stevecodes.AssetIQPro.repository.NotificationRepository;
@@ -11,11 +8,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -31,8 +34,11 @@ public class AssetDisposalService {
     private final BaseUrlService baseUrlService;
     private final SLAService slaService;
 
+    private static final String POLICY_UPLOAD_DIR = "uploads/disposal/policies/";
+    private static final String PROOF_UPLOAD_DIR = "uploads/disposal/proofs/";
+
     // ============================================
-    // Disposal Request Management
+    // DISPOSAL REQUEST CREATION
     // ============================================
 
     @Transactional
@@ -41,9 +47,6 @@ public class AssetDisposalService {
                                                       String priority) {
         log.info("=== CREATE DISPOSAL REQUEST START ===");
         log.info("📝 Creating disposal request for asset: {} by user: {}", assetId, requestedBy);
-        log.info("📝 Disposal Reason: {}", disposalReason);
-        log.info("📝 Disposal Method: {}", disposalMethod);
-        log.info("📝 Priority: {}", priority);
 
         try {
             Asset asset = assetRepository.findById(assetId)
@@ -62,7 +65,8 @@ public class AssetDisposalService {
 
             // Check for pending requests
             if (disposalRequestRepository.existsByAssetIdAndStatusIn(assetId,
-                    List.of("PENDING", "APPROVED", "IN_PROGRESS"))) {
+                    List.of("PENDING", "APPROVED", "IN_PROGRESS", "PENDING_FINANCE_APPROVAL",
+                            "PENDING_INFRA_APPROVAL", "PENDING_COMPLIANCE_APPROVAL", "PENDING_EXECUTION"))) {
                 log.warn("⚠️ Asset already has a pending disposal request");
                 throw new IllegalStateException("Asset already has a pending disposal request.");
             }
@@ -76,7 +80,17 @@ public class AssetDisposalService {
             request.setDisposalReason(disposalReason);
             request.setDisposalMethod(disposalMethod);
             request.setPriority(priority != null ? priority : "NORMAL");
-            request.setStatus("PENDING");
+
+            // Set initial workflow status - goes to Finance first
+            request.setStatus("PENDING_FINANCE_APPROVAL");
+            request.setCurrentApprovalStep("FINANCE");
+            request.setApprovalFlowStatus("IN_PROGRESS");
+
+            // Initialize approval statuses
+            request.setFinanceStatus("PENDING");
+            request.setInfraStatus("PENDING");
+            request.setComplianceStatus("PENDING");
+
             request.setRequestedAt(LocalDateTime.now());
 
             log.info("💾 Saving disposal request to database");
@@ -90,7 +104,6 @@ public class AssetDisposalService {
                 log.info("✅ SLA tracking started successfully for disposal request: {}", saved.getDisposalRequestId());
             } catch (Exception e) {
                 log.error("❌ Failed to start SLA tracking for disposal request: {}", e.getMessage(), e);
-                // Don't re-throw - the request is already saved
             }
 
             // Update asset status
@@ -99,13 +112,13 @@ public class AssetDisposalService {
             assetRepository.save(asset);
             log.info("✅ Asset status updated");
 
-            // Notify authorizers
-            log.info("📧 Notifying disposal authorizers");
+            // Notify Finance approvers
+            log.info("📧 Notifying Finance approvers");
             try {
-                notifyDisposalAuthorizers(saved);
-                log.info("✅ Authorizers notified");
+                notifyFinanceApprovers(saved);
+                log.info("✅ Finance approvers notified");
             } catch (Exception e) {
-                log.error("❌ Failed to notify authorizers: {}", e.getMessage(), e);
+                log.error("❌ Failed to notify Finance approvers: {}", e.getMessage(), e);
             }
 
             // Log audit
@@ -127,85 +140,430 @@ public class AssetDisposalService {
         }
     }
 
+    // ============================================
+    // FINANCE APPROVAL
+    // ============================================
+
     @Transactional
-    public AssetDisposalRequest completeDisposalProcess(Long requestId, Long completerId,
-                                                        String completionNotes,
-                                                        String disposalMethod,
-                                                        boolean dataWipeConfirmed) {
-        log.info("=== COMPLETE DISPOSAL PROCESS START ===");
-        log.info("📝 Completing disposal process for request: {} by: {}", requestId, completerId);
-        log.info("📝 Completion Notes: {}", completionNotes);
-        log.info("📝 Disposal Method: {}", disposalMethod);
-        log.info("📝 Data Wipe Confirmed: {}", dataWipeConfirmed);
+    public void approveByFinance(Long requestId, Long approverId, String comment) {
+        log.info("=== FINANCE APPROVAL START ===");
+        log.info("📝 Finance approver {} approving request: {}", approverId, requestId);
 
         try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-            log.info("✅ Found request with status: {}", request.getStatus());
+            AssetDisposalRequest request = validateRequest(requestId);
 
-            // Validate status
-            if (!"IN_PROGRESS".equals(request.getStatus()) && !"APPROVED".equals(request.getStatus())) {
-                log.error("❌ Invalid status: {}", request.getStatus());
-                throw new IllegalStateException("Request must be in progress or approved. Current: " + request.getStatus());
-            }
-            log.info("✅ Status validation passed");
-
-            // Handle data wipe
-            if (dataWipeConfirmed) {
-                log.info("📝 Confirming data wipe");
-                request.setDataWipeConfirmed(true);
-                request.setDataWipeConfirmedBy(completerId);
-                request.setDataWipeConfirmedAt(LocalDateTime.now());
-                log.info("✅ Data wipe confirmed");
+            // Validate current step
+            if (!"FINANCE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Finance approval step. Current: " + request.getCurrentApprovalStep());
             }
 
-            // Update request status
-            log.info("📝 Updating request status to COMPLETED");
+            if (!"PENDING".equals(request.getFinanceStatus())) {
+                throw new IllegalStateException("Finance approval already processed. Status: " + request.getFinanceStatus());
+            }
+
+            request.setFinanceApprovedBy(approverId);
+            request.setFinanceApprovedAt(LocalDateTime.now());
+            request.setFinanceComment(comment);
+            request.setFinanceStatus("APPROVED");
+
+            // Move to next step
+            request.setCurrentApprovalStep("INFRASTRUCTURE");
+            request.setStatus("PENDING_INFRA_APPROVAL");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Finance approval completed for request: {}", requestId);
+
+            // Notify Infrastructure approvers
+            try {
+                notifyInfrastructureApprovers(request);
+                log.info("✅ Infrastructure approvers notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify Infrastructure approvers: {}", e.getMessage(), e);
+            }
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been approved by Finance. It is now pending Infrastructure approval.");
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            auditService.logAction("DISPOSAL_FINANCE_APPROVED",
+                    "Disposal request #" + requestId + " approved by Finance",
+                    approverId);
+
+            log.info("=== FINANCE APPROVAL END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Finance approval: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void rejectByFinance(Long requestId, Long approverId, String reason) {
+        log.info("=== FINANCE REJECTION START ===");
+        log.info("📝 Finance approver {} rejecting request: {}", approverId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"FINANCE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Finance approval step.");
+            }
+
+            request.setFinanceApprovedBy(approverId);
+            request.setFinanceApprovedAt(LocalDateTime.now());
+            request.setFinanceComment(reason);
+            request.setFinanceStatus("REJECTED");
+            request.setStatus("REJECTED");
+            request.setRejectionReason("Finance Rejection: " + reason);
+            request.setApprovalFlowStatus("REJECTED");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Finance rejection processed for request: {}", requestId);
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been rejected by Finance. Reason: " + reason);
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            // Update asset status back to ACTIVE
+            try {
+                Asset asset = assetRepository.findById(request.getAssetId()).orElse(null);
+                if (asset != null) {
+                    asset.setDisposalStatus("ACTIVE");
+                    assetRepository.save(asset);
+                    log.info("✅ Asset status reverted to ACTIVE");
+                }
+            } catch (Exception e) {
+                log.error("❌ Failed to update asset status: {}", e.getMessage(), e);
+            }
+
+            auditService.logAction("DISPOSAL_FINANCE_REJECTED",
+                    "Disposal request #" + requestId + " rejected by Finance. Reason: " + reason,
+                    approverId);
+
+            log.info("=== FINANCE REJECTION END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Finance rejection: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    // ============================================
+    // INFRASTRUCTURE APPROVAL
+    // ============================================
+
+    @Transactional
+    public void approveByInfrastructure(Long requestId, Long approverId, String comment, MultipartFile policyFile) {
+        log.info("=== INFRASTRUCTURE APPROVAL START ===");
+        log.info("📝 Infrastructure approver {} approving request: {}", approverId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"INFRASTRUCTURE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Infrastructure approval step.");
+            }
+
+            // Upload policy file if provided
+            String policyPath = null;
+            if (policyFile != null && !policyFile.isEmpty()) {
+                policyPath = uploadPolicyFile(policyFile, requestId);
+                request.setDisposalPolicyPath(policyPath);
+                log.info("✅ Policy file uploaded: {}", policyPath);
+            }
+
+            request.setInfraApprovedBy(approverId);
+            request.setInfraApprovedAt(LocalDateTime.now());
+            request.setInfraComment(comment);
+            request.setInfraStatus("APPROVED");
+
+            // Move to next step
+            request.setCurrentApprovalStep("COMPLIANCE");
+            request.setStatus("PENDING_COMPLIANCE_APPROVAL");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Infrastructure approval completed for request: {}", requestId);
+
+            // Notify Compliance approvers
+            try {
+                notifyComplianceApprovers(request);
+                log.info("✅ Compliance approvers notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify Compliance approvers: {}", e.getMessage(), e);
+            }
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been approved by Infrastructure. It is now pending Risk & Compliance approval.");
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            auditService.logAction("DISPOSAL_INFRA_APPROVED",
+                    "Disposal request #" + requestId + " approved by Infrastructure" +
+                            (policyPath != null ? ". Policy uploaded: " + policyPath : ""),
+                    approverId);
+
+            log.info("=== INFRASTRUCTURE APPROVAL END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Infrastructure approval: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void rejectByInfrastructure(Long requestId, Long approverId, String reason) {
+        log.info("=== INFRASTRUCTURE REJECTION START ===");
+        log.info("📝 Infrastructure approver {} rejecting request: {}", approverId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"INFRASTRUCTURE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Infrastructure approval step.");
+            }
+
+            request.setInfraApprovedBy(approverId);
+            request.setInfraApprovedAt(LocalDateTime.now());
+            request.setInfraComment(reason);
+            request.setInfraStatus("REJECTED");
+            request.setStatus("REJECTED");
+            request.setRejectionReason("Infrastructure Rejection: " + reason);
+            request.setApprovalFlowStatus("REJECTED");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Infrastructure rejection processed for request: {}", requestId);
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been rejected by Infrastructure. Reason: " + reason);
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            // Update asset status back to ACTIVE
+            try {
+                Asset asset = assetRepository.findById(request.getAssetId()).orElse(null);
+                if (asset != null) {
+                    asset.setDisposalStatus("ACTIVE");
+                    assetRepository.save(asset);
+                    log.info("✅ Asset status reverted to ACTIVE");
+                }
+            } catch (Exception e) {
+                log.error("❌ Failed to update asset status: {}", e.getMessage(), e);
+            }
+
+            auditService.logAction("DISPOSAL_INFRA_REJECTED",
+                    "Disposal request #" + requestId + " rejected by Infrastructure. Reason: " + reason,
+                    approverId);
+
+            log.info("=== INFRASTRUCTURE REJECTION END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Infrastructure rejection: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    // ============================================
+    // RISK & COMPLIANCE APPROVAL
+    // ============================================
+
+    @Transactional
+    public void approveByCompliance(Long requestId, Long approverId, String comment) {
+        log.info("=== COMPLIANCE APPROVAL START ===");
+        log.info("📝 Compliance approver {} approving request: {}", approverId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"COMPLIANCE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Compliance approval step.");
+            }
+
+            request.setComplianceApprovedBy(approverId);
+            request.setComplianceApprovedAt(LocalDateTime.now());
+            request.setComplianceComment(comment);
+            request.setComplianceStatus("APPROVED");
+
+            // All approvals done - move to execution
+            request.setCurrentApprovalStep("EXECUTION");
+            request.setStatus("PENDING_EXECUTION");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Compliance approval completed for request: {}", requestId);
+
+            // Notify Infrastructure team (executors)
+            try {
+                notifyExecutionTeam(request);
+                log.info("✅ Execution team notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify execution team: {}", e.getMessage(), e);
+            }
+
+            // Notify requester
+            try {
+                notifyRequester(request, "All approvals completed! Your disposal request is now ready for execution.");
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            auditService.logAction("DISPOSAL_COMPLIANCE_APPROVED",
+                    "Disposal request #" + requestId + " approved by Risk & Compliance",
+                    approverId);
+
+            log.info("=== COMPLIANCE APPROVAL END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Compliance approval: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void rejectByCompliance(Long requestId, Long approverId, String reason) {
+        log.info("=== COMPLIANCE REJECTION START ===");
+        log.info("📝 Compliance approver {} rejecting request: {}", approverId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"COMPLIANCE".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not at Compliance approval step.");
+            }
+
+            request.setComplianceApprovedBy(approverId);
+            request.setComplianceApprovedAt(LocalDateTime.now());
+            request.setComplianceComment(reason);
+            request.setComplianceStatus("REJECTED");
+            request.setStatus("REJECTED");
+            request.setRejectionReason("Compliance Rejection: " + reason);
+            request.setApprovalFlowStatus("REJECTED");
+
+            disposalRequestRepository.save(request);
+            log.info("✅ Compliance rejection processed for request: {}", requestId);
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been rejected by Risk & Compliance. Reason: " + reason);
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            // Update asset status back to ACTIVE
+            try {
+                Asset asset = assetRepository.findById(request.getAssetId()).orElse(null);
+                if (asset != null) {
+                    asset.setDisposalStatus("ACTIVE");
+                    assetRepository.save(asset);
+                    log.info("✅ Asset status reverted to ACTIVE");
+                }
+            } catch (Exception e) {
+                log.error("❌ Failed to update asset status: {}", e.getMessage(), e);
+            }
+
+            auditService.logAction("DISPOSAL_COMPLIANCE_REJECTED",
+                    "Disposal request #" + requestId + " rejected by Risk & Compliance. Reason: " + reason,
+                    approverId);
+
+            log.info("=== COMPLIANCE REJECTION END - SUCCESS ===");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to process Compliance rejection: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    // ============================================
+    // EXECUTION
+    // ============================================
+
+    @Transactional
+    public void executeDisposal(Long requestId, Long executorId, String notes, MultipartFile proofDocument) {
+        log.info("=== EXECUTION START ===");
+        log.info("📝 Executor {} executing disposal request: {}", executorId, requestId);
+
+        try {
+            AssetDisposalRequest request = validateRequest(requestId);
+
+            if (!"EXECUTION".equals(request.getCurrentApprovalStep())) {
+                throw new IllegalStateException("Request is not ready for execution.");
+            }
+
+            // Upload proof document
+            String proofPath = null;
+            if (proofDocument != null && !proofDocument.isEmpty()) {
+                proofPath = uploadProofFile(proofDocument, requestId);
+                request.setProofDocumentPath(proofPath);
+                log.info("✅ Proof document uploaded: {}", proofPath);
+            }
+
+            request.setExecutedBy(executorId);
+            request.setExecutedAt(LocalDateTime.now());
             request.setStatus("COMPLETED");
-            request.setCompletedBy(completerId);
-            request.setCompletedAt(LocalDateTime.now());
-            request.setCompletionNotes(completionNotes);
+            request.setCurrentApprovalStep("COMPLETED");
+            request.setApprovalFlowStatus("COMPLETED");
+            request.setCompletionNotes(notes);
 
-            log.info("💾 Saving updated request");
-            AssetDisposalRequest saved = disposalRequestRepository.save(request);
-            log.info("✅ Request saved with status: {}", saved.getStatus());
-
-            // ✅ Complete SLA tracking
-            log.info("📊 Completing SLA tracking for disposal request: {}", requestId);
+            // Complete SLA tracking
             try {
                 slaService.completeSLATracking(requestId, "ASSET_DISPOSAL");
                 log.info("✅ SLA tracking completed for disposal request: {}", requestId);
             } catch (Exception e) {
-                log.error("❌ Failed to complete SLA tracking for disposal request: {}", e.getMessage(), e);
+                log.error("❌ Failed to complete SLA tracking: {}", e.getMessage(), e);
             }
 
-            // Update asset
-            log.info("📝 Updating asset record");
-            Asset asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> {
-                        log.error("❌ Asset not found: {}", request.getAssetId());
-                        return new RuntimeException("Asset not found");
-                    });
-            log.info("✅ Found asset: {} (Tag: {})", asset.getName(), asset.getTag());
+            disposalRequestRepository.save(request);
+            log.info("✅ Disposal execution completed for request: {}", requestId);
 
-            asset.setDisposalStatus("DISPOSED");
-            asset.setDisposalDate(LocalDate.now());
-            asset.setDisposalMethod(disposalMethod);
-            asset.setDisposalCompletedBy(completerId);
-            asset.setDisposalCompletedAt(LocalDateTime.now());
-            asset.setDisposalNotes(completionNotes);
-            asset.setDataWipeStatus(dataWipeConfirmed ? "COMPLETED" : "NOT_REQUIRED");
-            asset.setAssetLifecycleStatus("DISPOSED");
-            asset.setStatus(Asset.AssetStatus.RETIRED);
+            // Update asset status to DISPOSED
+            try {
+                Asset asset = assetRepository.findById(request.getAssetId())
+                        .orElseThrow(() -> new RuntimeException("Asset not found"));
 
-            assetRepository.save(asset);
-            log.info("✅ Asset updated with disposal status: DISPOSED");
+                // Update all asset status fields
+                asset.setStatus(Asset.AssetStatus.DISPOSED);
+                asset.setDisposalStatus("DISPOSED");
+                asset.setAssetLifecycleStatus("DISPOSED");
+                asset.setDisposalDate(LocalDate.now());
+                asset.setDisposalMethod(request.getDisposalMethod());
+                asset.setDisposalCompletedBy(executorId);
+                asset.setDisposalCompletedAt(LocalDateTime.now());
+                asset.setDisposalNotes(notes);
 
-            // Generate certificate
-            log.info("📄 Generating disposal certificate");
+                if (proofPath != null) {
+                    asset.setDisposalCertificatePath(proofPath);
+                }
+
+                assetRepository.save(asset);
+                log.info("✅ Asset {} marked as DISPOSED", asset.getTag());
+            } catch (Exception e) {
+                log.error("❌ Failed to update asset status: {}", e.getMessage(), e);
+            }
+
+            // Notify requester
+            try {
+                notifyRequester(request, "Your disposal request has been completed successfully!");
+                log.info("✅ Requester notified");
+            } catch (Exception e) {
+                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
+            }
+
+            // Generate disposal certificate
             try {
                 generateDisposalCertificate(requestId);
                 log.info("✅ Disposal certificate generated");
@@ -213,343 +571,289 @@ public class AssetDisposalService {
                 log.error("❌ Failed to generate disposal certificate: {}", e.getMessage(), e);
             }
 
-            // Notify requester
-            log.info("📧 Notifying requester");
-            try {
-                notifyRequester(request, "Your disposal request has been completed.");
-                log.info("✅ Requester notified");
-            } catch (Exception e) {
-                log.error("❌ Failed to notify requester: {}", e.getMessage(), e);
-            }
+            auditService.logAction("DISPOSAL_EXECUTED",
+                    "Disposal request #" + requestId + " executed by " + executorId +
+                            (proofPath != null ? ". Proof uploaded: " + proofPath : ""),
+                    executorId);
 
-            // Log audit
-            try {
-                auditService.logAction("DISPOSAL_PROCESS_COMPLETED",
-                        "Disposal process completed for request: " + requestId,
-                        completerId);
-                log.info("✅ Audit logged");
-            } catch (Exception e) {
-                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
-            }
-
-            log.info("=== COMPLETE DISPOSAL PROCESS END - SUCCESS ===");
-            return saved;
+            log.info("=== EXECUTION END - SUCCESS ===");
 
         } catch (Exception e) {
-            log.error("❌ Failed to complete disposal process: {}", e.getMessage(), e);
-            throw e;
-        }
-    }
-
-    @Transactional
-    public void confirmDataWipe(Long requestId, Long confirmerId) {
-        log.info("=== CONFIRM DATA WIPE START ===");
-        log.info("📝 Confirming data wipe for request: {} by: {}", requestId, confirmerId);
-
-        try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-            log.info("✅ Found request with status: {}", request.getStatus());
-
-            if (!"IN_PROGRESS".equals(request.getStatus()) && !"APPROVED".equals(request.getStatus())) {
-                log.error("❌ Invalid status: {}", request.getStatus());
-                throw new IllegalStateException("Request must be in progress or approved. Current: " + request.getStatus());
-            }
-            log.info("✅ Status validation passed");
-
-            request.setDataWipeConfirmed(true);
-            request.setDataWipeConfirmedBy(confirmerId);
-            request.setDataWipeConfirmedAt(LocalDateTime.now());
-            disposalRequestRepository.save(request);
-            log.info("✅ Data wipe confirmed for request: {}", requestId);
-
-            // Update asset
-            Asset asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> {
-                        log.error("❌ Asset not found: {}", request.getAssetId());
-                        return new RuntimeException("Asset not found");
-                    });
-            log.info("✅ Found asset: {} (Tag: {})", asset.getName(), asset.getTag());
-
-            asset.setDataWipeStatus("VERIFIED");
-            asset.setDataWipeVerifiedBy(confirmerId);
-            asset.setDataWipeVerifiedAt(LocalDateTime.now());
-            assetRepository.save(asset);
-            log.info("✅ Asset data wipe status updated to VERIFIED");
-
-            try {
-                auditService.logAction("DATA_WIPE_CONFIRMED",
-                        "Data wipe confirmed for disposal request: " + requestId,
-                        confirmerId);
-                log.info("✅ Audit logged");
-            } catch (Exception e) {
-                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
-            }
-
-            log.info("=== CONFIRM DATA WIPE END - SUCCESS ===");
-
-        } catch (Exception e) {
-            log.error("❌ Failed to confirm data wipe: {}", e.getMessage(), e);
+            log.error("❌ Failed to execute disposal: {}", e.getMessage(), e);
             throw e;
         }
     }
 
     // ============================================
-    // Query Methods
+    // QUERY METHODS
     // ============================================
 
-    public List<AssetDisposalRequest> getPendingRequests() {
-        log.debug("📋 Getting pending disposal requests");
-        return disposalRequestRepository.findByStatus("PENDING");
+    public List<AssetDisposalRequest> getPendingFinanceRequests() {
+        return disposalRequestRepository.findByStatus("PENDING_FINANCE_APPROVAL");
+    }
+
+    public List<AssetDisposalRequest> getPendingInfraRequests() {
+        return disposalRequestRepository.findByStatus("PENDING_INFRA_APPROVAL");
+    }
+
+    public List<AssetDisposalRequest> getPendingComplianceRequests() {
+        return disposalRequestRepository.findByStatus("PENDING_COMPLIANCE_APPROVAL");
+    }
+
+    public List<AssetDisposalRequest> getPendingExecutionRequests() {
+        return disposalRequestRepository.findByStatus("PENDING_EXECUTION");
     }
 
     public List<AssetDisposalRequest> getRequestsByStatus(String status) {
-        log.debug("📋 Getting disposal requests with status: {}", status);
         return disposalRequestRepository.findByStatus(status);
     }
 
     public List<AssetDisposalRequest> getRequestsByAssetId(Integer assetId) {
-        log.debug("📋 Getting disposal requests for asset: {}", assetId);
         return disposalRequestRepository.findByAssetId(assetId);
     }
 
     public List<AssetDisposalRequest> getRequestsByRequester(Long userId) {
-        log.debug("📋 Getting disposal requests for requester: {}", userId);
         return disposalRequestRepository.findByRequestedBy(userId);
     }
 
     public List<Asset> getAssetsReadyForDisposal() {
         LocalDate today = LocalDate.now();
-        log.debug("📋 Getting assets ready for disposal (EOL before: {})", today);
         return assetRepository.findByEolDateBeforeAndDisposalStatus(today, "ACTIVE");
     }
 
     public List<Asset> getAssetsPastRetentionPeriod() {
         LocalDate today = LocalDate.now();
-        log.debug("📋 Getting assets past retention period (before: {})", today);
         return assetRepository.findByRetentionPeriodEndDateBeforeAndDisposalStatus(today, "ACTIVE");
     }
 
     public AssetDisposalRequest getRequestById(Long requestId) {
-        log.debug("📋 Getting disposal request by ID: {}", requestId);
         return disposalRequestRepository.findById(requestId)
-                .orElseThrow(() -> {
-                    log.error("❌ Disposal request not found: {}", requestId);
-                    return new RuntimeException("Disposal request not found: " + requestId);
-                });
+                .orElseThrow(() -> new RuntimeException("Disposal request not found: " + requestId));
     }
 
     public boolean hasPendingRequest(Integer assetId) {
-        log.debug("📋 Checking for pending request on asset: {}", assetId);
         return disposalRequestRepository.existsByAssetIdAndStatusIn(assetId,
-                List.of("PENDING", "APPROVED", "IN_PROGRESS"));
+                List.of("PENDING", "APPROVED", "IN_PROGRESS", "PENDING_FINANCE_APPROVAL",
+                        "PENDING_INFRA_APPROVAL", "PENDING_COMPLIANCE_APPROVAL", "PENDING_EXECUTION"));
     }
 
     public AssetDisposalRequest getPendingRequestByAssetId(Integer assetId) {
-        log.debug("📋 Getting pending request for asset: {}", assetId);
         List<AssetDisposalRequest> requests = disposalRequestRepository
-                .findByAssetIdAndStatusIn(assetId, List.of("PENDING", "APPROVED", "IN_PROGRESS"));
+                .findByAssetIdAndStatusIn(assetId, List.of("PENDING_FINANCE_APPROVAL", "PENDING_INFRA_APPROVAL",
+                        "PENDING_COMPLIANCE_APPROVAL", "PENDING_EXECUTION", "IN_PROGRESS"));
         return requests.isEmpty() ? null : requests.get(0);
     }
 
     // ============================================
-    // Missing Methods - Added with Debug Logging
+    // HELPER METHODS
     // ============================================
 
-    @Transactional
-    public void approveDisposalRequest(Long requestId, Long userId, String comment, String approvalReference) {
-        log.info("=== APPROVE DISPOSAL REQUEST START ===");
-        log.info("📝 Approving disposal request: {} by user: {}", requestId, userId);
-        log.info("📝 Comment: {}", comment);
-        log.info("📝 Approval Reference: {}", approvalReference);
+    private AssetDisposalRequest validateRequest(Long requestId) {
+        return disposalRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Disposal request not found: " + requestId));
+    }
 
+    private String uploadPolicyFile(MultipartFile file, Long requestId) {
         try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-            log.info("✅ Found request with status: {}", request.getStatus());
-
-            if (!"PENDING".equals(request.getStatus())) {
-                log.error("❌ Invalid status for approval: {}", request.getStatus());
-                throw new IllegalStateException("Request must be pending. Current: " + request.getStatus());
+            Path uploadPath = Paths.get(POLICY_UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
             }
 
-            request.setStatus("APPROVED");
-            request.setApprovedBy(userId);
-            request.setApprovedAt(LocalDateTime.now());
-            request.setApprovalComment(comment);
-            request.setApprovalReference(approvalReference);
-
-            disposalRequestRepository.save(request);
-            log.info("✅ Disposal request approved");
-
-            try {
-                auditService.logAction("DISPOSAL_REQUEST_APPROVED",
-                        "Disposal request approved: " + requestId,
-                        userId);
-                log.info("✅ Audit logged");
-            } catch (Exception e) {
-                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
-            }
-
-            log.info("=== APPROVE DISPOSAL REQUEST END - SUCCESS ===");
-
-        } catch (Exception e) {
-            log.error("❌ Failed to approve disposal request: {}", e.getMessage(), e);
-            throw e;
+            String filename = "policy_" + requestId + "_" + System.currentTimeMillis() + "_" +
+                    file.getOriginalFilename().replaceAll("\\s+", "_");
+            Path filePath = uploadPath.resolve(filename);
+            Files.write(filePath, file.getBytes());
+            return filePath.toString();
+        } catch (IOException e) {
+            log.error("Failed to upload policy file: {}", e.getMessage());
+            throw new RuntimeException("Failed to upload policy file", e);
         }
     }
 
-    @Transactional
-    public void rejectDisposalRequest(Long requestId, Long userId, String reason) {
-        log.info("=== REJECT DISPOSAL REQUEST START ===");
-        log.info("📝 Rejecting disposal request: {} by user: {}", requestId, userId);
-        log.info("📝 Reason: {}", reason);
-
+    private String uploadProofFile(MultipartFile file, Long requestId) {
         try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-            log.info("✅ Found request with status: {}", request.getStatus());
-
-            if (!"PENDING".equals(request.getStatus())) {
-                log.error("❌ Invalid status for rejection: {}", request.getStatus());
-                throw new IllegalStateException("Request must be pending. Current: " + request.getStatus());
+            Path uploadPath = Paths.get(PROOF_UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
             }
 
-            request.setStatus("REJECTED");
-            request.setRejectionReason(reason);
-            request.setApprovedBy(userId);
-            request.setApprovedAt(LocalDateTime.now());
-
-            disposalRequestRepository.save(request);
-            log.info("✅ Disposal request rejected");
-
-            try {
-                auditService.logAction("DISPOSAL_REQUEST_REJECTED",
-                        "Disposal request rejected: " + requestId + " - Reason: " + reason,
-                        userId);
-                log.info("✅ Audit logged");
-            } catch (Exception e) {
-                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
-            }
-
-            log.info("=== REJECT DISPOSAL REQUEST END - SUCCESS ===");
-
-        } catch (Exception e) {
-            log.error("❌ Failed to reject disposal request: {}", e.getMessage(), e);
-            throw e;
-        }
-    }
-
-    @Transactional
-    public void startDisposalProcess(Long requestId, Long userId) {
-        log.info("=== START DISPOSAL PROCESS START ===");
-        log.info("📝 Starting disposal process for request: {} by user: {}", requestId, userId);
-
-        try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-            log.info("✅ Found request with status: {}", request.getStatus());
-
-            if (!"APPROVED".equals(request.getStatus())) {
-                log.error("❌ Invalid status for starting process: {}", request.getStatus());
-                throw new IllegalStateException("Request must be approved. Current: " + request.getStatus());
-            }
-
-            request.setStatus("IN_PROGRESS");
-            request.setCompletedBy(userId);
-            request.setCompletedAt(LocalDateTime.now());
-
-            disposalRequestRepository.save(request);
-            log.info("✅ Disposal process started");
-
-            // Update asset
-            Asset asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> {
-                        log.error("❌ Asset not found: {}", request.getAssetId());
-                        return new RuntimeException("Asset not found");
-                    });
-            log.info("✅ Found asset: {} (Tag: {})", asset.getName(), asset.getTag());
-
-            asset.setDisposalStatus("IN_PROGRESS");
-            assetRepository.save(asset);
-            log.info("✅ Asset status updated to IN_PROGRESS");
-
-            try {
-                auditService.logAction("DISPOSAL_PROCESS_STARTED",
-                        "Disposal process started for request: " + requestId,
-                        userId);
-                log.info("✅ Audit logged");
-            } catch (Exception e) {
-                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
-            }
-
-            log.info("=== START DISPOSAL PROCESS END - SUCCESS ===");
-
-        } catch (Exception e) {
-            log.error("❌ Failed to start disposal process: {}", e.getMessage(), e);
-            throw e;
+            String filename = "proof_" + requestId + "_" + System.currentTimeMillis() + "_" +
+                    file.getOriginalFilename().replaceAll("\\s+", "_");
+            Path filePath = uploadPath.resolve(filename);
+            Files.write(filePath, file.getBytes());
+            return filePath.toString();
+        } catch (IOException e) {
+            log.error("Failed to upload proof file: {}", e.getMessage());
+            throw new RuntimeException("Failed to upload proof file", e);
         }
     }
 
     // ============================================
-    // Helper Methods
+    // NOTIFICATION METHODS
     // ============================================
 
-    private void notifyDisposalAuthorizers(AssetDisposalRequest request) {
-        log.info("📧 Notifying disposal authorizers about request: {}", request.getDisposalRequestId());
+    private void notifyFinanceApprovers(AssetDisposalRequest request) {
+        log.info("📧 Notifying Finance approvers about request: {}", request.getDisposalRequestId());
 
         try {
             String requestLink = baseUrlService.buildUrl("/admin/disposal/%s", request.getDisposalRequestId());
             String assetName = getAssetName(request.getAssetId());
 
-            List<AppUser> authorizers = userService.getUsersWithPermission("DISPOSAL_APPROVE");
+            List<AppUser> approvers = userService.getUsersWithPermission("DISPOSAL_FINANCE_APPROVE");
 
-            if (authorizers.isEmpty()) {
-                log.warn("⚠️ No users with DISPOSAL_APPROVE permission found. Falling back to admins.");
-                authorizers = userService.getUsersByRole("ADMIN");
+            if (approvers.isEmpty()) {
+                log.warn("⚠️ No users with DISPOSAL_FINANCE_APPROVE permission found.");
+                approvers = userService.getUsersByRole("FINANCE");
             }
 
-            log.info("📧 Found {} authorizers to notify", authorizers.size());
-
-            for (AppUser user : authorizers) {
+            for (AppUser user : approvers) {
                 try {
                     emailService.sendSimpleEmail(
                             user.getEmail(),
-                            "New Asset Disposal Request - Action Required",
-                            generateDisposalRequestEmailBody(request, assetName, requestLink)
+                            "Action Required: Asset Disposal Request - Finance Approval",
+                            generateFinanceApprovalEmail(request, assetName, requestLink)
                     );
                     log.info("✅ Email sent to: {}", user.getEmail());
 
                     createNotification(
                             user.getUserId(),
-                            "DISPOSAL_REQUEST_PENDING",
-                            "New Disposal Request",
-                            "A disposal request for asset " + assetName + " requires your approval.",
+                            "DISPOSAL_FINANCE_PENDING",
+                            "Disposal Request - Finance Approval Required",
+                            "Disposal request #" + request.getDisposalRequestId() +
+                                    " for asset " + assetName + " requires your approval.",
                             requestLink
                     );
-                    log.info("✅ Notification created for user: {}", user.getUserId());
-
                 } catch (Exception e) {
-                    log.error("❌ Failed to notify user {}: {}", user.getUserId(), e.getMessage(), e);
+                    log.error("❌ Failed to notify user {}: {}", user.getUserId(), e.getMessage());
                 }
             }
 
-            log.info("✅ Notified {} authorizers", authorizers.size());
+        } catch (Exception e) {
+            log.error("❌ Failed to notify Finance approvers: {}", e.getMessage(), e);
+        }
+    }
+
+    private void notifyInfrastructureApprovers(AssetDisposalRequest request) {
+        log.info("📧 Notifying Infrastructure approvers about request: {}", request.getDisposalRequestId());
+
+        try {
+            String requestLink = baseUrlService.buildUrl("/admin/disposal/%s", request.getDisposalRequestId());
+            String assetName = getAssetName(request.getAssetId());
+
+            List<AppUser> approvers = userService.getUsersWithPermission("DISPOSAL_INFRA_APPROVE");
+
+            if (approvers.isEmpty()) {
+                log.warn("⚠️ No users with DISPOSAL_INFRA_APPROVE permission found.");
+                approvers = userService.getUsersByRole("INFRA");
+            }
+
+            for (AppUser user : approvers) {
+                try {
+                    emailService.sendSimpleEmail(
+                            user.getEmail(),
+                            "Action Required: Asset Disposal Request - Infrastructure Approval",
+                            generateInfrastructureApprovalEmail(request, assetName, requestLink)
+                    );
+                    log.info("✅ Email sent to: {}", user.getEmail());
+
+                    createNotification(
+                            user.getUserId(),
+                            "DISPOSAL_INFRA_PENDING",
+                            "Disposal Request - Infrastructure Approval Required",
+                            "Disposal request #" + request.getDisposalRequestId() +
+                                    " for asset " + assetName + " requires your approval.\nPlease upload the approved disposal policy.",
+                            requestLink
+                    );
+                } catch (Exception e) {
+                    log.error("❌ Failed to notify user {}: {}", user.getUserId(), e.getMessage());
+                }
+            }
 
         } catch (Exception e) {
-            log.error("❌ Failed to notify authorizers: {}", e.getMessage(), e);
+            log.error("❌ Failed to notify Infrastructure approvers: {}", e.getMessage(), e);
+        }
+    }
+
+    private void notifyComplianceApprovers(AssetDisposalRequest request) {
+        log.info("📧 Notifying Compliance approvers about request: {}", request.getDisposalRequestId());
+
+        try {
+            String requestLink = baseUrlService.buildUrl("/admin/disposal/%s", request.getDisposalRequestId());
+            String assetName = getAssetName(request.getAssetId());
+
+            List<AppUser> approvers = userService.getUsersWithPermission("DISPOSAL_COMPLIANCE_APPROVE");
+
+            if (approvers.isEmpty()) {
+                log.warn("⚠️ No users with DISPOSAL_COMPLIANCE_APPROVE permission found.");
+                approvers = userService.getUsersByRole("COMPLIANCE");
+            }
+
+            for (AppUser user : approvers) {
+                try {
+                    emailService.sendSimpleEmail(
+                            user.getEmail(),
+                            "Action Required: Asset Disposal Request - Risk & Compliance Approval",
+                            generateComplianceApprovalEmail(request, assetName, requestLink)
+                    );
+                    log.info("✅ Email sent to: {}", user.getEmail());
+
+                    createNotification(
+                            user.getUserId(),
+                            "DISPOSAL_COMPLIANCE_PENDING",
+                            "Disposal Request - Risk & Compliance Approval Required",
+                            "Disposal request #" + request.getDisposalRequestId() +
+                                    " for asset " + assetName + " requires your approval.",
+                            requestLink
+                    );
+                } catch (Exception e) {
+                    log.error("❌ Failed to notify user {}: {}", user.getUserId(), e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to notify Compliance approvers: {}", e.getMessage(), e);
+        }
+    }
+
+    private void notifyExecutionTeam(AssetDisposalRequest request) {
+        log.info("📧 Notifying execution team about request: {}", request.getDisposalRequestId());
+
+        try {
+            String requestLink = baseUrlService.buildUrl("/admin/disposal/%s", request.getDisposalRequestId());
+            String assetName = getAssetName(request.getAssetId());
+
+            List<AppUser> executors = userService.getUsersWithPermission("DISPOSAL_EXECUTE");
+
+            if (executors.isEmpty()) {
+                log.warn("⚠️ No users with DISPOSAL_EXECUTE permission found.");
+                executors = userService.getUsersByRole("INFRA");
+            }
+
+            for (AppUser user : executors) {
+                try {
+                    emailService.sendSimpleEmail(
+                            user.getEmail(),
+                            "Action Required: Asset Disposal Request - Ready for Execution",
+                            generateExecutionEmail(request, assetName, requestLink)
+                    );
+                    log.info("✅ Email sent to: {}", user.getEmail());
+
+                    createNotification(
+                            user.getUserId(),
+                            "DISPOSAL_READY_EXECUTE",
+                            "Disposal Request - Ready for Execution",
+                            "Disposal request #" + request.getDisposalRequestId() +
+                                    " for asset " + assetName + " is ready for execution.\nPlease upload proof of disposal.",
+                            requestLink
+                    );
+                } catch (Exception e) {
+                    log.error("❌ Failed to notify user {}: {}", user.getUserId(), e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to notify execution team: {}", e.getMessage(), e);
         }
     }
 
@@ -568,7 +872,7 @@ public class AssetDisposalService {
                                     "Disposal Request Update - #" + request.getDisposalRequestId(),
                                     "Dear " + user.getFullName() + ",\n\n" +
                                             "Your disposal request for asset " + assetName + " has been updated.\n" +
-                                            "Status: " + request.getStatus() + "\n" +
+                                            "Status: " + request.getStatusDisplay() + "\n" +
                                             "Message: " + message + "\n\n" +
                                             "View details: " + requestLink + "\n\n" +
                                             "Thank you,\nAssetIQ-Pro Team"
@@ -582,8 +886,6 @@ public class AssetDisposalService {
                                     message + " (Request #" + request.getDisposalRequestId() + ")",
                                     requestLink
                             );
-                            log.info("✅ Notification created for requester: {}", user.getUserId());
-
                         } catch (Exception e) {
                             log.error("❌ Failed to send notification to requester: {}", e.getMessage(), e);
                         }
@@ -596,49 +898,67 @@ public class AssetDisposalService {
         }
     }
 
-    private void generateDisposalCertificate(Long requestId) {
-        log.info("📄 Generating disposal certificate for request: {}", requestId);
+    // ============================================
+    // EMAIL GENERATION METHODS
+    // ============================================
 
-        try {
-            AssetDisposalRequest request = disposalRequestRepository.findById(requestId)
-                    .orElseThrow(() -> {
-                        log.error("❌ Disposal request not found: {}", requestId);
-                        return new RuntimeException("Disposal request not found: " + requestId);
-                    });
-
-            Asset asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> {
-                        log.error("❌ Asset not found: {}", request.getAssetId());
-                        return new RuntimeException("Asset not found");
-                    });
-
-            log.info("📄 Disposal certificate generated for request: {} (Asset: {})", requestId, asset.getTag());
-
-            // Send certificate to requester
-            userService.getUserById(request.getRequestedBy()).ifPresent(user -> {
-                try {
-                    emailService.sendSimpleEmail(
-                            user.getEmail(),
-                            "Disposal Certificate - Asset #" + asset.getTag(),
-                            "Dear " + user.getFullName() + ",\n\n" +
-                                    "A disposal certificate has been generated for asset " + asset.getTag() + ".\n" +
-                                    "Asset: " + asset.getName() + "\n" +
-                                    "Serial: " + asset.getSerialNumber() + "\n" +
-                                    "Disposal Date: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "\n" +
-                                    "Disposal Method: " + request.getDisposalMethod() + "\n\n" +
-                                    "Please contact IT Infrastructure for the official certificate.\n\n" +
-                                    "Thank you,\nAssetIQ-Pro Team"
-                    );
-                    log.info("✅ Certificate email sent to: {}", user.getEmail());
-                } catch (Exception e) {
-                    log.error("❌ Failed to send certificate email: {}", e.getMessage(), e);
-                }
-            });
-
-        } catch (Exception e) {
-            log.error("❌ Failed to generate disposal certificate: {}", e.getMessage(), e);
-        }
+    private String generateFinanceApprovalEmail(AssetDisposalRequest request, String assetName, String requestLink) {
+        return "A new asset disposal request requires your Finance approval.\n\n" +
+                "Request #: " + request.getDisposalRequestId() + "\n" +
+                "Asset: " + assetName + "\n" +
+                "Disposal Reason: " + request.getDisposalReason() + "\n" +
+                "Disposal Method: " + request.getDisposalMethod() + "\n" +
+                "Priority: " + request.getPriority() + "\n" +
+                "Requested By: " + getRequesterName(request.getRequestedBy()) + "\n" +
+                "Requested At: " + request.getRequestedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n\n" +
+                "Please review and approve/reject:\n" + requestLink + "\n\n" +
+                "Regards,\nAssetIQ-Pro System";
     }
+
+    private String generateInfrastructureApprovalEmail(AssetDisposalRequest request, String assetName, String requestLink) {
+        return "An asset disposal request requires your Infrastructure approval.\n\n" +
+                "Request #: " + request.getDisposalRequestId() + "\n" +
+                "Asset: " + assetName + "\n" +
+                "Disposal Reason: " + request.getDisposalReason() + "\n" +
+                "Disposal Method: " + request.getDisposalMethod() + "\n" +
+                "Priority: " + request.getPriority() + "\n" +
+                "Finance Approved By: " + getApproverName(request.getFinanceApprovedBy()) + "\n" +
+                "Finance Approved At: " + formatDateTime(request.getFinanceApprovedAt()) + "\n" +
+                "Finance Comment: " + (request.getFinanceComment() != null ? request.getFinanceComment() : "N/A") + "\n\n" +
+                "Please upload the approved disposal policy and review:\n" + requestLink + "\n\n" +
+                "Regards,\nAssetIQ-Pro System";
+    }
+
+    private String generateComplianceApprovalEmail(AssetDisposalRequest request, String assetName, String requestLink) {
+        return "An asset disposal request requires your Risk & Compliance approval.\n\n" +
+                "Request #: " + request.getDisposalRequestId() + "\n" +
+                "Asset: " + assetName + "\n" +
+                "Disposal Reason: " + request.getDisposalReason() + "\n" +
+                "Disposal Method: " + request.getDisposalMethod() + "\n" +
+                "Priority: " + request.getPriority() + "\n" +
+                "Finance Approved By: " + getApproverName(request.getFinanceApprovedBy()) + "\n" +
+                "Infrastructure Approved By: " + getApproverName(request.getInfraApprovedBy()) + "\n" +
+                "Infrastructure Comment: " + (request.getInfraComment() != null ? request.getInfraComment() : "N/A") + "\n\n" +
+                "Please review and approve/reject:\n" + requestLink + "\n\n" +
+                "Regards,\nAssetIQ-Pro System";
+    }
+
+    private String generateExecutionEmail(AssetDisposalRequest request, String assetName, String requestLink) {
+        return "An asset disposal request is ready for execution.\n\n" +
+                "Request #: " + request.getDisposalRequestId() + "\n" +
+                "Asset: " + assetName + "\n" +
+                "Disposal Method: " + request.getDisposalMethod() + "\n" +
+                "All approvals have been completed:\n" +
+                "✅ Finance: " + getApproverName(request.getFinanceApprovedBy()) + "\n" +
+                "✅ Infrastructure: " + getApproverName(request.getInfraApprovedBy()) + "\n" +
+                "✅ Risk & Compliance: " + getApproverName(request.getComplianceApprovedBy()) + "\n\n" +
+                "Please execute the disposal and upload proof:\n" + requestLink + "\n\n" +
+                "Regards,\nAssetIQ-Pro System";
+    }
+
+    // ============================================
+    // UTILITY METHODS
+    // ============================================
 
     private void createNotification(Long userId, String type, String title, String message, String link) {
         try {
@@ -677,16 +997,25 @@ public class AssetDisposalService {
         }
     }
 
-    private String generateDisposalRequestEmailBody(AssetDisposalRequest request, String assetName, String requestLink) {
-        return "A new asset disposal request has been submitted.\n\n" +
-                "Request #: " + request.getDisposalRequestId() + "\n" +
-                "Asset: " + assetName + "\n" +
-                "Disposal Reason: " + request.getDisposalReason() + "\n" +
-                "Disposal Method: " + request.getDisposalMethod() + "\n" +
-                "Priority: " + request.getPriority() + "\n" +
-                "Requested By: " + getRequesterName(request.getRequestedBy()) + "\n" +
-                "Requested At: " + request.getRequestedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n\n" +
-                "Please review and respond: " + requestLink + "\n\n" +
-                "Regards,\nAssetIQ-Pro System";
+    private String getApproverName(Long userId) {
+        if (userId == null) return "N/A";
+        try {
+            return userService.getUserById(userId)
+                    .map(AppUser::getFullName)
+                    .orElse("User #" + userId);
+        } catch (Exception e) {
+            return "User #" + userId;
+        }
+    }
+
+    private String formatDateTime(LocalDateTime dateTime) {
+        if (dateTime == null) return "N/A";
+        return dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+    }
+
+    private void generateDisposalCertificate(Long requestId) {
+        log.info("📄 Generating disposal certificate for request: {}", requestId);
+        // TODO: Implement PDF generation for disposal certificate
+        // This can be added later when PDF generation service is ready
     }
 }

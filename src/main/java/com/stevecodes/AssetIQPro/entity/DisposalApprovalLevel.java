@@ -55,11 +55,17 @@ public class DisposalApprovalLevel {
     @JoinColumn(name = "created_by", insertable = false, updatable = false)
     private AppUser creator;
 
-    public String getStatusDisplay() {
-        return levelName;
+    // ============================================
+    // Helper Methods
+    // ============================================
+
+    public String getLevelNameDisplay() {
+        if (levelName == null) return "";
+        return levelName.substring(0, 1).toUpperCase() + levelName.substring(1).toLowerCase();
     }
 
     public String getColorClass() {
+        if (levelName == null) return "bg-secondary";
         switch (levelName.toUpperCase()) {
             case "FINANCE":
                 return "bg-info";
@@ -72,5 +78,13 @@ public class DisposalApprovalLevel {
             default:
                 return "bg-secondary";
         }
+    }
+
+    public boolean isMandatory() {
+        return isMandatory != null && isMandatory;
+    }
+
+    public String getStatusDisplay() {
+        return isMandatory ? "Mandatory" : "Optional";
     }
 }

@@ -49,6 +49,9 @@ public class AssetDisposalRequest {
     @Column(name = "status")
     private String status = "PENDING";
 
+    // ============================================
+    // LEGACY APPROVAL FIELDS (Keep for backward compatibility)
+    // ============================================
     @Column(name = "approved_by")
     private Long approvedBy;
 
@@ -62,10 +65,103 @@ public class AssetDisposalRequest {
     @Column(name = "approval_comment")
     private String approvalComment;
 
-    // ✅ ADDED: Missing field for approval reference
     @Column(name = "approval_reference")
     private String approvalReference;
 
+    // ============================================
+    // FINANCE APPROVAL
+    // ============================================
+    @Column(name = "finance_approved_by")
+    private Long financeApprovedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "finance_approved_by", insertable = false, updatable = false)
+    private AppUser financeApprover;
+
+    @Column(name = "finance_approved_at")
+    private LocalDateTime financeApprovedAt;
+
+    @Column(name = "finance_comment", columnDefinition = "NVARCHAR(MAX)")
+    private String financeComment;
+
+    @Column(name = "finance_status")
+    private String financeStatus = "PENDING";
+
+    // ============================================
+    // INFRASTRUCTURE APPROVAL
+    // ============================================
+    @Column(name = "infra_approved_by")
+    private Long infraApprovedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "infra_approved_by", insertable = false, updatable = false)
+    private AppUser infraApprover;
+
+    @Column(name = "infra_approved_at")
+    private LocalDateTime infraApprovedAt;
+
+    @Column(name = "infra_comment", columnDefinition = "NVARCHAR(MAX)")
+    private String infraComment;
+
+    @Column(name = "infra_status")
+    private String infraStatus = "PENDING";
+
+    @Column(name = "disposal_policy_path")
+    private String disposalPolicyPath;
+
+    // ============================================
+    // RISK & COMPLIANCE APPROVAL
+    // ============================================
+    @Column(name = "compliance_approved_by")
+    private Long complianceApprovedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compliance_approved_by", insertable = false, updatable = false)
+    private AppUser complianceApprover;
+
+    @Column(name = "compliance_approved_at")
+    private LocalDateTime complianceApprovedAt;
+
+    @Column(name = "compliance_comment", columnDefinition = "NVARCHAR(MAX)")
+    private String complianceComment;
+
+    @Column(name = "compliance_status")
+    private String complianceStatus = "PENDING";
+
+    // ============================================
+    // FINAL EXECUTION
+    // ============================================
+    @Column(name = "executed_by")
+    private Long executedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "executed_by", insertable = false, updatable = false)
+    private AppUser executor;
+
+    @Column(name = "executed_at")
+    private LocalDateTime executedAt;
+
+    @Column(name = "proof_document_path")
+    private String proofDocumentPath;
+
+    // ============================================
+    // WORKFLOW TRACKING
+    // ============================================
+    @Column(name = "current_approval_step")
+    private String currentApprovalStep = "FINANCE";
+
+    @Column(name = "approval_flow_status")
+    private String approvalFlowStatus = "IN_PROGRESS";
+
+    // ============================================
+    // REJECTION
+    // ============================================
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    // ============================================
+    // COMPLETION
+    // ============================================
     @Column(name = "completed_by")
     private Long completedBy;
 
@@ -79,9 +175,9 @@ public class AssetDisposalRequest {
     @Column(name = "completion_notes")
     private String completionNotes;
 
-    @Column(name = "rejection_reason")
-    private String rejectionReason;
-
+    // ============================================
+    // DATA WIPE
+    // ============================================
     @Column(name = "data_wipe_confirmed")
     private Boolean dataWipeConfirmed = false;
 
@@ -95,6 +191,9 @@ public class AssetDisposalRequest {
     @Column(name = "data_wipe_confirmed_at")
     private LocalDateTime dataWipeConfirmedAt;
 
+    // ============================================
+    // TIMESTAMPS
+    // ============================================
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -104,7 +203,18 @@ public class AssetDisposalRequest {
     private LocalDateTime updatedAt;
 
     // ============================================
-    // Helper Methods
+    // ENUMS
+    // ============================================
+    public enum ApprovalStep {
+        FINANCE, INFRASTRUCTURE, COMPLIANCE, EXECUTION, COMPLETED
+    }
+
+    public enum ApprovalStatus {
+        PENDING, APPROVED, REJECTED
+    }
+
+    // ============================================
+    // HELPER METHODS
     // ============================================
 
     public void setApprovalReference(String approvalReference) {
@@ -116,29 +226,16 @@ public class AssetDisposalRequest {
     }
 
     // ============================================
-    // Enums
-    // ============================================
-
-    public enum DisposalStatus {
-        PENDING, APPROVED, REJECTED, IN_PROGRESS, COMPLETED
-    }
-
-    public enum DisposalPriority {
-        NORMAL, HIGH, URGENT
-    }
-
-    public enum DisposalMethod {
-        PHYSICAL_DESTRUCTION, DEGAUSSING, OVERWRITE, SHREDDED, RECYCLED, INCINERATION
-    }
-
-    // ============================================
-    // Display Helpers
+    // STATUS DISPLAY HELPERS
     // ============================================
 
     public String getStatusDisplay() {
         if (status == null) return "";
         switch (status) {
-            case "PENDING": return "Pending Approval";
+            case "PENDING_FINANCE_APPROVAL": return "Pending Finance";
+            case "PENDING_INFRA_APPROVAL": return "Pending Infrastructure";
+            case "PENDING_COMPLIANCE_APPROVAL": return "Pending Compliance";
+            case "PENDING_EXECUTION": return "Pending Execution";
             case "APPROVED": return "Approved";
             case "REJECTED": return "Rejected";
             case "IN_PROGRESS": return "In Progress";
@@ -150,11 +247,20 @@ public class AssetDisposalRequest {
     public String getStatusColor() {
         if (status == null) return "secondary";
         switch (status) {
-            case "PENDING": return "warning";
-            case "APPROVED": return "info";
-            case "REJECTED": return "danger";
-            case "IN_PROGRESS": return "primary";
-            case "COMPLETED": return "success";
+            case "PENDING_FINANCE_APPROVAL":
+            case "PENDING_INFRA_APPROVAL":
+            case "PENDING_COMPLIANCE_APPROVAL":
+                return "warning";
+            case "PENDING_EXECUTION":
+                return "info";
+            case "APPROVED":
+                return "success";
+            case "REJECTED":
+                return "danger";
+            case "IN_PROGRESS":
+                return "primary";
+            case "COMPLETED":
+                return "success";
             default: return "secondary";
         }
     }
@@ -190,5 +296,37 @@ public class AssetDisposalRequest {
             case "INCINERATION": return "Incineration";
             default: return disposalMethod;
         }
+    }
+
+    public String getCurrentStepDisplay() {
+        if (currentApprovalStep == null) return "Not Started";
+        switch (currentApprovalStep.toUpperCase()) {
+            case "FINANCE": return "Finance Approval";
+            case "INFRASTRUCTURE": return "Infrastructure Approval";
+            case "COMPLIANCE": return "Risk & Compliance Approval";
+            case "EXECUTION": return "Execution";
+            case "COMPLETED": return "Completed";
+            default: return currentApprovalStep;
+        }
+    }
+
+    public boolean isFinanceApproved() {
+        return "APPROVED".equals(financeStatus);
+    }
+
+    public boolean isInfraApproved() {
+        return "APPROVED".equals(infraStatus);
+    }
+
+    public boolean isComplianceApproved() {
+        return "APPROVED".equals(complianceStatus);
+    }
+
+    public boolean isAllApproved() {
+        return isFinanceApproved() && isInfraApproved() && isComplianceApproved();
+    }
+
+    public boolean isApprovalFlowComplete() {
+        return "COMPLETED".equals(approvalFlowStatus);
     }
 }
