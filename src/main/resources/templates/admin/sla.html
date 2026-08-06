@@ -26,6 +26,9 @@
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
                 <i class="fas fa-print me-2"></i>Print
             </button>
+            <button type="button" class="btn btn-outline-warning" onclick="triggerSLACheck()">
+                <i class="fas fa-sync me-2"></i>Check SLAs
+            </button>
         </div>
     </div>
 
@@ -81,6 +84,12 @@
             <button class="nav-link" id="tab-trackings-btn" data-bs-toggle="tab" data-bs-target="#tab-trackings" type="button" role="tab">
                 <i class="fas fa-chart-line me-2"></i>SLA Tracking
                 <span class="badge bg-warning ms-1" th:text="${activeSLACount}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-breached-btn" data-bs-toggle="tab" data-bs-target="#tab-breached" type="button" role="tab">
+                <i class="fas fa-exclamation-triangle me-2"></i>Breached SLAs
+                <span class="badge bg-danger ms-1" th:text="${breachedSLACount}">0</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -169,7 +178,7 @@
         </div>
 
         <!-- ============================================================ -->
-        <!-- TAB 2: SLA Tracking -->
+        <!-- TAB 2: SLA Tracking (In Progress) -->
         <!-- ============================================================ -->
         <div class="tab-pane fade" id="tab-trackings" role="tabpanel">
             <div class="table-card">
@@ -232,7 +241,58 @@
         </div>
 
         <!-- ============================================================ -->
-        <!-- TAB 3: Escalations -->
+        <!-- TAB 3: Breached SLAs -->
+        <!-- ============================================================ -->
+        <div class="tab-pane fade" id="tab-breached" role="tabpanel">
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table id="breachedSLATable" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Request Type</th>
+                            <th>Started</th>
+                            <th>Due</th>
+                            <th>Breaches</th>
+                            <th>Escalations</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="tracking : ${breachedSLAs}">
+                            <td th:text="${tracking.requestId}">1</td>
+                            <td>
+                                    <span class="badge" th:class="${tracking.requestType == 'ASSET_DISPOSAL' ? 'bg-danger' :
+                                                                  tracking.requestType == 'DRIVER_REQUEST' ? 'bg-primary' :
+                                                                  tracking.requestType == 'INFRA_REQUEST' ? 'bg-warning' :
+                                                                  tracking.requestType == 'RESOURCE_REQUEST' ? 'bg-info' :
+                                                                  tracking.requestType == 'BOOKING' ? 'bg-success' :
+                                                                  tracking.requestType == 'TRANSFER' ? 'bg-secondary' : 'bg-dark'}"
+                                          th:text="${tracking.requestType}">DRIVER_REQUEST</span>
+                            </td>
+                            <td th:text="${#temporals.format(tracking.slaStartedAt, 'dd/MM/yyyy HH:mm')}">Start</td>
+                            <td th:text="${#temporals.format(tracking.slaDueAt, 'dd/MM/yyyy HH:mm')}">Due</td>
+                            <td>
+                                <span class="badge bg-danger" th:text="${tracking.breachesCount}">0</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-warning" th:text="${tracking.escalationCount}">0</span>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        th:onclick="'viewTracking(' + ${tracking.trackingId} + ')'">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 4: Escalations -->
         <!-- ============================================================ -->
         <div class="tab-pane fade" id="tab-escalations" role="tabpanel">
             <div class="table-card">
@@ -677,6 +737,15 @@
         .btn-primary:hover {
             background: var(--primary-dark) !important;
         }
+        .btn-outline-warning {
+            border: 1px solid #ffc107 !important;
+            color: #ffc107 !important;
+            background: transparent !important;
+        }
+        .btn-outline-warning:hover {
+            background: #ffc107 !important;
+            color: #1a1a2e !important;
+        }
         .btn-sm {
             padding: 6px 12px !important;
             font-size: 12px !important;
@@ -1069,11 +1138,33 @@
                 }
             });
 
-            // SLA Tracking Table
+            // SLA Tracking Table (In Progress)
             $('#slaTrackingTable').DataTable({
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
                 order: [[2, 'desc']],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                    infoEmpty: 'No records found',
+                    infoFiltered: '(filtered from _MAX_ total records)'
+                }
+            });
+
+            // Breached SLAs Table
+            $('#breachedSLATable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
+                order: [[3, 'desc']],
                 dom: 'Bfrtip',
                 buttons: [
                     { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
@@ -1295,20 +1386,17 @@
         }
 
         function renderTrackingDetails(data) {
-            // Data is now the DTO directly (no nested 'tracking' object)
             console.log('📊 Rendering tracking details:', data);
 
             document.getElementById('trackingDetailLoading').style.display = 'none';
             document.getElementById('trackingDetailContent').style.display = 'block';
             document.getElementById('trackingDetailError').style.display = 'none';
 
-            // Basic Info - using data directly
             document.getElementById('detailRequestId').textContent = data.requestId || 'N/A';
             document.getElementById('detailRequestType').textContent = data.requestType || 'N/A';
             document.getElementById('detailConfigName').textContent = data.configName || 'N/A';
             document.getElementById('detailSlaHours').textContent = data.slaHours ? data.slaHours + ' hours' : 'N/A';
 
-            // Status with badge
             const statusMap = {
                 'IN_PROGRESS': { class: 'bg-primary', text: 'In Progress' },
                 'COMPLETED': { class: 'bg-success', text: 'Completed' },
@@ -1321,12 +1409,10 @@
             document.getElementById('trackingDetailStatus').className = 'badge ms-2 ' + statusInfo.class;
             document.getElementById('trackingDetailStatus').textContent = statusInfo.text;
 
-            // Dates
             document.getElementById('detailStartedAt').textContent = formatDate(data.slaStartedAt);
             document.getElementById('detailDueAt').textContent = formatDate(data.slaDueAt);
             document.getElementById('detailCompletedAt').textContent = data.completedAt ? formatDate(data.completedAt) : 'Not completed';
 
-            // Progress
             const progressBar = document.getElementById('detailProgressBar');
             const progressText = document.getElementById('detailPercentage');
             const percentage = data.percentageComplete || 0;
@@ -1343,7 +1429,6 @@
                 progressBar.className = 'progress-bar bg-success';
             }
 
-            // Breach Info
             const breachInfo = document.getElementById('breachInfo');
             if (data.status === 'BREACHED' || (data.breachesCount && data.breachesCount > 0)) {
                 breachInfo.style.display = 'block';
@@ -1353,7 +1438,6 @@
                 breachInfo.style.display = 'none';
             }
 
-            // Escalations - using data.escalations directly
             const escalations = data.escalations || [];
             const escalationList = document.getElementById('escalationList');
             if (escalations && escalations.length > 0) {
@@ -1405,6 +1489,41 @@
                 document.getElementById('trackingDetailError').style.display = 'none';
                 loadTrackingDetails(currentTrackingId);
             }
+        }
+
+        // ============================================================
+        // Trigger SLA Check Manually
+        // ============================================================
+        function triggerSLACheck() {
+            const btn = document.querySelector('.btn-outline-warning');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Checking...';
+            }
+
+            showToast('Triggering SLA check...', 'success');
+
+            fetch('/assetIQ-pro/admin/sla/trigger-check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                showToast(data, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Failed to trigger SLA check: ' + error.message, 'error');
+            })
+            .finally(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync me-2"></i>Check SLAs';
+                }
+            });
         }
 
         // ============================================================

@@ -54,6 +54,7 @@
                         <option value="MAINTENANCE">Maintenance</option>
                         <option value="TRANSFERRED">Transferred</option>
                         <option value="RETIRED">Retired</option>
+                        <option value="DISPOSED">Disposed</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -97,7 +98,8 @@
                               th:class="${asset.status == 'AVAILABLE' ? 'pill-available' :
                                          asset.status == 'ASSIGNED' ? 'pill-assigned' :
                                          asset.status == 'MAINTENANCE' ? 'pill-maintenance' :
-                                         asset.status == 'TRANSFERRED' ? 'pill-transferred' : 'pill-retired'}"
+                                         asset.status == 'TRANSFERRED' ? 'pill-transferred' :
+                                         asset.status == 'DISPOSED' ? 'pill-disposed' : 'pill-retired'}"
                               th:text="${asset.status}">Available</span>
                     </td>
                     <td>
@@ -131,7 +133,10 @@
                                 <i class="fas fa-ellipsis-vertical"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
-                                <li>
+
+                                <!-- ===================== EDIT ===================== -->
+                                <!-- Active: only rendered when NOT disposed -->
+                                <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        data-bs-toggle="modal" data-bs-target="#editAssetModal"
                                        th:data-assetid="${asset.assetId}"
@@ -154,6 +159,14 @@
                                         <i class="fas fa-edit me-2 text-primary"></i>Edit
                                     </a>
                                 </li>
+                                <!-- Disabled: rendered when disposed - no data-bs-toggle, no onclick, inert -->
+                                <li th:if="${asset.status == 'DISPOSED'}">
+                                    <a class="dropdown-item disabled text-muted" href="javascript:void(0)" tabindex="-1" aria-disabled="true">
+                                        <i class="fas fa-edit me-2"></i>Edit
+                                    </a>
+                                </li>
+
+                                <!-- ===================== VIEW (always enabled) ===================== -->
                                 <li>
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -161,7 +174,9 @@
                                         <i class="fas fa-eye me-2 text-info"></i>View
                                     </a>
                                 </li>
-                                <li>
+
+                                <!-- ===================== TRANSFER ===================== -->
+                                <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        data-bs-toggle="modal" data-bs-target="#createTransferModal"
                                        th:data-assetid="${asset.assetId}"
@@ -173,7 +188,15 @@
                                         <i class="fas fa-exchange-alt me-2 text-success"></i>Transfer
                                     </a>
                                 </li>
-                                <li th:if="${asset.eOLExpired or asset.eolDate != null}">
+                                <li th:if="${asset.status == 'DISPOSED'}">
+                                    <a class="dropdown-item disabled text-muted" href="javascript:void(0)" tabindex="-1" aria-disabled="true">
+                                        <i class="fas fa-exchange-alt me-2"></i>Transfer
+                                    </a>
+                                </li>
+
+                                <!-- ===================== REQUEST DISPOSAL ===================== -->
+                                <!-- Only ever shown for non-disposed assets that are EOL-eligible -->
+                                <li th:if="${asset.status != 'DISPOSED' and (asset.eOLExpired or asset.eolDate != null)}">
                                     <a class="dropdown-item text-warning" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
                                        th:data-tag="${asset.tag}"
@@ -184,12 +207,20 @@
                                         <i class="fas fa-trash-alt me-2 text-warning"></i>Request Disposal
                                     </a>
                                 </li>
+
                                 <li><hr class="dropdown-divider"></li>
-                                <li>
+
+                                <!-- ===================== DELETE ===================== -->
+                                <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item text-danger" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
                                        th:data-tag="${asset.tag}"
                                        onclick="deleteAsset(this)">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a>
+                                </li>
+                                <li th:if="${asset.status == 'DISPOSED'}">
+                                    <a class="dropdown-item disabled text-muted" href="javascript:void(0)" tabindex="-1" aria-disabled="true">
                                         <i class="fas fa-trash me-2"></i>Delete
                                     </a>
                                 </li>
@@ -326,7 +357,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="openEditFromView()">
+                    <button type="button" class="btn btn-primary" id="viewModalEditBtn" onclick="openEditFromView()">
                         <i class="fas fa-edit me-2"></i>Edit Asset
                     </button>
                 </div>
@@ -462,7 +493,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- REQUEST DISPOSAL MODAL - FIXED WITH FETCH -->
+    <!-- REQUEST DISPOSAL MODAL -->
     <!-- ============================================================ -->
     <div class="modal fade" id="requestDisposalModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -773,6 +804,7 @@
         .pill-maintenance { background: #fff3cd; color: #a3720a; }
         .pill-transferred { background: #d3f3fa; color: #12798a; }
         .pill-retired { background: #ececec; color: #6c757d; }
+        .pill-disposed { background: #fdeeee; color: #dc3545; }
 
         .warning-flag { font-size: 11px; font-weight: 600; color: #dc3545; display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; }
         .warning-flag i { font-size: 10px; }
@@ -792,9 +824,13 @@
             color: #6c757d;
             background: #fff;
         }
-        .action-dots-btn:hover,
-        .action-dots-btn:focus,
-        .action-dots-btn.show {
+        .action-dots-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .action-dots-btn:hover:not(:disabled),
+        .action-dots-btn:focus:not(:disabled),
+        .action-dots-btn.show:not(:disabled) {
             background: #f1f3f5;
             color: var(--ink);
             box-shadow: none;
@@ -815,11 +851,16 @@
             display: flex;
             align-items: center;
         }
-        .action-dropdown-menu .dropdown-item:hover,
-        .action-dropdown-menu .dropdown-item:focus {
+        .action-dropdown-menu .dropdown-item:hover:not(.disabled),
+        .action-dropdown-menu .dropdown-item:focus:not(.disabled) {
             background: #f1f3f5;
         }
-        .action-dropdown-menu .dropdown-item.text-danger:hover {
+        .action-dropdown-menu .dropdown-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .action-dropdown-menu .dropdown-item.text-danger:hover:not(.disabled) {
             background: #fbe9eb;
         }
         .action-dropdown-menu .dropdown-divider { margin: 4px 0; }
@@ -926,6 +967,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
+    <!-- th:inline="none" is REQUIRED: without it Thymeleaf tries to parse the
+         DataTables [[...]] JS array literals (e.g. lengthMenu) as its own
+         inline-expression syntax and throws TemplateProcessingException. -->
     <script th:inline="none">
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#assetsTable')) {
@@ -1015,6 +1059,7 @@
         });
 
         let currentAssetId = null;
+        let currentAssetStatus = null;
 
         function showToast(message, type) {
             type = type || 'success';
@@ -1085,6 +1130,13 @@
                 .then(data => {
                     const asset = data.asset;
                     const transfers = data.transfers || [];
+                    currentAssetStatus = asset.status || null;
+
+                    // Hide "Edit Asset" footer button on view modal if the asset is disposed
+                    const editBtn = document.getElementById('viewModalEditBtn');
+                    if (editBtn) {
+                        editBtn.style.display = (currentAssetStatus === 'DISPOSED') ? 'none' : 'inline-block';
+                    }
 
                     let transferHtml = '';
                     if (transfers.length > 0) {
@@ -1205,13 +1257,17 @@
 
         function openEditFromView() {
             if (!currentAssetId) return;
+            if (currentAssetStatus === 'DISPOSED') {
+                showToast('Cannot edit a disposed asset.', 'error');
+                return;
+            }
 
             const viewModalEl = document.getElementById('viewAssetModal');
             const viewModal = bootstrap.Modal.getOrCreateInstance(viewModalEl);
 
             viewModalEl.addEventListener('hidden.bs.modal', function onHidden() {
                 viewModalEl.removeEventListener('hidden.bs.modal', onHidden);
-                const btn = document.querySelector(`a[data-assetid="${currentAssetId}"]`);
+                const btn = document.querySelector(`a[data-assetid="${currentAssetId}"][data-tag]`);
                 if (btn) editAsset(btn);
             }, { once: true });
 
@@ -1316,7 +1372,7 @@
         }
 
         // ============================================================
-        // DISPOSAL FORM - SUBMIT VIA FETCH (NO FORM SUBMISSION)
+        // DISPOSAL FUNCTIONS
         // ============================================================
         function openDisposalModal(button) {
             const assetId = button.getAttribute('data-assetid');
@@ -1329,7 +1385,6 @@
             fetch('/assetIQ-pro/admin/disposal/api/asset/' + assetId + '/pending')
                 .then(response => {
                     if (!response.ok) {
-                        // If API fails, still allow opening the modal
                         throw new Error('API call failed');
                     }
                     return response.json();
@@ -1388,7 +1443,6 @@
                 });
         }
 
-        // ✅ NEW: actually submit the disposal request (this function was missing before)
         function submitDisposalForm() {
             const assetId = document.getElementById('disposalAssetId').value;
             const disposalReason = document.getElementById('disposalReason').value;
@@ -1426,8 +1480,6 @@
                 body: params.toString()
             })
             .then(function (response) {
-                // This endpoint returns "redirect:/assets" with flash attributes, not JSON —
-                // fetch follows the redirect automatically, so both ok and redirected count as success.
                 if (response.ok || response.redirected) {
                     showToast('Disposal request submitted successfully!', 'success');
                     const modalEl = document.getElementById('requestDisposalModal');

@@ -148,74 +148,104 @@ public class SLAService {
     }
 
     // ============================================
-    // SLA CHECKING (Scheduled Job)
+    // SLA CHECKING (Scheduled Job - Runs every minute for testing)
     // ============================================
 
-    @Scheduled(cron = "0 0/30 * * * *")
+    @Scheduled(cron = "0 */5 * * * *") // Every 5 minutes
     @Transactional
     public void checkAllSLAs() {
-        log.info("=== RUNNING SLA CHECK ===");
-        log.info("📊 Running SLA check for all request types");
+        log.info("=== 🔔 RUNNING SLA CHECK ===");
+        log.info("📊 Time: {}", LocalDateTime.now());
 
         try {
+            // Count all IN_PROGRESS trackings
             List<RequestSLATracking> trackings = trackingRepository.findByStatus("IN_PROGRESS");
             log.info("📊 Found {} active SLA trackings", trackings.size());
 
+            int processed = 0;
+            int breached = 0;
+            int escalated = 0;
+
             for (RequestSLATracking tracking : trackings) {
                 try {
-                    processSLACheck(tracking);
+                    boolean wasBreached = processSLACheck(tracking);
+                    if (wasBreached) breached++;
+                    processed++;
                 } catch (Exception e) {
                     log.error("❌ Error processing SLA for request {}: {}", tracking.getRequestId(), e.getMessage(), e);
                 }
             }
 
-            log.info("✅ SLA check completed");
+            log.info("✅ SLA check completed - Processed: {}, Breached: {}, Escalated: {}", processed, breached, escalated);
 
         } catch (Exception e) {
             log.error("❌ Error running SLA check: {}", e.getMessage(), e);
         }
     }
 
-    private void processSLACheck(RequestSLATracking tracking) {
+    private boolean processSLACheck(RequestSLATracking tracking) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime dueAt = tracking.getSlaDueAt();
         long totalHours = ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), dueAt);
         long elapsedHours = ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), now);
         double percentageElapsed = totalHours > 0 ? (double) elapsedHours / totalHours * 100 : 0;
 
-        log.debug("📊 Request {}: {}% elapsed, Due: {}", tracking.getRequestId(), percentageElapsed, dueAt);
+        log.info("📊 Request {}: {}% elapsed, Due: {}, Status: {}",
+                tracking.getRequestId(),
+                String.format("%.1f", percentageElapsed),
+                dueAt,
+                tracking.getStatus()
+        );
 
+        // 🔴 Check if SLA is breached (past due date)
         if (now.isAfter(dueAt)) {
-            log.warn("⚠️ SLA is past due for request: {}", tracking.getRequestId());
-            handleSLABreach(tracking);
-            return;
+            if (!"BREACHED".equals(tracking.getStatus())) {
+                log.warn("🚨 SLA BREACHED for request: {} (Due: {}, Now: {})",
+                        tracking.getRequestId(), dueAt, now);
+                handleSLABreach(tracking);
+                return true;
+            } else {
+                log.info("⚠️ SLA already breached for request: {}", tracking.getRequestId());
+            }
+            return false;
         }
 
+        // If already breached, don't process further
+        if ("BREACHED".equals(tracking.getStatus())) {
+            log.info("⚠️ SLA already breached for request: {}", tracking.getRequestId());
+            return false;
+        }
+
+        // Send reminders based on percentage elapsed
         if (percentageElapsed >= 50 && percentageElapsed < 75) {
             sendSLAReminder(tracking, "50");
         } else if (percentageElapsed >= 75 && percentageElapsed < 90) {
             sendSLAReminder(tracking, "75");
-        } else if (percentageElapsed >= 90) {
+        } else if (percentageElapsed >= 90 && percentageElapsed < 100) {
             sendSLAReminder(tracking, "90");
             if (tracking.getEscalationCount() < 3) {
                 escalateSLA(tracking);
             }
         }
+
+        return false;
     }
 
     // ============================================
-    // SLA BREACH HANDLING
+    // SLA BREACH HANDLING - FIXED
     // ============================================
 
     private void handleSLABreach(RequestSLATracking tracking) {
         log.warn("🚨 SLA BREACHED! Request: {} (Type: {})", tracking.getRequestId(), tracking.getRequestType());
 
         try {
+            // ✅ UPDATE STATUS TO BREACHED
             tracking.setStatus("BREACHED");
             tracking.setBreachesCount(tracking.getBreachesCount() + 1);
             trackingRepository.save(tracking);
-            log.info("✅ SLA marked as BREACHED for request: {}", tracking.getRequestId());
+            log.info("✅ SLA status updated to BREACHED for request: {}", tracking.getRequestId());
 
+            // Get owners
             Long ownerId = getRequestOwner(tracking.getRequestId(), tracking.getRequestType());
             AppUser owner = userService.getUserById(ownerId).orElse(null);
             AppUser manager = getLineManager(ownerId);
@@ -259,7 +289,7 @@ public class SLAService {
                 }
             }
 
-            // Create escalation record
+            // ✅ Create escalation record for the breach
             try {
                 SLAEscalationHistory escalation = new SLAEscalationHistory();
                 escalation.setRequestId(tracking.getRequestId());
@@ -293,7 +323,7 @@ public class SLAService {
     }
 
     // ============================================
-    // SLA ESCALATION
+    // SLA ESCALATION - FIXED
     // ============================================
 
     private void escalateSLA(RequestSLATracking tracking) {
@@ -308,17 +338,20 @@ public class SLAService {
                 return;
             }
 
+            // ✅ Update escalation count
+            int newEscalationCount = tracking.getEscalationCount() + 1;
             tracking.setEscalatedTo(manager.getUserId());
-            tracking.setEscalationCount(tracking.getEscalationCount() + 1);
+            tracking.setEscalationCount(newEscalationCount);
+            tracking.setStatus("ESCALATED"); // Set status to ESCALATED
             trackingRepository.save(tracking);
             log.info("✅ Escalation count updated to: {}", tracking.getEscalationCount());
 
-            // Create escalation record
+            // ✅ Create escalation record
             SLAEscalationHistory escalation = new SLAEscalationHistory();
             escalation.setRequestId(tracking.getRequestId());
             escalation.setRequestType(tracking.getRequestType());
             escalation.setSlaConfigId(tracking.getSlaConfigId());
-            escalation.setEscalationLevel(tracking.getEscalationCount());
+            escalation.setEscalationLevel(newEscalationCount);
             escalation.setEscalatedTo(manager.getUserId());
             escalation.setEscalatedBy(1L);
             escalation.setEscalatedAt(LocalDateTime.now());
@@ -328,6 +361,7 @@ public class SLAService {
             escalationHistoryRepository.save(escalation);
             log.info("✅ Escalation record created");
 
+            // Send escalation notification
             String escalationMessage = String.format(
                     "SLA Escalation: Request #%d (%s) has been pending for %d hours. Please review and take action.",
                     tracking.getRequestId(),
@@ -335,7 +369,6 @@ public class SLAService {
                     ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now())
             );
 
-            // Notify manager
             try {
                 sendSLANotification(
                         manager.getUserId(),
@@ -619,7 +652,8 @@ public class SLAService {
     }
 
     public List<RequestSLATracking> getAllActiveSLAs() {
-        return trackingRepository.findByStatus("IN_PROGRESS");
+        // Return IN_PROGRESS and ESCALATED as "active"
+        return trackingRepository.findByStatusIn(List.of("IN_PROGRESS", "ESCALATED"));
     }
 
     public void setEscalationCount(Long trackingId, int count) {
