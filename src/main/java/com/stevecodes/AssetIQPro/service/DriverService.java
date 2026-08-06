@@ -1,11 +1,7 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
-import com.stevecodes.AssetIQPro.entity.AppUser;
-import com.stevecodes.AssetIQPro.entity.DriverAvailability;
-import com.stevecodes.AssetIQPro.entity.DriverRating;
-import com.stevecodes.AssetIQPro.entity.DriverRequest;
-import com.stevecodes.AssetIQPro.entity.Notification;
+import com.stevecodes.AssetIQPro.entity.*;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
 import com.stevecodes.AssetIQPro.repository.DriverAvailabilityRepository;
 import com.stevecodes.AssetIQPro.repository.DriverRatingRepository;
@@ -981,6 +977,46 @@ public class DriverService {
                 .orElse("user@company.com");
     }
 
+    public List<DriverRequestDTO> getDriverRequestsAsDTOs() {
+        log.info("Getting all driver requests as DTOs");
+        return driverRequestRepository.findAllByOrderByRequestTimeDesc()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<DriverRequestDTO> getDriverRequestsByDriverIdAsDTOs(Long driverId) {
+        log.info("Getting driver requests for driver {} as DTOs", driverId);
+        return driverRequestRepository.findByDriverId(driverId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<DriverRequestDTO> getDriverRequestsByUserIdAsDTOs(Long userId) {
+        log.info("Getting driver requests for user {} as DTOs", userId);
+        return driverRequestRepository.findByUserId(userId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<DriverRequestDTO> getPendingRequestsForDriverAsDTOs(Long driverId) {
+        log.info("Getting pending requests for driver {} as DTOs", driverId);
+        return driverRequestRepository.findByDriverIdAndStatus(driverId, "PENDING")
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<DriverRequestDTO> getAcceptedRequestsForDriverAsDTOs(Long driverId) {
+        log.info("Getting accepted requests for driver {} as DTOs", driverId);
+        return driverRequestRepository.findByDriverIdAndStatus(driverId, "ACCEPTED")
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
     public DriverRequestDTO convertToDTO(DriverRequest request) {
         DriverRequestDTO dto = new DriverRequestDTO();
         dto.setRequestId(request.getRequestId());
@@ -997,6 +1033,28 @@ public class DriverService {
         dto.setDeclineReason(request.getDeclineReason());
         dto.setDeclinedReason(request.getDeclinedReason());
         dto.setNotes(request.getNotes());
+
+        // ============================================
+        // ✅ ADD SLA TRACKING DATA
+        // ============================================
+        try {
+            RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "DRIVER_REQUEST");
+            if (slaTracking != null) {
+                dto.setSlaStatus(slaTracking.getStatus());
+                dto.setSlaStatusDisplay(slaTracking.getStatusDisplay());
+                dto.setSlaPercentage(slaTracking.getPercentageComplete());
+            } else {
+                dto.setSlaStatus("N/A");
+                dto.setSlaStatusDisplay("N/A");
+                dto.setSlaPercentage(0.0);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch SLA status for driver request {}: {}", request.getRequestId(), e.getMessage());
+            dto.setSlaStatus("N/A");
+            dto.setSlaStatusDisplay("N/A");
+            dto.setSlaPercentage(0.0);
+        }
+
         return dto;
     }
 }

@@ -10,6 +10,7 @@ import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import com.stevecodes.AssetIQPro.repository.InfraRequestRepository;
 import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import com.stevecodes.AssetIQPro.repository.AppUserRepository;
+import com.stevecodes.AssetIQPro.entity.RequestSLATracking;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -827,6 +828,27 @@ public class InfraRequestService {
                 dto.setFinanceApprovedByName(user.getFullName());
                 dto.setFinanceApprovedByStaffId(user.getStaffId());
             });
+        }
+
+        // ============================================
+        // ✅ ADD SLA TRACKING DATA
+        // ============================================
+        try {
+            RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "INFRA_REQUEST");
+            if (slaTracking != null) {
+                dto.setSlaStatus(slaTracking.getStatus());
+                dto.setSlaStatusDisplay(slaTracking.getStatusDisplay());
+                dto.setSlaPercentage(slaTracking.getPercentageComplete());
+            } else {
+                dto.setSlaStatus("N/A");
+                dto.setSlaStatusDisplay("N/A");
+                dto.setSlaPercentage(0.0);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch SLA status for request {}: {}", request.getRequestId(), e.getMessage());
+            dto.setSlaStatus("N/A");
+            dto.setSlaStatusDisplay("N/A");
+            dto.setSlaPercentage(0.0);
         }
 
         return dto;

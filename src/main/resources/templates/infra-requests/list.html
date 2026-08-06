@@ -8,6 +8,53 @@
   <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+  <style>
+    /* SLA Status Styles */
+    .sla-status-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 0px;
+    }
+    .sla-status-badge.sla-in-progress { background: #cfe2ff; color: #0d6efd; }
+    .sla-status-badge.sla-completed { background: #d4edda; color: #198754; }
+    .sla-status-badge.sla-breached { background: #fdeeee; color: #dc3545; }
+    .sla-status-badge.sla-escalated { background: #fff4e0; color: #fd7e14; }
+    .sla-status-badge.sla-na { background: #eef0f3; color: #6c757d; }
+    .sla-progress-mini {
+        width: 60px;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        display: inline-block;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .sla-progress-mini .sla-progress-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .sla-progress-mini .sla-progress-bar.bg-danger { background: #dc3545; }
+    .sla-progress-mini .sla-progress-bar.bg-warning { background: #fd7e14; }
+    .sla-progress-mini .sla-progress-bar.bg-success { background: #198754; }
+    .sla-detail-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+    .sla-detail-row .sla-label {
+        font-size: 10px;
+        color: #9aa0a6;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+  </style>
 </head>
 
 <body>
@@ -102,6 +149,7 @@
               <th>Quantity</th>
               <th>Status</th>
               <th>Created</th>
+              <th>SLA</th>
               <th>Actions</th>
             </tr>
             </thead>
@@ -113,16 +161,46 @@
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
               <td>
-                  <span class="status-badge"
-                        th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'pending' :
-                                        (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
-                                        (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
-                                        (${request.status} == 'PROCUREMENT' ? 'procurement' :
-                                        (${request.status} == 'DELIVERED' ? 'completed' :
-                                        (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
-                        th:text="${request.status}">Pending</span>
+                                <span class="status-badge"
+                                      th:classappend="${request.status} == 'PENDING_LM_APPROVAL' ? 'pending' :
+                                                    (${request.status} == 'PENDING_INFRA_REVIEW' ? 'review' :
+                                                    (${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                                    (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                                    (${request.status} == 'DELIVERED' ? 'completed' :
+                                                    (${request.status} == 'COMPLETED' ? 'completed' : 'rejected')))))"
+                                      th:text="${request.status}">Pending</span>
               </td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
+              <td>
+                <!-- SLA Status Display -->
+                <div class="sla-detail-row">
+                                    <span class="sla-status-badge"
+                                          th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
+                                                    (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
+                                                    (request.slaStatus == 'BREACHED' ? 'sla-breached' :
+                                                    (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
+                                          th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
+                                        N/A
+                                    </span>
+                  <div class="sla-progress-mini" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED'}">
+                    <div class="sla-progress-bar"
+                         th:class="${request.slaPercentage > 90 ? 'bg-danger' :
+                                                       (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
+                         th:style="'width: ' + ${request.slaPercentage != null ? request.slaPercentage : 0} + '%;'">
+                    </div>
+                  </div>
+                  <span class="text-muted small" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED' and request.slaPercentage != null}"
+                        th:text="${#numbers.formatDecimal(request.slaPercentage, 0, 0)} + '%'">
+                                        0%
+                                    </span>
+                  <span class="text-danger small" th:if="${request.slaStatus == 'BREACHED'}">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </span>
+                  <span class="text-success small" th:if="${request.slaStatus == 'COMPLETED'}">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                </div>
+              </td>
               <td>
                 <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                   <i class="fas fa-eye"></i>
@@ -153,6 +231,7 @@
               <th>Staff ID</th>
               <th>Quantity</th>
               <th>Created</th>
+              <th>SLA</th>
               <th>Actions</th>
             </tr>
             </thead>
@@ -164,6 +243,29 @@
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
+              <td>
+                <div class="sla-detail-row">
+                                    <span class="sla-status-badge"
+                                          th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
+                                                    (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
+                                                    (request.slaStatus == 'BREACHED' ? 'sla-breached' :
+                                                    (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
+                                          th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
+                                        N/A
+                                    </span>
+                  <div class="sla-progress-mini" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED'}">
+                    <div class="sla-progress-bar"
+                         th:class="${request.slaPercentage > 90 ? 'bg-danger' :
+                                                       (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
+                         th:style="'width: ' + ${request.slaPercentage != null ? request.slaPercentage : 0} + '%;'">
+                    </div>
+                  </div>
+                  <span class="text-muted small" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED' and request.slaPercentage != null}"
+                        th:text="${#numbers.formatDecimal(request.slaPercentage, 0, 0)} + '%'">
+                                        0%
+                                    </span>
+                </div>
+              </td>
               <td>
                 <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                   <i class="fas fa-eye"></i>
@@ -195,6 +297,7 @@
               <th>Staff ID</th>
               <th>Quantity</th>
               <th>Created</th>
+              <th>SLA</th>
               <th>Actions</th>
             </tr>
             </thead>
@@ -206,6 +309,29 @@
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
+              <td>
+                <div class="sla-detail-row">
+                                    <span class="sla-status-badge"
+                                          th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
+                                                    (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
+                                                    (request.slaStatus == 'BREACHED' ? 'sla-breached' :
+                                                    (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
+                                          th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
+                                        N/A
+                                    </span>
+                  <div class="sla-progress-mini" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED'}">
+                    <div class="sla-progress-bar"
+                         th:class="${request.slaPercentage > 90 ? 'bg-danger' :
+                                                       (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
+                         th:style="'width: ' + ${request.slaPercentage != null ? request.slaPercentage : 0} + '%;'">
+                    </div>
+                  </div>
+                  <span class="text-muted small" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED' and request.slaPercentage != null}"
+                        th:text="${#numbers.formatDecimal(request.slaPercentage, 0, 0)} + '%'">
+                                        0%
+                                    </span>
+                </div>
+              </td>
               <td>
                 <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                   <i class="fas fa-eye"></i>
@@ -238,6 +364,7 @@
               <th>Quantity</th>
               <th>Status</th>
               <th>Created</th>
+              <th>SLA</th>
               <th>Actions</th>
             </tr>
             </thead>
@@ -249,13 +376,36 @@
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
               <td>
-                <span class="status-badge"
-                      th:classappend="${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
-                                      (${request.status} == 'PROCUREMENT' ? 'procurement' :
-                                      (${request.status} == 'DELIVERED' ? 'completed' : ''))"
-                      th:text="${request.status}">Pending</span>
+                                <span class="status-badge"
+                                      th:classappend="${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                                    (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                                    (${request.status} == 'DELIVERED' ? 'completed' : ''))"
+                                      th:text="${request.status}">Pending</span>
               </td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
+              <td>
+                <div class="sla-detail-row">
+                                    <span class="sla-status-badge"
+                                          th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
+                                                    (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
+                                                    (request.slaStatus == 'BREACHED' ? 'sla-breached' :
+                                                    (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
+                                          th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
+                                        N/A
+                                    </span>
+                  <div class="sla-progress-mini" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED'}">
+                    <div class="sla-progress-bar"
+                         th:class="${request.slaPercentage > 90 ? 'bg-danger' :
+                                                       (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
+                         th:style="'width: ' + ${request.slaPercentage != null ? request.slaPercentage : 0} + '%;'">
+                    </div>
+                  </div>
+                  <span class="text-muted small" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED' and request.slaPercentage != null}"
+                        th:text="${#numbers.formatDecimal(request.slaPercentage, 0, 0)} + '%'">
+                                        0%
+                                    </span>
+                </div>
+              </td>
               <td>
                 <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                   <i class="fas fa-eye"></i>
@@ -637,6 +787,46 @@
     .timeline-item .timeline-detail { font-size: 12.5px; color: #6c757d; }
     .timeline-item .timeline-detail .comment { display: block; margin-top: 4px; font-style: italic; color: #9aa0a6; }
 
+    /* SLA Status Styles */
+    .sla-status-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 0px;
+    }
+    .sla-status-badge.sla-in-progress { background: #cfe2ff; color: #0d6efd; }
+    .sla-status-badge.sla-completed { background: #d4edda; color: #198754; }
+    .sla-status-badge.sla-breached { background: #fdeeee; color: #dc3545; }
+    .sla-status-badge.sla-escalated { background: #fff4e0; color: #fd7e14; }
+    .sla-status-badge.sla-na { background: #eef0f3; color: #6c757d; }
+    .sla-progress-mini {
+        width: 60px;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        display: inline-block;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .sla-progress-mini .sla-progress-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .sla-progress-mini .sla-progress-bar.bg-danger { background: #dc3545; }
+    .sla-progress-mini .sla-progress-bar.bg-warning { background: #fd7e14; }
+    .sla-progress-mini .sla-progress-bar.bg-success { background: #198754; }
+    .sla-detail-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+
     /* Toasts */
     #toastContainer { max-width: 380px; }
     .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
@@ -650,32 +840,33 @@
 
     /* DataTables overrides */
     .dataTables_wrapper .dataTables_filter input {
-      border-radius: 10px !important;
-      border: 1px solid #e2e8f0 !important;
-      padding: 8px 14px !important;
-      font-size: 14px !important;
-      margin-left: 8px !important;
+        border-radius: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 8px 14px !important;
+        font-size: 14px !important;
+        margin-left: 8px !important;
     }
     .dataTables_wrapper .dataTables_length select {
-      border-radius: 10px !important;
-      border: 1px solid #e2e8f0 !important;
-      padding: 8px 14px !important;
-      font-size: 14px !important;
+        border-radius: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 8px 14px !important;
+        font-size: 14px !important;
     }
     .dataTables_wrapper .dataTables_paginate .paginate_button {
-      border-radius: 10px !important;
-      border: 1px solid #e9ecef !important;
-      padding: 6px 14px !important;
-      margin: 0 3px !important;
+        border-radius: 10px !important;
+        border: 1px solid #e9ecef !important;
+        padding: 6px 14px !important;
+        margin: 0 3px !important;
     }
     .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-      background: var(--primary-color) !important;
-      color: white !important;
-      border-color: var(--primary-color) !important;
+        background: var(--primary-color) !important;
+        color: white !important;
+        border-color: var(--primary-color) !important;
     }
 
     @media (max-width: 768px) {
-      #toastContainer { max-width: calc(100% - 24px); }
+        #toastContainer { max-width: calc(100% - 24px); }
+        .sla-detail-row { flex-wrap: wrap; }
     }
   </style>
 </div>
@@ -689,102 +880,106 @@
 
   <script th:inline="none">
     $(document).ready(function() {
-      if ($.fn.DataTable.isDataTable('#allRequestsTable')) {
-        $('#allRequestsTable').DataTable().destroy();
-      }
-      $('#allRequestsTable').DataTable({
-        pageLength: 10,
-        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
-        order: [[0, 'desc']],
-        columnDefs: [{ orderable: false, targets: 7 }],
-        language: {
-          search: "Search:",
-          lengthMenu: "Show _MENU_ entries",
-          info: "Showing _START_ to _END_ of _TOTAL_ requests",
-          infoEmpty: "No requests found",
-          infoFiltered: "(filtered from _MAX_ total requests)"
+        // All Requests - column 7 is SLA, column 8 is Actions
+        if ($.fn.DataTable.isDataTable('#allRequestsTable')) {
+            $('#allRequestsTable').DataTable().destroy();
         }
-      });
+        $('#allRequestsTable').DataTable({
+            pageLength: 10,
+            lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
+            order: [[0, 'desc']],
+            columnDefs: [{ orderable: false, targets: [7, 8] }],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ requests",
+                infoEmpty: "No requests found",
+                infoFiltered: "(filtered from _MAX_ total requests)"
+            }
+        });
 
-      if ($.fn.DataTable.isDataTable('#lmTable')) {
-        $('#lmTable').DataTable().destroy();
-      }
-      $('#lmTable').DataTable({
-        pageLength: 10,
-        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
-        order: [[0, 'desc']],
-        columnDefs: [{ orderable: false, targets: 6 }],
-        language: {
-          search: "Search:",
-          lengthMenu: "Show _MENU_ entries",
-          info: "Showing _START_ to _END_ of _TOTAL_ requests",
-          infoEmpty: "No pending LM approvals",
-          infoFiltered: "(filtered from _MAX_ total requests)"
+        // LM Approval - column 6 is SLA, column 7 is Actions
+        if ($.fn.DataTable.isDataTable('#lmTable')) {
+            $('#lmTable').DataTable().destroy();
         }
-      });
+        $('#lmTable').DataTable({
+            pageLength: 10,
+            lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
+            order: [[0, 'desc']],
+            columnDefs: [{ orderable: false, targets: [6, 7] }],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ requests",
+                infoEmpty: "No pending LM approvals",
+                infoFiltered: "(filtered from _MAX_ total requests)"
+            }
+        });
 
-      if ($.fn.DataTable.isDataTable('#infraTable')) {
-        $('#infraTable').DataTable().destroy();
-      }
-      $('#infraTable').DataTable({
-        pageLength: 10,
-        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
-        order: [[0, 'desc']],
-        columnDefs: [{ orderable: false, targets: 6 }],
-        language: {
-          search: "Search:",
-          lengthMenu: "Show _MENU_ entries",
-          info: "Showing _START_ to _END_ of _TOTAL_ requests",
-          infoEmpty: "No pending infrastructure reviews",
-          infoFiltered: "(filtered from _MAX_ total requests)"
+        // Infra Review - column 6 is SLA, column 7 is Actions
+        if ($.fn.DataTable.isDataTable('#infraTable')) {
+            $('#infraTable').DataTable().destroy();
         }
-      });
+        $('#infraTable').DataTable({
+            pageLength: 10,
+            lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
+            order: [[0, 'desc']],
+            columnDefs: [{ orderable: false, targets: [6, 7] }],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ requests",
+                infoEmpty: "No pending infrastructure reviews",
+                infoFiltered: "(filtered from _MAX_ total requests)"
+            }
+        });
 
-      if ($.fn.DataTable.isDataTable('#financeTable')) {
-        $('#financeTable').DataTable().destroy();
-      }
-      $('#financeTable').DataTable({
-        pageLength: 10,
-        lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
-        order: [[0, 'desc']],
-        columnDefs: [{ orderable: false, targets: 7 }],
-        language: {
-          search: "Search:",
-          lengthMenu: "Show _MENU_ entries",
-          info: "Showing _START_ to _END_ of _TOTAL_ requests",
-          infoEmpty: "No pending finance requests",
-          infoFiltered: "(filtered from _MAX_ total requests)"
+        // Finance - column 7 is SLA, column 8 is Actions
+        if ($.fn.DataTable.isDataTable('#financeTable')) {
+            $('#financeTable').DataTable().destroy();
         }
-      });
+        $('#financeTable').DataTable({
+            pageLength: 10,
+            lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, "All"] ],
+            order: [[0, 'desc']],
+            columnDefs: [{ orderable: false, targets: [7, 8] }],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ requests",
+                infoEmpty: "No pending finance requests",
+                infoFiltered: "(filtered from _MAX_ total requests)"
+            }
+        });
     });
 
     // ============================================
     // Toast Notifications
     // ============================================
     function showToast(message, type) {
-      type = type || 'success';
-      const isSuccess = type === 'success';
-      const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
-      const label = isSuccess ? 'Success' : 'Error';
-      const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        type = type || 'success';
+        const isSuccess = type === 'success';
+        const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const label = isSuccess ? 'Success' : 'Error';
+        const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
-      const toastHtml = `
-        <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
-          <div class="toast-header">
-            <i class="fas ${icon} me-2"></i>
-            <strong class="me-auto">${label}</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-          </div>
-          <div class="toast-body">${message}</div>
-        </div>
-      `;
+        const toastHtml = `
+            <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
+                <div class="toast-header">
+                    <i class="fas ${icon} me-2"></i>
+                    <strong class="me-auto">${label}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">${message}</div>
+            </div>
+        `;
 
-      const container = document.getElementById('toastContainer');
-      container.insertAdjacentHTML('beforeend', toastHtml);
-      const toastEl = document.getElementById(toastId);
-      const toast = new bootstrap.Toast(toastEl);
-      toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-      toast.show();
+        const container = document.getElementById('toastContainer');
+        container.insertAdjacentHTML('beforeend', toastHtml);
+        const toastEl = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastEl);
+        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        toast.show();
     }
 
     // ============================================
@@ -808,322 +1003,335 @@
     }
 
     // ============================================
-    // View Request
+    // View Request with SLA Status
     // ============================================
     function viewRequest(id) {
-      const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewRequestModal'));
-      const body = document.getElementById('viewRequestBody');
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewRequestModal'));
+        const body = document.getElementById('viewRequestBody');
 
-      body.innerHTML = `
-        <div class="text-center py-4">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-        </div>
-      `;
-
-      modal.show();
-
-      fetch('/assetIQ-pro/api/infra-requests/' + id)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Request not found (HTTP ' + response.status + ')');
-          }
-          return response.json();
-        })
-        .then(request => {
-          document.getElementById('viewRequestId').textContent = request.requestId;
-
-          const statusColors = {
-            'PENDING_LM_APPROVAL': 'warning',
-            'PENDING_INFRA_REVIEW': 'warning',
-            'PENDING_FINANCE_APPROVAL': 'warning',
-            'PROCUREMENT': 'primary',
-            'DELIVERED': 'success',
-            'COMPLETED': 'success',
-            'LM_REJECTED': 'danger',
-            'INFRA_REJECTED': 'danger',
-            'FINANCE_REJECTED': 'danger',
-            'CANCELLED': 'danger'
-          };
-          const statusColor = statusColors[request.status] || 'secondary';
-
-          body.innerHTML = `
-            <div class="row">
-              <div class="col-md-6">
-                <div class="detail-item">
-                  <span class="label">Resource Type</span>
-                  <span class="value">${request.resourceType || 'N/A'}</span>
+        body.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                <div class="detail-item">
-                  <span class="label">Quantity</span>
-                  <span class="value">${request.quantity || 1}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Requester</span>
-                  <span class="value">${request.requesterName || 'N/A'}</span>
-                  <span class="staff-id">${request.requesterStaffId ? '(' + request.requesterStaffId + ')' : ''}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Department</span>
-                  <span class="value">${request.requesterDepartment || 'N/A'}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Line Manager</span>
-                  <span class="value">${request.lineManagerStaffId || 'N/A'}</span>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="detail-item">
-                  <span class="label">Status</span>
-                  <span class="badge bg-${statusColor}">${request.status}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Created At</span>
-                  <span class="value">${request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="label">Last Updated</span>
-                  <span class="value">${request.updatedAt ? new Date(request.updatedAt).toLocaleString() : 'N/A'}</span>
-                </div>
-                ${request.procurementOrderRef ? `
-                <div class="detail-item">
-                  <span class="label">Procurement Order Ref</span>
-                  <span class="value">${request.procurementOrderRef}</span>
-                </div>` : ''}
-                ${request.purchaseCost ? `
-                <div class="detail-item">
-                  <span class="label">Purchase Cost</span>
-                  <span class="value">$${request.purchaseCost}</span>
-                </div>` : ''}
-                ${request.quotationPath ? `
-                <div class="mt-3">
-                  <a href="${getQuotationUrl(request.quotationPath)}" class="btn btn-primary btn-sm" target="_blank">
-                    <i class="fas fa-file-pdf me-2"></i>View Quotation
-                  </a>
-                </div>` : ''}
-              </div>
             </div>
+        `;
 
-            ${request.specification ? `
-            <div class="detail-item">
-              <span class="label">Specification</span>
-              <span class="value">${request.specification}</span>
-            </div>` : ''}
+        modal.show();
 
-            ${request.justification ? `
-            <div class="detail-item">
-              <span class="label">Justification</span>
-              <span class="value">${request.justification}</span>
-            </div>` : ''}
+        fetch('/assetIQ-pro/api/infra-requests/' + id)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Request not found (HTTP ' + response.status + ')');
+                }
+                return response.json();
+            })
+            .then(request => {
+                document.getElementById('viewRequestId').textContent = request.requestId;
 
-            <hr>
+                const statusColors = {
+                    'PENDING_LM_APPROVAL': 'warning',
+                    'PENDING_INFRA_REVIEW': 'warning',
+                    'PENDING_FINANCE_APPROVAL': 'warning',
+                    'PROCUREMENT': 'primary',
+                    'DELIVERED': 'success',
+                    'COMPLETED': 'success',
+                    'LM_REJECTED': 'danger',
+                    'INFRA_REJECTED': 'danger',
+                    'FINANCE_REJECTED': 'danger',
+                    'CANCELLED': 'danger'
+                };
+                const statusColor = statusColors[request.status] || 'secondary';
 
-            <h6 class="fw-bold mt-2">Approval Timeline</h6>
-            <div class="timeline">
-              <div class="timeline-item ${request.lmApprovedAt ? 'approved' : 'pending'}">
-                <div class="timeline-icon"><i class="fas ${request.lmApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
-                <div class="timeline-content">
-                  <div class="timeline-title">Line Manager</div>
-                  <div class="timeline-detail">${request.lmApprovedAt ?
-                    'Approved by ' + (request.lmApprovedByName || 'N/A') + ' on ' + new Date(request.lmApprovedAt).toLocaleString() +
-                    (request.lmComment ? '<span class="comment">Comment: ' + request.lmComment + '</span>' : '') :
-                    'Pending Approval'}</div>
-                </div>
-              </div>
-              <div class="timeline-item ${request.infraReviewedAt ? 'approved' : 'pending'}">
-                <div class="timeline-icon"><i class="fas ${request.infraReviewedAt ? 'fa-check' : 'fa-clock'}"></i></div>
-                <div class="timeline-content">
-                  <div class="timeline-title">Infrastructure</div>
-                  <div class="timeline-detail">${request.infraReviewedAt ?
-                    'Reviewed by ' + (request.infraReviewedByName || 'N/A') + ' on ' + new Date(request.infraReviewedAt).toLocaleString() +
-                    (request.infraComment ? '<span class="comment">Comment: ' + request.infraComment + '</span>' : '') :
-                    'Pending Review'}</div>
-                </div>
-              </div>
-              <div class="timeline-item ${request.financeApprovedAt ? 'approved' : 'pending'}">
-                <div class="timeline-icon"><i class="fas ${request.financeApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
-                <div class="timeline-content">
-                  <div class="timeline-title">Finance</div>
-                  <div class="timeline-detail">${request.financeApprovedAt ?
-                    'Approved by ' + (request.financeApprovedByName || 'N/A') + ' on ' + new Date(request.financeApprovedAt).toLocaleString() +
-                    (request.financeComment ? '<span class="comment">Comment: ' + request.financeComment + '</span>' : '') :
-                    'Pending Approval'}</div>
-                </div>
-              </div>
-              <div class="timeline-item ${request.deliveredAt ? 'approved' : 'pending'}">
-                <div class="timeline-icon"><i class="fas ${request.deliveredAt ? 'fa-check' : 'fa-clock'}"></i></div>
-                <div class="timeline-content">
-                  <div class="timeline-title">Delivery</div>
-                  <div class="timeline-detail">${request.deliveredAt ? 'Delivered on ' + new Date(request.deliveredAt).toLocaleString() : 'Not yet delivered'}</div>
-                </div>
-              </div>
-              <div class="timeline-item ${request.completedAt ? 'approved' : 'pending'}">
-                <div class="timeline-icon"><i class="fas ${request.completedAt ? 'fa-check' : 'fa-clock'}"></i></div>
-                <div class="timeline-content">
-                  <div class="timeline-title">Completion</div>
-                  <div class="timeline-detail">${request.completedAt ? 'Completed on ' + new Date(request.completedAt).toLocaleString() : 'Not yet completed'}</div>
-                </div>
-              </div>
-            </div>
-          `;
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          body.innerHTML = `
-            <div class="alert alert-danger">
-              <i class="fas fa-exclamation-circle me-2"></i>
-              Failed to load request details.
-            </div>
-          `;
-        });
+                // Determine SLA status display
+                const slaStatusMap = {
+                    'IN_PROGRESS': { class: 'sla-in-progress', text: 'In Progress' },
+                    'COMPLETED': { class: 'sla-completed', text: 'Completed' },
+                    'BREACHED': { class: 'sla-breached', text: 'Breached' },
+                    'ESCALATED': { class: 'sla-escalated', text: 'Escalated' }
+                };
+                const slaInfo = slaStatusMap[request.slaStatus] || { class: 'sla-na', text: 'N/A' };
+
+                body.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Resource Type</span>
+                                <span class="value">${request.resourceType || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Quantity</span>
+                                <span class="value">${request.quantity || 1}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Requester</span>
+                                <span class="value">${request.requesterName || 'N/A'}</span>
+                                <span class="staff-id">${request.requesterStaffId ? '(' + request.requesterStaffId + ')' : ''}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Department</span>
+                                <span class="value">${request.requesterDepartment || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Line Manager</span>
+                                <span class="value">${request.lineManagerStaffId || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="label">Status</span>
+                                <span class="badge bg-${statusColor}">${request.status}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">SLA Status</span>
+                                <span class="sla-status-badge ${slaInfo.class}">${slaInfo.text}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Created At</span>
+                                <span class="value">${request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Last Updated</span>
+                                <span class="value">${request.updatedAt ? new Date(request.updatedAt).toLocaleString() : 'N/A'}</span>
+                            </div>
+                            ${request.procurementOrderRef ? `
+                            <div class="detail-item">
+                                <span class="label">Procurement Order Ref</span>
+                                <span class="value">${request.procurementOrderRef}</span>
+                            </div>` : ''}
+                            ${request.purchaseCost ? `
+                            <div class="detail-item">
+                                <span class="label">Purchase Cost</span>
+                                <span class="value">$${request.purchaseCost}</span>
+                            </div>` : ''}
+                            ${request.quotationPath ? `
+                            <div class="mt-3">
+                                <a href="${getQuotationUrl(request.quotationPath)}" class="btn btn-primary btn-sm" target="_blank">
+                                    <i class="fas fa-file-pdf me-2"></i>View Quotation
+                                </a>
+                            </div>` : ''}
+                        </div>
+                    </div>
+
+                    ${request.specification ? `
+                    <div class="detail-item">
+                        <span class="label">Specification</span>
+                        <span class="value">${request.specification}</span>
+                    </div>` : ''}
+
+                    ${request.justification ? `
+                    <div class="detail-item">
+                        <span class="label">Justification</span>
+                        <span class="value">${request.justification}</span>
+                    </div>` : ''}
+
+                    <hr>
+
+                    <h6 class="fw-bold mt-2">Approval Timeline</h6>
+                    <div class="timeline">
+                        <div class="timeline-item ${request.lmApprovedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.lmApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Line Manager</div>
+                                <div class="timeline-detail">${request.lmApprovedAt ?
+                                    'Approved by ' + (request.lmApprovedByName || 'N/A') + ' on ' + new Date(request.lmApprovedAt).toLocaleString() +
+                                    (request.lmComment ? '<span class="comment">Comment: ' + request.lmComment + '</span>' : '') :
+                                    'Pending Approval'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.infraReviewedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.infraReviewedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Infrastructure</div>
+                                <div class="timeline-detail">${request.infraReviewedAt ?
+                                    'Reviewed by ' + (request.infraReviewedByName || 'N/A') + ' on ' + new Date(request.infraReviewedAt).toLocaleString() +
+                                    (request.infraComment ? '<span class="comment">Comment: ' + request.infraComment + '</span>' : '') :
+                                    'Pending Review'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.financeApprovedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.financeApprovedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Finance</div>
+                                <div class="timeline-detail">${request.financeApprovedAt ?
+                                    'Approved by ' + (request.financeApprovedByName || 'N/A') + ' on ' + new Date(request.financeApprovedAt).toLocaleString() +
+                                    (request.financeComment ? '<span class="comment">Comment: ' + request.financeComment + '</span>' : '') :
+                                    'Pending Approval'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.deliveredAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.deliveredAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Delivery</div>
+                                <div class="timeline-detail">${request.deliveredAt ? 'Delivered on ' + new Date(request.deliveredAt).toLocaleString() : 'Not yet delivered'}</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item ${request.completedAt ? 'approved' : 'pending'}">
+                            <div class="timeline-icon"><i class="fas ${request.completedAt ? 'fa-check' : 'fa-clock'}"></i></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Completion</div>
+                                <div class="timeline-detail">${request.completedAt ? 'Completed on ' + new Date(request.completedAt).toLocaleString() : 'Not yet completed'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                body.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load request details.
+                    </div>
+                `;
+            });
     }
 
     // ============================================
     // Create Request
     // ============================================
     document.getElementById('infraRequestForm').addEventListener('submit', function(e) {
-      e.preventDefault();
+        e.preventDefault();
 
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
-      data.quantity = parseInt(data.quantity);
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        data.quantity = parseInt(data.quantity);
 
-      fetch('/assetIQ-pro/api/infra-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('createRequestModal')).hide();
-          showToast('Request submitted successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          return response.text().then(text => {
-            throw new Error(text || 'Failed to submit request');
-          });
-        }
-      })
-      .catch(error => {
-        showToast('Error: ' + error.message, 'error');
-      });
+        fetch('/assetIQ-pro/api/infra-requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('createRequestModal')).hide();
+                showToast('Request submitted successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                return response.text().then(text => {
+                    throw new Error(text || 'Failed to submit request');
+                });
+            }
+        })
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+        });
     });
 
     // ============================================
     // Line Manager Actions
     // ============================================
     function showApproveLM(id) {
-      document.getElementById('approveLMId').value = id;
-      document.getElementById('approveLMComment').value = '';
-      new bootstrap.Modal(document.getElementById('approveLMModal')).show();
+        document.getElementById('approveLMId').value = id;
+        document.getElementById('approveLMComment').value = '';
+        new bootstrap.Modal(document.getElementById('approveLMModal')).show();
     }
 
     function submitApproveLM() {
-      const id = document.getElementById('approveLMId').value;
-      const comment = document.getElementById('approveLMComment').value;
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-lm?comment=' + encodeURIComponent(comment || ''), {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('approveLMModal')).hide();
-          showToast('Request approved successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to approve request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('approveLMId').value;
+        const comment = document.getElementById('approveLMComment').value;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-lm?comment=' + encodeURIComponent(comment || ''), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('approveLMModal')).hide();
+                showToast('Request approved successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to approve request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     function showRejectLM(id) {
-      document.getElementById('rejectLMId').value = id;
-      document.getElementById('rejectLMReason').value = '';
-      new bootstrap.Modal(document.getElementById('rejectLMModal')).show();
+        document.getElementById('rejectLMId').value = id;
+        document.getElementById('rejectLMReason').value = '';
+        new bootstrap.Modal(document.getElementById('rejectLMModal')).show();
     }
 
     function submitRejectLM() {
-      const id = document.getElementById('rejectLMId').value;
-      const reason = document.getElementById('rejectLMReason').value;
-      if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-lm?reason=' + encodeURIComponent(reason), {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('rejectLMModal')).hide();
-          showToast('Request rejected successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to reject request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('rejectLMId').value;
+        const reason = document.getElementById('rejectLMReason').value;
+        if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-lm?reason=' + encodeURIComponent(reason), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('rejectLMModal')).hide();
+                showToast('Request rejected successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to reject request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // ============================================
     // Infrastructure Actions
     // ============================================
     function showReviewInfra(id) {
-      document.getElementById('reviewInfraId').value = id;
-      document.getElementById('reviewInfraComment').value = '';
-      document.getElementById('quotationFile').value = '';
-      new bootstrap.Modal(document.getElementById('reviewInfraModal')).show();
+        document.getElementById('reviewInfraId').value = id;
+        document.getElementById('reviewInfraComment').value = '';
+        document.getElementById('quotationFile').value = '';
+        new bootstrap.Modal(document.getElementById('reviewInfraModal')).show();
     }
 
     function submitReviewRequest(id, comment, approved) {
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/review-infra?comment=' + encodeURIComponent(comment || '') + '&approved=' + approved, {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('reviewInfraModal')).hide();
-          showToast(approved ? 'Request approved successfully!' : 'Request rejected successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to review request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/review-infra?comment=' + encodeURIComponent(comment || '') + '&approved=' + approved, {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('reviewInfraModal')).hide();
+                showToast(approved ? 'Request approved successfully!' : 'Request rejected successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to review request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     function submitReviewInfra(approved) {
-      const id = document.getElementById('reviewInfraId').value;
-      const comment = document.getElementById('reviewInfraComment').value;
-      const fileInput = document.getElementById('quotationFile');
-      const file = fileInput.files[0];
+        const id = document.getElementById('reviewInfraId').value;
+        const comment = document.getElementById('reviewInfraComment').value;
+        const fileInput = document.getElementById('quotationFile');
+        const file = fileInput.files[0];
 
-      if (approved && file) {
-        const formData = new FormData();
-        formData.append('file', file);
+        if (approved && file) {
+            const formData = new FormData();
+            formData.append('file', file);
 
-        fetch('/assetIQ-pro/api/infra-requests/' + id + '/upload-quotation', {
-          method: 'POST',
-          body: formData
-        })
-        .then(response => {
-          if (response.ok) {
-            return submitReviewRequest(id, comment, approved);
-          } else {
-            showToast('Failed to upload quotation.', 'error');
-            throw new Error('Upload failed');
-          }
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          showToast('Error uploading quotation: ' + error.message, 'error');
-        });
-      } else {
-        submitReviewRequest(id, comment, approved);
-      }
+            fetch('/assetIQ-pro/api/infra-requests/' + id + '/upload-quotation', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return submitReviewRequest(id, comment, approved);
+                } else {
+                    showToast('Failed to upload quotation.', 'error');
+                    throw new Error('Upload failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error uploading quotation: ' + error.message, 'error');
+            });
+        } else {
+            submitReviewRequest(id, comment, approved);
+        }
     }
 
     function showRejectInfra(id) {
-      document.getElementById('reviewInfraId').value = id;
-      document.getElementById('reviewInfraComment').value = '';
-      document.getElementById('quotationFile').value = '';
-      new bootstrap.Modal(document.getElementById('reviewInfraModal')).show();
+        document.getElementById('reviewInfraId').value = id;
+        document.getElementById('reviewInfraComment').value = '';
+        document.getElementById('quotationFile').value = '';
+        new bootstrap.Modal(document.getElementById('reviewInfraModal')).show();
     }
 
     // ============================================
@@ -1132,160 +1340,160 @@
 
     // Step 1: Approve Finance
     function showApproveFinance(id) {
-      document.getElementById('approveFinanceId').value = id;
-      document.getElementById('approveFinanceComment').value = '';
-      new bootstrap.Modal(document.getElementById('approveFinanceModal')).show();
+        document.getElementById('approveFinanceId').value = id;
+        document.getElementById('approveFinanceComment').value = '';
+        new bootstrap.Modal(document.getElementById('approveFinanceModal')).show();
     }
 
     function submitApproveFinance() {
-      const id = document.getElementById('approveFinanceId').value;
-      const comment = document.getElementById('approveFinanceComment').value;
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-finance?comment=' + encodeURIComponent(comment || ''), {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('approveFinanceModal')).hide();
-          showToast('Request approved successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to approve request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('approveFinanceId').value;
+        const comment = document.getElementById('approveFinanceComment').value;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-finance?comment=' + encodeURIComponent(comment || ''), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('approveFinanceModal')).hide();
+                showToast('Request approved successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to approve request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // Reject Finance
     function showRejectFinance(id) {
-      document.getElementById('rejectFinanceId').value = id;
-      document.getElementById('rejectFinanceReason').value = '';
-      new bootstrap.Modal(document.getElementById('rejectFinanceModal')).show();
+        document.getElementById('rejectFinanceId').value = id;
+        document.getElementById('rejectFinanceReason').value = '';
+        new bootstrap.Modal(document.getElementById('rejectFinanceModal')).show();
     }
 
     function submitRejectFinance() {
-      const id = document.getElementById('rejectFinanceId').value;
-      const reason = document.getElementById('rejectFinanceReason').value;
-      if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-finance?reason=' + encodeURIComponent(reason), {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('rejectFinanceModal')).hide();
-          showToast('Request rejected successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to reject request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('rejectFinanceId').value;
+        const reason = document.getElementById('rejectFinanceReason').value;
+        if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-finance?reason=' + encodeURIComponent(reason), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('rejectFinanceModal')).hide();
+                showToast('Request rejected successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to reject request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // Step 2: Mark Procurement
     function showProcurement(id) {
-      document.getElementById('procurementId').value = id;
-      document.getElementById('procurementOrderRef').value = '';
-      document.getElementById('procurementCost').value = '';
-      document.getElementById('procurementSupplierId').value = '';
-      new bootstrap.Modal(document.getElementById('procurementModal')).show();
+        document.getElementById('procurementId').value = id;
+        document.getElementById('procurementOrderRef').value = '';
+        document.getElementById('procurementCost').value = '';
+        document.getElementById('procurementSupplierId').value = '';
+        new bootstrap.Modal(document.getElementById('procurementModal')).show();
     }
 
     function submitProcurement() {
-      const id = document.getElementById('procurementId').value;
-      const orderRef = document.getElementById('procurementOrderRef').value;
-      const cost = document.getElementById('procurementCost').value;
-      const supplierId = document.getElementById('procurementSupplierId').value;
+        const id = document.getElementById('procurementId').value;
+        const orderRef = document.getElementById('procurementOrderRef').value;
+        const cost = document.getElementById('procurementCost').value;
+        const supplierId = document.getElementById('procurementSupplierId').value;
 
-      let url = '/assetIQ-pro/api/infra-requests/' + id + '/mark-procurement';
-      let params = [];
+        let url = '/assetIQ-pro/api/infra-requests/' + id + '/mark-procurement';
+        let params = [];
 
-      if (orderRef && orderRef.trim()) {
-        params.push('procurementOrderRef=' + encodeURIComponent(orderRef.trim()));
-      }
-      if (cost && cost.trim() && !isNaN(parseFloat(cost))) {
-        params.push('purchaseCost=' + encodeURIComponent(parseFloat(cost)));
-      }
-      if (supplierId && supplierId.trim() && !isNaN(parseInt(supplierId))) {
-        params.push('supplierId=' + encodeURIComponent(parseInt(supplierId)));
-      }
-
-      if (params.length > 0) {
-        url += '?' + params.join('&');
-      }
-
-      fetch(url, { method: 'POST' })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('procurementModal')).hide();
-          showToast('Request moved to procurement successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to move request to procurement.', 'error');
+        if (orderRef && orderRef.trim()) {
+            params.push('procurementOrderRef=' + encodeURIComponent(orderRef.trim()));
         }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        if (cost && cost.trim() && !isNaN(parseFloat(cost))) {
+            params.push('purchaseCost=' + encodeURIComponent(parseFloat(cost)));
+        }
+        if (supplierId && supplierId.trim() && !isNaN(parseInt(supplierId))) {
+            params.push('supplierId=' + encodeURIComponent(parseInt(supplierId)));
+        }
+
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+
+        fetch(url, { method: 'POST' })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('procurementModal')).hide();
+                showToast('Request moved to procurement successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to move request to procurement.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // Step 3: Mark Delivered
     function showDelivered(id) {
-      document.getElementById('deliveredId').value = id;
-      document.getElementById('deliveredNotes').value = '';
-      new bootstrap.Modal(document.getElementById('deliveredModal')).show();
+        document.getElementById('deliveredId').value = id;
+        document.getElementById('deliveredNotes').value = '';
+        new bootstrap.Modal(document.getElementById('deliveredModal')).show();
     }
 
     function submitDelivered() {
-      const id = document.getElementById('deliveredId').value;
-      const notes = document.getElementById('deliveredNotes').value;
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/mark-delivered?notes=' + encodeURIComponent(notes || ''), {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('deliveredModal')).hide();
-          showToast('Request marked as delivered successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to mark request as delivered.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('deliveredId').value;
+        const notes = document.getElementById('deliveredNotes').value;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/mark-delivered?notes=' + encodeURIComponent(notes || ''), {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('deliveredModal')).hide();
+                showToast('Request marked as delivered successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to mark request as delivered.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // Step 4: Complete
     function showComplete(id) {
-      document.getElementById('completeId').value = id;
-      new bootstrap.Modal(document.getElementById('completeModal')).show();
+        document.getElementById('completeId').value = id;
+        new bootstrap.Modal(document.getElementById('completeModal')).show();
     }
 
     function submitComplete() {
-      const id = document.getElementById('completeId').value;
-      fetch('/assetIQ-pro/api/infra-requests/' + id + '/complete', {
-        method: 'POST'
-      })
-      .then(response => {
-        if (response.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
-          showToast('Request completed successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else {
-          showToast('Failed to complete request.', 'error');
-        }
-      })
-      .catch(error => showToast('Error: ' + error.message, 'error'));
+        const id = document.getElementById('completeId').value;
+        fetch('/assetIQ-pro/api/infra-requests/' + id + '/complete', {
+            method: 'POST'
+        })
+        .then(response => {
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
+                showToast('Request completed successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast('Failed to complete request.', 'error');
+            }
+        })
+        .catch(error => showToast('Error: ' + error.message, 'error'));
     }
 
     // View Quotation - Fixed with context path
     function viewQuotation(id) {
-      fetch('/assetIQ-pro/api/infra-requests/' + id)
-        .then(response => response.json())
-        .then(request => {
-          if (request.quotationPath) {
-            window.open(getQuotationUrl(request.quotationPath), '_blank');
-          } else {
-            showToast('No quotation attached.', 'error');
-          }
-        })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        fetch('/assetIQ-pro/api/infra-requests/' + id)
+            .then(response => response.json())
+            .then(request => {
+                if (request.quotationPath) {
+                    window.open(getQuotationUrl(request.quotationPath), '_blank');
+                } else {
+                    showToast('No quotation attached.', 'error');
+                }
+            })
+            .catch(error => showToast('Error: ' + error.message, 'error'));
     }
   </script>
 </div>

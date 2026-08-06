@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.ResourceRequestDTO;
+import com.stevecodes.AssetIQPro.entity.RequestSLATracking;
 import com.stevecodes.AssetIQPro.entity.ResourceRequest;
 import com.stevecodes.AssetIQPro.entity.StockItem;
 import com.stevecodes.AssetIQPro.repository.ResourceRequestRepository;
@@ -671,7 +672,7 @@ public class ResourceRequestService {
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
         dto.setPdfReportPath(request.getPdfReportPath());
 
-        // ✅ Stock item fields
+        // Stock item fields
         dto.setStockItemId(request.getStockItemId());
         dto.setStockItemName(request.getStockItemName());
 
@@ -679,6 +680,27 @@ public class ResourceRequestService {
         if (request.getStockItemId() != null) {
             stockItemRepository.findById(request.getStockItemId())
                     .ifPresent(item -> dto.setCurrentStockQuantity(item.getQuantity()));
+        }
+
+        // ============================================
+        // ✅ ADD SLA TRACKING DATA
+        // ============================================
+        try {
+            RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "RESOURCE_REQUEST");
+            if (slaTracking != null) {
+                dto.setSlaStatus(slaTracking.getStatus());
+                dto.setSlaStatusDisplay(slaTracking.getStatusDisplay());
+                dto.setSlaPercentage(slaTracking.getPercentageComplete());
+            } else {
+                dto.setSlaStatus("N/A");
+                dto.setSlaStatusDisplay("N/A");
+                dto.setSlaPercentage(0.0);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch SLA status for resource request {}: {}", request.getRequestId(), e.getMessage());
+            dto.setSlaStatus("N/A");
+            dto.setSlaStatusDisplay("N/A");
+            dto.setSlaPercentage(0.0);
         }
 
         return dto;

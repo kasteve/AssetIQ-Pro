@@ -6,6 +6,74 @@
 
 <head>
     <title>My Requests - AssetIQ-Pro</title>
+    <style>
+        /* SLA Status Styles */
+        .sla-status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+        .sla-status-badge.sla-in-progress { background: #cfe2ff; color: #0d6efd; }
+        .sla-status-badge.sla-completed { background: #d4edda; color: #198754; }
+        .sla-status-badge.sla-breached { background: #fdeeee; color: #dc3545; }
+        .sla-status-badge.sla-escalated { background: #fff4e0; color: #fd7e14; }
+        .sla-status-badge.sla-na { background: #eef0f3; color: #6c757d; }
+        .sla-progress-mini {
+            width: 60px;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .sla-progress-mini .sla-progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .sla-progress-mini .sla-progress-bar.bg-danger { background: #dc3545; }
+        .sla-progress-mini .sla-progress-bar.bg-warning { background: #fd7e14; }
+        .sla-progress-mini .sla-progress-bar.bg-success { background: #198754; }
+
+        /* Table styles for My Requests */
+        .requests-table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+        .requests-table thead th {
+            background: #f8f9fb;
+            border-bottom: 1px solid #eef0f3;
+            color: #6c757d;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            white-space: nowrap;
+        }
+        .requests-table tbody td {
+            padding: 12px 14px;
+            vertical-align: middle;
+            font-size: 13px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .requests-table tbody tr:hover {
+            background: #f8f9fc;
+        }
+        .requests-table .status-badge {
+            font-size: 10px;
+            padding: 3px 10px;
+        }
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 
 <body>
@@ -110,41 +178,85 @@
                             </button>
                         </div>
                         <div class="panel-body">
-                            <div th:if="${driverRequests != null and !driverRequests.isEmpty()}" id="driverRequestsList">
-                                <div th:each="req : ${driverRequests}" class="booking-row">
-                                    <div>
-                                        <div class="booking-row-title" th:text="${req.destination}">Destination</div>
-                                        <small class="text-muted" th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</small>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="status-badge"
-                                              th:classappend="${req.status} == 'PENDING' ? 'pending' :
-                                                              (${req.status} == 'ACCEPTED' ? 'accepted' :
-                                                              (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
-                                              th:text="${req.status}">PENDING</span>
+                            <div th:if="${driverRequests != null and !driverRequests.isEmpty()}">
+                                <div class="table-container">
+                                    <table class="requests-table">
+                                        <thead>
+                                        <tr>
+                                            <th>Destination</th>
+                                            <th>Requested</th>
+                                            <th>Status</th>
+                                            <th>SLA Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="req : ${driverRequests}">
+                                            <td>
+                                                <div class="fw-bold" th:text="${req.destination}">Destination</div>
+                                                <small class="text-muted" th:text="${req.requestedBy}">Requester</small>
+                                            </td>
+                                            <td>
+                                                <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
+                                            </td>
+                                            <td>
+                                                    <span class="status-badge"
+                                                          th:classappend="${req.status} == 'PENDING' ? 'pending' :
+                                                                          (${req.status} == 'ACCEPTED' ? 'accepted' :
+                                                                          (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
+                                                          th:text="${req.status}">PENDING</span>
+                                            </td>
+                                            <td>
+                                                <!-- SLA Status Badge -->
+                                                <span th:if="${req.slaStatus == 'IN_PROGRESS'}" class="sla-status-badge sla-in-progress" th:text="${req.slaStatusDisplay}">In Progress</span>
+                                                <span th:if="${req.slaStatus == 'COMPLETED'}" class="sla-status-badge sla-completed" th:text="${req.slaStatusDisplay}">Completed</span>
+                                                <span th:if="${req.slaStatus == 'BREACHED'}" class="sla-status-badge sla-breached" th:text="${req.slaStatusDisplay}">Breached</span>
+                                                <span th:if="${req.slaStatus == 'ESCALATED'}" class="sla-status-badge sla-escalated" th:text="${req.slaStatusDisplay}">Escalated</span>
+                                                <span th:if="${req.slaStatus == null or req.slaStatus == 'N/A'}" class="sla-status-badge sla-na">N/A</span>
 
-                                        <!-- Complete Trip button for ACCEPTED requests -->
-                                        <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
-                                            <button class="btn btn-sm btn-success mt-1 w-100"
-                                                    th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                <i class="fas fa-check-circle"></i> Complete Trip
-                                            </button>
-                                        </div>
-
-                                        <div th:if="${req.status} == 'PENDING'">
-                                            <button class="btn btn-sm btn-warning mt-1 recall-btn"
-                                                    th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
-                                                <i class="fas fa-undo"></i> Recall
-                                            </button>
-                                        </div>
-                                    </div>
+                                                <!-- Progress Bar -->
+                                                <div th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED'}" class="sla-progress-mini">
+                                                    <div class="sla-progress-bar"
+                                                         th:class="${req.slaPercentage != null and req.slaPercentage > 90} ? 'bg-danger' : ((${req.slaPercentage != null and req.slaPercentage > 75}) ? 'bg-warning' : 'bg-success')"
+                                                         th:style="'width: ' + ${req.slaPercentage != null ? req.slaPercentage : 0} + '%;'">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted ms-1" th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED' and req.slaPercentage != null}"
+                                                       th:text="${#numbers.formatDecimal(req.slaPercentage, 0, 0)} + '%'">
+                                                    0%
+                                                </small>
+                                                <small class="text-danger ms-1" th:if="${req.slaStatus == 'BREACHED'}">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                </small>
+                                                <small class="text-success ms-1" th:if="${req.slaStatus == 'COMPLETED'}">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <!-- Complete Trip button for ACCEPTED requests -->
+                                                <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
+                                                    <button class="btn btn-sm btn-success w-100"
+                                                            th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                        <i class="fas fa-check-circle"></i> Complete
+                                                    </button>
+                                                </div>
+                                                <!-- Recall button for PENDING requests -->
+                                                <div th:if="${req.status} == 'PENDING'">
+                                                    <button class="btn btn-sm btn-warning w-100 recall-btn"
+                                                            th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
+                                                        <i class="fas fa-undo"></i> Recall
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                             <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
                                 <i class="fas fa-car"></i>
                                 No driver requests
                             </div>
-                            <div class="pagination-controls" id="driverRequestsPagination"></div>
                         </div>
                     </div>
                 </div>
@@ -763,6 +875,73 @@
         .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
         .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
         .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+
+        /* SLA Status Styles */
+        .sla-status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 0px;
+        }
+        .sla-status-badge.sla-in-progress { background: #cfe2ff; color: #0d6efd; }
+        .sla-status-badge.sla-completed { background: #d4edda; color: #198754; }
+        .sla-status-badge.sla-breached { background: #fdeeee; color: #dc3545; }
+        .sla-status-badge.sla-escalated { background: #fff4e0; color: #fd7e14; }
+        .sla-status-badge.sla-na { background: #eef0f3; color: #6c757d; }
+        .sla-progress-mini {
+            width: 60px;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .sla-progress-mini .sla-progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .sla-progress-mini .sla-progress-bar.bg-danger { background: #dc3545; }
+        .sla-progress-mini .sla-progress-bar.bg-warning { background: #fd7e14; }
+        .sla-progress-mini .sla-progress-bar.bg-success { background: #198754; }
+
+        /* Table styles for My Requests */
+        .requests-table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+        .requests-table thead th {
+            background: #f8f9fb;
+            border-bottom: 1px solid #eef0f3;
+            color: #6c757d;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            white-space: nowrap;
+        }
+        .requests-table tbody td {
+            padding: 12px 14px;
+            vertical-align: middle;
+            font-size: 13px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .requests-table tbody tr:hover {
+            background: #f8f9fc;
+        }
+        .requests-table .status-badge {
+            font-size: 10px;
+            padding: 3px 10px;
+        }
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
     </style>
 </div>
 

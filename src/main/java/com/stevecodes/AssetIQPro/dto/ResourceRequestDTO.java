@@ -59,6 +59,13 @@ public class ResourceRequestDTO {
     private String pdfReportPath;
 
     // ============================================
+    // ✅ SLA Tracking Fields
+    // ============================================
+    private String slaStatus;
+    private String slaStatusDisplay;
+    private Double slaPercentage;
+
+    // ============================================
     // Helper Methods
     // ============================================
 
@@ -116,5 +123,30 @@ public class ResourceRequestDTO {
             return stockItemName + (currentStockQuantity != null ? " (Available: " + currentStockQuantity + ")" : "");
         }
         return "No stock item linked";
+    }
+
+    // ============================================
+    // ✅ SLA Status Helpers
+    // ============================================
+    public String getSlaStatusDisplay() {
+        if (slaStatus == null) return "N/A";
+        switch (slaStatus) {
+            case "IN_PROGRESS": return "In Progress";
+            case "COMPLETED": return "Completed";
+            case "BREACHED": return "Breached";
+            case "ESCALATED": return "Escalated";
+            default: return slaStatus;
+        }
+    }
+
+    public String getSlaStatusColor() {
+        if (slaStatus == null) return "sla-na";
+        switch (slaStatus) {
+            case "IN_PROGRESS": return "sla-in-progress";
+            case "COMPLETED": return "sla-completed";
+            case "BREACHED": return "sla-breached";
+            case "ESCALATED": return "sla-escalated";
+            default: return "sla-na";
+        }
     }
 }

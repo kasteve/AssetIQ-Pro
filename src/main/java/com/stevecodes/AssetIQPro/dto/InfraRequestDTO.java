@@ -93,6 +93,13 @@ public class InfraRequestDTO {
     private LocalDateTime signingTokenExpiry;
 
     // ============================================
+    // SLA Tracking Fields
+    // ============================================
+    private String slaStatus;
+    private String slaStatusDisplay;
+    private Double slaPercentage;
+
+    // ============================================
     // Status Display
     // ============================================
     public String getStatusDisplay() {
@@ -134,6 +141,31 @@ public class InfraRequestDTO {
             case "COMPLETED": return "success";
             case "CANCELLED": return "danger";
             default: return "secondary";
+        }
+    }
+
+    // ============================================
+    // SLA Status Helpers
+    // ============================================
+    public String getSlaStatusDisplay() {
+        if (slaStatus == null) return "N/A";
+        switch (slaStatus) {
+            case "IN_PROGRESS": return "In Progress";
+            case "COMPLETED": return "Completed";
+            case "BREACHED": return "Breached";
+            case "ESCALATED": return "Escalated";
+            default: return slaStatus;
+        }
+    }
+
+    public String getSlaStatusColor() {
+        if (slaStatus == null) return "sla-na";
+        switch (slaStatus) {
+            case "IN_PROGRESS": return "sla-in-progress";
+            case "COMPLETED": return "sla-completed";
+            case "BREACHED": return "sla-breached";
+            case "ESCALATED": return "sla-escalated";
+            default: return "sla-na";
         }
     }
 }

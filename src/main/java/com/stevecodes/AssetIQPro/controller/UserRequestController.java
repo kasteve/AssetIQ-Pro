@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.BookingDTO;
+import com.stevecodes.AssetIQPro.dto.DriverRequestDTO;
 import com.stevecodes.AssetIQPro.dto.InfraRequestDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Booking;
@@ -62,19 +63,28 @@ public class UserRequestController {
 
         log.info("Loading dashboard for user: {}", userId);
 
-        // Driver requests - filtered by userId
-        model.addAttribute("driverRequests", driverService.getRequestsByUserId(userId));
+        // ============================================
+        // ✅ DRIVER REQUESTS - Convert to DTOs
+        // ============================================
+        List<DriverRequest> driverRequestEntities = driverService.getRequestsByUserId(userId);
+        List<DriverRequestDTO> driverRequests = driverRequestEntities.stream()
+                .map(driverService::convertToDTO)
+                .collect(Collectors.toList());
+        model.addAttribute("driverRequests", driverRequests);
 
+        // ✅ All drivers for dropdown
         List<AppUser> allDrivers = driverService.getAllDrivers();
         model.addAttribute("allDrivers", allDrivers);
 
-        // ✅ Get available driver IDs for status display
+        // ✅ Available driver IDs for status display
         Set<Long> availableDriverIds = driverService.getAvailableDrivers().stream()
                 .map(AppUser::getUserId)
                 .collect(Collectors.toSet());
         model.addAttribute("availableDriverIds", availableDriverIds);
 
-        // Room bookings - filtered by userId
+        // ============================================
+        // ✅ ROOM BOOKINGS
+        // ============================================
         List<BookingDTO> roomBookings = bookingService.getBookingsWithUserNames(userId);
         model.addAttribute("roomBookings", roomBookings);
 
@@ -94,7 +104,9 @@ public class UserRequestController {
                 .collect(Collectors.toSet());
         model.addAttribute("availableRoomIds", availableRoomIds);
 
-        // ✅ Infrastructure requests - PROPERLY FILTERED
+        // ============================================
+        // ✅ INFRASTRUCTURE REQUESTS - Already DTOs
+        // ============================================
         List<InfraRequestDTO> allInfraRequests = infraRequestService.getAllRequests();
         List<InfraRequestDTO> filteredInfraRequests;
 
@@ -119,28 +131,35 @@ public class UserRequestController {
         model.addAttribute("infraRequests", filteredInfraRequests);
 
         // ============================================
-        // ✅ PENDING APPROVALS - ALL TYPES
+        // ✅ PENDING APPROVALS - ALL TYPES with DTOs
         // ============================================
         List<Object> allPendingApprovals = new ArrayList<>();
 
-        // 1. Driver requests pending approval (for drivers)
+        // 1. Driver requests pending approval (for drivers) - Convert to DTOs
         if (currentUser.isDriver() || currentUser.isAdmin()) {
-            List<DriverRequest> pendingDriverApprovals = driverService.getPendingRequestsForDriver(currentUser.getUserId());
+            List<DriverRequest> pendingEntities = driverService.getPendingRequestsForDriver(currentUser.getUserId());
+            List<DriverRequestDTO> pendingDriverApprovals = pendingEntities.stream()
+                    .map(driverService::convertToDTO)
+                    .collect(Collectors.toList());
             model.addAttribute("pendingDriverApprovals", pendingDriverApprovals);
             allPendingApprovals.addAll(pendingDriverApprovals);
             log.info("Found {} pending driver approvals for user: {}", pendingDriverApprovals.size(), currentUser.getUsername());
         }
 
+        // 2. Accepted trips for driver - Convert to DTOs
         if (currentUser.isDriver()) {
-            List<DriverRequest> myAcceptedTrips = driverService.getDriverBookingsLast7Days(currentUser.getUserId())
+            List<DriverRequest> acceptedEntities = driverService.getDriverBookingsLast7Days(currentUser.getUserId())
                     .stream()
                     .filter(r -> "ACCEPTED".equals(r.getStatus()))
+                    .collect(Collectors.toList());
+            List<DriverRequestDTO> myAcceptedTrips = acceptedEntities.stream()
+                    .map(driverService::convertToDTO)
                     .collect(Collectors.toList());
             model.addAttribute("myAcceptedTrips", myAcceptedTrips);
             log.info("Driver {} has {} accepted trips awaiting completion", currentUser.getUsername(), myAcceptedTrips.size());
         }
 
-        // 2. Server room bookings pending approval (for INFRA/ADMIN users)
+        // 3. Server room bookings pending approval (for INFRA/ADMIN users)
         if (currentUser.hasAnyPermission("APPROVE_INFRA", "REVIEW_INFRA", "ADMIN", "SUPER_ADMIN")) {
             List<Booking> pendingServerRooms = bookingRepository.findPendingServerRoomBookings();
 
@@ -165,7 +184,7 @@ public class UserRequestController {
             log.info("Found {} pending server room approvals for user: {}", pendingServerRoomDTOs.size(), currentUser.getUsername());
         }
 
-        // 3. Infrastructure requests pending approval (for LM, INFRA, FINANCE)
+        // 4. Infrastructure requests pending approval - Already DTOs
         if (currentUser.isAdmin() || currentUser.hasAnyPermission("APPROVE_LM", "APPROVE_INFRA", "REVIEW_INFRA", "APPROVE_FINANCE")) {
             List<InfraRequestDTO> pendingInfraRequests = new ArrayList<>();
 
@@ -230,9 +249,12 @@ public class UserRequestController {
     @GetMapping("/driver/{driverId}/bookings")
     @ResponseBody
     @PreAuthorize("isAuthenticated()")
-    public List<DriverRequest> getDriverBookings(@PathVariable Long driverId) {
+    public List<DriverRequestDTO> getDriverBookings(@PathVariable Long driverId) {
         log.info("Getting bookings for driver: {}", driverId);
-        return driverService.getDriverBookingsLast7Days(driverId);
+        return driverService.getDriverBookingsLast7Days(driverId)
+                .stream()
+                .map(driverService::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/driver/{driverId}/details")
@@ -241,31 +263,36 @@ public class UserRequestController {
         log.info("Viewing driver details for: {}", driverId);
         AppUser driver = userService.getUserById(driverId).orElse(null);
 
-        // ✅ Get ALL bookings for this driver
+        // ✅ Get ALL bookings for this driver and convert to DTOs
         List<DriverRequest> allBookings = driverService.getDriverBookingsLast7Days(driverId);
 
-        // ✅ Separate by status
-        List<DriverRequest> pendingBookings = allBookings.stream()
+        // ✅ Convert to DTOs
+        List<DriverRequestDTO> allBookingDTOs = allBookings.stream()
+                .map(driverService::convertToDTO)
+                .collect(Collectors.toList());
+
+        // ✅ Separate by status using DTOs
+        List<DriverRequestDTO> pendingBookings = allBookingDTOs.stream()
                 .filter(b -> "PENDING".equals(b.getStatus()))
                 .collect(Collectors.toList());
 
-        List<DriverRequest> acceptedBookings = allBookings.stream()
+        List<DriverRequestDTO> acceptedBookings = allBookingDTOs.stream()
                 .filter(b -> "ACCEPTED".equals(b.getStatus()))
                 .collect(Collectors.toList());
 
-        List<DriverRequest> completedBookings = allBookings.stream()
+        List<DriverRequestDTO> completedBookings = allBookingDTOs.stream()
                 .filter(b -> "COMPLETED".equals(b.getStatus()))
                 .collect(Collectors.toList());
 
-        List<DriverRequest> declinedBookings = allBookings.stream()
+        List<DriverRequestDTO> declinedBookings = allBookingDTOs.stream()
                 .filter(b -> "DECLINED".equals(b.getStatus()) || "RECALLED".equals(b.getStatus()))
                 .collect(Collectors.toList());
 
-        int bookingCount = allBookings.size();
+        int bookingCount = allBookingDTOs.size();
 
         model.addAttribute("driver", driver);
         model.addAttribute("bookingCount", bookingCount);
-        model.addAttribute("allBookings", allBookings);
+        model.addAttribute("allBookings", allBookingDTOs);
         model.addAttribute("pendingBookings", pendingBookings);
         model.addAttribute("acceptedBookings", acceptedBookings);
         model.addAttribute("completedBookings", completedBookings);
