@@ -290,20 +290,39 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        if (userDTO.getFullName() != null) user.setFullName(userDTO.getFullName());
-        if (userDTO.getRole() != null) user.setRole(userDTO.getRole());
-        if (userDTO.isActive() != user.isActive()) user.setActive(userDTO.isActive());
-        if (userDTO.isBlocked() != user.isBlocked()) user.setBlocked(userDTO.isBlocked());
-        if (userDTO.getPasswordHash() != null) user.setPasswordHash(userDTO.getPasswordHash());
+        // ✅ UPDATE USER FIELDS - THESE WERE MISSING
+        if (userDTO.getStaffId() != null) {
+            user.setStaffId(userDTO.getStaffId());
+        }
+        if (userDTO.getUsername() != null) {
+            user.setUsername(userDTO.getUsername());
+        }
+        if (userDTO.getEmail() != null) {
+            user.setEmail(userDTO.getEmail());
+        }
+        if (userDTO.getFullName() != null) {
+            user.setFullName(userDTO.getFullName());
+        }
+        if (userDTO.getRole() != null) {
+            user.setRole(userDTO.getRole());
+        }
+
+        // ✅ FIX: The problem - these are being set but not saved properly
+        // Make sure active and blocked are set correctly
+        user.setActive(userDTO.isActive());
+        user.setBlocked(userDTO.isBlocked());
 
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             user.setDepartmentEntity(dept);
             user.setDepartment(dept.getName());
+        } else {
+            user.setDepartmentEntity(null);
+            user.setDepartment(null);
         }
 
-        // Update employee
+        // Update employee (this part is working)
         Employee employee = user.getEmployee();
         if (employee != null) {
             employee.setFirstName(getFirstName(userDTO.getFullName()));
@@ -326,7 +345,7 @@ public class AppUserService {
             employeeRepository.save(employee);
         }
 
-        // ✅ FIXED: Update permissions using Set to avoid duplicates
+        // Update permissions
         if (userDTO.getPermissions() != null) {
             Set<Permission> newPermissions = new HashSet<>();
             for (String permName : userDTO.getPermissions()) {
@@ -337,6 +356,8 @@ public class AppUserService {
         }
 
         user.setUpdatedAt(LocalDateTime.now());
+
+        // ✅ THIS IS THE KEY - Save the user!
         AppUser updated = userRepository.save(user);
 
         auditService.logAction("USER_UPDATED",

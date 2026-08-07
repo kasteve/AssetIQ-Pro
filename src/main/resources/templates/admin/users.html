@@ -108,8 +108,11 @@
                                        th:data-email="${user.email}"
                                        th:data-role="${user.role}"
                                        th:data-departmentid="${user.departmentEntity != null ? user.departmentEntity.departmentId : ''}"
+                                       th:data-employeeid="${user.employee != null ? user.employee.employeeId : ''}"
                                        th:data-linemanagerid="${user.employee != null && user.employee.lineManager != null ? user.employee.lineManager.employeeId : ''}"
-                                       th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}">
+                                       th:data-phonenumber="${user.employee != null ? user.employee.phoneNumber : ''}"
+                                       th:data-active="${user.active}"
+                                       th:data-blocked="${user.blocked}">
                                         <i class="fas fa-edit me-2 text-primary"></i>Edit User
                                     </a>
                                 </li>
@@ -251,6 +254,7 @@
                 </div>
                 <form th:action="@{/admin/users/update}" method="post">
                     <input type="hidden" name="userId" id="editUserId">
+                    <input type="hidden" name="employeeId" id="editEmployeeId">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Staff ID</label>
@@ -301,6 +305,16 @@
                                 <option value="ADMIN">Admin Approver</option>
                                 <option value="SUPERADMIN">Super Admin</option>
                             </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="active" id="editActive" value="true">
+                                <label class="form-check-label" for="editActive">Active</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="blocked" id="editBlocked" value="true">
+                                <label class="form-check-label" for="editBlocked">Blocked</label>
+                            </div>
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Permissions</label>
@@ -354,12 +368,12 @@
     </div>
 
     <!-- ============================================ -->
-    <!-- Toast Container (replaces window.alert)       -->
+    <!-- Toast Container                               -->
     <!-- ============================================ -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;" id="toastContainer"></div>
 
     <!-- ============================================ -->
-    <!-- Confirm Modal (replaces window.confirm)       -->
+    <!-- Confirm Modal                                -->
     <!-- ============================================ -->
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -512,9 +526,7 @@
             margin-right: 4px !important;
         }
 
-        /* ============================================ */
-        /* Toast styling                                 */
-        /* ============================================ */
+        /* Toast styling */
         .app-toast {
             min-width: 300px;
             border-radius: 12px;
@@ -554,7 +566,7 @@
 
     <script th:inline="none">
         // ============================================
-        // Toast helper (replaces window.alert)
+        // Toast helper
         // ============================================
         const TOAST_ICONS = {
             success: 'fa-circle-check',
@@ -594,7 +606,7 @@
         }
 
         // ============================================
-        // Confirm helper (replaces window.confirm)
+        // Confirm helper
         // ============================================
         function showConfirm(message, onConfirm, options = {}) {
             const modalEl = document.getElementById('confirmActionModal');
@@ -609,7 +621,6 @@
 
             const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-            // Replace button to clear any previously bound handlers
             const newYesBtn = yesBtn.cloneNode(true);
             yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
 
@@ -621,6 +632,9 @@
             modal.show();
         }
 
+        // ============================================
+        // DataTables
+        // ============================================
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#usersTable')) {
                 $('#usersTable').DataTable().destroy();
@@ -628,7 +642,7 @@
             $('#usersTable').DataTable({
                 destroy: true,
                 pageLength: 10,
-                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
                 order: [[0, 'asc']],
                 columnDefs: [
                     { orderable: false, targets: 7 }
@@ -642,17 +656,20 @@
                     { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
                 ],
                 language: {
-                    search: "Search:",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ users",
-                    infoEmpty: "No users found",
-                    infoFiltered: "(filtered from _MAX_ total users)"
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ users',
+                    infoEmpty: 'No users found',
+                    infoFiltered: '(filtered from _MAX_ total users)'
                 }
             });
         });
 
         let resetUserId = null;
 
+        // ============================================
+        // Edit User - Load permissions
+        // ============================================
         document.addEventListener('DOMContentLoaded', function() {
             const resetModal = document.getElementById('resetPasswordModal');
             if (resetModal) {
@@ -663,9 +680,6 @@
                 });
             }
 
-            // ============================================
-            // EDIT USER MODAL - Load permissions when opened
-            // ============================================
             const editModal = document.getElementById('editUserModal');
             if (editModal) {
                 editModal.addEventListener('show.bs.modal', function(event) {
@@ -674,6 +688,7 @@
 
                     // Set basic fields
                     document.getElementById('editUserId').value = userId;
+                    document.getElementById('editEmployeeId').value = button.getAttribute('data-employeeid') || '';
                     document.getElementById('editStaffId').value = button.getAttribute('data-staffid') || '';
                     document.getElementById('editUsername').value = button.getAttribute('data-username') || '';
                     document.getElementById('editFullName').value = button.getAttribute('data-fullname') || '';
@@ -682,101 +697,70 @@
                     document.getElementById('editRole').value = button.getAttribute('data-role') || 'EMPLOYEE';
                     document.getElementById('editDepartmentId').value = button.getAttribute('data-departmentid') || '';
                     document.getElementById('editLineManagerId').value = button.getAttribute('data-linemanagerid') || '';
+                    document.getElementById('editActive').checked = button.getAttribute('data-active') === 'true';
+                    document.getElementById('editBlocked').checked = button.getAttribute('data-blocked') === 'true';
 
-                    // Uncheck all permissions first
-                    document.querySelectorAll('#editUserModal input[name="permissions"]').forEach(cb => {
+                    // Uncheck all permissions
+                    document.querySelectorAll('#editUserModal input[name="permissions"]').forEach(function(cb) {
                         cb.checked = false;
                     });
 
-                    // ✅ Fetch user permissions with better error handling
-                    const apiUrl = '/assetIQ-pro/api/admin/users/' + userId + '/permissions';
-                    console.log('Fetching permissions for user ' + userId + ' from: ' + apiUrl);
+                    // Fetch user permissions
+                    var apiUrl = '/assetIQ-pro/api/admin/users/' + userId + '/permissions';
+                    console.log('Fetching permissions for user ' + userId);
 
                     fetch(apiUrl, {
                         method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         credentials: 'same-origin'
                     })
-                    .then(response => {
-                        console.log('Response status:', response.status);
-                        if (!response.ok) {
-                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                        }
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('HTTP ' + response.status);
                         return response.json();
                     })
-                    .then(permissions => {
+                    .then(function(permissions) {
                         console.log('Permissions received:', permissions);
                         if (permissions && permissions.length > 0) {
-                            const checkboxes = document.querySelectorAll('#editUserModal input[name="permissions"]');
-                            checkboxes.forEach(cb => {
+                            var checkboxes = document.querySelectorAll('#editUserModal input[name="permissions"]');
+                            checkboxes.forEach(function(cb) {
                                 if (permissions.includes(cb.value)) {
                                     cb.checked = true;
-                                    console.log('Checked permission:', cb.value);
                                 }
                             });
-                        } else {
-                            console.log('No permissions found for user');
                         }
                     })
-                    .catch(error => {
+                    .catch(function(error) {
                         console.error('Error loading permissions:', error);
-                        // ✅ Fallback: Try alternative API endpoint
-                        console.log('Trying fallback API endpoint...');
-                        fetch('/assetIQ-pro/api/admin/users/' + userId, {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            credentials: 'same-origin'
-                        })
-                        .then(res => res.json())
-                        .then(userData => {
-                            console.log('User data from fallback:', userData);
-                            if (userData && userData.permissions) {
-                                const permissions = userData.permissions.map(p =>
-                                    typeof p === 'string' ? p : p.permissionName
-                                );
-                                const checkboxes = document.querySelectorAll('#editUserModal input[name="permissions"]');
-                                checkboxes.forEach(cb => {
-                                    if (permissions.includes(cb.value)) {
-                                        cb.checked = true;
-                                    }
-                                });
-                                console.log('Permissions loaded from fallback');
-                            }
-                        })
-                        .catch(err2 => {
-                            console.error('Both API endpoints failed:', err2);
-                            showToast('Unable to load current permissions for this user.', 'error');
-                        });
+                        showToast('Unable to load current permissions for this user.', 'error');
                     });
                 });
             }
         });
 
+        // ============================================
+        // Action Functions
+        // ============================================
         function toggleUser(id) {
             showConfirm('Are you sure you want to toggle this user\'s status?', function() {
                 fetch('/assetIQ-pro/admin/users/' + id + '/toggle', { method: 'POST' })
-                    .then(response => {
+                    .then(function(response) {
                         if (!response.ok) throw new Error('Request failed');
                         showToast('User status updated successfully.', 'success');
-                        setTimeout(() => window.location.reload(), 900);
+                        setTimeout(function() { window.location.reload(); }, 900);
                     })
-                    .catch(err => showToast('Failed to toggle user status: ' + err.message, 'error'));
+                    .catch(function(err) { showToast('Failed to toggle user status: ' + err.message, 'error'); });
             }, { title: 'Toggle User Status', confirmLabel: 'Toggle', confirmClass: 'btn-primary' });
         }
 
         function deleteUser(id) {
             showConfirm('This will permanently delete the user. This action cannot be undone.', function() {
                 fetch('/assetIQ-pro/admin/users/' + id + '/delete', { method: 'POST' })
-                    .then(response => {
+                    .then(function(response) {
                         if (!response.ok) throw new Error('Request failed');
                         showToast('User deleted successfully.', 'success');
-                        setTimeout(() => window.location.reload(), 900);
+                        setTimeout(function() { window.location.reload(); }, 900);
                     })
-                    .catch(err => showToast('Failed to delete user: ' + err.message, 'error'));
+                    .catch(function(err) { showToast('Failed to delete user: ' + err.message, 'error'); });
             }, { title: 'Delete User', confirmLabel: 'Delete', confirmClass: 'btn-danger' });
         }
 
@@ -787,7 +771,7 @@
             }
             showConfirm('Reset password for this user? A temporary password will be emailed to them.', function() {
                 fetch('/assetIQ-pro/admin/users/' + resetUserId + '/reset-password', { method: 'POST' })
-                    .then(response => {
+                    .then(function(response) {
                         if (response.ok) {
                             showToast('Password reset email sent!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
@@ -795,7 +779,7 @@
                             throw new Error('Failed');
                         }
                     })
-                    .catch(err => showToast('Failed to reset password: ' + err.message, 'error'));
+                    .catch(function(err) { showToast('Failed to reset password: ' + err.message, 'error'); });
             }, { title: 'Reset Password', confirmLabel: 'Reset', confirmClass: 'btn-warning' });
         }
     </script>

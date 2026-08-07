@@ -106,8 +106,20 @@ public class UserViewController {
             }
 
             log.info("Updating user: {}", userDTO.getUserId());
+            log.info("UserDTO received: fullName={}, role={}, departmentId={}, email={}, active={}, blocked={}",
+                    userDTO.getFullName(), userDTO.getRole(), userDTO.getDepartmentId(),
+                    userDTO.getEmail(), userDTO.isActive(), userDTO.isBlocked());
+
+            // ✅ Ensure the userId is set in the DTO
+            if (userDTO.getUserId() == null) {
+                redirectAttributes.addFlashAttribute("error", "User ID is required for update.");
+                return "redirect:/admin/users";
+            }
+
+            // ✅ Call the service to update
             userService.updateUser(userDTO.getUserId(), userDTO);
             redirectAttributes.addFlashAttribute("success", "User updated successfully!");
+
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to update users.");
         } catch (Exception e) {
@@ -162,6 +174,44 @@ public class UserViewController {
         return "redirect:/admin/users";
     }
 
+    @PostMapping("/{userId}/block")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
+    public String blockUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
+        try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
+            userService.blockUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User blocked successfully!");
+        } catch (Exception e) {
+            log.error("Error blocking user: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to block user: " + e.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+
+    @PostMapping("/{userId}/unblock")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
+    public String unblockUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
+        try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+                return "redirect:/login";
+            }
+
+            userService.unblockUser(userId);
+            redirectAttributes.addFlashAttribute("success", "User unblocked successfully!");
+        } catch (Exception e) {
+            log.error("Error unblocking user: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Failed to unblock user: " + e.getMessage());
+        }
+        return "redirect:/admin/users";
+    }
+
     @PostMapping("/{userId}/delete")
     @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public String deleteUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
@@ -181,5 +231,32 @@ public class UserViewController {
             redirectAttributes.addFlashAttribute("error", "Failed to delete user: " + e.getMessage());
         }
         return "redirect:/admin/users";
+    }
+
+    @GetMapping("/{userId}/edit")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
+    public String editUser(@PathVariable Long userId, Model model) {
+        try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return "redirect:/login";
+            }
+
+            AppUser user = userService.getUserById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+            model.addAttribute("user", user);
+            model.addAttribute("allPermissions", permissionService.getAllPermissions());
+            model.addAttribute("departments", departmentService.getAllDepartments());
+            model.addAttribute("employees", employeeService.getAllEmployees());
+            model.addAttribute("roles", List.of("EMPLOYEE", "DRIVER", "INFRA", "FINANCE", "MANAGER", "ADMIN", "SUPERADMIN"));
+            model.addAttribute("canEdit", currentUser.hasAnyPermission("USER_EDIT", "MANAGE_USERS", "ADMIN"));
+            model.addAttribute("canManageRoles", currentUser.hasAnyPermission("MANAGE_ROLES", "ADMIN"));
+
+            return "admin/user-edit";
+        } catch (Exception e) {
+            log.error("Error loading edit user page: {}", e.getMessage(), e);
+            return "redirect:/admin/users";
+        }
     }
 }
