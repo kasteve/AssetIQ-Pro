@@ -201,15 +201,25 @@
                                     </span>
                 </div>
               </td>
-              <td>
-                <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <a th:if="${request.status} == 'COMPLETED'"
-                   th:href="@{/infra-requests/{id}/pdf(id=${request.requestId})}"
-                   class="btn btn-sm btn-secondary">
-                  <i class="fas fa-file-pdf"></i>
-                </a>
+              <td class="text-center">
+                <div class="dropdown action-dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary action-dots-btn"
+                          data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                    <i class="fas fa-ellipsis-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
+                        <i class="fas fa-eye me-2 text-info"></i>View
+                      </a>
+                    </li>
+                    <li th:if="${request.status} == 'COMPLETED'">
+                      <a class="dropdown-item" th:href="@{/infra-requests/{id}/pdf(id=${request.requestId})}">
+                        <i class="fas fa-file-pdf me-2 text-danger"></i>Download PDF
+                      </a>
+                    </li>
+                  </ul>
+                </div>
               </td>
             </tr>
             </tbody>
@@ -266,16 +276,30 @@
                                     </span>
                 </div>
               </td>
-              <td>
-                <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-success" th:onclick="'showApproveLM(' + ${request.requestId} + ')'">
-                  <i class="fas fa-check"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" th:onclick="'showRejectLM(' + ${request.requestId} + ')'">
-                  <i class="fas fa-times"></i>
-                </button>
+              <td class="text-center">
+                <div class="dropdown action-dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary action-dots-btn"
+                          data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                    <i class="fas fa-ellipsis-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
+                        <i class="fas fa-eye me-2 text-info"></i>View
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showApproveLM(' + ${request.requestId} + ')'">
+                        <i class="fas fa-check me-2 text-success"></i>Approve
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showRejectLM(' + ${request.requestId} + ')'">
+                        <i class="fas fa-times me-2"></i>Reject
+                      </a>
+                    </li>
+                  </ul>
+                </div>
               </td>
             </tr>
             </tbody>
@@ -332,16 +356,30 @@
                                     </span>
                 </div>
               </td>
-              <td>
-                <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-success" th:onclick="'showReviewInfra(' + ${request.requestId} + ')'">
-                  <i class="fas fa-check"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" th:onclick="'showRejectInfra(' + ${request.requestId} + ')'">
-                  <i class="fas fa-times"></i>
-                </button>
+              <td class="text-center">
+                <div class="dropdown action-dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary action-dots-btn"
+                          data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                    <i class="fas fa-ellipsis-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
+                        <i class="fas fa-eye me-2 text-info"></i>View
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showReviewInfra(' + ${request.requestId} + ')'">
+                        <i class="fas fa-check me-2 text-success"></i>Approve
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showRejectInfra(' + ${request.requestId} + ')'">
+                        <i class="fas fa-times me-2"></i>Reject
+                      </a>
+                    </li>
+                  </ul>
+                </div>
               </td>
             </tr>
             </tbody>
@@ -406,47 +444,62 @@
                                     </span>
                 </div>
               </td>
-              <td>
-                <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
-                  <i class="fas fa-eye"></i>
-                </button>
+              <td class="text-center">
+                <div class="dropdown action-dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-secondary action-dots-btn"
+                          data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                    <i class="fas fa-ellipsis-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                    <li>
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
+                        <i class="fas fa-eye me-2 text-info"></i>View
+                      </a>
+                    </li>
 
-                <!-- Approve - Only when PENDING_FINANCE_APPROVAL -->
-                <button class="btn btn-sm btn-success" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'"
-                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
-                  <i class="fas fa-check"></i>
-                </button>
+                    <!-- Approve - Only when PENDING_FINANCE_APPROVAL -->
+                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'">
+                        <i class="fas fa-check me-2 text-success"></i>Approve
+                      </a>
+                    </li>
 
-                <!-- Reject - Only when PENDING_FINANCE_APPROVAL -->
-                <button class="btn btn-sm btn-danger" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'"
-                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
-                  <i class="fas fa-times"></i>
-                </button>
+                    <!-- Reject - Only when PENDING_FINANCE_APPROVAL -->
+                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
+                      <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'">
+                        <i class="fas fa-times me-2"></i>Reject
+                      </a>
+                    </li>
 
-                <!-- Procurement - When PENDING_FINANCE_APPROVAL or PROCUREMENT -->
-                <button class="btn btn-sm btn-info" th:onclick="'showProcurement(' + ${request.requestId} + ')'"
-                        th:if="${request.status} == 'PENDING_FINANCE_APPROVAL' or ${request.status} == 'PROCUREMENT'">
-                  <i class="fas fa-shopping-cart"></i>
-                </button>
+                    <!-- Procurement - When PENDING_FINANCE_APPROVAL or PROCUREMENT -->
+                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL' or ${request.status} == 'PROCUREMENT'">
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showProcurement(' + ${request.requestId} + ')'">
+                        <i class="fas fa-shopping-cart me-2 text-info"></i>Procurement
+                      </a>
+                    </li>
 
-                <!-- Delivered - Only when PROCUREMENT -->
-                <button class="btn btn-sm btn-warning" th:onclick="'showDelivered(' + ${request.requestId} + ')'"
-                        th:if="${request.status} == 'PROCUREMENT'">
-                  <i class="fas fa-truck"></i>
-                </button>
+                    <!-- Delivered - Only when PROCUREMENT -->
+                    <li th:if="${request.status} == 'PROCUREMENT'">
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showDelivered(' + ${request.requestId} + ')'">
+                        <i class="fas fa-truck me-2 text-warning"></i>Mark Delivered
+                      </a>
+                    </li>
 
-                <!-- Complete - Only when DELIVERED -->
-                <button class="btn btn-sm btn-secondary" th:onclick="'showComplete(' + ${request.requestId} + ')'"
-                        th:if="${request.status} == 'DELIVERED'">
-                  <i class="fas fa-check-double"></i>
-                </button>
+                    <!-- Complete - Only when DELIVERED -->
+                    <li th:if="${request.status} == 'DELIVERED'">
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showComplete(' + ${request.requestId} + ')'">
+                        <i class="fas fa-check-double me-2 text-secondary"></i>Complete
+                      </a>
+                    </li>
 
-                <!-- View Quotation - When quotation exists -->
-                <button th:if="${request.quotationPath != null}"
-                        class="btn btn-sm btn-info"
-                        th:onclick="'viewQuotation(' + ${request.requestId} + ')'">
-                  <i class="fas fa-file-pdf"></i>
-                </button>
+                    <!-- View Quotation - When quotation exists -->
+                    <li th:if="${request.quotationPath != null}">
+                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewQuotation(' + ${request.requestId} + ')'">
+                        <i class="fas fa-file-pdf me-2 text-danger"></i>View Quotation
+                      </a>
+                    </li>
+                  </ul>
+                </div>
               </td>
             </tr>
             </tbody>
@@ -827,6 +880,52 @@
         margin-top: 4px;
     }
 
+    /* Actions Dropdown (3-dot ellipsis) */
+    .action-dropdown { display: inline-block; }
+    .action-dots-btn {
+        border-radius: 8px !important;
+        width: 32px;
+        height: 32px;
+        padding: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e9ecef;
+        color: #6c757d;
+        background: #fff;
+    }
+    .action-dots-btn:hover,
+    .action-dots-btn:focus,
+    .action-dots-btn.show {
+        background: #f1f3f5;
+        color: var(--ink);
+        box-shadow: none;
+    }
+    .action-dots-btn::after { display: none; }
+    .action-dropdown-menu {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 12px 32px rgba(15,23,42,0.16);
+        padding: 6px;
+        min-width: 180px;
+    }
+    .action-dropdown-menu .dropdown-item {
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13.5px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+    }
+    .action-dropdown-menu .dropdown-item:hover,
+    .action-dropdown-menu .dropdown-item:focus {
+        background: #f1f3f5;
+    }
+    .action-dropdown-menu .dropdown-item.text-danger:hover {
+        background: #fbe9eb;
+    }
+    .action-dropdown-menu .dropdown-divider { margin: 4px 0; }
+
     /* Toasts */
     #toastContainer { max-width: 380px; }
     .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
@@ -879,6 +978,23 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
   <script th:inline="none">
+    // ============================================
+    // Actions dropdown init (must survive DataTables redraws)
+    // ============================================
+    function initActionDropdowns() {
+        document.querySelectorAll('.action-dots-btn').forEach(function (btn) {
+            var existing = bootstrap.Dropdown.getInstance(btn);
+            if (existing) {
+                existing.dispose();
+            }
+            new bootstrap.Dropdown(btn, {
+                popperConfig: function (defaultConfig) {
+                    return Object.assign({}, defaultConfig, { strategy: 'fixed' });
+                }
+            });
+        });
+    }
+
     $(document).ready(function() {
         // All Requests - column 7 is SLA, column 8 is Actions
         if ($.fn.DataTable.isDataTable('#allRequestsTable')) {
@@ -895,7 +1011,8 @@
                 info: "Showing _START_ to _END_ of _TOTAL_ requests",
                 infoEmpty: "No requests found",
                 infoFiltered: "(filtered from _MAX_ total requests)"
-            }
+            },
+            drawCallback: function() { initActionDropdowns(); }
         });
 
         // LM Approval - column 6 is SLA, column 7 is Actions
@@ -913,7 +1030,8 @@
                 info: "Showing _START_ to _END_ of _TOTAL_ requests",
                 infoEmpty: "No pending LM approvals",
                 infoFiltered: "(filtered from _MAX_ total requests)"
-            }
+            },
+            drawCallback: function() { initActionDropdowns(); }
         });
 
         // Infra Review - column 6 is SLA, column 7 is Actions
@@ -931,7 +1049,8 @@
                 info: "Showing _START_ to _END_ of _TOTAL_ requests",
                 infoEmpty: "No pending infrastructure reviews",
                 infoFiltered: "(filtered from _MAX_ total requests)"
-            }
+            },
+            drawCallback: function() { initActionDropdowns(); }
         });
 
         // Finance - column 7 is SLA, column 8 is Actions
@@ -949,8 +1068,11 @@
                 info: "Showing _START_ to _END_ of _TOTAL_ requests",
                 infoEmpty: "No pending finance requests",
                 infoFiltered: "(filtered from _MAX_ total requests)"
-            }
+            },
+            drawCallback: function() { initActionDropdowns(); }
         });
+
+        initActionDropdowns();
     });
 
     // ============================================

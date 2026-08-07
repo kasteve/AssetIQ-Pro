@@ -402,24 +402,32 @@
                             <span class="badge bg-success" th:text="${myAcceptedTrips.size()}">0</span>
                         </div>
                         <div class="panel-body">
-                            <div th:each="trip : ${myAcceptedTrips}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title" th:text="${trip.destination}">Destination</div>
-                                    <small class="text-muted">
-                                        Requested by: <strong th:text="${trip.requestedBy}">Requester</strong>
-                                    </small>
-                                    <br>
-                                    <small class="text-muted" th:text="${#temporals.format(trip.requestTime, 'dd/MM/yyyy HH:mm')}">Time</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge accepted">ACCEPTED</span>
-                                    <div class="mt-2">
-                                        <button class="btn btn-sm btn-success"
-                                                th:onclick="'completeDriverTrip(' + ${trip.requestId} + ', ' + ${trip.driverId} + ')'">
-                                            <i class="fas fa-check-circle"></i> Complete Trip
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="table-container">
+                                <table class="requests-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Destination</th>
+                                        <th>Requested By</th>
+                                        <th>Requested Time</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="trip : ${myAcceptedTrips}">
+                                        <td th:text="${trip.destination}">Destination</td>
+                                        <td th:text="${trip.requestedBy}">Requester</td>
+                                        <td th:text="${#temporals.format(trip.requestTime, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                        <td><span class="status-badge accepted">ACCEPTED</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-success"
+                                                    th:onclick="'completeDriverTrip(' + ${trip.requestId} + ', ' + ${trip.driverId} + ')'">
+                                                <i class="fas fa-check-circle"></i> Complete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -433,43 +441,45 @@
                             <span class="badge bg-warning" th:text="${pendingDriverApprovals.size()}">0</span>
                         </div>
                         <div class="panel-body">
-                            <div th:each="req : ${pendingDriverApprovals}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title">
-                                        <i class="fas fa-user me-2"></i>
-                                        <span th:text="${req.requestedBy}">Requester</span>
-                                    </div>
-                                    <small class="text-muted">
-                                        Destination: <strong th:text="${req.destination}">Destination</strong>
-                                    </small>
-                                    <br>
-                                    <small class="text-muted">
-                                        Requested: <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                    </small>
-                                    <div th:if="${req.reason}" class="mt-1">
-                                        <small class="text-muted">Reason: <span th:text="${req.reason}">Reason</span></small>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge pending">PENDING</span>
-                                    <div class="mt-2">
-                                        <textarea class="form-control form-control-sm mb-1"
-                                                  th:id="'rejectReason_' + ${req.requestId}"
-                                                  rows="1"
-                                                  placeholder="Rejection reason"
-                                                  style="width: 180px; font-size: 12px;"></textarea>
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-sm btn-success"
-                                                    th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                <i class="fas fa-check"></i> Accept
-                                            </button>
-                                            <button class="btn btn-sm btn-danger"
-                                                    th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                <i class="fas fa-times"></i> Reject
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="table-container">
+                                <table class="requests-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Requester</th>
+                                        <th>Destination</th>
+                                        <th>Requested</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="req : ${pendingDriverApprovals}">
+                                        <td th:text="${req.requestedBy}">Requester</td>
+                                        <td th:text="${req.destination}">Destination</td>
+                                        <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                        <td><span class="status-badge pending">PENDING</span></td>
+                                        <td th:text="${req.reason != null ? req.reason : '-'}">Reason</td>
+                                        <td>
+                                            <textarea class="form-control form-control-sm mb-1"
+                                                      th:id="'rejectReason_' + ${req.requestId}"
+                                                      rows="1"
+                                                      placeholder="Rejection reason"
+                                                      style="width: 170px; font-size: 12px;"></textarea>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-success"
+                                                        th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                    <i class="fas fa-check"></i> Accept
+                                                </button>
+                                                <button class="btn btn-sm btn-danger"
+                                                        th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                    <i class="fas fa-times"></i> Reject
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -483,38 +493,40 @@
                             <span class="badge bg-warning" th:text="${pendingServerRooms.size()}">0</span>
                         </div>
                         <div class="panel-body">
-                            <div th:each="booking : ${pendingServerRooms}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title">
-                                        <i class="fas fa-door-open me-2"></i>
-                                        <span th:text="${booking.roomName}">Room</span>
-                                    </div>
-                                    <small class="text-muted">
-                                        Booked by: <strong th:text="${booking.bookedBy}">User</strong>
-                                    </small>
-                                    <br>
-                                    <small class="text-muted">
-                                        Time: <span th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</span>
-                                    </small>
-                                    <div th:if="${booking.purpose}" class="mt-1">
-                                        <small class="text-muted">Purpose: <span th:text="${booking.purpose}">Purpose</span></small>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge pending">PENDING</span>
-                                    <div class="mt-2">
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-sm btn-success"
-                                                    th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                            <button class="btn btn-sm btn-danger"
-                                                    th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
-                                                <i class="fas fa-times"></i> Decline
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="table-container">
+                                <table class="requests-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Room</th>
+                                        <th>Booked By</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                        <th>Purpose</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="booking : ${pendingServerRooms}">
+                                        <td th:text="${booking.roomName}">Room</td>
+                                        <td th:text="${booking.bookedBy}">User</td>
+                                        <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</td>
+                                        <td><span class="status-badge pending">PENDING</span></td>
+                                        <td th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-success"
+                                                        th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
+                                                    <i class="fas fa-check"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger"
+                                                        th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
+                                                    <i class="fas fa-times"></i> Decline
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -528,38 +540,43 @@
                             <span class="badge bg-warning" th:text="${pendingInfraRequests.size()}">0</span>
                         </div>
                         <div class="panel-body">
-                            <div th:each="req : ${pendingInfraRequests}" class="booking-row">
-                                <div>
-                                    <div class="booking-row-title">
-                                        <i class="fas fa-user me-2"></i>
-                                        <span th:text="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}">Requester</span>
-                                    </div>
-                                    <small class="text-muted">
-                                        Resource: <strong th:text="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}">Resource</strong>
-                                    </small>
-                                    <br>
-                                    <small class="text-muted">
-                                        Status: <span th:text="${req.statusDisplay}">Status</span>
-                                    </small>
-                                    <div th:if="${req.specification}" class="mt-1">
-                                        <small class="text-muted">Specification: <span th:text="${req.specification}">Specification</span></small>
-                                    </div>
-                                    <div th:if="${req.justification}" class="mt-1">
-                                        <small class="text-muted">Justification: <span th:text="${req.justification}">Justification</span></small>
-                                    </div>
-                                    <div th:if="${req.quantity}" class="mt-1">
-                                        <small class="text-muted">Quantity: <strong th:text="${req.quantity}">1</strong></small>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="status-badge pending" th:text="${req.statusDisplay}">PENDING</span>
-                                    <div class="mt-2">
-                                        <a th:href="'/assetIQ-pro/infra-requests/' + ${req.requestId}"
-                                           class="btn btn-sm btn-primary">
-                                            <i class="fas fa-eye"></i> View
-                                        </a>
-                                    </div>
-                                </div>
+                            <div class="table-container">
+                                <table class="requests-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Requester</th>
+                                        <th>Resource</th>
+                                        <th>Status</th>
+                                        <th>Specification</th>
+                                        <th>Justification</th>
+                                        <th>Qty</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="req : ${pendingInfraRequests}">
+                                        <td th:text="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}">Requester</td>
+                                        <td th:text="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}">Resource</td>
+                                        <td><span class="status-badge pending" th:text="${req.statusDisplay}">PENDING</span></td>
+                                        <td class="text-truncate" style="max-width: 180px;" th:text="${req.specification != null ? req.specification : '-'}">Specification</td>
+                                        <td class="text-truncate" style="max-width: 180px;" th:text="${req.justification != null ? req.justification : '-'}">Justification</td>
+                                        <td th:text="${req.quantity != null ? req.quantity : '-'}">1</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-primary view-infra-btn"
+                                                    th:data-requestid="${req.requestId}"
+                                                    th:data-requester="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}"
+                                                    th:data-resource="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}"
+                                                    th:data-status="${req.statusDisplay}"
+                                                    th:data-specification="${req.specification}"
+                                                    th:data-justification="${req.justification}"
+                                                    th:data-quantity="${req.quantity}"
+                                                    onclick="viewInfraRequest(this)">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -772,6 +789,69 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- INFRASTRUCTURE REQUEST DETAILS MODAL (replaces page navigation) -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="infraRequestDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-tools me-2" style="color:#0d6efd;"></i>
+                        Infrastructure Request #<span id="infraDetailId">-</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-item mb-3">
+                                <span class="label">Requester</span>
+                                <span class="value" id="infraDetailRequester">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item mb-3">
+                                <span class="label">Resource Type</span>
+                                <span class="value" id="infraDetailResource">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item mb-3">
+                                <span class="label">Status</span>
+                                <span class="value" id="infraDetailStatus">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item mb-3">
+                                <span class="label">Quantity</span>
+                                <span class="value" id="infraDetailQuantity">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="detail-item mb-3">
+                                <span class="label">Specification</span>
+                                <p class="value mb-0" id="infraDetailSpecification">-</p>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="detail-item">
+                                <span class="label">Justification</span>
+                                <p class="value mb-0" id="infraDetailJustification">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" id="infraDetailFullLink" class="btn btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>Open Full Page
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Styles -->
@@ -791,6 +871,8 @@
         .btn-warning { background: #fd7e14 !important; color: white !important; }
         .btn-danger { background: #dc3545 !important; }
         .btn-info { background: #0dcaf0 !important; color: white !important; }
+        .btn-outline-primary { background: transparent !important; border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; }
+        .btn-outline-primary:hover { background: var(--primary-color) !important; color: white !important; }
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
         .btn:disabled { opacity: 0.65 !important; cursor: not-allowed !important; }
         .booking-tabs { border-bottom: 2px solid #eef0f3; gap: 6px; margin-bottom: 22px; }
@@ -851,6 +933,10 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
+
+        /* Detail item styling used by the Infra Request Details modal */
+        .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; margin-bottom: 2px; }
+        .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
 
         .center-alert-overlay {
             position: fixed; inset: 0; z-index: 1080;
@@ -1265,6 +1351,25 @@
                     console.error('Error:', error);
                     body.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Failed to load room details.</div>';
                 });
+        }
+
+        // ============================================
+        // Infrastructure Request Details (modal, no navigation)
+        // ============================================
+        function viewInfraRequest(button) {
+            const id = button.getAttribute('data-requestid');
+            document.getElementById('infraDetailId').textContent = id || '-';
+            document.getElementById('infraDetailRequester').textContent = button.getAttribute('data-requester') || 'N/A';
+            document.getElementById('infraDetailResource').textContent = button.getAttribute('data-resource') || 'N/A';
+            document.getElementById('infraDetailStatus').textContent = button.getAttribute('data-status') || 'N/A';
+            document.getElementById('infraDetailQuantity').textContent = button.getAttribute('data-quantity') || 'N/A';
+            document.getElementById('infraDetailSpecification').textContent = button.getAttribute('data-specification') || 'N/A';
+            document.getElementById('infraDetailJustification').textContent = button.getAttribute('data-justification') || 'N/A';
+
+            const fullLink = document.getElementById('infraDetailFullLink');
+            if (fullLink) fullLink.href = '/assetIQ-pro/infra-requests/' + id;
+
+            new bootstrap.Modal(document.getElementById('infraRequestDetailsModal')).show();
         }
 
         // ============================================
