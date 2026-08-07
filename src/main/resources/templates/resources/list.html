@@ -152,7 +152,7 @@
                             <th>Requested</th>
                             <th>Status</th>
                             <th>SLA</th>
-                            <th>Actions</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -201,47 +201,64 @@
                                     </span>
                                 </div>
                             </td>
-                            <td>
-                                <div class="btn-group btn-group-sm action-btn-group" role="group">
-                                    <!-- View Button -->
-                                    <button class="btn btn-outline-primary" th:onclick="'viewRequest(' + ${req.requestId} + ')'" title="View Details">
-                                        <i class="fas fa-eye"></i>
+                            <td class="text-center">
+                                <div class="dropdown actions-dropdown">
+                                    <button class="btn btn-actions-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="fas fa-ellipsis-v"></i>
                                     </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </li>
 
-                                    <!-- PENDING: Accept / Reject -->
-                                    <th:block th:if="${req.status == 'PENDING'}">
-                                        <button class="btn btn-outline-success" th:onclick="'showAdminApprove(' + ${req.requestId} + ')'" title="Accept">
-                                            <i class="fas fa-check"></i> Accept
-                                        </button>
-                                        <button class="btn btn-outline-danger" th:onclick="'showAdminReject(' + ${req.requestId} + ')'" title="Reject">
-                                            <i class="fas fa-times"></i> Reject
-                                        </button>
-                                    </th:block>
+                                        <!-- PENDING: Accept / Reject -->
+                                        <th:block th:if="${req.status == 'PENDING'}">
+                                            <li>
+                                                <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showAdminApprove(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-check"></i> Accept
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showAdminReject(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-times"></i> Reject
+                                                </a>
+                                            </li>
+                                        </th:block>
 
-                                    <!-- ACCEPTED: Mark Complete -->
-                                    <th:block th:if="${req.status == 'ACCEPTED'}">
-                                        <button class="btn btn-outline-success" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'" title="Mark as Complete">
-                                            <i class="fas fa-check-double"></i> Complete
-                                        </button>
-                                    </th:block>
+                                        <!-- ACCEPTED: Mark Complete -->
+                                        <th:block th:if="${req.status == 'ACCEPTED'}">
+                                            <li>
+                                                <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-check-double"></i> Mark Complete
+                                                </a>
+                                            </li>
+                                        </th:block>
 
-                                    <!-- COMPLETED: Sign (if not signed) -->
-                                    <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature == null}">
-                                        <button class="btn btn-outline-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'" title="Sign Acknowledgement">
-                                            <i class="fas fa-signature"></i> Sign
-                                        </button>
-                                        <!-- Reminder Button -->
-                                        <button class="btn btn-outline-warning" th:onclick="'confirmResendLink(' + ${req.requestId} + ')'" title="Resend Signing Link">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                    </th:block>
+                                        <!-- COMPLETED: Sign (if not signed) -->
+                                        <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature == null}">
+                                            <li>
+                                                <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-signature"></i> Sign Acknowledgement
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-warning" href="javascript:void(0)" th:onclick="'confirmResendLink(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-envelope"></i> Resend Signing Link
+                                                </a>
+                                            </li>
+                                        </th:block>
 
-                                    <!-- COMPLETED & SIGNED: Generate PDF -->
-                                    <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature != null}">
-                                        <button class="btn btn-outline-danger" th:onclick="'generatePDF(' + ${req.requestId} + ')'" title="Generate PDF">
-                                            <i class="fas fa-file-pdf"></i> PDF
-                                        </button>
-                                    </th:block>
+                                        <!-- COMPLETED & SIGNED: Generate PDF -->
+                                        <th:block th:if="${req.status == 'COMPLETED' and req.requesterSignature != null}">
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'generatePDF(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-file-pdf"></i> Generate PDF
+                                                </a>
+                                            </li>
+                                        </th:block>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -258,7 +275,7 @@
                     <table id="pendingTable" class="table table-hover res-table">
                         <thead>
                         <tr>
-                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Requested</th><th>SLA</th><th>Actions</th>
+                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Requested</th><th>SLA</th><th class="text-center">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -291,14 +308,28 @@
                                     </span>
                                 </div>
                             </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-sm btn-success" th:onclick="'showAdminApprove(' + ${req.requestId} + ')'">
-                                        <i class="fas fa-check"></i> Accept
+                            <td class="text-center">
+                                <div class="dropdown actions-dropdown">
+                                    <button class="btn btn-actions-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="fas fa-ellipsis-v"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-danger" th:onclick="'showAdminReject(' + ${req.requestId} + ')'">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showAdminApprove(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-check"></i> Accept
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showAdminReject(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-times"></i> Reject
+                                            </a>
+                                        </li>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -315,7 +346,7 @@
                     <table id="acceptedTable" class="table table-hover res-table">
                         <thead>
                         <tr>
-                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Accepted</th><th>SLA</th><th>Actions</th>
+                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Accepted</th><th>SLA</th><th class="text-center">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -348,10 +379,24 @@
                                     </span>
                                 </div>
                             </td>
-                            <td>
-                                <button class="btn btn-sm btn-success" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'">
-                                    <i class="fas fa-check-double"></i> Mark Complete
-                                </button>
+                            <td class="text-center">
+                                <div class="dropdown actions-dropdown">
+                                    <button class="btn btn-actions-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showMarkComplete(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-check-double"></i> Mark Complete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                         </tbody>
@@ -367,7 +412,7 @@
                     <table id="completedTable" class="table table-hover res-table">
                         <thead>
                         <tr>
-                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Completed</th><th>Status</th><th>SLA</th><th>Actions</th>
+                            <th>ID</th><th>Requested By</th><th>Type</th><th>Description</th><th>Completed</th><th>Status</th><th>SLA</th><th class="text-center">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -403,24 +448,37 @@
                                     </span>
                                 </div>
                             </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-sm btn-primary" th:onclick="'viewRequest(' + ${req.requestId} + ')'">
-                                        <i class="fas fa-eye"></i> View
+                            <td class="text-center">
+                                <div class="dropdown actions-dropdown">
+                                    <button class="btn btn-actions-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="fas fa-ellipsis-v"></i>
                                     </button>
-                                    <th:block th:if="${req.requesterSignature == null}">
-                                        <button class="btn btn-sm btn-success" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-signature"></i> Sign
-                                        </button>
-                                        <button class="btn btn-sm btn-warning" th:onclick="'confirmResendLink(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-envelope"></i> Reminder
-                                        </button>
-                                    </th:block>
-                                    <th:block th:if="${req.requesterSignature != null}">
-                                        <button class="btn btn-sm btn-danger" th:onclick="'generatePDF(' + ${req.requestId} + ')'">
-                                            <i class="fas fa-file-pdf"></i> PDF
-                                        </button>
-                                    </th:block>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${req.requestId} + ')'">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </li>
+                                        <th:block th:if="${req.requesterSignature == null}">
+                                            <li>
+                                                <a class="dropdown-item text-success" href="javascript:void(0)" th:onclick="'showAcknowledge(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-signature"></i> Sign
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-warning" href="javascript:void(0)" th:onclick="'confirmResendLink(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-envelope"></i> Reminder
+                                                </a>
+                                            </li>
+                                        </th:block>
+                                        <th:block th:if="${req.requesterSignature != null}">
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'generatePDF(' + ${req.requestId} + ')'">
+                                                    <i class="fas fa-file-pdf"></i> Generate PDF
+                                                </a>
+                                            </li>
+                                        </th:block>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -715,12 +773,55 @@
         .status-badge.completed { background: #eef0fd; color: #6610f2; }
         .status-badge.recalled { background: #eef0f3; color: #6c757d; }
 
-        .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12px !important; margin-right: 4px; border: 1px solid #e9ecef; }
-        .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; color: white; }
-        .action-btn-group .btn-outline-success:hover { background: #198754; border-color: #198754; color: white; }
-        .action-btn-group .btn-outline-danger:hover { background: #dc3545; border-color: #dc3545; color: white; }
-        .action-btn-group .btn-outline-warning:hover { background: #ffc107; border-color: #ffc107; color: #212529; }
+        /* ============================================ */
+        /* Kebab (3-dot) Actions Menu                    */
+        /* ============================================ */
+        .actions-dropdown { position: relative; display: inline-block; }
+        .btn-actions-toggle {
+            background: transparent !important;
+            border: 1px solid #e9ecef !important;
+            border-radius: 8px !important;
+            width: 34px;
+            height: 34px;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d !important;
+            font-size: 14px !important;
+        }
+        .btn-actions-toggle:hover,
+        .btn-actions-toggle:focus,
+        .btn-actions-toggle.show {
+            background: #eef0f3 !important;
+            color: var(--ink) !important;
+            box-shadow: none !important;
+        }
+        .btn-actions-toggle::after { display: none !important; }
+        .actions-dropdown .dropdown-menu {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.16);
+            padding: 6px;
+            min-width: 200px;
+            z-index: 1060;
+        }
+        .actions-dropdown .dropdown-item {
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--ink);
+        }
+        .actions-dropdown .dropdown-item i { width: 16px; text-align: center; }
+        .actions-dropdown .dropdown-item:hover,
+        .actions-dropdown .dropdown-item:focus { background: #f5f6f8; color: var(--ink); }
+        .actions-dropdown .dropdown-item.text-success:hover { background: #e6f7ec; }
+        .actions-dropdown .dropdown-item.text-danger:hover { background: #fdeeee; }
+        .actions-dropdown .dropdown-item.text-warning:hover { background: #fff4e0; }
 
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
@@ -828,7 +929,6 @@
             .page-header-row h4 { text-align: center; }
             .page-header-row > div { display: flex; flex-direction: column; gap: 8px; }
             .page-header-row .btn { width: 100%; }
-            .action-btn-group .btn { font-size: 10px !important; padding: 4px 6px !important; }
             .res-desc { max-width: 100px; }
             #toastContainer { max-width: calc(100% - 24px); }
             .sla-detail-row { flex-wrap: wrap; }
