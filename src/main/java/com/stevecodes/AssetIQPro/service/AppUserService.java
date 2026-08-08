@@ -224,17 +224,14 @@ public class AppUserService {
         user.setLockedUntil(null);
         user.setEmployee(savedEmployee);
 
-        // ✅ FIXED: Assign permissions using Set to avoid duplicates
         Set<Permission> permissions = new HashSet<>();
 
-        // Add default permissions
         List<String> defaultPermissions = getDefaultPermissions();
         for (String permName : defaultPermissions) {
             permissionRepository.findByPermissionName(permName)
                     .ifPresent(permissions::add);
         }
 
-        // Add user-selected permissions (if any)
         if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
             for (String permName : userDTO.getPermissions()) {
                 permissionRepository.findByPermissionName(permName)
@@ -242,7 +239,6 @@ public class AppUserService {
             }
         }
 
-        // ✅ Set permissions (Set handles deduplication automatically)
         user.setPermissions(permissions);
 
         AppUser savedUser = userRepository.save(user);
@@ -281,7 +277,7 @@ public class AppUserService {
     }
 
     // ============================================
-    // Update User - Does NOT force password change
+    // Update User - FIXED with duplicate checks
     // ============================================
     @Transactional
     public AppUser updateUser(Long userId, UserDTO userDTO) {
@@ -290,16 +286,34 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // ✅ UPDATE USER FIELDS - THESE WERE MISSING
-        if (userDTO.getStaffId() != null) {
-            user.setStaffId(userDTO.getStaffId());
-        }
-        if (userDTO.getUsername() != null) {
-            user.setUsername(userDTO.getUsername());
-        }
-        if (userDTO.getEmail() != null) {
+        // ✅ CHECK FOR DUPLICATE EMAIL (excluding current user)
+        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
+            Optional<AppUser> existingUser = userRepository.findByEmail(userDTO.getEmail());
+            if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
+                throw new UserAlreadyExistsException("Email '" + userDTO.getEmail() + "' is already registered to another user.");
+            }
             user.setEmail(userDTO.getEmail());
         }
+
+        // ✅ CHECK FOR DUPLICATE USERNAME (excluding current user)
+        if (userDTO.getUsername() != null && !userDTO.getUsername().equals(user.getUsername())) {
+            Optional<AppUser> existingUser = userRepository.findByUsername(userDTO.getUsername());
+            if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
+                throw new UserAlreadyExistsException("Username '" + userDTO.getUsername() + "' is already taken.");
+            }
+            user.setUsername(userDTO.getUsername());
+        }
+
+        // ✅ CHECK FOR DUPLICATE STAFF ID (excluding current user)
+        if (userDTO.getStaffId() != null && !userDTO.getStaffId().equals(user.getStaffId())) {
+            Optional<AppUser> existingUser = userRepository.findByStaffId(userDTO.getStaffId());
+            if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
+                throw new UserAlreadyExistsException("Staff ID '" + userDTO.getStaffId() + "' is already registered.");
+            }
+            user.setStaffId(userDTO.getStaffId());
+        }
+
+        // Update other fields
         if (userDTO.getFullName() != null) {
             user.setFullName(userDTO.getFullName());
         }
@@ -307,8 +321,6 @@ public class AppUserService {
             user.setRole(userDTO.getRole());
         }
 
-        // ✅ FIX: The problem - these are being set but not saved properly
-        // Make sure active and blocked are set correctly
         user.setActive(userDTO.isActive());
         user.setBlocked(userDTO.isBlocked());
 
@@ -322,7 +334,7 @@ public class AppUserService {
             user.setDepartment(null);
         }
 
-        // Update employee (this part is working)
+        // Update employee
         Employee employee = user.getEmployee();
         if (employee != null) {
             employee.setFirstName(getFirstName(userDTO.getFullName()));
@@ -357,7 +369,6 @@ public class AppUserService {
 
         user.setUpdatedAt(LocalDateTime.now());
 
-        // ✅ THIS IS THE KEY - Save the user!
         AppUser updated = userRepository.save(user);
 
         auditService.logAction("USER_UPDATED",
@@ -435,7 +446,6 @@ public class AppUserService {
 
         user.setRole(role);
 
-        // ✅ FIXED: Re-assign default permissions with Set
         Set<Permission> permissions = new HashSet<>();
         List<String> defaultPermissions = getDefaultPermissions();
         for (String permName : defaultPermissions) {
@@ -596,7 +606,6 @@ public class AppUserService {
         Permission permission = permissionRepository.findByPermissionName(permissionName)
                 .orElseThrow(() -> new ResourceNotFoundException("Permission not found: " + permissionName));
 
-        // ✅ Check if already has the permission
         if (!user.getPermissions().contains(permission)) {
             user.addPermission(permission);
             userRepository.save(user);
@@ -632,7 +641,6 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // ✅ FIXED: Use Set to avoid duplicates
         Set<Permission> newPermissions = new HashSet<>();
         for (String permName : permissionNames) {
             permissionRepository.findByPermissionName(permName)
@@ -711,6 +719,7 @@ public class AppUserService {
         log.info("Getting user by employee ID: {}", employeeId);
         return userRepository.findByEmployeeId(employeeId);
     }
+
     @Transactional
     public void toggleUserStatus(Long userId) {
         log.info("Toggling user status: {}", userId);

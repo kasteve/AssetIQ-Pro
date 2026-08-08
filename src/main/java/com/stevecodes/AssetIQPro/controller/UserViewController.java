@@ -3,6 +3,7 @@ package com.stevecodes.AssetIQPro.controller;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.dto.UserDTO;
+import com.stevecodes.AssetIQPro.exception.UserAlreadyExistsException;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.AuditService;
 import com.stevecodes.AssetIQPro.service.DepartmentService;
@@ -86,6 +87,9 @@ public class UserViewController {
             log.info("Creating user: {}", userDTO.getUsername());
             userService.createUser(userDTO);
             redirectAttributes.addFlashAttribute("success", "User created successfully! Welcome email sent.");
+        } catch (UserAlreadyExistsException e) {
+            log.warn("User creation failed: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to create users.");
         } catch (Exception e) {
@@ -110,16 +114,17 @@ public class UserViewController {
                     userDTO.getFullName(), userDTO.getRole(), userDTO.getDepartmentId(),
                     userDTO.getEmail(), userDTO.isActive(), userDTO.isBlocked());
 
-            // ✅ Ensure the userId is set in the DTO
             if (userDTO.getUserId() == null) {
                 redirectAttributes.addFlashAttribute("error", "User ID is required for update.");
                 return "redirect:/admin/users";
             }
 
-            // ✅ Call the service to update
             userService.updateUser(userDTO.getUserId(), userDTO);
             redirectAttributes.addFlashAttribute("success", "User updated successfully!");
 
+        } catch (UserAlreadyExistsException e) {
+            log.warn("User update failed: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to update users.");
         } catch (Exception e) {
@@ -174,44 +179,6 @@ public class UserViewController {
         return "redirect:/admin/users";
     }
 
-    @PostMapping("/{userId}/block")
-    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
-    public String blockUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
-        try {
-            AppUser currentUser = SecurityUtils.getCurrentUser();
-            if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
-            }
-
-            userService.blockUser(userId);
-            redirectAttributes.addFlashAttribute("success", "User blocked successfully!");
-        } catch (Exception e) {
-            log.error("Error blocking user: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to block user: " + e.getMessage());
-        }
-        return "redirect:/admin/users";
-    }
-
-    @PostMapping("/{userId}/unblock")
-    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
-    public String unblockUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
-        try {
-            AppUser currentUser = SecurityUtils.getCurrentUser();
-            if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
-            }
-
-            userService.unblockUser(userId);
-            redirectAttributes.addFlashAttribute("success", "User unblocked successfully!");
-        } catch (Exception e) {
-            log.error("Error unblocking user: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to unblock user: " + e.getMessage());
-        }
-        return "redirect:/admin/users";
-    }
-
     @PostMapping("/{userId}/delete")
     @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
     public String deleteUser(@PathVariable Long userId, RedirectAttributes redirectAttributes) {
@@ -227,8 +194,16 @@ public class UserViewController {
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to delete users.");
         } catch (Exception e) {
-            log.error("Error deleting user: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to delete user: " + e.getMessage());
+            log.error("Error deleting user: {}", e.getMessage(), e);
+            String friendlyMessage = "Cannot delete this user because they have associated records in the system. ";
+            if (e.getMessage() != null && e.getMessage().contains("TransferTokens")) {
+                friendlyMessage += "The user has existing transfer tokens that need to be processed first.";
+            } else if (e.getMessage() != null && e.getMessage().contains("REFERENCE constraint")) {
+                friendlyMessage += "The user has existing records that reference them. Please remove these references first.";
+            } else {
+                friendlyMessage += "The user has been deactivated instead.";
+            }
+            redirectAttributes.addFlashAttribute("error", friendlyMessage);
         }
         return "redirect:/admin/users";
     }

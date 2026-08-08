@@ -77,14 +77,18 @@
                         <span th:if="${user.department != null}" class="usr-dept" th:text="${user.department}">IT</span>
                         <span th:unless="${user.department != null}" class="usr-dept none">N/A</span>
                     </td>
+                    <!-- FIXED: Using th:switch instead of chained ternary to avoid SpEL parsing error -->
                     <td>
-                        <span class="role-badge" th:classappend="${user.role == 'SUPERADMIN' ? 'role-superadmin' :
-                                                                   user.role == 'ADMIN' ? 'role-admin' :
-                                                                   user.role == 'DRIVER' ? 'role-driver' :
-                                                                   user.role == 'INFRA' ? 'role-infra' :
-                                                                   user.role == 'FINANCE' ? 'role-finance' :
-                                                                   user.role == 'MANAGER' ? 'role-manager' : 'role-employee'}"
-                              th:text="${user.role != null ? user.role : 'EMPLOYEE'}">EMPLOYEE</span>
+                        <th:block th:switch="${user.role}">
+                            <span class="role-badge role-superadmin" th:case="'SUPERADMIN'" th:text="'SUPERADMIN'">SUPERADMIN</span>
+                            <span class="role-badge role-admin" th:case="'ADMIN'" th:text="'ADMIN'">ADMIN</span>
+                            <span class="role-badge role-driver" th:case="'DRIVER'" th:text="'DRIVER'">DRIVER</span>
+                            <span class="role-badge role-infra" th:case="'INFRA'" th:text="'INFRA'">INFRA</span>
+                            <span class="role-badge role-finance" th:case="'FINANCE'" th:text="'FINANCE'">FINANCE</span>
+                            <span class="role-badge role-manager" th:case="'MANAGER'" th:text="'MANAGER'">MANAGER</span>
+                            <span class="role-badge role-employee" th:case="'EMPLOYEE'" th:text="'EMPLOYEE'">EMPLOYEE</span>
+                            <span class="role-badge role-employee" th:case="*" th:text="'EMPLOYEE'">EMPLOYEE</span>
+                        </th:block>
                     </td>
                     <td>
                         <span class="status-badge" th:classappend="${user.active} ? 'active' : 'inactive'"
@@ -368,9 +372,11 @@
     </div>
 
     <!-- ============================================ -->
-    <!-- Toast Container                               -->
+    <!-- Toast Container - CENTER OF PAGE             -->
     <!-- ============================================ -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;" id="toastContainer"></div>
+    <div class="toast-container position-fixed top-50 start-50 translate-middle" style="z-index: 9999; pointer-events: none;" id="toastContainer">
+        <!-- Toasts will be added here dynamically -->
+    </div>
 
     <!-- ============================================ -->
     <!-- Confirm Modal                                -->
@@ -526,29 +532,169 @@
             margin-right: 4px !important;
         }
 
-        /* Toast styling */
-        .app-toast {
-            min-width: 300px;
-            border-radius: 12px;
-            border: none;
-            box-shadow: 0 12px 32px rgba(15,23,42,0.18);
-            overflow: hidden;
-            margin-bottom: 10px;
+        /* ============================================ */
+        /* CENTERED TOAST STYLES                       */
+        /* ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
         }
+
+        .app-toast {
+            pointer-events: auto;
+            min-width: 320px;
+            max-width: 500px;
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            margin-bottom: 0;
+            animation: slideInCenter 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+            transform-origin: center;
+            width: 100%;
+        }
+
         .app-toast .toast-header {
             border-bottom: none;
             font-weight: 700;
-            font-size: 13.5px;
-            padding: 10px 14px;
+            font-size: 15px;
+            padding: 14px 20px;
+            background: white;
         }
+
+        .app-toast .toast-header i {
+            font-size: 20px;
+        }
+
         .app-toast .toast-body {
-            font-size: 13.5px;
-            padding: 10px 14px 14px 14px;
+            font-size: 14.5px;
+            padding: 14px 20px 20px 20px;
+            background: white;
+            color: #1a1a2e;
+            line-height: 1.5;
         }
-        .app-toast.toast-success .toast-header { background: #e6f7ec; color: #198754; }
-        .app-toast.toast-error .toast-header { background: #fdeeee; color: #dc3545; }
-        .app-toast.toast-warning .toast-header { background: #fff4e0; color: #fd7e14; }
-        .app-toast.toast-info .toast-header { background: #e8eefc; color: #0d6efd; }
+
+        .app-toast.toast-success .toast-header {
+            background: #e6f7ec;
+            color: #0d7a3e;
+            border-bottom: 2px solid #28a745;
+        }
+        .app-toast.toast-success .toast-header i { color: #28a745; }
+
+        .app-toast.toast-error .toast-header {
+            background: #fdeeee;
+            color: #b02a37;
+            border-bottom: 2px solid #dc3545;
+        }
+        .app-toast.toast-error .toast-header i { color: #dc3545; }
+
+        .app-toast.toast-warning .toast-header {
+            background: #fff4e0;
+            color: #b35d0a;
+            border-bottom: 2px solid #fd7e14;
+        }
+        .app-toast.toast-warning .toast-header i { color: #fd7e14; }
+
+        .app-toast.toast-info .toast-header {
+            background: #e8eefc;
+            color: #0a58ca;
+            border-bottom: 2px solid #0d6efd;
+        }
+        .app-toast.toast-info .toast-header i { color: #0d6efd; }
+
+        /* Animation for centered toast */
+        @keyframes slideInCenter {
+            0% {
+                opacity: 0;
+                transform: scale(0.7) translateY(-30px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes slideOutCenter {
+            0% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.7) translateY(-30px);
+            }
+        }
+
+        .app-toast.hiding {
+            animation: slideOutCenter 0.4s ease-in forwards;
+        }
+
+        /* Backdrop overlay when toast is visible */
+        .toast-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 9998;
+            backdrop-filter: blur(4px);
+            animation: fadeInBackdrop 0.3s ease forwards;
+        }
+
+        @keyframes fadeInBackdrop {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes fadeOutBackdrop {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .toast-backdrop.hiding {
+            animation: fadeOutBackdrop 0.3s ease forwards;
+        }
+
+        .app-toast .btn-close {
+            filter: none;
+            opacity: 0.5;
+        }
+        .app-toast .btn-close:hover {
+            opacity: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 576px) {
+            .toast-container {
+                max-width: 100%;
+                padding: 16px;
+            }
+            .app-toast {
+                min-width: auto;
+                max-width: 100%;
+                border-radius: 12px;
+            }
+            .app-toast .toast-header {
+                font-size: 14px;
+                padding: 12px 16px;
+            }
+            .app-toast .toast-body {
+                font-size: 13.5px;
+                padding: 12px 16px 16px 16px;
+            }
+        }
     </style>
 </div>
 
@@ -566,7 +712,7 @@
 
     <script th:inline="none">
         // ============================================
-        // Toast helper
+        // Toast helper - CENTERED WITH BACKDROP
         // ============================================
         const TOAST_ICONS = {
             success: 'fa-circle-check',
@@ -575,22 +721,36 @@
             info: 'fa-circle-info'
         };
         const TOAST_TITLES = {
-            success: 'Success',
-            error: 'Error',
-            warning: 'Warning',
-            info: 'Notice'
+            success: '✅ Success',
+            error: '❌ Error',
+            warning: '⚠️ Warning',
+            info: 'ℹ️ Notice'
         };
 
-        function showToast(message, type = 'info', delay = 4000) {
+        // Track active backdrop
+        let backdropElement = null;
+        let activeToasts = 0;
+
+        function showToast(message, type = 'info', delay = 5000) {
             const container = document.getElementById('toastContainer');
             const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
             const title = TOAST_TITLES[type] || TOAST_TITLES.info;
+
+            // Create backdrop if this is the first toast
+            if (activeToasts === 0) {
+                backdropElement = document.createElement('div');
+                backdropElement.className = 'toast-backdrop';
+                document.body.appendChild(backdropElement);
+            }
+            activeToasts++;
 
             const toastEl = document.createElement('div');
             toastEl.className = 'toast app-toast toast-' + type;
             toastEl.setAttribute('role', 'alert');
             toastEl.setAttribute('aria-live', 'assertive');
             toastEl.setAttribute('aria-atomic', 'true');
+
+            // Build toast with custom close button that handles cleanup
             toastEl.innerHTML =
                 '<div class="toast-header">' +
                     '<i class="fas ' + icon + ' me-2"></i>' +
@@ -600,9 +760,46 @@
                 '<div class="toast-body">' + message + '</div>';
 
             container.appendChild(toastEl);
-            const bsToast = new bootstrap.Toast(toastEl, { delay: delay });
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+
+            // Create Bootstrap toast instance
+            const bsToast = new bootstrap.Toast(toastEl, {
+                delay: delay,
+                autohide: true
+            });
+
+            // Handle toast hidden event
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                // Add hiding animation class
+                toastEl.classList.add('hiding');
+                setTimeout(function() {
+                    toastEl.remove();
+                    activeToasts--;
+
+                    // Remove backdrop when all toasts are gone
+                    if (activeToasts === 0 && backdropElement) {
+                        backdropElement.classList.add('hiding');
+                        setTimeout(function() {
+                            if (backdropElement) {
+                                backdropElement.remove();
+                                backdropElement = null;
+                            }
+                        }, 300);
+                    }
+                }, 400);
+            });
+
+            // Show the toast
             bsToast.show();
+
+            // Auto-close after delay if not hidden by Bootstrap
+            setTimeout(function() {
+                if (toastEl && toastEl.parentNode) {
+                    const bsInstance = bootstrap.Toast.getInstance(toastEl);
+                    if (bsInstance) {
+                        bsInstance.hide();
+                    }
+                }
+            }, delay + 500);
         }
 
         // ============================================
@@ -746,7 +943,7 @@
                     .then(function(response) {
                         if (!response.ok) throw new Error('Request failed');
                         showToast('User status updated successfully.', 'success');
-                        setTimeout(function() { window.location.reload(); }, 900);
+                        setTimeout(function() { window.location.reload(); }, 1200);
                     })
                     .catch(function(err) { showToast('Failed to toggle user status: ' + err.message, 'error'); });
             }, { title: 'Toggle User Status', confirmLabel: 'Toggle', confirmClass: 'btn-primary' });
@@ -758,7 +955,7 @@
                     .then(function(response) {
                         if (!response.ok) throw new Error('Request failed');
                         showToast('User deleted successfully.', 'success');
-                        setTimeout(function() { window.location.reload(); }, 900);
+                        setTimeout(function() { window.location.reload(); }, 1200);
                     })
                     .catch(function(err) { showToast('Failed to delete user: ' + err.message, 'error'); });
             }, { title: 'Delete User', confirmLabel: 'Delete', confirmClass: 'btn-danger' });
@@ -782,6 +979,24 @@
                     .catch(function(err) { showToast('Failed to reset password: ' + err.message, 'error'); });
             }, { title: 'Reset Password', confirmLabel: 'Reset', confirmClass: 'btn-warning' });
         }
+    </script>
+
+    <!-- ============================================ -->
+    <!-- Flash Message Bridge                          -->
+    <!-- ============================================ -->
+    <script th:if="${success != null or error != null}" th:inline="javascript">
+        /*<![CDATA[*/
+        (function() {
+            var flashSuccess = /*[[${success}]]*/ null;
+            var flashError = /*[[${error}]]*/ null;
+            if (flashSuccess) {
+                showToast(flashSuccess, 'success');
+            }
+            if (flashError) {
+                showToast(flashError, 'error');
+            }
+        })();
+        /*]]>*/
     </script>
 </div>
 </body>
