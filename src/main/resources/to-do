@@ -11,8 +11,6 @@ Transfer, delete and Request Disposal options should become inactive after the a
 asset status changes to disposed, those options should become inactive so that only view is active.
 
 
-2. server room booking >> Infra approver does not see the booking to approve. instead only sees the option to cancel the bookoing.
-
 3. Improve the message body design from the default plain text
 
 4. Ensure infra resource request is async to allow immediate update of the UI . Introduce a job to send out emails in the backend.
@@ -29,12 +27,8 @@ asset status changes to disposed, those options should become inactive so that o
 
 12. Make the cab requests appear under the pending requests and completions tab for the admin to approve them since they are not linked to any driver
 
-13. Make sure the error indicating that the room you are booking for that time has been already booked.
-
 17. make the disposal list appear as a table so that if they are many items to dispose, the list appears in the table
 Also, make the approve and decline buttons appear professional not buttons stretching the entire page width
-
-16. Add signout button to the server room so that the requester signs the link on their email just like one the driver has to complete trip
 
 17 Make these alerts display very well for the user to see on the UI (2026-08-09 09:24:04 - ❌ Error creating disposal request: Asset has not reached EOL yet. Disposal cannot be initiated.)
 

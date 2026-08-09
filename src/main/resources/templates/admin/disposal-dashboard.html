@@ -123,33 +123,42 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No requests pending finance approval</p>
                     </div>
-                    <div th:each="req : ${pendingFinance}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
-                                      th:text="${req.priority}">Normal</span>
-                            </div>
-                            <small class="text-muted">
-                                Tag: <span th:text="${req.asset != null ? req.asset.tag : 'N/A'}">N/A</span>
-                                | Requested by: <span th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</span>
-                                | <span th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                            </small>
-                            <div class="mt-1"><small class="text-muted">Reason: <span th:text="${req.disposalReason}">Reason</span></small></div>
-                            <div class="mt-1">
-                                <small class="text-muted">Purchase Cost: <span th:text="${req.asset != null and req.asset.purchaseCost != null ? req.asset.purchaseCost : 'N/A'}">N/A</span></small>
-                                <small class="text-muted ms-3">EOL Date: <span th:text="${req.asset != null and req.asset.eolDate != null ? #temporals.format(req.asset.eolDate, 'dd/MM/yyyy') : 'N/A'}">N/A</span></small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <span class="status-badge pending">PENDING</span>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-sm btn-primary view-detail-btn"
-                                        th:data-target="'modal-finance-' + ${req.disposalRequestId}">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                            </div>
-                        </div>
+                    <div th:if="${pendingFinance != null and !pendingFinance.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Requested By</th>
+                                <th>Requested</th>
+                                <th>Priority</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${pendingFinance}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</td>
+                                <td th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td>
+                                    <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
+                                          th:text="${req.priority}">Normal</span>
+                                </td>
+                                <td class="text-truncate" style="max-width: 200px;" th:text="${req.disposalReason}">Reason</td>
+                                <td><span class="status-badge pending">PENDING</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary view-detail-btn"
+                                            th:data-target="'modal-finance-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -169,33 +178,45 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No requests pending infra approval</p>
                     </div>
-                    <div th:each="req : ${pendingInfra}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
-                                      th:text="${req.priority}">Normal</span>
-                                <span class="badge bg-success ms-1">✅ Finance Approved</span>
-                            </div>
-                            <small class="text-muted">
-                                Tag: <span th:text="${req.asset != null ? req.asset.tag : 'N/A'}">N/A</span>
-                                | Requested by: <span th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</span>
-                                | <span th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                            </small>
-                            <div class="mt-1"><small class="text-muted">Reason: <span th:text="${req.disposalReason}">Reason</span></small></div>
-                            <div class="mt-1">
-                                <small class="text-success">Infrastructure Approved by: <span th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</span></small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <span class="status-badge pending">PENDING</span>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-sm btn-primary view-detail-btn"
-                                        th:data-target="'modal-infra-' + ${req.disposalRequestId}">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                            </div>
-                        </div>
+                    <div th:if="${pendingInfra != null and !pendingInfra.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Requested By</th>
+                                <th>Requested</th>
+                                <th>Priority</th>
+                                <th>Finance Approved By</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${pendingInfra}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</td>
+                                <td th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td>
+                                    <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
+                                          th:text="${req.priority}">Normal</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">✅</span>
+                                    <span th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</span>
+                                </td>
+                                <td><span class="status-badge pending">PENDING</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary view-detail-btn"
+                                            th:data-target="'modal-infra-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -215,39 +236,50 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No requests pending compliance approval</p>
                     </div>
-                    <div th:each="req : ${pendingCompliance}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
-                                      th:text="${req.priority}">Normal</span>
-                                <span class="badge bg-success ms-1">✅ Finance Approved</span>
-                                <span class="badge bg-warning ms-1">⏳ Infrastructure Approved</span>
-                            </div>
-                            <small class="text-muted">
-                                Tag: <span th:text="${req.asset != null ? req.asset.tag : 'N/A'}">N/A</span>
-                                | Requested by: <span th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</span>
-                                | <span th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                            </small>
-                            <div class="mt-1"><small class="text-muted">Reason: <span th:text="${req.disposalReason}">Reason</span></small></div>
-                            <div class="mt-1">
-                                <small class="text-success">Infrastructure Approved by: <span th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'N/A'}">N/A</span></small>
-                            </div>
-                            <div th:if="${req.disposalPolicyPath}" class="mt-1">
-                                <a th:href="${req.disposalPolicyPath}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-file-pdf me-1"></i>View Policy
-                                </a>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <span class="status-badge pending">PENDING</span>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-sm btn-primary view-detail-btn"
-                                        th:data-target="'modal-compliance-' + ${req.disposalRequestId}">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                            </div>
-                        </div>
+                    <div th:if="${pendingCompliance != null and !pendingCompliance.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Requested By</th>
+                                <th>Priority</th>
+                                <th>Approvals</th>
+                                <th>Policy</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${pendingCompliance}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</td>
+                                <td>
+                                    <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
+                                          th:text="${req.priority}">Normal</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success me-1">✅ Finance</span>
+                                    <span class="badge bg-success">✅ Infra</span>
+                                </td>
+                                <td>
+                                    <a th:if="${req.disposalPolicyPath}" th:href="${req.disposalPolicyPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-file-pdf"></i> View
+                                    </a>
+                                    <span th:unless="${req.disposalPolicyPath}" class="text-muted small">-</span>
+                                </td>
+                                <td><span class="status-badge pending">PENDING</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary view-detail-btn"
+                                            th:data-target="'modal-compliance-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -267,30 +299,42 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No requests ready for execution</p>
                     </div>
-                    <div th:each="req : ${pendingExecution}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
-                                      th:text="${req.priority}">Normal</span>
-                                <span class="badge bg-success ms-1">✅ All Approved</span>
-                            </div>
-                            <small class="text-muted">
-                                Tag: <span th:text="${req.asset != null ? req.asset.tag : 'N/A'}">N/A</span>
-                                | Requested by: <span th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</span>
-                                | <span th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                            </small>
-                            <div class="mt-1"><small class="text-success">✅ Finance | ✅ Infrastructure | ✅ Compliance</small></div>
-                        </div>
-                        <div class="text-end">
-                            <span class="status-badge inprogress">READY</span>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-sm btn-primary view-detail-btn"
-                                        th:data-target="'modal-execution-' + ${req.disposalRequestId}">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                            </div>
-                        </div>
+                    <div th:if="${pendingExecution != null and !pendingExecution.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Requested By</th>
+                                <th>Requested</th>
+                                <th>Priority</th>
+                                <th>Approvals</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${pendingExecution}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${req.requester != null ? req.requester.fullName : 'Unknown'}">User</td>
+                                <td th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td>
+                                    <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
+                                          th:text="${req.priority}">Normal</span>
+                                </td>
+                                <td><span class="badge bg-success">✅ All Approved</span></td>
+                                <td><span class="status-badge inprogress">READY</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary view-detail-btn"
+                                            th:data-target="'modal-execution-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -310,26 +354,37 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No rejected requests</p>
                     </div>
-                    <div th:each="req : ${rejectedRequests}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="status-badge rejected">REJECTED</span>
-                            </div>
-                            <small class="text-muted">
-                                Rejected at: <span th:text="${req.currentApprovalStep}">Step</span>
-                                | <span th:text="${#temporals.format(req.updatedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                            </small>
-                            <div class="mt-1">
-                                <small class="text-danger">Reason: <span th:text="${req.rejectionReason}">Reason</span></small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-secondary view-detail-btn"
-                                    th:data-target="'modal-rejected-' + ${req.disposalRequestId}">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </div>
+                    <div th:if="${rejectedRequests != null and !rejectedRequests.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Rejected At</th>
+                                <th>Time</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${rejectedRequests}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${req.currentApprovalStep}">Step</td>
+                                <td th:text="${#temporals.format(req.updatedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td class="text-truncate" style="max-width: 220px;" th:text="${req.rejectionReason}">Reason</td>
+                                <td><span class="status-badge rejected">REJECTED</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary view-detail-btn"
+                                            th:data-target="'modal-rejected-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -349,26 +404,37 @@
                         <i class="fas fa-check-circle" style="color: #198754; font-size: 24px;"></i>
                         <p class="mt-2">No completed requests</p>
                     </div>
-                    <div th:each="req : ${completedRequests}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="status-badge completed">COMPLETED</span>
-                            </div>
-                            <small class="text-muted">
-                                Completed: <span th:text="${#temporals.format(req.completedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                | By: <span th:text="${req.executor != null ? req.executor.fullName : 'N/A'}">User</span>
-                            </small>
-                            <div th:if="${req.completionNotes}" class="mt-1">
-                                <small class="text-muted">Notes: <span th:text="${req.completionNotes}">Notes</span></small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-secondary view-detail-btn"
-                                    th:data-target="'modal-completed-' + ${req.disposalRequestId}">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </div>
+                    <div th:if="${completedRequests != null and !completedRequests.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Completed</th>
+                                <th>Executed By</th>
+                                <th>Notes</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${completedRequests}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
+                                </td>
+                                <td th:text="${#temporals.format(req.completedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td th:text="${req.executor != null ? req.executor.fullName : 'N/A'}">User</td>
+                                <td class="text-truncate" style="max-width: 220px;" th:text="${req.completionNotes != null ? req.completionNotes : '-'}">Notes</td>
+                                <td><span class="status-badge completed">COMPLETED</span></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary view-detail-btn"
+                                            th:data-target="'modal-completed-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -388,33 +454,45 @@
                         <i class="fas fa-inbox" style="font-size: 24px;"></i>
                         <p class="mt-2">You have not submitted any disposal requests</p>
                     </div>
-                    <div th:each="req : ${myRequests}" class="request-item">
-                        <div>
-                            <div class="request-title">
-                                <span th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</span>
-                                <span class="status-badge" th:class="${req.status == 'PENDING_FINANCE_APPROVAL' ? 'pending' :
-                                                                          req.status == 'PENDING_INFRA_APPROVAL' ? 'pending' :
-                                                                          req.status == 'PENDING_COMPLIANCE_APPROVAL' ? 'pending' :
-                                                                          req.status == 'PENDING_EXECUTION' ? 'inprogress' :
-                                                                          req.status == 'REJECTED' ? 'rejected' :
-                                                                          req.status == 'COMPLETED' ? 'completed' : ''}"
-                                      th:text="${req.statusDisplay}">PENDING</span>
-                            </div>
-                            <small class="text-muted">
-                                Requested: <span th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                | Reason: <span th:text="${req.disposalReason}">Reason</span>
-                                | Step: <span th:text="${req.currentApprovalStep}">Step</span>
-                            </small>
-                            <div class="mt-1">
-                                <small class="text-muted" th:if="${req.rejectionReason}">Rejected: <span th:text="${req.rejectionReason}">Reason</span></small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <button type="button" class="btn btn-sm btn-primary view-detail-btn"
-                                    th:data-target="'modal-my-' + ${req.disposalRequestId}">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </div>
+                    <div th:if="${myRequests != null and !myRequests.isEmpty()}" class="table-container">
+                        <table class="disposal-table">
+                            <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Requested</th>
+                                <th>Reason</th>
+                                <th>Current Step</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="req : ${myRequests}">
+                                <td>
+                                    <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
+                                    <small class="text-muted" th:if="${req.rejectionReason}" th:text="'Rejected: ' + ${req.rejectionReason}">Rejected</small>
+                                </td>
+                                <td th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td class="text-truncate" style="max-width: 200px;" th:text="${req.disposalReason}">Reason</td>
+                                <td th:text="${req.currentApprovalStep}">Step</td>
+                                <td>
+                                    <span class="status-badge" th:class="${req.status == 'PENDING_FINANCE_APPROVAL' ? 'pending' :
+                                                                              req.status == 'PENDING_INFRA_APPROVAL' ? 'pending' :
+                                                                              req.status == 'PENDING_COMPLIANCE_APPROVAL' ? 'pending' :
+                                                                              req.status == 'PENDING_EXECUTION' ? 'inprogress' :
+                                                                              req.status == 'REJECTED' ? 'rejected' :
+                                                                              req.status == 'COMPLETED' ? 'completed' : ''}"
+                                          th:text="${req.statusDisplay}">PENDING</span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary view-detail-btn"
+                                            th:data-target="'modal-my-' + ${req.disposalRequestId}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -507,24 +585,30 @@
                                 <i class="fas fa-info-circle me-2"></i>
                                 Please validate purchase details and confirm EOL has been reached.
                             </div>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/finance/approve'}" method="post">
-                                <div class="mb-3">
-                                    <label class="form-label">Comment</label>
-                                    <textarea name="comment" class="form-control" rows="2" placeholder="Add approval comment..."></textarea>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/finance/approve'}" method="post" class="approval-action-form">
+                                        <label class="form-label">Comment</label>
+                                        <textarea name="comment" class="form-control" rows="2" placeholder="Add approval comment..."></textarea>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 mb-2">
-                                    <i class="fas fa-check me-2"></i>Approve
-                                </button>
-                            </form>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/finance/reject'}" method="post">
-                                <div class="mb-3">
-                                    <label class="form-label">Rejection Reason *</label>
-                                    <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/finance/reject'}" method="post" class="approval-action-form">
+                                        <label class="form-label">Rejection Reason *</label>
+                                        <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-danger w-100">
-                                    <i class="fas fa-times me-2"></i>Reject
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -616,29 +700,33 @@
                                 <i class="fas fa-info-circle me-2"></i>
                                 Validate EOL and upload the approved disposal policy/plan document.
                             </div>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/infra/approve'}" method="post" enctype="multipart/form-data">
-                                <div class="mb-3">
-                                    <label class="form-label">Comment</label>
-                                    <textarea name="comment" class="form-control" rows="2" placeholder="Add approval comment..."></textarea>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/infra/approve'}" method="post" enctype="multipart/form-data" class="approval-action-form">
+                                        <label class="form-label">Comment</label>
+                                        <textarea name="comment" class="form-control mb-2" rows="2" placeholder="Add approval comment..."></textarea>
+                                        <label class="form-label">Disposal Policy/Plan *</label>
+                                        <input type="file" name="policyFile" class="form-control" accept=".pdf,.doc,.docx" required>
+                                        <small class="text-muted d-block mt-1">Upload the approved disposal policy document</small>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Disposal Policy/Plan *</label>
-                                    <input type="file" name="policyFile" class="form-control" accept=".pdf,.doc,.docx" required>
-                                    <small class="text-muted">Upload the approved disposal policy document</small>
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/infra/reject'}" method="post" class="approval-action-form">
+                                        <label class="form-label">Rejection Reason *</label>
+                                        <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 mb-2">
-                                    <i class="fas fa-check me-2"></i>Approve
-                                </button>
-                            </form>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/infra/reject'}" method="post">
-                                <div class="mb-3">
-                                    <label class="form-label">Rejection Reason *</label>
-                                    <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-danger w-100">
-                                    <i class="fas fa-times me-2"></i>Reject
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -746,24 +834,30 @@
                                 <i class="fas fa-info-circle me-2"></i>
                                 Review the disposal policy/plan and approve the process.
                             </div>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/compliance/approve'}" method="post">
-                                <div class="mb-3">
-                                    <label class="form-label">Comment</label>
-                                    <textarea name="comment" class="form-control" rows="2" placeholder="Add approval comment..."></textarea>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/compliance/approve'}" method="post" class="approval-action-form">
+                                        <label class="form-label">Comment</label>
+                                        <textarea name="comment" class="form-control" rows="2" placeholder="Add approval comment..."></textarea>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 mb-2">
-                                    <i class="fas fa-check me-2"></i>Approve
-                                </button>
-                            </form>
-                            <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/compliance/reject'}" method="post">
-                                <div class="mb-3">
-                                    <label class="form-label">Rejection Reason *</label>
-                                    <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
+                                <div class="col-md-6">
+                                    <form th:action="@{'/admin/disposal/' + ${req.disposalRequestId} + '/compliance/reject'}" method="post" class="approval-action-form">
+                                        <label class="form-label">Rejection Reason *</label>
+                                        <textarea name="reason" class="form-control" rows="2" required placeholder="Provide reason for rejection..."></textarea>
+                                        <div class="text-end mt-2">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-danger w-100">
-                                    <i class="fas fa-times me-2"></i>Reject
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -864,9 +958,11 @@
                                     <input type="file" name="proofDocument" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
                                     <small class="text-muted">Upload proof of disposal (photo, certificate, etc.)</small>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100">
-                                    <i class="fas fa-check-circle me-2"></i>Execute Disposal
-                                </button>
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-check-circle me-2"></i>Execute Disposal
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -1153,18 +1249,40 @@
         .booking-panel .panel-header h6 i { margin-right: 8px; }
         .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
 
-        .request-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 14px;
-            border-bottom: 1px solid #f0f2f5;
+        /* Disposal list tables (replaces stacked request-item rows) */
+        .table-container {
+            max-height: 520px;
+            overflow-y: auto;
         }
-        .request-item:last-child { border-bottom: none; }
-        .request-title { font-weight: 600; font-size: 14px; color: var(--ink); }
-        .request-title .badge { margin-left: 8px; font-size: 10px; }
+        .disposal-table {
+            width: 100%;
+            margin-bottom: 0;
+            border-collapse: collapse;
+        }
+        .disposal-table thead th {
+            position: sticky;
+            top: 0;
+            background: #f8f9fb;
+            border-bottom: 1px solid #eef0f3;
+            color: #6c757d;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            white-space: nowrap;
+            z-index: 1;
+        }
+        .disposal-table tbody td {
+            padding: 12px 14px;
+            vertical-align: middle;
+            font-size: 13px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .disposal-table tbody tr:hover { background: #f8f9fc; }
+        .disposal-table tbody tr:last-child td { border-bottom: none; }
 
-        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; }
         .status-badge.pending { background: #fff4e0; color: #fd7e14; }
         .status-badge.approved { background: #d4edda; color: #198754; }
         .status-badge.rejected { background: #fdeeee; color: #dc3545; }
@@ -1172,7 +1290,7 @@
         .status-badge.completed { background: #e8eefc; color: #6610f2; }
 
         .btn { border-radius: 10px !important; padding: 6px 14px !important; font-weight: 600 !important; font-size: 12px !important; }
-        .btn-sm { padding: 4px 12px !important; font-size: 11px !important; }
+        .btn-sm { padding: 5px 14px !important; font-size: 11.5px !important; }
         .btn-primary { background: var(--primary-color) !important; border: none !important; color: white !important; }
         .btn-primary:hover { background: var(--primary-dark) !important; }
         .btn-success { background: #198754 !important; border: none !important; color: white !important; }
@@ -1181,8 +1299,17 @@
         .btn-warning:hover { background: #e0a800 !important; }
         .btn-danger { background: #dc3545 !important; border: none !important; color: white !important; }
         .btn-danger:hover { background: #bb2d3b !important; }
+        .btn-outline-danger { background: transparent !important; border: 1.5px solid #dc3545 !important; color: #dc3545 !important; }
+        .btn-outline-danger:hover { background: #dc3545 !important; color: white !important; }
         .btn-outline-secondary { border: 1px solid #e9ecef !important; color: #6c757d !important; }
         .btn-outline-secondary:hover { background: #f8f9fa !important; }
+        .btn-outline-primary { border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; background: transparent !important; }
+        .btn-outline-primary:hover { background: var(--primary-color) !important; color: white !important; }
+
+        /* Compact approve/reject form pairs inside modals */
+        .approval-action-form .form-label { font-weight: 600; font-size: 12.5px; color: var(--ink); margin-bottom: 4px; }
+        .approval-action-form .form-control { border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 12px; font-size: 13px; }
+        .approval-action-form .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
 
         .empty-state-sm { text-align: center; padding: 30px 20px; color: #adb5bd; }
         .empty-state-sm i { font-size: 24px; margin-bottom: 6px; display: block; }
@@ -1215,9 +1342,8 @@
         @media (max-width: 768px) {
             .stat-card { padding: 16px; }
             .stat-info h3 { font-size: 22px; }
-            .request-item { flex-direction: column; align-items: flex-start; gap: 8px; }
-            .request-item .text-end { width: 100%; text-align: left; }
             .disposal-tabs .nav-link { font-size: 12px; padding: 8px 10px; }
+            .disposal-table thead th, .disposal-table tbody td { padding: 10px; font-size: 12px; }
         }
     </style>
 </div>
