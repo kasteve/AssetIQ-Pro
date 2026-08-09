@@ -11,70 +11,41 @@ Transfer, delete and Request Disposal options should become inactive after the a
 asset status changes to disposed, those options should become inactive so that only view is active.
 
 
-
-Review the SLA breached link
-
-2026-08-04 15:00:00 - 📧 EMAIL CONTENT
-2026-08-04 15:00:00 - Type: Simple Email
-2026-08-04 15:00:00 - To: admin@company.com
-2026-08-04 15:00:00 - Subject: SLA Breached - AssetIQ-Pro
-2026-08-04 15:00:00 - -----------------------------------------
-2026-08-04 15:00:00 - Body:
-2026-08-04 15:00:00 - SLA BREACHED! Request #19 (INFRA_REQUEST) has exceeded its SLA of 120 hours. Please take immediate action.
-
-View details: http://localhost:8091/assetIQ-pro/infra-requests/19   >>> Returns a json instead of opening the page to view details
-
-{
-  "lineManagerId": 16,
-  "resourceType": "Monitor",
-  "specification": "lenovo",
-  "quantity": 1,
-  "justification": "Not sure",
-  "requestId": 19,
-  "requesterId": 10,
-  "requesterName": "Normal Employee",
-  "requesterDepartment": "Operations",
-  "requesterStaffId": "STAFF00006",
-  "lineManagerStaffId": "04343",
-  "status": "PROCUREMENT",
-  "createdAt": "2026-08-02T18:19:46.780022",
-  "updatedAt": "2026-08-02T18:25:20.615528",
-  "assetId": null,
-  "supplierId": null,
-  "supplierName": null,
-  "purchaseCost": null,
-  "procurementOrderRef": null,
-  "lmComment": "approved",
-  "infraComment": "sasa",
-  "financeComment": "sasa",
-  "lmApprovedByStaffId": "04343",
-  "infraReviewedByStaffId": "04343",
-  "financeApprovedByStaffId": "04343",
-  "deliveryNotes": null,
-  "deliveredAt": null,
-  "deliveredBy": null,
-  "deliveredByName": null,
-  "acknowledgedAt": null,
-  "acknowledgedBy": null,
-  "acknowledgedByName": null,
-  "pdfReportPath": null,
-  "lmApprovedAt": "2026-08-02T18:23:53.513748",
-  "infraReviewedAt": "2026-08-02T18:24:35.4404684",
-  "financeApprovedAt": "2026-08-02T18:25:13.3894559",
-  "completedAt": null,
-  "lmApprovedBy": 16,
-  "infraReviewedBy": 16,
-  "financeApprovedBy": 16,
-  "lmApprovedByName": "Festo Driver Snr",
-  "infraReviewedByName": "Festo Driver Snr",
-  "financeApprovedByName": "Festo Driver Snr",
-  "quotationPath": "uploads\\infra\\quotations\\cb255044-42a9-4621-8eb2-a920f3ece416_transfer_15.pdf",
-  "requesterSignature": null,
-  "requesterSignedAt": null,
-  "signingToken": null,
-  "signingTokenExpiry": null,
-  "statusColor": "primary",
-  "statusDisplay": "In Procurement"
-}
-
 2. server room booking >> Infra approver does not see the booking to approve. instead only sees the option to cancel the bookoing.
+
+3. Improve the message body design from the default plain text
+
+4. Ensure infra resource request is async to allow immediate update of the UI . Introduce a job to send out emails in the backend.
+
+5. Review the infra request flow (Finance has 3 layers ie. approve, procurement and finally deliver so that the requester signs the form to acknowledge receipt)
+
+7. Make the resources list display only requests for that user only and not for others unless the user has admin rights to view all . infra list is working fine in this regard
+
+8. Review and define default permissions for every user role so that they are assigned everytime a user is assigned that role
+
+9. Also ensure the resource receipt acknowledgement email is sent and allow admins to trigger a resend of the link
+
+10. Instead of sending links for one to track sla, should be just a notification but user should login to trackin the portal
+
+11. Make users get instant responses on UI not waiting for the backend activity like emails to be sent out to give the user a response.
+
+12. Make the cab requests appear under the pending requests and completions tab for the admin to approve them since they are not linked to any driver
+
+13. Make sure the error indicating that the room you are booking for that time has been already booked.
+
+14 2026-08-09 08:51:42 - Invalid CSRF token found for http://localhost:8091/assetIQ-pro/bookings/room/23/request-slot
+also link for resending email
+
+15. Make my bookings for the room appear as a table just like the ones for drivers.
+
+17. make the disposal list appear as a table so that if they are many items to dispose, the list appears in the table
+Also, make the approve and decline buttons appear professional not buttons stretching the entire page width
+
+16. Add signout button to the server room so that the requester signs the link on their email just like one the driver has to complete trip
+
+17 Make these alerts display very well for the user to see on the UI (2026-08-09 09:24:04 - ❌ Error creating disposal request: Asset has not reached EOL yet. Disposal cannot be initiated.)
+
+18.2026-08-09 09:48:18 - Resolved [org.springframework.web.servlet.resource.NoResourceFoundException: No static resource admin/uploads/disposal/policies/policy_8_1786258083749_transfer_7.pdf.]
+Endpoint for viewing the uploaded diposal policy by compliance from infra is missing
+
+19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.
