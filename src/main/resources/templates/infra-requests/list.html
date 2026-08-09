@@ -411,34 +411,34 @@
               <td th:text="${request.requesterStaffId}">STAFF001</td>
               <td th:text="${request.quantity}">1</td>
               <td>
-                                <span class="status-badge"
-                                      th:classappend="${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
-                                                    (${request.status} == 'PROCUREMENT' ? 'procurement' :
-                                                    (${request.status} == 'DELIVERED' ? 'completed' : ''))"
-                                      th:text="${request.status}">Pending</span>
+            <span class="status-badge"
+                  th:classappend="${request.status} == 'PENDING_FINANCE_APPROVAL' ? 'finance' :
+                                (${request.status} == 'PROCUREMENT' ? 'procurement' :
+                                (${request.status} == 'DELIVERED' ? 'completed' : ''))"
+                  th:text="${request.status}">Pending</span>
               </td>
               <td th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
               <td>
                 <div class="sla-detail-row">
-                                    <span class="sla-status-badge"
-                                          th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
-                                                    (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
-                                                    (request.slaStatus == 'BREACHED' ? 'sla-breached' :
-                                                    (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
-                                          th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
-                                        N/A
-                                    </span>
+              <span class="sla-status-badge"
+                    th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
+                              (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
+                              (request.slaStatus == 'BREACHED' ? 'sla-breached' :
+                              (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
+                    th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
+                N/A
+              </span>
                   <div class="sla-progress-mini" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED'}">
                     <div class="sla-progress-bar"
                          th:class="${request.slaPercentage > 90 ? 'bg-danger' :
-                                                       (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
+                               (request.slaPercentage > 75 ? 'bg-warning' : 'bg-success')}"
                          th:style="'width: ' + ${request.slaPercentage != null ? request.slaPercentage : 0} + '%;'">
                     </div>
                   </div>
                   <span class="text-muted small" th:if="${request.slaStatus != null and request.slaStatus != 'COMPLETED' and request.slaStatus != 'BREACHED' and request.slaPercentage != null}"
                         th:text="${#numbers.formatDecimal(request.slaPercentage, 0, 0)} + '%'">
-                                        0%
-                                    </span>
+                0%
+              </span>
                 </div>
               </td>
               <td class="text-center">
@@ -448,48 +448,65 @@
                     <i class="fas fa-ellipsis-vertical"></i>
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                    <!-- View - Always visible -->
                     <li>
                       <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewRequest(' + ${request.requestId} + ')'">
                         <i class="fas fa-eye me-2 text-info"></i>View
                       </a>
                     </li>
 
-                    <!-- Approve - Only when PENDING_FINANCE_APPROVAL -->
-                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
-                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'">
-                        <i class="fas fa-check me-2 text-success"></i>Approve
-                      </a>
-                    </li>
+                    <li><hr class="dropdown-divider" th:if="${request.status == 'PENDING_FINANCE_APPROVAL' or request.status == 'PROCUREMENT' or request.status == 'DELIVERED'}"></li>
 
-                    <!-- Reject - Only when PENDING_FINANCE_APPROVAL -->
-                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL'">
-                      <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'">
-                        <i class="fas fa-times me-2"></i>Reject
-                      </a>
-                    </li>
+                    <!-- ============================================ -->
+                    <!-- STEP 1: PENDING_FINANCE_APPROVAL Actions    -->
+                    <!-- Show: Approve, Reject, Procurement (optional) -->
+                    <!-- ============================================ -->
+                    <th:block th:if="${request.status == 'PENDING_FINANCE_APPROVAL'}">
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showApproveFinance(' + ${request.requestId} + ')'">
+                          <i class="fas fa-check me-2 text-success"></i>Approve
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="javascript:void(0)" th:onclick="'showRejectFinance(' + ${request.requestId} + ')'">
+                          <i class="fas fa-times me-2"></i>Reject
+                        </a>
+                      </li>
+                      <!-- Optional: Procurement can be used to skip approval and go directly to procurement -->
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showProcurement(' + ${request.requestId} + ')'">
+                          <i class="fas fa-shopping-cart me-2 text-info"></i>Procurement
+                        </a>
+                      </li>
+                    </th:block>
 
-                    <!-- Procurement - When PENDING_FINANCE_APPROVAL or PROCUREMENT -->
-                    <li th:if="${request.status} == 'PENDING_FINANCE_APPROVAL' or ${request.status} == 'PROCUREMENT'">
-                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showProcurement(' + ${request.requestId} + ')'">
-                        <i class="fas fa-shopping-cart me-2 text-info"></i>Procurement
-                      </a>
-                    </li>
+                    <!-- ============================================ -->
+                    <!-- STEP 2: PROCUREMENT Actions                 -->
+                    <!-- Show: Mark Delivered (to move to DELIVERED) -->
+                    <!-- ============================================ -->
+                    <th:block th:if="${request.status == 'PROCUREMENT'}">
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showDelivered(' + ${request.requestId} + ')'">
+                          <i class="fas fa-truck me-2 text-warning"></i>Mark Delivered
+                        </a>
+                      </li>
+                    </th:block>
 
-                    <!-- Delivered - Only when PROCUREMENT -->
-                    <li th:if="${request.status} == 'PROCUREMENT'">
-                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showDelivered(' + ${request.requestId} + ')'">
-                        <i class="fas fa-truck me-2 text-warning"></i>Mark Delivered
-                      </a>
-                    </li>
+                    <!-- ============================================ -->
+                    <!-- STEP 3: DELIVERED Actions                   -->
+                    <!-- Show: Complete (requester signs)            -->
+                    <!-- ============================================ -->
+                    <th:block th:if="${request.status == 'DELIVERED'}">
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showComplete(' + ${request.requestId} + ')'">
+                          <i class="fas fa-check-double me-2 text-secondary"></i>Complete
+                        </a>
+                      </li>
+                    </th:block>
 
-                    <!-- Complete - Only when DELIVERED -->
-                    <li th:if="${request.status} == 'DELIVERED'">
-                      <a class="dropdown-item" href="javascript:void(0)" th:onclick="'showComplete(' + ${request.requestId} + ')'">
-                        <i class="fas fa-check-double me-2 text-secondary"></i>Complete
-                      </a>
-                    </li>
-
-                    <!-- View Quotation - When quotation exists -->
+                    <!-- ============================================ -->
+                    <!-- Common: View Quotation (if available)       -->
+                    <!-- ============================================ -->
                     <li th:if="${request.quotationPath != null}">
                       <a class="dropdown-item" href="javascript:void(0)" th:onclick="'viewQuotation(' + ${request.requestId} + ')'">
                         <i class="fas fa-file-pdf me-2 text-danger"></i>View Quotation
@@ -509,7 +526,6 @@
       </div>
     </div>
   </div>
-
   <!-- Create Request Modal -->
   <div class="modal fade" id="createRequestModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">

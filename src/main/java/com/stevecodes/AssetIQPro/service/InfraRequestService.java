@@ -94,7 +94,7 @@ public class InfraRequestService {
     }
 
     public List<InfraRequestDTO> getFinanceRequests() {
-        log.info("Getting finance requests");
+        log.info("Getting finance requests - all finance-related statuses");
         return requestRepository.findByStatusIn(List.of(
                         RequestStatus.PENDING_FINANCE_APPROVAL,
                         RequestStatus.PROCUREMENT,
