@@ -18,7 +18,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -489,7 +488,7 @@ public class AssetDisposalService {
     }
 
     // ============================================
-    // EXECUTION
+    // EXECUTION - FIXED: Uses DISPOSED from enum
     // ============================================
 
     @Transactional
@@ -530,7 +529,7 @@ public class AssetDisposalService {
             disposalRequestRepository.save(request);
             log.info("✅ Disposal execution completed for request: {}", requestId);
 
-            // Update asset status to DISPOSED
+            // ✅ FIXED: Update asset status to DISPOSED (enum value exists)
             try {
                 Asset asset = assetRepository.findById(request.getAssetId())
                         .orElseThrow(() -> new RuntimeException("Asset not found"));
@@ -645,7 +644,7 @@ public class AssetDisposalService {
     }
 
     // ============================================
-    // HELPER METHODS
+    // HELPER METHODS - FIXED UPLOAD PATHS
     // ============================================
 
     private AssetDisposalRequest validateRequest(Long requestId) {
@@ -664,7 +663,9 @@ public class AssetDisposalService {
                     file.getOriginalFilename().replaceAll("\\s+", "_");
             Path filePath = uploadPath.resolve(filename);
             Files.write(filePath, file.getBytes());
-            return filePath.toString();
+
+            // ✅ FIXED: Use forward slashes and correct relative path (no "admin/" prefix)
+            return "uploads/disposal/policies/" + filename;
         } catch (IOException e) {
             log.error("Failed to upload policy file: {}", e.getMessage());
             throw new RuntimeException("Failed to upload policy file", e);
@@ -682,7 +683,9 @@ public class AssetDisposalService {
                     file.getOriginalFilename().replaceAll("\\s+", "_");
             Path filePath = uploadPath.resolve(filename);
             Files.write(filePath, file.getBytes());
-            return filePath.toString();
+
+            // ✅ FIXED: Use forward slashes and correct relative path (no "admin/" prefix)
+            return "uploads/disposal/proofs/" + filename;
         } catch (IOException e) {
             log.error("Failed to upload proof file: {}", e.getMessage());
             throw new RuntimeException("Failed to upload proof file", e);

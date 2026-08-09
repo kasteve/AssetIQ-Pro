@@ -71,8 +71,6 @@ public class Asset {
     @Column(name = "warranty_years")
     private Integer warrantyYears;
 
-    // NEW: number of years the asset is expected to remain fit for use.
-    // Drives automatic calculation of eolDate = purchaseDate + lifespanYears.
     @Column(name = "lifespan_years")
     private Integer lifespanYears;
 
@@ -150,7 +148,15 @@ public class Asset {
     private String assetLifecycleStatus = "ACTIVE";
 
     // ============================================
-    // Helper Methods
+    // ENUM
+    // ============================================
+
+    public enum AssetStatus {
+        AVAILABLE, ASSIGNED, MAINTENANCE, RETIRED, TRANSFERRED, DISPOSED
+    }
+
+    // ============================================
+    // HELPER METHODS
     // ============================================
 
     public Integer getDaysUntilWarrantyExpiry() {
@@ -224,6 +230,17 @@ public class Asset {
         return status == AssetStatus.MAINTENANCE;
     }
 
+    public boolean isTransferred() {
+        return status == AssetStatus.TRANSFERRED;
+    }
+
+    // ✅ ADDED: Check if asset is disposed
+    public boolean isDisposed() {
+        return status == AssetStatus.DISPOSED ||
+                "DISPOSED".equals(disposalStatus) ||
+                "DISPOSED".equals(assetLifecycleStatus);
+    }
+
     public String getAssetName() {
         return name != null ? name : tag;
     }
@@ -236,7 +253,16 @@ public class Asset {
         return purchaseCost != null ? purchaseCost.doubleValue() : 0.0;
     }
 
-    public enum AssetStatus {
-        AVAILABLE, ASSIGNED, MAINTENANCE, RETIRED, TRANSFERRED, DISPOSED
+    public String getStatusColor() {
+        if (status == null) return "secondary";
+        switch (status) {
+            case AVAILABLE: return "success";
+            case ASSIGNED: return "primary";
+            case MAINTENANCE: return "warning";
+            case RETIRED: return "secondary";
+            case TRANSFERRED: return "info";
+            case DISPOSED: return "danger";
+            default: return "secondary";
+        }
     }
 }

@@ -58,8 +58,28 @@ public class SecurityConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Main uploads handler - covers all subdirectories
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:./uploads/");
+
+        // Explicit handlers for specific upload directories (for clarity)
+        registry.addResourceHandler("/uploads/disposal/policies/**")
+                .addResourceLocations("file:./uploads/disposal/policies/");
+
+        registry.addResourceHandler("/uploads/disposal/proofs/**")
+                .addResourceLocations("file:./uploads/disposal/proofs/");
+
+        registry.addResourceHandler("/uploads/infra/quotations/**")
+                .addResourceLocations("file:./uploads/infra/quotations/");
+
+        registry.addResourceHandler("/uploads/infra/reports/**")
+                .addResourceLocations("file:./uploads/infra/reports/");
+
+        registry.addResourceHandler("/uploads/invoices/**")
+                .addResourceLocations("file:./uploads/invoices/");
+
+        registry.addResourceHandler("/uploads/resources/reports/**")
+                .addResourceLocations("file:./uploads/resources/reports/");
     }
 
     @Bean
@@ -90,7 +110,6 @@ public class SecurityConfig implements WebMvcConfigurer {
                     System.out.println("Session ID: " + session.getId());
                 }
 
-                // ✅ Use request.getContextPath() dynamically
                 String contextPath = request.getContextPath();
                 response.sendRedirect(contextPath + "/dashboard");
             }
@@ -100,24 +119,6 @@ public class SecurityConfig implements WebMvcConfigurer {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // ============================================================
-                // CSRF PROTECTION
-                // Re-enabled (Spring's default, session-backed CsrfTokenRepository)
-                // instead of fully disabled. This is what populates the `_csrf`
-                // request attribute that layouts/default.html reads to render
-                // <meta name="_csrf" .../> for JS-built forms/fetch calls, and
-                // what Thymeleaf's spring-security dialect uses to auto-inject
-                // hidden CSRF fields into every th:action form.
-                //
-                // Only genuinely non-browser-session flows are exempted:
-                //   - stateless API auth entry points
-                //   - "sign" links opened directly from emailed/shared URLs,
-                //     which aren't a normal logged-in session and often carry
-                //     their own opaque/one-time token for authorization
-                //   - a declared public API endpoint for stock lookups
-                // Everything else (all authenticated pages, all admin forms,
-                // asset/transfer CRUD) is now CSRF-protected.
-                // ============================================================
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/api/auth/**"),
@@ -164,7 +165,6 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 errorResponse.put("timestamp", System.currentTimeMillis());
                                 response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
                             } else {
-                                // ✅ Use request.getContextPath() for login redirect
                                 response.sendRedirect(request.getContextPath() + "/login");
                             }
                         })

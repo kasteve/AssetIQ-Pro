@@ -223,7 +223,7 @@
         </div>
 
         <!-- ============================================================ -->
-        <!-- TAB 3: RISK & COMPLIANCE APPROVAL -->
+        <!-- TAB 3: RISK & COMPLIANCE APPROVAL - FIXED LINKS -->
         <!-- ============================================================ -->
         <div class="tab-pane fade" id="tab-compliance" role="tabpanel">
             <div class="booking-panel">
@@ -265,7 +265,11 @@
                                     <span class="badge bg-success">✅ Infra</span>
                                 </td>
                                 <td>
-                                    <a th:if="${req.disposalPolicyPath}" th:href="${req.disposalPolicyPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <!-- ✅ FIXED: Correct link with context path -->
+                                    <a th:if="${req.disposalPolicyPath}"
+                                       th:href="@{${'/' + req.disposalPolicyPath}}"
+                                       target="_blank"
+                                       class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-file-pdf"></i> View
                                     </a>
                                     <span th:unless="${req.disposalPolicyPath}" class="text-muted small">-</span>
@@ -572,7 +576,7 @@
                                 </div>
                             </div>
                             <div th:if="${req.asset != null and req.asset.purchaseInvoicePath != null}" class="mt-2">
-                                <a th:href="${req.asset.purchaseInvoicePath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <a th:href="@{${'/' + req.asset.purchaseInvoicePath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file-invoice me-1"></i>View Purchase Invoice
                                 </a>
                             </div>
@@ -738,7 +742,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- COMPLIANCE APPROVAL MODALS -->
+    <!-- COMPLIANCE APPROVAL MODALS - FIXED LINKS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${pendingCompliance}">
         <div class="modal fade disposal-modal" th:id="'modal-compliance-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -801,8 +805,9 @@
                                     <span class="value" th:text="${req.infraComment}">Comment</span>
                                 </div>
                             </div>
+                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.disposalPolicyPath}" class="mt-2">
-                                <a th:href="${req.disposalPolicyPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <a th:href="@{${'/' + req.disposalPolicyPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file-pdf me-1"></i>View Disposal Policy
                                 </a>
                             </div>
@@ -869,7 +874,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- EXECUTION MODALS -->
+    <!-- EXECUTION MODALS - FIXED LINKS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${pendingExecution}">
         <div class="modal fade disposal-modal" th:id="'modal-execution-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -915,8 +920,9 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.disposalPolicyPath}" class="mt-2">
-                                <a th:href="${req.disposalPolicyPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <a th:href="@{${'/' + req.disposalPolicyPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file-pdf me-1"></i>View Disposal Policy
                                 </a>
                             </div>
@@ -1028,7 +1034,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- COMPLETED REQUESTS MODALS -->
+    <!-- COMPLETED REQUESTS MODALS - FIXED LINKS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${completedRequests}">
         <div class="modal fade disposal-modal" th:id="'modal-completed-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -1082,8 +1088,9 @@
                                     <span class="value" th:text="${req.completionNotes}">Notes</span>
                                 </div>
                             </div>
+                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.proofDocumentPath}" class="mt-2">
-                                <a th:href="${req.proofDocumentPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <a th:href="@{${'/' + req.proofDocumentPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file me-1"></i>View Proof
                                 </a>
                             </div>
@@ -1249,7 +1256,6 @@
         .booking-panel .panel-header h6 i { margin-right: 8px; }
         .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
 
-        /* Disposal list tables (replaces stacked request-item rows) */
         .table-container {
             max-height: 520px;
             overflow-y: auto;
@@ -1306,7 +1312,6 @@
         .btn-outline-primary { border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; background: transparent !important; }
         .btn-outline-primary:hover { background: var(--primary-color) !important; color: white !important; }
 
-        /* Compact approve/reject form pairs inside modals */
         .approval-action-form .form-label { font-weight: 600; font-size: 12.5px; color: var(--ink); margin-bottom: 4px; }
         .approval-action-form .form-control { border-radius: 10px; border: 1px solid #e2e8f0; padding: 8px 12px; font-size: 13px; }
         .approval-action-form .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
@@ -1353,8 +1358,6 @@
         (function () {
             function initDisposalDashboard() {
 
-                // --- Tabs: explicit init (don't rely solely on data-bs-toggle auto-wiring,
-                // which silently no-ops if bootstrap.bundle.js loaded/executed after this block) ---
                 document.querySelectorAll('#disposalTabs button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
                     tabBtn.addEventListener('click', function (e) {
                         e.preventDefault();
@@ -1366,8 +1369,6 @@
                     });
                 });
 
-                // --- View buttons: delegated on document, so it keeps working even if
-                // buttons/modals are re-rendered or this init runs before all nodes exist ---
                 document.addEventListener('click', function (e) {
                     var btn = e.target.closest('.view-detail-btn');
                     if (!btn) return;
@@ -1384,7 +1385,6 @@
                     bootstrap.Modal.getOrCreateInstance(modal).show();
                 });
 
-                // Spinner on submit for all disposal action forms (inside modals)
                 document.querySelectorAll('.disposal-modal form[method="post"]').forEach(function (form) {
                     form.addEventListener('submit', function () {
                         var btn = this.querySelector('button[type="submit"]');

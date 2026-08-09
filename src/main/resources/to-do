@@ -11,11 +11,9 @@ Transfer, delete and Request Disposal options should become inactive after the a
 asset status changes to disposed, those options should become inactive so that only view is active.
 
 
-3. Improve the message body design from the default plain text
+3. Improve the email body design from the default plain text.
 
 4. Ensure infra resource request is async to allow immediate update of the UI . Introduce a job to send out emails in the backend.
-
-5. Review the infra request flow (Finance has 3 layers ie. approve, procurement and finally deliver so that the requester signs the form to acknowledge receipt)
 
 7. Make the resources list display only requests for that user only and not for others unless the user has admin rights to view all . infra list is working fine in this regard
 
