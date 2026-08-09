@@ -132,6 +132,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 new AntPathRequestMatcher("/api/resource-requests/**"),
                                 new AntPathRequestMatcher("/api/infra-requests/**"),
                                 new AntPathRequestMatcher("/admin/**"),
+                                new AntPathRequestMatcher("/resources/**"),
+                                new AntPathRequestMatcher("/bookings/room/**"),
                                 new AntPathRequestMatcher("/bookings/driver-request/**")
                         )
                 )

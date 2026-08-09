@@ -73,6 +73,321 @@
             max-height: 500px;
             overflow-y: auto;
         }
+
+        /* Room booking row styles - matching driver request style */
+        .booking-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .booking-row:last-child { border-bottom: none; }
+        .booking-row-title { font-weight: 600; font-size: 13px; color: var(--ink); }
+        .recall-btn { padding: 2px 8px !important; font-size: 10px !important; }
+
+        /* Status badge styles */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
+        .status-badge.booked { background: #e6f7ec; color: #198754; }
+        .status-badge.completed { background: #eef0fd; color: #6610f2; }
+        .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
+        .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
+        .status-badge.active { background: #e6f7ec; color: #198754; }
+
+        /* Room grid styles */
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .room-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+            margin-bottom: 6px;
+        }
+        .room-item:hover {
+            background: #f8f9fb;
+            border-color: #e8ecf0;
+        }
+        .room-item .room-name { font-weight: 600; color: var(--ink); font-size: 14px; display: block; }
+        .room-item .room-type { font-size: 11px; color: #6c757d; display: block; }
+        .room-item .room-status { font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-top: 2px; }
+        .room-item .room-status.available { background: #e6f7ec; color: #198754; }
+        .room-item .room-status.occupied { background: #fdeeee; color: #dc3545; }
+
+        /* Panel styles */
+        .booking-panel {
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.25s ease;
+            border: 1px solid #eef0f3;
+        }
+        .booking-panel:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+        .booking-panel .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #eef0f3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: transparent;
+        }
+        .booking-panel .panel-header h6 {
+            font-weight: 700;
+            font-size: 14px;
+            margin: 0;
+            color: var(--ink);
+        }
+        .booking-panel .panel-header h6 i { color: var(--primary-color); margin-right: 8px; }
+        .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
+        .booking-panel .panel-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #eef0f3;
+            background: transparent;
+        }
+        .panel-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .quick-action-btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        .quick-action-btn:hover { transform: scale(1.02); }
+        .quick-action-btn.btn-primary { background: var(--primary-color); color: white; }
+        .quick-action-btn.btn-success { background: #198754; color: white; }
+
+        .empty-state-sm {
+            text-align: center;
+            padding: 30px 20px;
+            color: #adb5bd;
+        }
+        .empty-state-sm i { font-size: 24px; margin-bottom: 6px; display: block; }
+
+        /* View toggle group */
+        .view-toggle-group {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .view-toggle-group .view-toggle-btn {
+            padding: 6px 11px !important;
+            border-radius: 0 !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #6c757d !important;
+            background: white !important;
+            font-size: 12px !important;
+        }
+        .view-toggle-group .view-toggle-btn:hover { background: #f8f9fb !important; }
+        .view-toggle-group .view-toggle-btn.active {
+            background: var(--primary-color) !important;
+            border-color: var(--primary-color) !important;
+            color: white !important;
+        }
+
+        /* Room booking table styles - matching driver table */
+        .room-booking-table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+        .room-booking-table thead th {
+            background: #f8f9fb;
+            border-bottom: 1px solid #eef0f3;
+            color: #6c757d;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            white-space: nowrap;
+        }
+        .room-booking-table tbody td {
+            padding: 12px 14px;
+            vertical-align: middle;
+            font-size: 13px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .room-booking-table tbody tr:hover {
+            background: #f8f9fc;
+        }
+
+        .center-alert-overlay {
+            position: fixed; inset: 0; z-index: 1080;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.25s ease;
+            background: rgba(15, 23, 42, 0.15);
+        }
+        .center-alert-overlay.show { opacity: 1; visibility: visible; }
+        .center-alert-box {
+            width: 180px; height: 180px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 12px; padding: 20px; text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
+        .center-alert-icon { font-size: 42px; }
+        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
+        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
+        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .pagination-controls .page-btn {
+            width: 28px; height: 28px; border-radius: 8px;
+            border: 1px solid #e2e8f0; background: white;
+            color: var(--ink); font-size: 11px;
+            display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s ease;
+            padding: 0 !important;
+        }
+        .pagination-controls .page-btn:hover:not(:disabled) {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        .pagination-controls .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .pagination-controls .page-indicator {
+            font-size: 11.5px;
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        /* Modal styles */
+        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
+        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            padding: 10px 14px;
+            font-size: 14px;
+        }
+        .modal-body .form-control:focus, .modal-body .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(13,110,253,0.08);
+        }
+
+        .booking-tabs {
+            border-bottom: 2px solid #eef0f3;
+            gap: 6px;
+            margin-bottom: 22px;
+        }
+        .booking-tabs .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none !important;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 12px 20px !important;
+            font-weight: 700;
+            font-size: 14.5px;
+            color: #6c757d;
+            background: transparent;
+            position: relative;
+            top: 2px;
+        }
+        .booking-tabs .nav-link i { font-size: 15px; }
+        .booking-tabs .nav-link .badge { font-size: 10.5px; }
+        .booking-tabs .nav-link:hover { color: var(--ink); background: #f8f9fb; border: none; }
+        .booking-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: white;
+            border-bottom: 2px solid var(--primary-color) !important;
+            box-shadow: 0 -4px 14px rgba(0,0,0,0.04);
+        }
+        .booking-tab-content { width: 100%; }
+
+        .btn {
+            border-radius: 10px !important;
+            padding: 9px 20px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            border: none !important;
+        }
+        .btn-primary { background: var(--primary-color) !important; }
+        .btn-primary:hover { background: var(--primary-dark) !important; }
+        .btn-success { background: #198754 !important; }
+        .btn-success:hover { background: #157347 !important; }
+        .btn-warning { background: #fd7e14 !important; color: white !important; }
+        .btn-warning:hover { background: #e06b0f !important; color: white !important; }
+        .btn-danger { background: #dc3545 !important; }
+        .btn-danger:hover { background: #b02a37 !important; }
+        .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
+        .btn-secondary { background: #eef0f3 !important; color: var(--ink) !important; }
+        .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
+
+        .page-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .page-header-row h4 {
+            font-weight: 700;
+            font-size: 19px;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+        .page-header-row h4 i { color: var(--primary-color); }
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .content { padding: 28px 32px; width: 100%; }
+
+        .detail-item .label {
+            font-size: 10.5px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #9aa0a6;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .detail-item .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink);
+        }
     </style>
 </head>
 
@@ -263,7 +578,7 @@
             </div>
         </div>
 
-        <!-- ================= ROOMS TAB ================= -->
+        <!-- ================= ROOMS TAB - UPDATED WITH TABLE ================= -->
         <div class="tab-pane fade" id="rooms-pane" role="tabpanel" aria-labelledby="rooms-tab-btn">
             <div class="row g-4">
                 <div class="col-xl-4">
@@ -306,82 +621,94 @@
                         <div class="panel-header">
                             <h6><i class="fas fa-calendar-check"></i>My Room Bookings</h6>
                             <div class="panel-header-actions">
-                                <div class="btn-group btn-group-sm view-toggle-group" role="group">
-                                    <button type="button" id="roomViewListBtn" class="btn view-toggle-btn active" onclick="setRoomBookingsView('list')" title="List view">
-                                        <i class="fas fa-list"></i>
-                                    </button>
-                                    <button type="button" id="roomViewCalendarBtn" class="btn view-toggle-btn" onclick="setRoomBookingsView('calendar')" title="Calendar view">
-                                        <i class="fas fa-calendar-alt"></i>
-                                    </button>
-                                </div>
                                 <button class="btn btn-sm btn-success quick-action-btn" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
                                     <i class="fas fa-plus me-1"></i>Book
                                 </button>
                             </div>
                         </div>
                         <div class="panel-body">
-                            <div th:if="${roomBookings != null and !roomBookings.isEmpty()}" id="roomBookingsList">
-                                <div th:each="booking : ${roomBookings}" class="booking-row"
-                                     th:data-bookingid="${booking.bookingId}"
-                                     th:data-roomid="${booking.roomId}"
-                                     th:data-roomtype="${booking.roomType}">
-                                    <div>
-                                        <div class="booking-row-title" th:text="${booking.roomName}">Room</div>
-                                        <small class="text-muted"
-                                               th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</small>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="status-badge"
-                                              th:data-status="${booking.status}"
-                                              th:data-start="${#temporals.format(booking.startTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
-                                              th:data-end="${#temporals.format(booking.endTime, 'yyyy-MM-dd''T''HH:mm:ss')}"
-                                              th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
-                                                              (${booking.status} == 'BOOKED' ? 'booked' :
-                                                              (${booking.status} == 'ACTIVE' ? 'booked' :
-                                                              (${booking.status} == 'PENDING' ? 'pending' :
-                                                              (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
-                                              th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
-                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId == session.userId}">
-                                            <button class="btn btn-sm btn-warning mt-1 recall-btn"
-                                                    th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
-                                                <i class="fas fa-undo"></i> Recall
-                                            </button>
-                                        </div>
-                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
-                                            <button class="btn btn-sm btn-info mt-1 recall-btn"
-                                                    th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
-                                                <i class="fas fa-handshake"></i> Request
-                                            </button>
-                                        </div>
-                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
-                                            <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="mt-1">
-                                                <input type="hidden" name="infraComment" value="Signing out user">
-                                                <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                    <i class="fas fa-sign-out-alt me-1"></i>Sign Out
-                                                </button>
-                                            </form>
-                                        </div>
-                                        <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
-                                            <button class="btn btn-sm btn-danger mt-1 w-100"
-                                                    th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
-                                                <i class="fas fa-times me-1"></i>Cancel
-                                            </button>
-                                        </div>
-                                    </div>
+                            <div th:if="${roomBookings != null and !roomBookings.isEmpty()}">
+                                <div class="table-container">
+                                    <table class="room-booking-table">
+                                        <thead>
+                                        <tr>
+                                            <th>Room</th>
+                                            <th>Booked By</th>
+                                            <th>Date &amp; Time</th>
+                                            <th>Purpose</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="booking : ${roomBookings}">
+                                            <td>
+                                                <div class="fw-bold" th:text="${booking.roomName}">Room Name</div>
+                                                <small class="text-muted" th:text="${booking.roomType}">Room Type</small>
+                                            </td>
+                                            <td th:text="${booking.bookedBy}">Booked By</td>
+                                            <td>
+                                                <span th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">Start</span>
+                                                <span class="text-muted"> - </span>
+                                                <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">End</span>
+                                            </td>
+                                            <td>
+                                                <span th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</span>
+                                            </td>
+                                            <td>
+                                                <span class="status-badge"
+                                                      th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
+                                                                      (${booking.status} == 'BOOKED' ? 'booked' :
+                                                                      (${booking.status} == 'ACTIVE' ? 'booked' :
+                                                                      (${booking.status} == 'PENDING' ? 'pending' :
+                                                                      (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
+                                                      th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
+                                            </td>
+                                            <td>
+                                                <!-- Recall button for BOOKED/PENDING bookings by owner -->
+                                                <div th:if="${(booking.status == 'BOOKED' or booking.status == 'PENDING') and booking.userId == session.userId}">
+                                                    <button class="btn btn-sm btn-warning recall-btn"
+                                                            th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
+                                                        <i class="fas fa-undo"></i> Recall
+                                                    </button>
+                                                </div>
+
+                                                <!-- Request Slot button for BOOKED bookings by other users (non-server room) -->
+                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
+                                                    <button class="btn btn-sm btn-info recall-btn"
+                                                            th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
+                                                        <i class="fas fa-handshake"></i> Request
+                                                    </button>
+                                                </div>
+
+                                                <!-- Sign Out button for INFRA users on server rooms -->
+                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                                    <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post">
+                                                        <input type="hidden" name="infraComment" value="Signing out user">
+                                                        <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                            <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                                        </button>
+                                                    </form>
+                                                </div>
+
+                                                <!-- Admin Cancel button for INFRA users -->
+                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
+                                                    <button class="btn btn-sm btn-danger mt-1 w-100"
+                                                            th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
+                                                        <i class="fas fa-times me-1"></i>Cancel
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                            <div th:if="${roomBookings == null or roomBookings.isEmpty()}" id="roomBookingsEmpty" class="empty-state-sm">
+                            <div th:if="${roomBookings == null or roomBookings.isEmpty()}" class="empty-state-sm">
                                 <i class="fas fa-calendar-check"></i>
                                 No room bookings
                             </div>
                             <div class="pagination-controls" id="roomBookingsPagination"></div>
-                            <div id="roomBookingsCalendar" class="room-bookings-calendar" style="display: none;"></div>
-                            <div class="calendar-legend" id="roomBookingsLegend" style="display: none;">
-                                <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Booked</span>
-                                <span class="legend-item"><span class="legend-dot" style="background:#fd7e14;"></span>Pending</span>
-                                <span class="legend-item"><span class="legend-dot" style="background:#6610f2;"></span>Completed</span>
-                                <span class="legend-item"><span class="legend-dot" style="background:#dc3545;"></span>Cancelled</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -623,7 +950,6 @@
                             <input type="text" id="destinationInput" name="destination" class="form-control" required>
                         </div>
 
-                        <!-- ✅ NEW: Request Time field -->
                         <div class="mb-3">
                             <label for="requestTimeInput" class="form-label">Request Time *</label>
                             <input type="datetime-local" id="requestTimeInput" name="requestTime" class="form-control" required>
@@ -789,9 +1115,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- INFRASTRUCTURE REQUEST DETAILS MODAL (replaces page navigation) -->
-    <!-- ============================================================ -->
+    <!-- Infrastructure Request Details Modal -->
     <div class="modal fade" id="infraRequestDetailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -857,183 +1181,49 @@
 <!-- Styles -->
 <div layout:fragment="styles">
     <style>
-        .content { padding: 28px 32px; width: 100%; }
-        .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
-        .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
-        .page-header-row h4 i { color: var(--primary-color); }
-        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-        .btn { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; }
-        .btn-primary { background: var(--primary-color) !important; }
-        .btn-primary:hover { background: var(--primary-dark) !important; }
-        .btn-secondary { background: #eef0f3 !important; color: var(--ink) !important; }
-        .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
-        .btn-success { background: #198754 !important; }
-        .btn-warning { background: #fd7e14 !important; color: white !important; }
-        .btn-danger { background: #dc3545 !important; }
-        .btn-info { background: #0dcaf0 !important; color: white !important; }
-        .btn-outline-primary { background: transparent !important; border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; }
-        .btn-outline-primary:hover { background: var(--primary-color) !important; color: white !important; }
-        .btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
-        .btn:disabled { opacity: 0.65 !important; cursor: not-allowed !important; }
-        .booking-tabs { border-bottom: 2px solid #eef0f3; gap: 6px; margin-bottom: 22px; }
-        .booking-tabs .nav-link { display: flex; align-items: center; gap: 8px; border: none !important; border-radius: 10px 10px 0 0 !important; padding: 12px 20px !important; font-weight: 700; font-size: 14.5px; color: #6c757d; background: transparent; position: relative; top: 2px; }
-        .booking-tabs .nav-link i { font-size: 15px; }
-        .booking-tabs .nav-link .badge { font-size: 10.5px; }
-        .booking-tabs .nav-link:hover { color: var(--ink); background: #f8f9fb; border: none; }
-        .booking-tabs .nav-link.active { color: var(--primary-color); background: white; border-bottom: 2px solid var(--primary-color) !important; box-shadow: 0 -4px 14px rgba(0,0,0,0.04); }
-        .booking-tab-content { width: 100%; }
-        .booking-panel { background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; height: 100%; display: flex; flex-direction: column; transition: box-shadow 0.25s ease; border: 1px solid #eef0f3; }
-        .booking-panel:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-        .booking-panel .panel-header { padding: 16px 20px; border-bottom: 1px solid #eef0f3; display: flex; justify-content: space-between; align-items: center; background: transparent; }
-        .booking-panel .panel-header h6 { font-weight: 700; font-size: 14px; margin: 0; color: var(--ink); }
-        .booking-panel .panel-header h6 i { color: var(--primary-color); margin-right: 8px; }
-        .booking-panel .panel-body { padding: 16px 20px; flex: 1; }
-        .booking-panel .panel-footer { padding: 12px 20px; border-top: 1px solid #eef0f3; background: transparent; }
-        .panel-header-actions { display: flex; align-items: center; gap: 10px; }
-        .view-toggle-group { border-radius: 8px; overflow: hidden; }
-        .view-toggle-group .view-toggle-btn { padding: 6px 11px !important; border-radius: 0 !important; border: 1px solid #e2e8f0 !important; color: #6c757d !important; background: white !important; font-size: 12px !important; }
-        .view-toggle-group .view-toggle-btn:hover { background: #f8f9fb !important; }
-        .view-toggle-group .view-toggle-btn.active { background: var(--primary-color) !important; border-color: var(--primary-color) !important; color: white !important; }
-        .driver-grid, .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
-        .driver-item, .room-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; transition: all 0.2s ease; cursor: pointer; border: 1px solid transparent; margin-bottom: 6px; }
-        .driver-item:hover, .room-item:hover { background: #f8f9fb; border-color: #e8ecf0; }
-        .driver-item .driver-name, .room-item .room-name { font-weight: 600; color: var(--ink); font-size: 14px; display: block; }
-        .driver-item .driver-status, .room-item .room-status { font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-top: 2px; }
-        .driver-item .driver-status.available, .room-item .room-status.available { background: #e6f7ec; color: #198754; }
-        .driver-item .driver-status.busy { background: #fff4e0; color: #fd7e14; }
-        .room-item .room-status.occupied { background: #fdeeee; color: #dc3545; }
-        .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
-        .driver-item .booking-count { font-size: 12px; color: #6c757d; background: #f0f2f5; padding: 2px 10px; border-radius: 12px; }
-        .room-item .room-type { font-size: 11px; color: #6c757d; display: block; }
-        .booking-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #f0f2f5; }
-        .booking-row:last-child { border-bottom: none; }
-        .booking-row-title { font-weight: 600; font-size: 13px; color: var(--ink); }
-        .recall-btn { padding: 2px 8px !important; font-size: 10px !important; }
-        .empty-state-sm { text-align: center; padding: 30px 20px; color: #adb5bd; }
-        .empty-state-sm i { font-size: 24px; margin-bottom: 6px; display: block; }
-        .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 10px; }
-        .pagination-controls .page-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; color: var(--ink); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; padding: 0 !important; }
-        .pagination-controls .page-btn:hover:not(:disabled) { background: var(--primary-color); border-color: var(--primary-color); color: white; }
-        .pagination-controls .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .pagination-controls .page-indicator { font-size: 11.5px; color: #6c757d; font-weight: 600; }
-        .quick-action-btn { padding: 6px 14px; font-size: 12px; border-radius: 8px; font-weight: 600; border: none; transition: all 0.2s ease; }
-        .quick-action-btn:hover { transform: scale(1.02); }
-        .quick-action-btn.btn-primary { background: var(--primary-color); color: white; }
-        .quick-action-btn.btn-success { background: #198754; color: white; }
-        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
-        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
-        .status-badge.accepted, .status-badge.booked { background: #e6f7ec; color: #198754; }
-        .status-badge.rejected, .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
-        .status-badge.recalled { background: #eef0f3; color: #6c757d; }
-        .status-badge.completed { background: #eef0fd; color: #6610f2; }
-        .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
-        .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
-        .modal-footer { border-top: 1px solid rgba(0,0,0,0.06); padding: 16px 24px; }
-        .modal-title { font-weight: 700; font-size: 18px; }
-        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
-        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
-        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
-
-        /* Detail item styling used by the Infra Request Details modal */
-        .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; margin-bottom: 2px; }
-        .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
-
-        .center-alert-overlay {
-            position: fixed; inset: 0; z-index: 1080;
-            display: flex; align-items: center; justify-content: center;
-            pointer-events: none;
-            opacity: 0; visibility: hidden;
-            transition: opacity 0.25s ease;
-            background: rgba(15, 23, 42, 0.15);
-        }
-        .center-alert-overlay.show { opacity: 1; visibility: visible; }
-        .center-alert-box {
-            width: 180px; height: 180px;
-            background: white; border-radius: 20px;
-            box-shadow: 0 24px 60px rgba(15,23,42,0.25);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 12px; padding: 20px; text-align: center;
-            transform: scale(0.85);
-            transition: transform 0.25s ease;
-        }
-        .center-alert-overlay.show .center-alert-box { transform: scale(1); }
-        .center-alert-icon { font-size: 42px; }
-        .center-alert-box.center-alert-success .center-alert-icon { color: #198754; }
-        .center-alert-box.center-alert-error .center-alert-icon { color: #dc3545; }
-        .center-alert-message { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
-
-        /* SLA Status Styles */
-        .sla-status-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 700;
-            margin-left: 0px;
-        }
-        .sla-status-badge.sla-in-progress { background: #cfe2ff; color: #0d6efd; }
-        .sla-status-badge.sla-completed { background: #d4edda; color: #198754; }
-        .sla-status-badge.sla-breached { background: #fdeeee; color: #dc3545; }
-        .sla-status-badge.sla-escalated { background: #fff4e0; color: #fd7e14; }
-        .sla-status-badge.sla-na { background: #eef0f3; color: #6c757d; }
-        .sla-progress-mini {
-            width: 60px;
-            height: 6px;
-            background: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-            display: inline-block;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-        .sla-progress-mini .sla-progress-bar {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.5s ease;
-        }
-        .sla-progress-mini .sla-progress-bar.bg-danger { background: #dc3545; }
-        .sla-progress-mini .sla-progress-bar.bg-warning { background: #fd7e14; }
-        .sla-progress-mini .sla-progress-bar.bg-success { background: #198754; }
-
-        /* Table styles for My Requests */
-        .requests-table {
-            width: 100%;
-            margin-bottom: 0;
-        }
-        .requests-table thead th {
-            background: #f8f9fb;
-            border-bottom: 1px solid #eef0f3;
-            color: #6c757d;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 12px 14px;
-            white-space: nowrap;
-        }
-        .requests-table tbody td {
-            padding: 12px 14px;
-            vertical-align: middle;
-            font-size: 13px;
-            border-bottom: 1px solid #f5f6f8;
-        }
-        .requests-table tbody tr:hover {
-            background: #f8f9fc;
-        }
-        .requests-table .status-badge {
-            font-size: 10px;
-            padding: 3px 10px;
-        }
-        .table-container {
-            max-height: 500px;
+        /* Additional styles for driver grid */
+        .driver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 8px;
+            max-height: 420px;
             overflow-y: auto;
+            padding-right: 4px;
         }
+        .driver-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+            margin-bottom: 6px;
+        }
+        .driver-item:hover {
+            background: #f8f9fb;
+            border-color: #e8ecf0;
+        }
+        .driver-item .driver-name { font-weight: 600; color: var(--ink); font-size: 14px; display: block; }
+        .driver-item .driver-status { font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; display: inline-block; margin-top: 2px; }
+        .driver-item .driver-status.available { background: #e6f7ec; color: #198754; }
+        .driver-item .driver-status.busy { background: #fff4e0; color: #fd7e14; }
+        .driver-item .booking-count { font-size: 12px; color: #6c757d; background: #f0f2f5; padding: 2px 10px; border-radius: 12px; }
+
+        .status-badge.accepted { background: #e6f7ec; color: #198754; }
+        .status-badge.recalled { background: #eef0f3; color: #6c757d; }
+        .status-badge.rejected { background: #fdeeee; color: #dc3545; }
+        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
+        .status-badge.booked { background: #e6f7ec; color: #198754; }
+        .status-badge.completed { background: #eef0fd; color: #6610f2; }
+        .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
+        .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
     </style>
 </div>
 
 <!-- Scripts -->
 <div layout:fragment="scripts">
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script th:inline="none">
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
         const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
@@ -1188,7 +1378,7 @@
             const requestTimeInput = document.getElementById('requestTimeInput');
             if (requestTimeInput) {
                 const now = new Date();
-                now.setHours(now.getHours() + 1); // Add 1 hour
+                now.setHours(now.getHours() + 1);
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const day = String(now.getDate()).padStart(2, '0');
@@ -1197,7 +1387,6 @@
                 const dateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
                 requestTimeInput.value = dateTimeString;
 
-                // Set min and max attributes
                 const minDate = new Date();
                 minDate.setHours(minDate.getHours() + 1);
                 const minYear = minDate.getFullYear();
@@ -1214,70 +1403,17 @@
                 const maxDay = String(maxDate.getDate()).padStart(2, '0');
                 requestTimeInput.max = `${maxYear}-${maxMonth}-${maxDay}T23:59`;
             }
-        });
 
-        // ============================================
-        // Room Calendar
-        // ============================================
-        let roomCalendar = null;
-        function statusColor(status) {
-            if (status === 'PENDING') return '#fd7e14';
-            if (status === 'CANCELLED') return '#dc3545';
-            if (status === 'CONFIRMED') return '#6610f2';
-            return '#198754';
-        }
-        function buildRoomBookingEvents() {
-            const rows = document.querySelectorAll('#roomBookingsList > .booking-row');
-            const events = [];
-            rows.forEach(function (row) {
-                const badge = row.querySelector('.status-badge[data-status]');
-                if (!badge || !badge.dataset.start || !badge.dataset.end) return;
-                const status = badge.dataset.status;
-                const roomName = row.querySelector('.booking-row-title')?.textContent?.trim() || 'Room';
-                events.push({
-                    title: roomName,
-                    start: badge.dataset.start,
-                    end: badge.dataset.end,
-                    backgroundColor: statusColor(status),
-                    borderColor: statusColor(status),
-                    extendedProps: { roomId: row.dataset.roomid, roomName: roomName, roomType: row.dataset.roomtype }
-                });
-            });
-            return events;
-        }
-        function initRoomCalendar() {
-            const calendarEl = document.getElementById('roomBookingsCalendar');
-            if (!calendarEl || roomCalendar || typeof FullCalendar === 'undefined') return;
-            roomCalendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth' },
-                height: 'auto',
-                events: buildRoomBookingEvents(),
-                eventClick: function (info) {
-                    const props = info.event.extendedProps;
-                    if (props.roomId) { viewRoomDetails(props.roomId, props.roomName, props.roomType); }
+            // Paginate room bookings if they exist
+            const roomBookingsList = document.getElementById('roomBookingsList');
+            const roomPagination = document.getElementById('roomBookingsPagination');
+            if (roomBookingsList && roomPagination) {
+                const rows = roomBookingsList.querySelectorAll('.booking-row');
+                if (rows.length > 8) {
+                    paginateList('roomBookingsList', 'roomBookingsPagination', 8);
                 }
-            });
-            roomCalendar.render();
-        }
-        function setRoomBookingsView(view) {
-            const listEl = document.getElementById('roomBookingsList');
-            const paginationEl = document.getElementById('roomBookingsPagination');
-            const emptyEl = document.getElementById('roomBookingsEmpty');
-            const calendarEl = document.getElementById('roomBookingsCalendar');
-            const legendEl = document.getElementById('roomBookingsLegend');
-            const listBtn = document.getElementById('roomViewListBtn');
-            const calBtn = document.getElementById('roomViewCalendarBtn');
-            const showCalendar = view === 'calendar';
-            if (listEl) listEl.style.display = showCalendar ? 'none' : '';
-            if (paginationEl) paginationEl.style.display = showCalendar ? 'none' : '';
-            if (emptyEl) emptyEl.style.display = showCalendar ? 'none' : '';
-            if (calendarEl) calendarEl.style.display = showCalendar ? 'block' : 'none';
-            if (legendEl) legendEl.style.display = showCalendar ? 'flex' : 'none';
-            listBtn?.classList.toggle('active', !showCalendar);
-            calBtn?.classList.toggle('active', showCalendar);
-            if (showCalendar) { initRoomCalendar(); roomCalendar?.updateSize(); }
-        }
+            }
+        });
 
         // ============================================
         // View Functions
@@ -1354,7 +1490,7 @@
         }
 
         // ============================================
-        // Infrastructure Request Details (modal, no navigation)
+        // Infrastructure Request Details
         // ============================================
         function viewInfraRequest(button) {
             const id = button.getAttribute('data-requestid');
@@ -1481,9 +1617,6 @@
             });
         }
 
-        // ============================================
-        // COMPLETE DRIVER TRIP
-        // ============================================
         function completeDriverTrip(requestId, driverId) {
             showConfirm('Mark this trip as completed? The requester will be notified to rate the driver.', function () {
                 const formData = new FormData();
@@ -1505,9 +1638,6 @@
             });
         }
 
-        // ============================================
-        // SERVER ROOM APPROVAL FUNCTIONS
-        // ============================================
         function approveServerRoom(bookingId) {
             showConfirm('Approve this server room booking?', function () {
                 const formData = new FormData();
@@ -1563,9 +1693,6 @@
             document.querySelectorAll('.room-item').forEach(function (el) {
                 el.addEventListener('click', function () { viewRoomDetails(el.dataset.roomid, el.dataset.roomname, el.dataset.roomtype); });
             });
-            paginateList('driverRequestsList', 'driverRequestsPagination', 8);
-            paginateList('roomBookingsList', 'roomBookingsPagination', 8);
-            document.getElementById('rooms-tab-btn')?.addEventListener('shown.bs.tab', function () { roomCalendar?.updateSize(); });
         });
     </script>
 
