@@ -31,7 +31,7 @@ public class BookingService {
     private final AuditService auditService;
     private final AppUserService appUserService;
     private final NotificationRepository notificationRepository;
-    private final BaseUrlService baseUrlService;  // ✅ ADDED
+    private final BaseUrlService baseUrlService;
 
     private static final int MAX_BOOKING_DAYS = 7;
 
@@ -83,6 +83,11 @@ public class BookingService {
         booking.setPurpose(dto.getPurpose());
         booking.setCreatedAt(LocalDateTime.now());
 
+        // ✅ FIXED: Set roomType and roomName on the booking
+        booking.setRoomType(room.getRoomType());
+        booking.setRoomName(room.getRoomName());
+        log.info("Setting booking roomType: {}, roomName: {}", room.getRoomType(), room.getRoomName());
+
         if (isServerRoom) {
             booking.setStatus(BookingStatus.PENDING);
             log.info("Server room booking requires infrastructure approval");
@@ -92,7 +97,8 @@ public class BookingService {
         }
 
         Booking saved = bookingRepository.save(booking);
-        log.info("✅ Booking saved with ID: {}, Status: {}", saved.getBookingId(), saved.getStatus());
+        log.info("✅ Booking saved with ID: {}, Status: {}, roomType: {}",
+                saved.getBookingId(), saved.getStatus(), saved.getRoomType());
 
         if (isServerRoom) {
             notifyInfrastructureTeam(saved, room);
@@ -206,7 +212,7 @@ public class BookingService {
                 "SERVER_ROOM_APPROVED",
                 "Server Room Approved",
                 "Your server room booking for " + roomName + " has been approved.",
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("SERVER_ROOM_APPROVED",
@@ -253,7 +259,7 @@ public class BookingService {
                 "SERVER_ROOM_DECLINED",
                 "Server Room Declined",
                 "Your server room booking for " + roomName + " has been declined. Reason: " + reason,
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("SERVER_ROOM_DECLINED",
@@ -285,7 +291,6 @@ public class BookingService {
                 (infraComment != null ? " | Comment: " + infraComment : ""));
         bookingRepository.save(booking);
 
-        // ✅ DYNAMIC URL
         String signOutLink = baseUrlService.buildUrl("/bookings/server-room/sign-out?token=%s", token);
 
         String requesterEmail = getEmailForUser(booking.getUserId());
@@ -377,7 +382,6 @@ public class BookingService {
                 dto.setBookedByUsername(user.getUsername());
             });
 
-            // Check if booking is currently active (IN USE)
             boolean isCurrentlyActive = booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now);
             dto.setCurrentlyActive(isCurrentlyActive);
             dto.setActive(true);
@@ -401,7 +405,6 @@ public class BookingService {
             throw new IllegalStateException("This slot is not available for request.");
         }
 
-        // Don't allow requesting if the booking is currently active
         LocalDateTime now = LocalDateTime.now();
         if (booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now)) {
             throw new IllegalStateException("Cannot request a slot that is currently in use.");
@@ -427,7 +430,6 @@ public class BookingService {
         booking.setSlotRequestStatus("PENDING");
         bookingRepository.save(booking);
 
-        // ✅ DYNAMIC URL
         String responseLink = baseUrlService.buildUrl("/bookings/slot-request/%s/respond?requesterId=%s", bookingId, requesterId);
 
         String currentBookerEmail = getEmailForUser(booking.getUserId());
@@ -455,7 +457,7 @@ public class BookingService {
                 "SLOT_REQUEST_SENT",
                 "Slot Request Sent",
                 "You have requested to use " + roomName + " from " + timeSlot + ". Waiting for approval.",
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
         auditService.logAction("SLOT_REQUESTED",
@@ -476,7 +478,6 @@ public class BookingService {
 
         String requesterName = booking.getSlotRequestUserName();
 
-        // Transfer the booking to the requester
         booking.setUserId(requesterId);
         booking.setSlotRequestUserId(null);
         booking.setSlotRequestUserName(null);
@@ -544,7 +545,6 @@ public class BookingService {
         booking.setNotes("Cancelled by admin: " + adminId + " at " + LocalDateTime.now());
         bookingRepository.save(booking);
 
-        // Notify the original booker
         String userEmail = getEmailForUser(booking.getUserId());
         Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
         String roomName = room != null ? room.getRoomName() : "Room #" + booking.getRoomId();
@@ -613,7 +613,6 @@ public class BookingService {
             dto.setPurpose(booking.getPurpose());
             dto.setUserId(booking.getUserId());
 
-            // Check if currently active
             boolean isCurrentlyActive = booking.getStartTime().isBefore(now) && booking.getEndTime().isAfter(now);
             dto.setCurrentlyActive(isCurrentlyActive);
             dto.setActive(true);
@@ -694,16 +693,13 @@ public class BookingService {
 
     private void notifyInfrastructureTeam(Booking booking, Room room) {
         String roomName = room != null ? room.getRoomName() : "Server Room";
-        // ✅ DYNAMIC URL
         String approvalLink = baseUrlService.buildUrl("/bookings/server-room/%s/respond", booking.getBookingId());
 
-        // Try multiple role names
         List<com.stevecodes.AssetIQPro.entity.AppUser> infraUsers = new ArrayList<>();
         infraUsers.addAll(appUserService.getUsersByRole("INFRASTRUCTURE"));
         infraUsers.addAll(appUserService.getUsersByRole("INFRA"));
         infraUsers.addAll(appUserService.getUsersByRole("ADMIN"));
 
-        // Remove duplicates
         infraUsers = infraUsers.stream()
                 .distinct()
                 .collect(Collectors.toList());
@@ -791,7 +787,7 @@ public class BookingService {
                 "ROOM_BOOKING_CONFIRMED",
                 "Room Booking Confirmed",
                 "Your booking for " + roomName + " has been confirmed.",
-                baseUrlService.buildUrl("/bookings/bookings-dashboard")  // ✅ DYNAMIC
+                baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
     }
 
@@ -818,16 +814,21 @@ public class BookingService {
         dto.setCreatedAt(booking.getCreatedAt());
         dto.setPurpose(booking.getPurpose());
         dto.setNotes(booking.getNotes());
-
-        // Add server room comment fields to DTO
         dto.setInfraComment(booking.getInfraComment());
         dto.setRequesterComment(booking.getRequesterComment());
 
-        roomRepository.findById(booking.getRoomId())
-                .ifPresent(room -> {
-                    dto.setRoomName(room.getRoomName());
-                    dto.setRoomType(room.getRoomType());
-                });
+        // Set roomName and roomType from the booking entity (which should now be populated)
+        dto.setRoomName(booking.getRoomName());
+        dto.setRoomType(booking.getRoomType());
+
+        // Fallback to room repository if not set
+        if (dto.getRoomName() == null || dto.getRoomType() == null) {
+            roomRepository.findById(booking.getRoomId())
+                    .ifPresent(room -> {
+                        if (dto.getRoomName() == null) dto.setRoomName(room.getRoomName());
+                        if (dto.getRoomType() == null) dto.setRoomType(room.getRoomType());
+                    });
+        }
 
         return dto;
     }

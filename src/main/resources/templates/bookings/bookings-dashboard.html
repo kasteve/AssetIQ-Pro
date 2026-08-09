@@ -388,6 +388,44 @@
             font-weight: 600;
             color: var(--ink);
         }
+
+        /* Toast notification stack (top-right) */
+        .toast-stack {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1090;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 320px;
+            max-width: calc(100vw - 40px);
+        }
+        .app-toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(15,23,42,0.18);
+            padding: 14px 16px;
+            border-left: 4px solid #6c757d;
+            opacity: 0;
+            transform: translateX(30px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .app-toast.show { opacity: 1; transform: translateX(0); }
+        .app-toast.app-toast-success { border-left-color: #198754; }
+        .app-toast.app-toast-error { border-left-color: #dc3545; }
+        .app-toast .app-toast-icon { font-size: 18px; margin-top: 1px; }
+        .app-toast.app-toast-success .app-toast-icon { color: #198754; }
+        .app-toast.app-toast-error .app-toast-icon { color: #dc3545; }
+        .app-toast .app-toast-message { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.4; flex: 1; }
+        .app-toast .app-toast-close {
+            background: none; border: none; color: #adb5bd; font-size: 14px;
+            cursor: pointer; padding: 0; line-height: 1;
+        }
+        .app-toast .app-toast-close:hover { color: #6c757d; }
     </style>
 </head>
 
@@ -401,6 +439,9 @@
             <div class="center-alert-message" id="centerAlertMessage"></div>
         </div>
     </div>
+
+    <!-- ===== TOAST STACK (top-right, non-blocking notices) ===== -->
+    <div id="toastStack" class="toast-stack"></div>
 
     <div class="page-header-row">
         <h4><i class="fas fa-list me-2"></i>My Requests</h4>
@@ -434,7 +475,7 @@
         </li>
         <!-- Pending Approvals Tab -->
         <li class="nav-item" role="presentation"
-            th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or isDriver or isInfra}">
+            th:if="${session.role == 'DRIVER' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or isDriver or isInfra}">
             <button class="nav-link" id="approvals-tab-btn" data-bs-toggle="tab"
                     data-bs-target="#approvals-pane" type="button" role="tab"
                     aria-controls="approvals-pane" aria-selected="false">
@@ -681,8 +722,8 @@
                                                     </button>
                                                 </div>
 
-                                                <!-- Sign Out button for INFRA users on server rooms -->
-                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                                <!-- Sign Out button for INFRA and ADMIN users on server rooms -->
+                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
                                                     <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post">
                                                         <input type="hidden" name="infraComment" value="Signing out user">
                                                         <button type="submit" class="btn btn-sm btn-primary w-100">
@@ -840,15 +881,22 @@
                                         <td><span class="status-badge pending">PENDING</span></td>
                                         <td th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</td>
                                         <td>
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-success"
-                                                        th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
-                                                    <i class="fas fa-check"></i> Approve
-                                                </button>
-                                                <button class="btn btn-sm btn-danger"
-                                                        th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
-                                                    <i class="fas fa-times"></i> Decline
-                                                </button>
+                                            <!-- INFRA or ADMIN can approve/decline -->
+                                            <div th:if="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}">
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-sm btn-success"
+                                                            th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
+                                                        <i class="fas fa-check"></i> Approve
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger"
+                                                            th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
+                                                        <i class="fas fa-times"></i> Decline
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <!-- Show message for non-INFRA/ADMIN users -->
+                                            <div th:unless="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}">
+                                                <span class="text-muted small">Waiting for infrastructure approval</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -860,7 +908,7 @@
                 </div>
 
                 <!-- Infrastructure Requests Pending Approval -->
-                <div class="col-12" th:if="${pendingInfraRequests != null and !pendingInfraRequests.isEmpty()}">
+                <!-- <div class="col-12" th:if="${pendingInfraRequests != null and !pendingInfraRequests.isEmpty()}">
                     <div class="booking-panel">
                         <div class="panel-header">
                             <h6><i class="fas fa-tools me-2"></i>Infrastructure Requests Pending Your Approval</h6>
@@ -907,7 +955,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Empty State -->
                 <div class="col-12"
@@ -1115,6 +1163,28 @@
         </div>
     </div>
 
+    <!-- Decline Reason Modal (replaces native window.prompt) -->
+    <div class="modal fade" id="declineReasonModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-times-circle me-2" style="color: #dc3545;"></i>Decline Booking</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="declineReasonInput" class="form-label">Reason for declining</label>
+                    <textarea id="declineReasonInput" class="form-control" rows="3" placeholder="Let the requester know why this is being declined..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="declineReasonConfirmBtn">
+                        <i class="fas fa-times me-1"></i>Decline
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Infrastructure Request Details Modal -->
     <div class="modal fade" id="infraRequestDetailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -1259,6 +1329,35 @@
         }
 
         // ============================================
+        // Corner Toast Stack (non-blocking notices)
+        // ============================================
+        function showCornerToast(message, type, durationMs) {
+            type = type || 'success';
+            durationMs = durationMs || 3500;
+            const stack = document.getElementById('toastStack');
+            if (!stack) return;
+
+            const toastEl = document.createElement('div');
+            toastEl.className = 'app-toast app-toast-' + (type === 'success' ? 'success' : 'error');
+            toastEl.innerHTML =
+                '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle') + ' app-toast-icon"></i>' +
+                '<div class="app-toast-message"></div>' +
+                '<button type="button" class="app-toast-close" aria-label="Dismiss"><i class="fas fa-times"></i></button>';
+            toastEl.querySelector('.app-toast-message').textContent = message;
+
+            stack.appendChild(toastEl);
+            requestAnimationFrame(function () { toastEl.classList.add('show'); });
+
+            function dismiss() {
+                toastEl.classList.remove('show');
+                setTimeout(function () { toastEl.remove(); }, 250);
+            }
+
+            toastEl.querySelector('.app-toast-close').addEventListener('click', dismiss);
+            setTimeout(dismiss, durationMs);
+        }
+
+        // ============================================
         // Confirm Modal
         // ============================================
         function showConfirm(message, onConfirm) {
@@ -1283,6 +1382,46 @@
                 });
             });
             modal.show();
+        }
+
+        // ============================================
+        // Decline Reason Modal (replaces window.prompt)
+        // ============================================
+        function showReasonPrompt(options, onSubmit) {
+            options = options || {};
+            const modalEl = document.getElementById('declineReasonModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const titleEl = modalEl.querySelector('.modal-title');
+            const labelEl = modalEl.querySelector('label[for="declineReasonInput"]');
+            const inputEl = document.getElementById('declineReasonInput');
+
+            if (options.title) titleEl.innerHTML = '<i class="fas fa-times-circle me-2" style="color: #dc3545;"></i>' + options.title;
+            if (options.label) labelEl.textContent = options.label;
+            inputEl.value = '';
+            inputEl.placeholder = options.placeholder || 'Let the requester know why this is being declined...';
+
+            const oldBtn = document.getElementById('declineReasonConfirmBtn');
+            const newBtn = oldBtn.cloneNode(true);
+            oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+            if (options.confirmLabel) newBtn.innerHTML = '<i class="fas fa-times me-1"></i>' + options.confirmLabel;
+
+            newBtn.addEventListener('click', function () {
+                if (newBtn.disabled) return;
+                const reason = inputEl.value.trim() || 'No reason provided';
+                newBtn.disabled = true;
+                const originalHtml = newBtn.innerHTML;
+                newBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Please wait...';
+                modal.hide();
+                onSubmit(reason);
+                modalEl.addEventListener('hidden.bs.modal', function restore() {
+                    newBtn.disabled = false;
+                    newBtn.innerHTML = originalHtml;
+                    modalEl.removeEventListener('hidden.bs.modal', restore);
+                });
+            });
+
+            modal.show();
+            setTimeout(function () { inputEl.focus(); }, 300);
         }
 
         // ============================================
@@ -1661,25 +1800,28 @@
 
         function declineServerRoom(bookingId) {
             showConfirm('Decline this server room booking?', function () {
-                const reason = prompt('Please provide a reason for declining:');
-                if (reason === null) return;
+                showReasonPrompt({
+                    title: 'Decline Server Room Booking',
+                    label: 'Reason for declining',
+                    confirmLabel: 'Decline Booking'
+                }, function (reason) {
+                    const formData = new FormData();
+                    formData.append('declinedReason', reason);
 
-                const formData = new FormData();
-                formData.append('declinedReason', reason || 'No reason provided');
-
-                fetch('/assetIQ-pro/bookings/server-room/' + bookingId + '/decline', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showToast('Server room booking declined successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
-                    } else {
-                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
-                    }
-                })
-                .catch(error => showToast('Error: ' + error.message, 'error'));
+                    fetch('/assetIQ-pro/bookings/server-room/' + bookingId + '/decline', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            showCornerToast('Server room booking declined successfully!', 'success');
+                            setTimeout(() => window.location.reload(), 900);
+                        } else {
+                            return response.text().then(text => { showCornerToast('Error: ' + text, 'error'); });
+                        }
+                    })
+                    .catch(error => showCornerToast('Error: ' + error.message, 'error'));
+                });
             });
         }
 
