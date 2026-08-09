@@ -124,13 +124,18 @@ public class BookingService {
                 continue;
             }
 
+            // ✅ SKIP CONFIRMED (signed out) bookings - they don't occupy the room
+            if (booking.getStatus() == BookingStatus.CONFIRMED) {
+                log.info("Skipping CONFIRMED booking {} - room is signed out", booking.getBookingId());
+                continue;
+            }
+
             if (booking.getStatus() == BookingStatus.PENDING) {
                 log.info("Skipping PENDING booking {} - does not block availability", booking.getBookingId());
                 continue;
             }
 
             if (booking.getStatus() == BookingStatus.BOOKED ||
-                    booking.getStatus() == BookingStatus.CONFIRMED ||
                     booking.getStatus() == BookingStatus.ACTIVE) {
 
                 boolean overlaps = !endTime.isBefore(booking.getStartTime()) &&
@@ -817,7 +822,7 @@ public class BookingService {
         dto.setInfraComment(booking.getInfraComment());
         dto.setRequesterComment(booking.getRequesterComment());
 
-        // Set roomName and roomType from the booking entity (which should now be populated)
+        // Set roomName and roomType from the booking entity
         dto.setRoomName(booking.getRoomName());
         dto.setRoomType(booking.getRoomType());
 

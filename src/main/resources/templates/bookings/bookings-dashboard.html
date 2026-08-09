@@ -1440,7 +1440,7 @@
         }
 
         // ============================================
-        // AJAX Form Submission
+        // AJAX Form Submission - FIXED for JSON responses
         // ============================================
         document.addEventListener('submit', function (e) {
             const form = e.target;
@@ -1462,24 +1462,33 @@
 
             fetch(form.getAttribute('action'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
+                },
                 body: params.toString()
             })
             .then(function (response) {
-                if (response.ok || response.redirected) {
-                    showToast('Request submitted successfully!', 'success');
-                    const modalEl = form.closest('.modal');
-                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-                    setTimeout(function () { window.location.reload(); }, 900);
-                } else {
-                    return response.text().then(function (text) {
-                        showToast('Failed to submit: ' + (text || response.statusText), 'error');
+                // ✅ Parse response as JSON
+                return response.json().then(function (data) {
+                    if (response.ok) {
+                        // Success
+                        const message = data.message || 'Request submitted successfully!';
+                        showToast(message, 'success');
+                        const modalEl = form.closest('.modal');
+                        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                        setTimeout(function () { window.location.reload(); }, 900);
                         unlockSubmitButton(btn);
-                    });
-                }
+                    } else {
+                        // Error - show error message from JSON response
+                        const errorMsg = data.error || 'An error occurred. Please try again.';
+                        showCornerToast(errorMsg, 'error', 6000);
+                        unlockSubmitButton(btn);
+                    }
+                });
             })
             .catch(function (err) {
-                showToast('Error: ' + err.message, 'error');
+                showCornerToast('Error: ' + err.message, 'error', 6000);
                 unlockSubmitButton(btn);
             });
         }, true);
@@ -1838,15 +1847,15 @@
         });
     </script>
 
-    <!-- Flash Messages -->
+    <!-- Flash Messages - using corner toast for better visibility -->
     <script th:if="${success != null}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {
-            showToast(/*[[${success}]]*/ 'Success', 'success');
+            showCornerToast(/*[[${success}]]*/ 'Success', 'success', 4500);
         });
     </script>
     <script th:if="${error != null}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {
-            showToast(/*[[${error}]]*/ 'Error', 'error');
+            showCornerToast(/*[[${error}]]*/ 'Error', 'error', 6000);
         });
     </script>
 </div>

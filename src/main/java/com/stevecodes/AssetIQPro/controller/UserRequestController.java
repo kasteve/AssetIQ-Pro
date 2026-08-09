@@ -19,6 +19,8 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -30,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -92,8 +95,9 @@ public class UserRequestController {
         model.addAttribute("allRooms", allRooms);
 
         LocalDateTime now = LocalDateTime.now();
+        // ✅ FIXED: Exclude CONFIRMED (signed out) from occupied rooms
         Set<Long> occupiedRoomIds = bookingRepository.findActiveBookingsAtTime(now,
-                        List.of(Booking.BookingStatus.BOOKED, Booking.BookingStatus.ACTIVE, Booking.BookingStatus.CONFIRMED))
+                        List.of(Booking.BookingStatus.BOOKED, Booking.BookingStatus.ACTIVE))
                 .stream()
                 .map(Booking::getRoomId)
                 .collect(Collectors.toSet());
@@ -263,15 +267,12 @@ public class UserRequestController {
         log.info("Viewing driver details for: {}", driverId);
         AppUser driver = userService.getUserById(driverId).orElse(null);
 
-        // ✅ Get ALL bookings for this driver and convert to DTOs
         List<DriverRequest> allBookings = driverService.getDriverBookingsLast7Days(driverId);
 
-        // ✅ Convert to DTOs
         List<DriverRequestDTO> allBookingDTOs = allBookings.stream()
                 .map(driverService::convertToDTO)
                 .collect(Collectors.toList());
 
-        // ✅ Separate by status using DTOs
         List<DriverRequestDTO> pendingBookings = allBookingDTOs.stream()
                 .filter(b -> "PENDING".equals(b.getStatus()))
                 .collect(Collectors.toList());
@@ -315,7 +316,6 @@ public class UserRequestController {
                 return "redirect:/login";
             }
 
-            // If no request time provided, use current time + 1 hour
             if (requestTime == null) {
                 requestTime = LocalDateTime.now().plusHours(1);
             }
@@ -470,20 +470,20 @@ public class UserRequestController {
 
     @PostMapping("/room")
     @PreAuthorize("hasAnyAuthority('ROOM_BOOK', 'ADMIN', 'SUPER_ADMIN')")
-    public String createRoomBooking(
+    @ResponseBody
+    public ResponseEntity<?> createRoomBooking(
             @RequestParam Long userId,
             @RequestParam Long roomId,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime startTime,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime endTime,
             @RequestParam(required = false) String purpose,
-            HttpSession session,
-            RedirectAttributes redirectAttributes) {
+            HttpSession session) {
 
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("========================================");
@@ -497,35 +497,35 @@ public class UserRequestController {
 
             if (endTime.isBefore(startTime) || endTime.equals(startTime)) {
                 log.error("❌ End time must be after start time");
-                redirectAttributes.addFlashAttribute("error", "End time must be after start time.");
-                return "redirect:/bookings/bookings-dashboard";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "End time must be after start time."));
             }
 
             LocalDateTime now = LocalDateTime.now();
             if (startTime.isBefore(now)) {
                 log.error("❌ Start time must be in the future. startTime: {}, now: {}", startTime, now);
-                redirectAttributes.addFlashAttribute("error", "Start time must be in the future.");
-                return "redirect:/bookings/bookings-dashboard";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Start time must be in the future."));
             }
 
             LocalDateTime maxDate = now.plusDays(7);
             if (startTime.isAfter(maxDate)) {
-                redirectAttributes.addFlashAttribute("error", "Bookings are only allowed within 7 days from today. Please select a date within the next 7 days.");
-                return "redirect:/bookings/bookings-dashboard";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Bookings are only allowed within 7 days from today. Please select a date within the next 7 days."));
             }
 
             Room room = roomRepository.findById(roomId).orElse(null);
             if (room == null) {
                 log.error("❌ Room not found: {}", roomId);
-                redirectAttributes.addFlashAttribute("error", "Room not found.");
-                return "redirect:/bookings/bookings-dashboard";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Room not found."));
             }
             log.info("✅ Room found: {}, Type: {}", room.getRoomName(), room.getRoomType());
 
             if (room.getStatus() != Room.RoomStatus.AVAILABLE) {
                 log.error("❌ Room is not available. Status: {}", room.getStatus());
-                redirectAttributes.addFlashAttribute("error", "Room is not available for booking.");
-                return "redirect:/bookings/bookings-dashboard";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Room is not available for booking."));
             }
 
             BookingDTO dto = new BookingDTO();
@@ -539,18 +539,25 @@ public class UserRequestController {
             BookingDTO result = bookingService.createRoomBooking(dto);
             log.info("✅ Booking created successfully with ID: {}", result.getBookingId());
 
-            redirectAttributes.addFlashAttribute("success", "Room booked successfully! Check your email for confirmation.");
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Room booked successfully! Check your email for confirmation.",
+                    "bookingId", result.getBookingId()
+            ));
 
         } catch (IllegalStateException e) {
-            log.error("❌ Booking validation error: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            String errorMessage = e.getMessage();
+            log.error("❌ Booking validation error: {}", errorMessage);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", errorMessage));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to book rooms.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to book rooms."));
         } catch (Exception e) {
             log.error("❌ Error booking room: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to book room: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to book room: " + e.getMessage()));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/room/{bookingId}/recall")
