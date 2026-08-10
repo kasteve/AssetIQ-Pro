@@ -1984,26 +1984,31 @@
         }
 
         // ============================================
-        // Cab (External Driver) Approval Functions
+        // Cab (External Driver) Approval Functions - FIXED
         // ============================================
 
         function approveCabRequest(requestId) {
             showConfirm('Approve this cab request? An external cab will be arranged for the requester.', function () {
-                // For cab requests, we use driverId = -1
-                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/accept?driverId=-1', {
-                    method: 'POST'
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showToast('Cab request approved successfully! The requester has been notified.', 'success');
-                        setTimeout(() => window.location.reload(), 1200);
-                    } else {
-                        return response.text().then(text => {
-                            showToast('Failed to approve cab request: ' + text, 'error');
-                        });
+                // ✅ CORRECT: Use the approve-cab endpoint
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/approve-cab', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
                     }
                 })
-                .catch(error => showToast('Error: ' + error.message, 'error'));
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        if (response.ok) {
+                            showToast('Cab request approved successfully! The requester has been notified.', 'success');
+                            setTimeout(function() { window.location.reload(); }, 1200);
+                        } else {
+                            showToast('Failed to approve cab request: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                    });
+                })
+                .catch(function(error) {
+                    showToast('Error: ' + error.message, 'error');
+                });
             });
         }
 
@@ -2014,25 +2019,31 @@
                 placeholder: 'Please provide a reason for rejecting this cab request...',
                 confirmLabel: 'Reject Request'
             }, function (reason) {
+                // ✅ CORRECT: Use the approve-cab endpoint for rejection too
+                // Or create a separate endpoint if needed
                 const formData = new FormData();
-                formData.append('driverId', '-1');
                 formData.append('reason', reason);
 
-                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline', {
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline-cab', {
                     method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showToast('Cab request rejected successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 1200);
-                    } else {
-                        return response.text().then(text => {
-                            showToast('Failed to reject cab request: ' + text, 'error');
-                        });
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
                     }
                 })
-                .catch(error => showToast('Error: ' + error.message, 'error'));
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        if (response.ok) {
+                            showToast('Cab request rejected successfully!', 'success');
+                            setTimeout(function() { window.location.reload(); }, 1200);
+                        } else {
+                            showToast('Failed to reject cab request: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                    });
+                })
+                .catch(function(error) {
+                    showToast('Error: ' + error.message, 'error');
+                });
             });
         }
 
