@@ -32,7 +32,7 @@ public class ResourceRequestService {
     private final AppUserService appUserService;
     private final PdfGenerationService pdfGenerationService;
     private final BaseUrlService baseUrlService;
-    private final SLAService slaService;  // ✅ ADDED
+    private final SLAService slaService;
 
     private static final String REPORT_DIR = "uploads/resources/reports/";
 
@@ -50,7 +50,7 @@ public class ResourceRequestService {
 
     public List<ResourceRequestDTO> getResourceRequestsByUserId(Long userId) {
         log.info("Getting resource requests for user: {}", userId);
-        return resourceRequestRepository.findByUserId(userId)
+        return resourceRequestRepository.findByUserIdOrderByRequestTimeDesc(userId)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -682,9 +682,7 @@ public class ResourceRequestService {
                     .ifPresent(item -> dto.setCurrentStockQuantity(item.getQuantity()));
         }
 
-        // ============================================
         // ✅ ADD SLA TRACKING DATA
-        // ============================================
         try {
             RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "RESOURCE_REQUEST");
             if (slaTracking != null) {

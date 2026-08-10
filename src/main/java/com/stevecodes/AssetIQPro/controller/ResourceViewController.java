@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
@@ -74,37 +75,53 @@ public class ResourceViewController {
 
     @GetMapping("/list")
     public String listResourceRequests(Model model) {
-        log.info("Displaying resource requests list");
+        log.info("=== LOADING RESOURCE REQUESTS PAGE ===");
 
         AppUser currentUser = SecurityUtils.getCurrentUser();
         if (currentUser == null) {
             return "redirect:/login";
         }
 
-        // ✅ Get filtered requests based on user role
+        Long userId = currentUser.getUserId();
+        log.info("Current user ID: {}, Role: {}", userId, currentUser.getRole());
+
+        // ✅ Get ALL resource requests
         List<ResourceRequestDTO> allRequests = resourceRequestService.getAllResourceRequests();
         List<ResourceRequestDTO> filteredRequests;
 
-        if (currentUser.isAdmin() || currentUser.hasPermission("RESOURCE_REQUEST_VIEW")) {
+        // ✅ If user is ADMIN or SUPER_ADMIN, show all requests
+        if (currentUser.isAdmin() || currentUser.hasPermission("VIEW_ALL_TRANSACTIONS")) {
             filteredRequests = allRequests;
-            log.info("Admin viewing all {} resource requests", filteredRequests.size());
+            log.info("Admin user viewing all {} resource requests", filteredRequests.size());
         } else {
-            // Regular users see only their own requests
+            // ✅ Regular user - see only their own requests
             filteredRequests = allRequests.stream()
-                    .filter(r -> r.getUserId() != null && r.getUserId().equals(currentUser.getUserId()))
-                    .collect(java.util.stream.Collectors.toList());
-            log.info("User {} viewing {} of {} total resource requests",
+                    .filter(r -> r.getUserId() != null && r.getUserId().equals(userId))
+                    .collect(Collectors.toList());
+            log.info("Regular user {} viewing {} resource requests (out of {} total)",
                     currentUser.getUsername(), filteredRequests.size(), allRequests.size());
         }
 
-        List<ResourceRequestDTO> pendingRequests = resourceRequestService.getPendingResourceRequests();
-        List<ResourceRequestDTO> acceptedRequests = resourceRequestService.getAcceptedResourceRequests();
-        List<ResourceRequestDTO> completedRequests = resourceRequestService.getCompletedResourceRequests();
+        // Filter by status from filtered list
+        List<ResourceRequestDTO> pendingRequests = filteredRequests.stream()
+                .filter(r -> "PENDING".equals(r.getStatus()))
+                .collect(Collectors.toList());
 
-        long pendingCount = resourceRequestService.countPendingRequests();
-        long acceptedCount = resourceRequestService.countAcceptedRequests();
-        long declinedCount = resourceRequestService.countDeclinedRequests();
-        long completedCount = resourceRequestService.countCompletedRequests();
+        List<ResourceRequestDTO> acceptedRequests = filteredRequests.stream()
+                .filter(r -> "ACCEPTED".equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        List<ResourceRequestDTO> completedRequests = filteredRequests.stream()
+                .filter(r -> "COMPLETED".equals(r.getStatus()))
+                .collect(Collectors.toList());
+
+        // Counts for stats from filtered list
+        long pendingCount = pendingRequests.size();
+        long acceptedCount = acceptedRequests.size();
+        long declinedCount = filteredRequests.stream()
+                .filter(r -> "REJECTED".equals(r.getStatus()))
+                .count();
+        long completedCount = completedRequests.size();
 
         model.addAttribute("resourceRequests", filteredRequests);
         model.addAttribute("pendingRequests", pendingRequests);
