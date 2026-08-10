@@ -8,6 +8,7 @@ import com.stevecodes.AssetIQPro.service.AssetDisposalService;
 import com.stevecodes.AssetIQPro.service.AssetService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -136,42 +137,44 @@ public class AssetDisposalController {
     }
 
     // ============================================
-    // CREATE DISPOSAL REQUEST
+    // CREATE DISPOSAL REQUEST - FIXED WITH JSON RESPONSE
     // ============================================
 
     @PostMapping("/request")
     @PreAuthorize("hasAnyAuthority('DISPOSAL_REQUEST', 'ADMIN', 'SUPER_ADMIN')")
-    public String createDisposalRequest(@RequestParam Integer assetId,
-                                        @RequestParam String disposalReason,
-                                        @RequestParam String disposalMethod,
-                                        @RequestParam(required = false) String priority,
-                                        RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> createDisposalRequest(@RequestParam Integer assetId,
+                                                   @RequestParam String disposalReason,
+                                                   @RequestParam String disposalMethod,
+                                                   @RequestParam(required = false) String priority) {
         log.info("=== CREATE DISPOSAL REQUEST ===");
         log.info("📝 Asset: {}, Reason: {}, Method: {}", assetId, disposalReason, disposalMethod);
 
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in."));
             }
 
             Asset asset = assetService.getAssetEntityById(assetId);
             disposalService.createDisposalRequest(assetId, currentUser.getUserId(),
                     disposalReason, disposalMethod, priority);
 
-            redirectAttributes.addFlashAttribute("success",
-                    "Disposal request created successfully for asset: " + asset.getTag());
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Disposal request created successfully for asset: " + asset.getTag(),
+                    "assetId", assetId
+            ));
 
         } catch (IllegalStateException e) {
             log.error("❌ Error creating disposal request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("❌ Error creating disposal request: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to create disposal request.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create disposal request: " + e.getMessage()));
         }
-
-        return "redirect:/assets";
     }
 
     // ============================================

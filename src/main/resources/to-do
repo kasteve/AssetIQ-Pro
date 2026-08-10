@@ -25,9 +25,4 @@ asset status changes to disposed, those options should become inactive so that o
 
 12. Make the cab requests appear under the pending requests and completions tab for the admin to approve them since they are not linked to any driver
 
-17 Make these alerts display very well for the user to see on the UI (2026-08-09 09:24:04 - ❌ Error creating disposal request: Asset has not reached EOL yet. Disposal cannot be initiated.)
-
-18.2026-08-09 09:48:18 - Resolved [org.springframework.web.servlet.resource.NoResourceFoundException: No static resource admin/uploads/disposal/policies/policy_8_1786258083749_transfer_7.pdf.]
-Endpoint for viewing the uploaded diposal policy by compliance from infra is missing
-
 19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.

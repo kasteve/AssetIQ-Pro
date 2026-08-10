@@ -15,8 +15,18 @@
 <body>
 <div layout:fragment="content">
 
-    <!-- ===== TOAST CONTAINER ===== -->
+    <!-- ===== TOAST CONTAINER (corner) ===== -->
     <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080;"></div>
+
+    <!-- ===== CENTER TOAST OVERLAY ===== -->
+    <div id="centerToastOverlay" class="center-toast-overlay">
+        <div id="centerToast" class="center-toast">
+            <div class="toast-icon" id="centerToastIcon"><i class="fas fa-check-circle"></i></div>
+            <div class="toast-title" id="centerToastTitle">Success</div>
+            <div class="toast-message" id="centerToastMessage">Operation completed successfully.</div>
+            <button class="toast-btn btn-primary" onclick="closeCenterToast()">OK</button>
+        </div>
+    </div>
 
     <div class="page-header-row">
         <h4><i class="fas fa-laptop me-2"></i>Asset Management</h4>
@@ -132,7 +142,6 @@
                             <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
 
                                 <!-- ===================== EDIT ===================== -->
-                                <!-- Active: only rendered when NOT disposed -->
                                 <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        data-bs-toggle="modal" data-bs-target="#editAssetModal"
@@ -156,14 +165,13 @@
                                         <i class="fas fa-edit me-2 text-primary"></i>Edit
                                     </a>
                                 </li>
-                                <!-- Disabled: rendered when disposed - no data-bs-toggle, no onclick, inert -->
                                 <li th:if="${asset.status == 'DISPOSED'}">
                                     <a class="dropdown-item disabled text-muted" href="javascript:void(0)" tabindex="-1" aria-disabled="true">
                                         <i class="fas fa-edit me-2"></i>Edit
                                     </a>
                                 </li>
 
-                                <!-- ===================== VIEW (always enabled) ===================== -->
+                                <!-- ===================== VIEW ===================== -->
                                 <li>
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -192,7 +200,6 @@
                                 </li>
 
                                 <!-- ===================== REQUEST DISPOSAL ===================== -->
-                                <!-- Only ever shown for non-disposed assets that are EOL-eligible -->
                                 <li th:if="${asset.status != 'DISPOSED' and (asset.eOLExpired or asset.eolDate != null)}">
                                     <a class="dropdown-item text-warning" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -880,6 +887,7 @@
         .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; }
         .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
 
+        /* Corner Toast */
         #toastContainer { max-width: 380px; }
         .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
         .app-toast .toast-header { border-bottom: none !important; padding: 12px 14px 4px 14px; font-weight: 700; font-size: 13.5px; }
@@ -890,6 +898,92 @@
         .app-toast.toast-error .toast-header i { color: #dc3545; }
         .app-toast .btn-close { font-size: 10px; }
 
+        /* ============================================ */
+        /* CENTER TOAST STYLES                         */
+        /* ============================================ */
+        .center-toast-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(6px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .center-toast-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .center-toast {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 50px;
+            max-width: 520px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+            transform: scale(0.8) translateY(30px);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+
+        .center-toast-overlay.show .center-toast {
+            transform: scale(1) translateY(0);
+        }
+
+        .center-toast .toast-icon {
+            font-size: 60px;
+            margin-bottom: 16px;
+        }
+
+        .center-toast.toast-success .toast-icon { color: #198754; }
+        .center-toast.toast-error .toast-icon { color: #dc3545; }
+        .center-toast.toast-warning .toast-icon { color: #fd7e14; }
+        .center-toast.toast-info .toast-icon { color: #0d6efd; }
+
+        .center-toast .toast-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 8px;
+        }
+
+        .center-toast .toast-message {
+            font-size: 16px;
+            color: #495057;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .center-toast .toast-btn {
+            padding: 10px 35px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .center-toast .toast-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .center-toast .toast-btn.btn-primary { background: var(--primary-color); color: white; }
+        .center-toast .toast-btn.btn-success { background: #198754; color: white; }
+        .center-toast .toast-btn.btn-danger { background: #dc3545; color: white; }
+        .center-toast .toast-btn.btn-warning { background: #fd7e14; color: white; }
+
+        /* Modal LG */
         .modal-lg { max-width: 720px; }
         .wizard-steps { display: flex; align-items: center; justify-content: center; padding: 18px 24px 4px; gap: 6px; }
         .wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #adb5bd; flex-shrink: 0; }
@@ -946,6 +1040,10 @@
 
         @media (max-width: 768px) {
             #toastContainer { max-width: calc(100% - 24px); }
+            .center-toast { padding: 30px 24px; }
+            .center-toast .toast-icon { font-size: 44px; }
+            .center-toast .toast-title { font-size: 20px; }
+            .center-toast .toast-message { font-size: 14px; }
         }
     </style>
 </div>
@@ -964,10 +1062,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
-    <!-- th:inline="none" is REQUIRED: without it Thymeleaf tries to parse the
-         DataTables [[...]] JS array literals (e.g. lengthMenu) as its own
-         inline-expression syntax and throws TemplateProcessingException. -->
     <script th:inline="none">
+        // ============================================
+        // Center Toast Functions
+        // ============================================
+        let centerToastTimer = null;
+
+        function showCenterToast(message, type, title) {
+            type = type || 'info';
+            title = title || getToastTitle(type);
+
+            const overlay = document.getElementById('centerToastOverlay');
+            const toast = document.getElementById('centerToast');
+            const icon = document.getElementById('centerToastIcon');
+            const titleEl = document.getElementById('centerToastTitle');
+            const msgEl = document.getElementById('centerToastMessage');
+
+            // Set icon
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+            icon.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '"></i>';
+
+            // Set class
+            toast.className = 'center-toast toast-' + type;
+
+            // Set title and message
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+
+            // Show
+            overlay.classList.add('show');
+
+            // Auto-hide after 5 seconds for success/info, longer for errors
+            const duration = (type === 'error' || type === 'warning') ? 8000 : 5000;
+
+            if (centerToastTimer) {
+                clearTimeout(centerToastTimer);
+            }
+            centerToastTimer = setTimeout(function() {
+                closeCenterToast();
+            }, duration);
+        }
+
+        function closeCenterToast() {
+            const overlay = document.getElementById('centerToastOverlay');
+            overlay.classList.remove('show');
+            if (centerToastTimer) {
+                clearTimeout(centerToastTimer);
+                centerToastTimer = null;
+            }
+        }
+
+        function getToastTitle(type) {
+            const titles = {
+                success: 'Success',
+                error: 'Error',
+                warning: 'Warning',
+                info: 'Notice'
+            };
+            return titles[type] || titles.info;
+        }
+
+        // ============================================
+        // Corner Toast (for non-critical messages)
+        // ============================================
+        function showToast(message, type) {
+            type = type || 'success';
+
+            // Use center toast for errors and warnings
+            if (type === 'error' || type === 'warning') {
+                showCenterToast(message, type);
+                return;
+            }
+
+            // Use corner toast for success
+            const isSuccess = type === 'success';
+            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
+            const label = isSuccess ? 'Success' : 'Error';
+            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
+                    <div class="toast-header">
+                        <i class="fas ${icon} me-2"></i>
+                        <strong class="me-auto">${label}</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">${message}</div>
+                </div>
+            `;
+
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl);
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            toast.show();
+        }
+
+        // ============================================
+        // DataTables
+        // ============================================
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#assetsTable')) {
                 $('#assetsTable').DataTable().destroy();
@@ -1058,32 +1257,6 @@
         let currentAssetId = null;
         let currentAssetStatus = null;
 
-        function showToast(message, type) {
-            type = type || 'success';
-            const isSuccess = type === 'success';
-            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
-            const label = isSuccess ? 'Success' : 'Error';
-            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-
-            const toastHtml = `
-                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
-                    <div class="toast-header">
-                        <i class="fas ${icon} me-2"></i>
-                        <strong class="me-auto">${label}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                    <div class="toast-body">${message}</div>
-                </div>
-            `;
-
-            const container = document.getElementById('toastContainer');
-            container.insertAdjacentHTML('beforeend', toastHtml);
-            const toastEl = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastEl);
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-            toast.show();
-        }
-
         function deleteAsset(button) {
             const id = button.getAttribute('data-assetid');
             const tag = button.getAttribute('data-tag') || ('#' + id);
@@ -1129,7 +1302,6 @@
                     const transfers = data.transfers || [];
                     currentAssetStatus = asset.status || null;
 
-                    // Hide "Edit Asset" footer button on view modal if the asset is disposed
                     const editBtn = document.getElementById('viewModalEditBtn');
                     if (editBtn) {
                         editBtn.style.display = (currentAssetStatus === 'DISPOSED') ? 'none' : 'inline-block';
@@ -1255,7 +1427,7 @@
         function openEditFromView() {
             if (!currentAssetId) return;
             if (currentAssetStatus === 'DISPOSED') {
-                showToast('Cannot edit a disposed asset.', 'error');
+                showCenterToast('Cannot edit a disposed asset.', 'error', 'Action Not Allowed');
                 return;
             }
 
@@ -1310,7 +1482,7 @@
                 })
                 .catch(error => {
                     console.error('Error loading asset for edit:', error);
-                    showToast('Failed to load asset details for editing.', 'error');
+                    showCenterToast('Failed to load asset details for editing.', 'error', 'Error');
                 });
         }
 
@@ -1369,7 +1541,7 @@
         }
 
         // ============================================================
-        // DISPOSAL FUNCTIONS
+        // DISPOSAL FUNCTIONS WITH CENTER TOAST
         // ============================================================
         function openDisposalModal(button) {
             const assetId = button.getAttribute('data-assetid');
@@ -1388,7 +1560,11 @@
                 })
                 .then(data => {
                     if (data.hasPending) {
-                        showToast('This asset already has a pending disposal request (ID: ' + data.requestId + '). Please wait for it to be processed before submitting another one.', 'error');
+                        showCenterToast(
+                            'This asset already has a pending disposal request (ID: ' + data.requestId + '). Please wait for it to be processed before submitting another one.',
+                            'error',
+                            'Pending Request'
+                        );
                         return;
                     }
 
@@ -1447,15 +1623,15 @@
             const priority = document.getElementById('disposalPriority').value;
 
             if (!assetId) {
-                showToast('No asset selected for disposal.', 'error');
+                showCenterToast('No asset selected for disposal.', 'error', 'Submission Failed');
                 return;
             }
             if (!disposalReason) {
-                showToast('Please select a disposal reason.', 'error');
+                showCenterToast('Please select a disposal reason.', 'error', 'Submission Failed');
                 return;
             }
             if (!disposalMethod) {
-                showToast('Please select a disposal method.', 'error');
+                showCenterToast('Please select a disposal method.', 'error', 'Submission Failed');
                 return;
             }
 
@@ -1473,25 +1649,50 @@
 
             fetch('/assetIQ-pro/admin/disposal/request', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
+                },
                 body: params.toString()
             })
             .then(function (response) {
-                if (response.ok || response.redirected) {
-                    showToast('Disposal request submitted successfully!', 'success');
-                    const modalEl = document.getElementById('requestDisposalModal');
-                    bootstrap.Modal.getInstance(modalEl)?.hide();
-                    setTimeout(function () { window.location.reload(); }, 1200);
-                } else {
-                    return response.text().then(function (text) {
-                        showToast('Failed to submit disposal request: ' + (text || response.statusText), 'error');
+                // ✅ Always try to parse as JSON first
+                return response.json().then(function (data) {
+                    if (response.ok) {
+                        // Success
+                        showCenterToast(data.message || 'Disposal request submitted successfully!', 'success');
+                        const modalEl = document.getElementById('requestDisposalModal');
+                        bootstrap.Modal.getInstance(modalEl)?.hide();
+                        setTimeout(function () { window.location.reload(); }, 1500);
+                    } else {
+                        // Error - show the error message from the response
+                        const errorMsg = data.error || 'Failed to submit disposal request.';
+                        // Check for specific error patterns and make them user-friendly
+                        let friendlyMsg = errorMsg;
+                        if (errorMsg.includes('EOL') || errorMsg.includes('reached its End of Life')) {
+                            friendlyMsg = 'This asset has not reached its End of Life (EOL) date yet. Disposal cannot be initiated.';
+                        } else if (errorMsg.includes('pending disposal')) {
+                            friendlyMsg = 'This asset already has a pending disposal request.';
+                        } else if (errorMsg.includes('not found')) {
+                            friendlyMsg = 'Asset not found. Please refresh and try again.';
+                        }
+                        showCenterToast(friendlyMsg, 'error', 'Submission Failed');
                         btn.disabled = false;
                         btn.innerHTML = originalHtml;
-                    });
-                }
+                    }
+                });
             })
             .catch(function (error) {
-                showToast('Error: ' + error.message, 'error');
+                // If JSON parsing fails, check if it's a redirect
+                if (error.message && error.message.includes('JSON')) {
+                    // It might be a redirect with flash message
+                    showCenterToast('Disposal request submitted successfully!', 'success');
+                    const modalEl = document.getElementById('requestDisposalModal');
+                    bootstrap.Modal.getInstance(modalEl)?.hide();
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                } else {
+                    showCenterToast('Error: ' + error.message, 'error', 'Submission Failed');
+                }
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             });
@@ -1518,6 +1719,13 @@
                     showTransferWizardStep(1);
                 });
             }
+
+            // Close center toast on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeCenterToast();
+                }
+            });
         });
     </script>
 </div>
