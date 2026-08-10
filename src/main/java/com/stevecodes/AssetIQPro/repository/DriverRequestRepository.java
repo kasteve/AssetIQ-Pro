@@ -22,6 +22,8 @@ public interface DriverRequestRepository extends JpaRepository<DriverRequest, Lo
 
     List<DriverRequest> findAllByOrderByRequestTimeDesc();
 
+    List<DriverRequest> findByStatusIn(List<String> statuses);
+
     @Query("SELECT d FROM DriverRequest d WHERE d.driverId = :driverId AND d.status IN :statuses")
     List<DriverRequest> findByDriverIdAndStatusIn(@Param("driverId") Long driverId,
                                                   @Param("statuses") List<String> statuses);
@@ -75,4 +77,10 @@ public interface DriverRequestRepository extends JpaRepository<DriverRequest, Lo
 
     @Query("SELECT d FROM DriverRequest d WHERE d.userId = :userId ORDER BY d.requestTime DESC")
     List<DriverRequest> findTop5ByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT dr FROM DriverRequest dr WHERE dr.status IN ('PENDING', 'PENDING_ADMIN') ORDER BY dr.requestTime DESC")
+    List<DriverRequest> findAllPendingRequests();
+
+    long countByStatus(String status);
+
 }

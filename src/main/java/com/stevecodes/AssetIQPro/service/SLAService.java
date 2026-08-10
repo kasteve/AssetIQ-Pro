@@ -260,12 +260,11 @@ public class SLAService {
             // Notify owner
             if (owner != null) {
                 try {
-                    sendSLANotification(
+                    sendSLANotificationWithoutLink(
                             owner.getUserId(),
                             "SLA_BREACHED",
                             "SLA Breached",
-                            breachMessage + " Please take immediate action.",
-                            "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                            breachMessage + " Please login to the AssetIQ-Pro portal to view details and take immediate action."
                     );
                     log.info("✅ Owner notified: {}", owner.getUserId());
                 } catch (Exception e) {
@@ -276,12 +275,12 @@ public class SLAService {
             // Notify manager
             if (manager != null) {
                 try {
-                    sendSLANotification(
+                    sendSLANotificationWithoutLink(
                             manager.getUserId(),
                             "SLA_BREACHED_ESCALATED",
                             "SLA Breached - Employee Alert",
-                            "Employee: " + (owner != null ? owner.getFullName() : "Unknown") + "\n" + breachMessage,
-                            "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                            "Employee: " + (owner != null ? owner.getFullName() : "Unknown") + "\n" + breachMessage +
+                                    "\n\nPlease login to the AssetIQ-Pro portal to view details and take action."
                     );
                     log.info("✅ Manager notified: {}", manager.getUserId());
                 } catch (Exception e) {
@@ -363,19 +362,18 @@ public class SLAService {
 
             // Send escalation notification
             String escalationMessage = String.format(
-                    "SLA Escalation: Request #%d (%s) has been pending for %d hours. Please review and take action.",
+                    "SLA Escalation: Request #%d (%s) has been pending for %d hours. Please login to the AssetIQ-Pro portal to review and take action.",
                     tracking.getRequestId(),
                     tracking.getRequestType(),
                     ChronoUnit.HOURS.between(tracking.getSlaStartedAt(), LocalDateTime.now())
             );
 
             try {
-                sendSLANotification(
+                sendSLANotificationWithoutLink(
                         manager.getUserId(),
                         "SLA_ESCALATED",
                         "SLA Escalated - Action Required",
-                        escalationMessage,
-                        "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                        escalationMessage
                 );
                 log.info("✅ Escalation notification sent to manager: {}", manager.getUserId());
             } catch (Exception e) {
@@ -412,7 +410,7 @@ public class SLAService {
             }
 
             String reminderMessage = String.format(
-                    "SLA Reminder: Request #%d (%s) has used %s%% of its SLA time. Due at: %s",
+                    "SLA Reminder: Request #%d (%s) has used %s%% of its SLA time. Due at: %s. Please login to the AssetIQ-Pro portal to track progress.",
                     tracking.getRequestId(),
                     tracking.getRequestType(),
                     percentage,
@@ -421,12 +419,11 @@ public class SLAService {
 
             // Notify owner
             try {
-                sendSLANotification(
+                sendSLANotificationWithoutLink(
                         owner.getUserId(),
                         "SLA_REMINDER",
                         "SLA Reminder - " + percentage + "% Elapsed",
-                        reminderMessage,
-                        "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                        reminderMessage
                 );
                 log.info("✅ Reminder sent to owner: {} at {}%", owner.getUserId(), percentage);
             } catch (Exception e) {
@@ -438,12 +435,11 @@ public class SLAService {
                 AppUser manager = getLineManager(ownerId);
                 if (manager != null) {
                     try {
-                        sendSLANotification(
+                        sendSLANotificationWithoutLink(
                                 manager.getUserId(),
                                 "SLA_REMINDER_MANAGER",
                                 "SLA Reminder - Employee Request at " + percentage + "%",
-                                "Employee: " + owner.getFullName() + "\n" + reminderMessage,
-                                "/" + getRequestTypePath(tracking.getRequestType()) + "/" + tracking.getRequestId()
+                                "Employee: " + owner.getFullName() + "\n" + reminderMessage
                         );
                         log.info("✅ Reminder sent to manager: {} at {}%", manager.getUserId(), percentage);
                     } catch (Exception e) {
@@ -510,6 +506,50 @@ public class SLAService {
         }
     }
 
+    /**
+     * Send SLA notification WITHOUT a link to view details.
+     * Users are instructed to login to the portal to track progress.
+     */
+    private void sendSLANotificationWithoutLink(Long userId, String type, String title, String message) {
+        try {
+            // Create in-app notification (with link for in-app navigation)
+            String link = "/dashboard/sla-tracker"; // Generic link to SLA dashboard
+            notificationService.createNotification(userId, type, title, message, link);
+            log.debug("✅ In-app notification created for user: {}", userId);
+        } catch (Exception e) {
+            log.error("❌ Failed to create in-app notification: {}", e.getMessage(), e);
+        }
+
+        try {
+            // Send email WITHOUT link - instruct to login to portal
+            userService.getUserById(userId).ifPresent(user -> {
+                try {
+                    String emailBody = String.format(
+                            "%s\n\n" +
+                                    "Please login to the AssetIQ-Pro portal to view details and track the progress of this request.\n\n" +
+                                    "Regards,\n" +
+                                    "AssetIQ-Pro Team\n\n" +
+                                    "This is an automated notification. Please do not reply to this email."
+                    );
+                    emailService.sendSimpleEmail(
+                            user.getEmail(),
+                            title + " - AssetIQ-Pro",
+                            message + "\n\n" + emailBody
+                    );
+                    log.debug("✅ Email sent to: {}", user.getEmail());
+                } catch (Exception e) {
+                    log.error("❌ Failed to send email to {}: {}", user.getEmail(), e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            log.error("❌ Failed to send email notification: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Legacy method - kept for compatibility with other parts of the system
+     * that might still use it. New notifications should use sendSLANotificationWithoutLink.
+     */
     private void sendSLANotification(Long userId, String type, String title, String message, String link) {
         try {
             // Create in-app notification
@@ -520,14 +560,21 @@ public class SLAService {
         }
 
         try {
-            // Send email
+            // Send email WITHOUT link - instruct to login to portal
             userService.getUserById(userId).ifPresent(user -> {
                 try {
                     String fullLink = baseUrlService.buildUrl(link);
+                    String emailBody = String.format(
+                            "%s\n\n" +
+                                    "Please login to the AssetIQ-Pro portal to view details and track the progress of this request.\n\n" +
+                                    "Regards,\n" +
+                                    "AssetIQ-Pro Team\n\n" +
+                                    "This is an automated notification. Please do not reply to this email."
+                    );
                     emailService.sendSimpleEmail(
                             user.getEmail(),
                             title + " - AssetIQ-Pro",
-                            message + "\n\nView details: " + fullLink + "\n\nRegards,\nAssetIQ-Pro Team"
+                            message + "\n\n" + emailBody
                     );
                     log.debug("✅ Email sent to: {}", user.getEmail());
                 } catch (Exception e) {

@@ -95,7 +95,6 @@ public class UserRequestController {
         model.addAttribute("allRooms", allRooms);
 
         LocalDateTime now = LocalDateTime.now();
-        // ✅ FIXED: Exclude CONFIRMED (signed out) from occupied rooms
         Set<Long> occupiedRoomIds = bookingRepository.findActiveBookingsAtTime(now,
                         List.of(Booking.BookingStatus.BOOKED, Booking.BookingStatus.ACTIVE))
                 .stream()
@@ -148,6 +147,27 @@ public class UserRequestController {
             model.addAttribute("pendingDriverApprovals", pendingDriverApprovals);
             allPendingApprovals.addAll(pendingDriverApprovals);
             log.info("Found {} pending driver approvals for user: {}", pendingDriverApprovals.size(), currentUser.getUsername());
+        }
+
+        // ✅ NEW: Cab (External Driver) Requests Pending Approval - for ADMIN users
+        if (currentUser.isAdmin() || currentUser.hasAnyPermission("DRIVER_APPROVE", "ADMIN", "SUPER_ADMIN")) {
+            // Get all pending driver requests including PENDING_ADMIN
+            List<DriverRequest> allPendingRequests = driverService.getPendingRequests();
+
+            // Filter for cab requests (driverId = -1) and exclude PENDING_ADMIN that are already assigned
+            List<DriverRequestDTO> pendingCabRequests = allPendingRequests.stream()
+                    .filter(req -> req.getDriverId() != null && req.getDriverId() == -1L)
+                    .map(driverService::convertToDTO)
+                    .collect(Collectors.toList());
+
+            if (!pendingCabRequests.isEmpty()) {
+                model.addAttribute("pendingCabRequests", pendingCabRequests);
+                allPendingApprovals.addAll(pendingCabRequests);
+                log.info("Found {} pending cab requests for admin user: {}", pendingCabRequests.size(), currentUser.getUsername());
+            } else {
+                // Add empty list to avoid null in template
+                model.addAttribute("pendingCabRequests", List.of());
+            }
         }
 
         // 2. Accepted trips for driver - Convert to DTOs
@@ -303,17 +323,18 @@ public class UserRequestController {
 
     @PostMapping("/driver-request")
     @PreAuthorize("isAuthenticated()")
-    public String createDriverRequest(@RequestParam Long userId,
-                                      @RequestParam String destination,
-                                      @RequestParam(required = false) Long driverId,
-                                      @RequestParam(required = false) String reason,
-                                      @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime requestTime,
-                                      RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> createDriverRequest(
+            @RequestParam Long userId,
+            @RequestParam String destination,
+            @RequestParam(required = false) Long driverId,
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime requestTime) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             if (requestTime == null) {
@@ -328,119 +349,150 @@ public class UserRequestController {
                     .getUsername();
 
             driverService.createDriverRequest(userId, destination, driverId, reason, requestedBy, requestTime);
-            redirectAttributes.addFlashAttribute("success", "Driver requested successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Driver requested successfully!"
+            ));
+
         } catch (IllegalStateException e) {
             log.error("Driver request validation error: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error creating driver request: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to create driver request.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create driver request."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/recall")
     @PreAuthorize("isAuthenticated()")
-    public String recallDriverRequest(@PathVariable Long requestId,
-                                      RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> recallDriverRequest(@PathVariable Long requestId) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("Recalling driver request: {}", requestId);
             driverService.recallRequest(requestId);
-            redirectAttributes.addFlashAttribute("success", "Driver request recalled successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Driver request recalled successfully!"
+            ));
         } catch (Exception e) {
             log.error("Error recalling driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to recall driver request.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to recall driver request."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/accept")
     @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
-    public String acceptDriverRequest(@PathVariable Long requestId,
-                                      @RequestParam Long driverId,
-                                      RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> acceptDriverRequest(
+            @PathVariable Long requestId,
+            @RequestParam Long driverId) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("Driver {} accepting request: {}", driverId, requestId);
             driverService.acceptRequest(requestId, driverId);
-            redirectAttributes.addFlashAttribute("success", "Driver request accepted successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Driver request accepted successfully!"
+            ));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to accept driver requests.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to accept driver requests."));
         } catch (IllegalStateException e) {
             log.error("Error accepting driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error accepting driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to accept driver request.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to accept driver request."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/decline")
     @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
-    public String declineDriverRequest(@PathVariable Long requestId,
-                                       @RequestParam Long driverId,
-                                       @RequestParam(required = false) String reason,
-                                       RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> declineDriverRequest(
+            @PathVariable Long requestId,
+            @RequestParam Long driverId,
+            @RequestParam(required = false) String reason) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             String declineReason = (reason != null && !reason.isEmpty()) ? reason : "No reason provided";
             log.info("Driver {} declining request: {} - Reason: {}", driverId, requestId, declineReason);
             driverService.declineRequest(requestId, driverId, declineReason);
-            redirectAttributes.addFlashAttribute("success", "Driver request declined successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Driver request declined successfully!"
+            ));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to decline driver requests.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to decline driver requests."));
         } catch (IllegalStateException e) {
             log.error("Error declining driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error declining driver request: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to decline driver request.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to decline driver request."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/complete")
     @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
-    public String completeTrip(@PathVariable Long requestId,
-                               @RequestParam Long driverId,
-                               RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> completeTrip(
+            @PathVariable Long requestId,
+            @RequestParam Long driverId) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("Driver {} completing trip for request: {}", driverId, requestId);
             driverService.completeTrip(requestId, driverId);
-            redirectAttributes.addFlashAttribute("success", "Trip completed successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Trip completed successfully!"
+            ));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to complete trips.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to complete trips."));
         } catch (IllegalStateException e) {
             log.error("Error completing trip: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error completing trip: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to complete trip.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to complete trip."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/driver-request/{requestId}/rate")
@@ -562,69 +614,81 @@ public class UserRequestController {
 
     @PostMapping("/room/{bookingId}/recall")
     @PreAuthorize("isAuthenticated()")
-    public String recallRoomBooking(@PathVariable Long bookingId,
-                                    RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> recallRoomBooking(@PathVariable Long bookingId) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("Recalling room booking: {}", bookingId);
             bookingService.recallRoomBooking(bookingId);
-            redirectAttributes.addFlashAttribute("success", "Room booking recalled successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Room booking recalled successfully!"
+            ));
         } catch (Exception e) {
             log.error("Error recalling room booking: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to recall room booking.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to recall room booking."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/room/{bookingId}/cancel")
     @PreAuthorize("hasAnyAuthority('ROOM_CANCEL', 'ADMIN', 'SUPER_ADMIN')")
-    public String cancelRoomBooking(@PathVariable Long bookingId,
-                                    RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> cancelRoomBooking(@PathVariable Long bookingId) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             log.info("Cancelling room booking: {}", bookingId);
             bookingService.cancelBooking(bookingId);
-            redirectAttributes.addFlashAttribute("success", "Room booking cancelled successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Room booking cancelled successfully!"
+            ));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to cancel room bookings.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to cancel room bookings."));
         } catch (Exception e) {
             log.error("Error cancelling room booking: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to cancel room booking.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to cancel room booking."));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @PostMapping("/room/{bookingId}/request-slot")
     @PreAuthorize("isAuthenticated()")
-    public String requestSlot(@PathVariable Long bookingId,
-                              HttpSession session,
-                              RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> requestSlot(@PathVariable Long bookingId, HttpSession session) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             Long userId = (Long) session.getAttribute("userId");
             log.info("User {} requesting slot for booking: {}", userId, bookingId);
             bookingService.requestSlot(bookingId, userId);
-            redirectAttributes.addFlashAttribute("success", "Slot request sent successfully! The current booker will be notified.");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Slot request sent successfully! The current booker will be notified."
+            ));
         } catch (Exception e) {
             log.error("Error requesting slot: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to request slot: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to request slot: " + e.getMessage()));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 
     @GetMapping("/slot-request/{bookingId}/respond")
@@ -912,6 +976,35 @@ public class UserRequestController {
         }
     }
 
+    @PostMapping("/driver-request/{requestId}/approve-cab")
+    @PreAuthorize("hasAnyAuthority('DRIVER_APPROVE', 'ADMIN', 'SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<?> approveCabRequest(@PathVariable Long requestId) {
+        try {
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
+            }
+
+            log.info("Admin approving cab request: {}", requestId);
+            driverService.approveCabRequest(requestId);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Cab request approved successfully!"
+            ));
+        } catch (IllegalStateException e) {
+            log.error("Error approving cab request: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error approving cab request: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to approve cab request."));
+        }
+    }
+
     @GetMapping("/server-room/thankyou")
     public String serverRoomThankYou() {
         return "bookings/server-room-thankyou";
@@ -934,26 +1027,30 @@ public class UserRequestController {
 
     @PostMapping("/admin/booking/{bookingId}/cancel")
     @PreAuthorize("hasAnyAuthority('MANAGE_BOOKINGS', 'ADMIN', 'SUPER_ADMIN')")
-    public String adminCancelBooking(@PathVariable Long bookingId,
-                                     HttpSession session,
-                                     RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public ResponseEntity<?> adminCancelBooking(@PathVariable Long bookingId, HttpSession session) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "You must be logged in to perform this action."));
             }
 
             Long userId = (Long) session.getAttribute("userId");
             log.info("Admin {} cancelling booking: {}", userId, bookingId);
             bookingService.adminCancelBooking(bookingId, userId);
-            redirectAttributes.addFlashAttribute("success", "Booking cancelled successfully!");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Booking cancelled successfully!"
+            ));
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("error", "You don't have permission to cancel bookings.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You don't have permission to cancel bookings."));
         } catch (Exception e) {
             log.error("Error cancelling booking: {}", e.getMessage());
-            redirectAttributes.addFlashAttribute("error", "Failed to cancel booking: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to cancel booking: " + e.getMessage()));
         }
-        return "redirect:/bookings/bookings-dashboard";
     }
 }

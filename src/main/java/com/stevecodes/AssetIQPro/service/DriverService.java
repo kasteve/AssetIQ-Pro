@@ -184,7 +184,7 @@ public class DriverService {
             request.setDriverId(-1L);
             request.setReason(reason);
             request.setRequestTime(requestTime != null ? requestTime : LocalDateTime.now());
-            request.setStatus("PENDING_ADMIN");
+            request.setStatus("PENDING_ADMIN");  // ✅ This is correct
             request.setRequestedBy(requestedBy);
 
             log.info("💾 Saving CAB request");
@@ -210,6 +210,69 @@ public class DriverService {
 
         } catch (Exception e) {
             log.error("❌ Error creating CAB request: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Transactional
+    public DriverRequest approveCabRequest(Long requestId) {
+        log.info("=== APPROVE CAB REQUEST START ===");
+        log.info("📝 Admin approving cab request: {}", requestId);
+
+        try {
+            DriverRequest request = driverRequestRepository.findById(requestId)
+                    .orElseThrow(() -> {
+                        log.error("❌ Cab request not found: {}", requestId);
+                        return new RuntimeException("Cab request not found: " + requestId);
+                    });
+            log.info("✅ Found request with status: {}", request.getStatus());
+
+            if (!"PENDING_ADMIN".equals(request.getStatus()) && !"PENDING".equals(request.getStatus())) {
+                log.error("❌ Invalid status: {}", request.getStatus());
+                throw new IllegalStateException("Request is not pending approval");
+            }
+
+            // For cab requests, we set driverId = -1 (external cab)
+            request.setStatus("ACCEPTED");
+            request.setDriverId(-1L);
+            request.setAcceptedAt(LocalDateTime.now());
+            request.setDriverDecisionTime(LocalDateTime.now());
+
+            log.info("💾 Saving approved cab request");
+            DriverRequest saved = driverRequestRepository.save(request);
+            log.info("✅ Cab request approved");
+
+            // Send email to requester
+            try {
+                String requesterEmail = getUserEmail(request.getUserId());
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Cab Request Approved",
+                        "Your cab request has been approved.\n\n" +
+                                "Destination: " + request.getDestination() + "\n" +
+                                "Your external cab has been arranged and will arrive shortly.\n\n" +
+                                "Thank you for using AssetIQ-Pro."
+                );
+                log.info("✅ Email sent to requester");
+            } catch (Exception e) {
+                log.error("❌ Failed to send email: {}", e.getMessage(), e);
+            }
+
+            // Log audit
+            try {
+                auditService.logAction("CAB_REQUEST_APPROVED",
+                        "Cab request approved: " + requestId,
+                        request.getUserId());
+                log.info("✅ Audit logged");
+            } catch (Exception e) {
+                log.error("❌ Failed to log audit: {}", e.getMessage(), e);
+            }
+
+            log.info("=== APPROVE CAB REQUEST END - SUCCESS ===");
+            return saved;
+
+        } catch (Exception e) {
+            log.error("❌ Error approving cab request: {}", e.getMessage(), e);
             throw e;
         }
     }
@@ -299,7 +362,8 @@ public class DriverService {
                     });
             log.info("✅ Found request with status: {}", request.getStatus());
 
-            if (!"PENDING".equals(request.getStatus())) {
+            // ✅ FIX: Allow both PENDING and PENDING_ADMIN
+            if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
                 log.error("❌ Invalid status: {}", request.getStatus());
                 throw new IllegalStateException("Request is no longer pending");
             }
@@ -308,36 +372,38 @@ public class DriverService {
             LocalDate requestDate = request.getRequestDate() != null ? request.getRequestDate() : request.getRequestTime().toLocalDate();
             LocalTime requestTime = request.getRequestTimeOnly() != null ? request.getRequestTimeOnly() : request.getRequestTime().toLocalTime();
 
-            // Check for conflicting trips
-            List<DriverRequest> existingTrips = driverRequestRepository.findByDriverIdAndStatusIn(
-                    driverId, List.of("ACCEPTED", "PENDING")
-            );
+            // Check for conflicting trips (skip for cab requests with driverId = -1)
+            if (driverId != null && driverId != -1L) {
+                List<DriverRequest> existingTrips = driverRequestRepository.findByDriverIdAndStatusIn(
+                        driverId, List.of("ACCEPTED", "PENDING")
+                );
 
-            boolean hasConflict = existingTrips.stream().anyMatch(existing -> {
-                if (existing.getRequestId().equals(requestId)) {
-                    return false;
+                boolean hasConflict = existingTrips.stream().anyMatch(existing -> {
+                    if (existing.getRequestId().equals(requestId)) {
+                        return false;
+                    }
+
+                    LocalDate existingDate = existing.getRequestDate() != null ? existing.getRequestDate() : existing.getRequestTime().toLocalDate();
+                    LocalTime existingTime = existing.getRequestTimeOnly() != null ? existing.getRequestTimeOnly() : existing.getRequestTime().toLocalTime();
+
+                    if (!requestDate.equals(existingDate)) {
+                        return false;
+                    }
+
+                    LocalTime existingStart = existingTime;
+                    LocalTime existingEnd = existingTime.plusHours(2);
+                    LocalTime newStart = requestTime;
+                    LocalTime newEnd = requestTime.plusHours(2);
+
+                    return !(newEnd.isBefore(existingStart) || newStart.isAfter(existingEnd));
+                });
+
+                if (hasConflict) {
+                    log.warn("⚠️ Conflict detected for driver {} at time {}", driverId, requestTime);
+                    throw new IllegalStateException("Driver already has a booking at this time. Please choose a different time.");
                 }
-
-                LocalDate existingDate = existing.getRequestDate() != null ? existing.getRequestDate() : existing.getRequestTime().toLocalDate();
-                LocalTime existingTime = existing.getRequestTimeOnly() != null ? existing.getRequestTimeOnly() : existing.getRequestTime().toLocalTime();
-
-                if (!requestDate.equals(existingDate)) {
-                    return false;
-                }
-
-                LocalTime existingStart = existingTime;
-                LocalTime existingEnd = existingTime.plusHours(2);
-                LocalTime newStart = requestTime;
-                LocalTime newEnd = requestTime.plusHours(2);
-
-                return !(newEnd.isBefore(existingStart) || newStart.isAfter(existingEnd));
-            });
-
-            if (hasConflict) {
-                log.warn("⚠️ Conflict detected for driver {} at time {}", driverId, requestTime);
-                throw new IllegalStateException("Driver already has a booking at this time. Please choose a different time.");
+                log.info("✅ No conflicts found");
             }
-            log.info("✅ No conflicts found");
 
             request.setStatus("ACCEPTED");
             request.setDriverId(driverId);
@@ -348,13 +414,13 @@ public class DriverService {
             DriverRequest saved = driverRequestRepository.save(request);
             log.info("✅ Request accepted");
 
-            // Only update availability to BUSY if the trip is for today
-            if (requestDate.equals(LocalDate.now())) {
+            // Only update availability to BUSY if the trip is for today and not a cab request
+            if (driverId != null && driverId != -1L && requestDate.equals(LocalDate.now())) {
                 updateDriverAvailability(driverId, "BUSY");
                 log.info("📝 Driver availability set to BUSY for today");
             }
 
-            String driverName = getDriverName(driverId);
+            String driverName = driverId != null && driverId != -1L ? getDriverName(driverId) : "Cab (External)";
 
             // Send email
             try {
@@ -391,7 +457,7 @@ public class DriverService {
             try {
                 auditService.logAction("DRIVER_REQUEST_ACCEPTED",
                         "Driver request accepted: " + requestId + " by driver: " + driverId + " for " + requestDate,
-                        driverId);
+                        driverId != null ? driverId : request.getUserId());
                 log.info("✅ Audit logged");
             } catch (Exception e) {
                 log.error("❌ Failed to log audit: {}", e.getMessage(), e);
@@ -419,7 +485,8 @@ public class DriverService {
                     });
             log.info("✅ Found request with status: {}", request.getStatus());
 
-            if (!"PENDING".equals(request.getStatus())) {
+            // ✅ FIX: Allow both PENDING and PENDING_ADMIN
+            if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
                 log.error("❌ Invalid status: {}", request.getStatus());
                 throw new IllegalStateException("Request is no longer pending");
             }
@@ -439,7 +506,7 @@ public class DriverService {
                         getUserEmail(request.getUserId()),
                         "Driver Request Declined",
                         "Your driver request has been declined.\n\n" +
-                                "Driver: " + getDriverName(driverId) + "\n" +
+                                "Driver: " + (driverId != null && driverId != -1L ? getDriverName(driverId) : "Cab (External)") + "\n" +
                                 "Reason: " + reason + "\n\n" +
                                 "Please try requesting another driver or select Cab."
                 );
@@ -466,7 +533,7 @@ public class DriverService {
             try {
                 auditService.logAction("DRIVER_REQUEST_DECLINED",
                         "Driver request declined: " + requestId + " by driver: " + driverId,
-                        driverId);
+                        driverId != null ? driverId : request.getUserId());
                 log.info("✅ Audit logged");
             } catch (Exception e) {
                 log.error("❌ Failed to log audit: {}", e.getMessage(), e);
@@ -823,6 +890,13 @@ public class DriverService {
 
     public List<DriverRequest> getPendingAdminRequests() {
         return driverRequestRepository.findByStatus("PENDING_ADMIN");
+    }
+
+    // ✅ NEW: Get all pending driver requests (for admin to see cab requests)
+    public List<DriverRequest> getPendingRequests() {
+        log.info("Getting all pending driver requests including PENDING_ADMIN");
+        // Include both PENDING and PENDING_ADMIN statuses
+        return driverRequestRepository.findByStatusIn(List.of("PENDING", "PENDING_ADMIN"));
     }
 
     // ============================================

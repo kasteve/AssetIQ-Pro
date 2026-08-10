@@ -72,6 +72,7 @@
         .table-container {
             max-height: 500px;
             overflow-y: auto;
+            overflow-x: visible;
         }
 
         /* Room booking row styles - matching driver request style */
@@ -426,6 +427,60 @@
             cursor: pointer; padding: 0; line-height: 1;
         }
         .app-toast .app-toast-close:hover { color: #6c757d; }
+
+        /* ============================================ */
+        /* Ellipsis action dropdown (replaces button groups) */
+        /* ============================================ */
+        .action-dropdown { display: inline-block; position: relative; }
+        .action-dropdown .ellipsis-btn {
+            width: 32px;
+            height: 32px;
+            padding: 0 !important;
+            border-radius: 8px !important;
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            color: #6c757d !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            line-height: 1;
+        }
+        .action-dropdown .ellipsis-btn:hover,
+        .action-dropdown .ellipsis-btn:focus {
+            background: #f0f2f5 !important;
+            color: var(--ink) !important;
+            box-shadow: none !important;
+        }
+        .action-dropdown .ellipsis-btn::after { display: none !important; }
+        .action-dropdown .dropdown-menu {
+            border-radius: 12px;
+            border: 1px solid #eef0f3;
+            box-shadow: 0 16px 40px rgba(15,23,42,0.14);
+            padding: 6px;
+            min-width: 170px;
+        }
+        .action-dropdown .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+        .action-dropdown .dropdown-item i { width: 14px; text-align: center; }
+        .action-dropdown .dropdown-item:active { background: transparent; }
+        .action-dropdown .dropdown-item.text-success { color: #198754 !important; }
+        .action-dropdown .dropdown-item.text-success:hover { background: #e6f7ec; }
+        .action-dropdown .dropdown-item.text-danger { color: #dc3545 !important; }
+        .action-dropdown .dropdown-item.text-danger:hover { background: #fdeeee; }
+        .action-dropdown .dropdown-item.text-primary { color: var(--primary-color) !important; }
+        .action-dropdown .dropdown-item.text-primary:hover { background: #eaf1ff; }
+        .action-dropdown .dropdown-item.text-warning { color: #fd7e14 !important; }
+        .action-dropdown .dropdown-item.text-warning:hover { background: #fff4e0; }
+        .action-dropdown .dropdown-divider { margin: 4px 0; }
     </style>
 </head>
 
@@ -818,7 +873,7 @@
                                         <th>Requested</th>
                                         <th>Status</th>
                                         <th>Reason</th>
-                                        <th>Actions</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -828,21 +883,25 @@
                                         <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</td>
                                         <td><span class="status-badge pending">PENDING</span></td>
                                         <td th:text="${req.reason != null ? req.reason : '-'}">Reason</td>
-                                        <td>
-                                            <textarea class="form-control form-control-sm mb-1"
-                                                      th:id="'rejectReason_' + ${req.requestId}"
-                                                      rows="1"
-                                                      placeholder="Rejection reason"
-                                                      style="width: 170px; font-size: 12px;"></textarea>
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-success"
-                                                        th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                    <i class="fas fa-check"></i> Accept
+                                        <td class="text-center">
+                                            <div class="dropdown action-dropdown">
+                                                <button type="button" class="btn ellipsis-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions">
+                                                    <i class="fas fa-ellipsis-v"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger"
-                                                        th:onclick="'rejectDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                    <i class="fas fa-times"></i> Reject
-                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li>
+                                                        <a class="dropdown-item text-success" href="#"
+                                                           th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + '); return false;'">
+                                                            <i class="fas fa-check"></i> Accept
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger" href="#"
+                                                           th:onclick="'openRejectDriverPrompt(' + ${req.requestId} + ', ' + ${req.driverId} + '); return false;'">
+                                                            <i class="fas fa-times"></i> Reject
+                                                        </a>
+                                                    </li>
+                                                </ul>
                                             </div>
                                         </td>
                                     </tr>
@@ -870,7 +929,7 @@
                                         <th>Time</th>
                                         <th>Status</th>
                                         <th>Purpose</th>
-                                        <th>Actions</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -880,23 +939,89 @@
                                         <td th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')} + ' - ' + ${#temporals.format(booking.endTime, 'HH:mm')}">Time</td>
                                         <td><span class="status-badge pending">PENDING</span></td>
                                         <td th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</td>
-                                        <td>
+                                        <td class="text-center">
                                             <!-- INFRA or ADMIN can approve/decline -->
-                                            <div th:if="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}">
-                                                <div class="btn-group" role="group">
-                                                    <button class="btn btn-sm btn-success"
-                                                            th:onclick="'approveServerRoom(' + ${booking.bookingId} + ')'">
-                                                        <i class="fas fa-check"></i> Approve
-                                                    </button>
-                                                    <button class="btn btn-sm btn-danger"
-                                                            th:onclick="'declineServerRoom(' + ${booking.bookingId} + ')'">
-                                                        <i class="fas fa-times"></i> Decline
-                                                    </button>
-                                                </div>
+                                            <div th:if="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}"
+                                                 class="dropdown action-dropdown">
+                                                <button type="button" class="btn ellipsis-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li>
+                                                        <a class="dropdown-item text-success" href="#"
+                                                           th:onclick="'approveServerRoom(' + ${booking.bookingId} + '); return false;'">
+                                                            <i class="fas fa-check"></i> Approve
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger" href="#"
+                                                           th:onclick="'declineServerRoom(' + ${booking.bookingId} + '); return false;'">
+                                                            <i class="fas fa-times"></i> Decline
+                                                        </a>
+                                                    </li>
+                                                </ul>
                                             </div>
                                             <!-- Show message for non-INFRA/ADMIN users -->
                                             <div th:unless="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}">
                                                 <span class="text-muted small">Waiting for infrastructure approval</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- CAB (External Driver) Requests Pending Approval - NEW -->
+                <!-- ============================================================ -->
+                <div class="col-12" th:if="${pendingCabRequests != null and !pendingCabRequests.isEmpty()}">
+                    <div class="booking-panel">
+                        <div class="panel-header">
+                            <h6><i class="fas fa-taxi me-2" style="color: #0dcaf0;"></i>Cab Requests Pending Approval</h6>
+                            <span class="badge bg-info" th:text="${pendingCabRequests.size()}">0</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="table-container">
+                                <table class="requests-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Requester</th>
+                                        <th>Destination</th>
+                                        <th>Requested</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="req : ${pendingCabRequests}">
+                                        <td th:text="${req.requestedBy}">Requester</td>
+                                        <td th:text="${req.destination}">Destination</td>
+                                        <td th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                        <td><span class="status-badge pending">PENDING</span></td>
+                                        <td th:text="${req.reason != null ? req.reason : '-'}">Reason</td>
+                                        <td class="text-center">
+                                            <div class="dropdown action-dropdown">
+                                                <button type="button" class="btn ellipsis-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li>
+                                                        <a class="dropdown-item text-success" href="#"
+                                                           th:onclick="'approveCabRequest(' + ${req.requestId} + '); return false;'">
+                                                            <i class="fas fa-check"></i> Approve
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger" href="#"
+                                                           th:onclick="'rejectCabRequest(' + ${req.requestId} + '); return false;'">
+                                                            <i class="fas fa-times"></i> Reject
+                                                        </a>
+                                                    </li>
+                                                </ul>
                                             </div>
                                         </td>
                                     </tr>
@@ -960,6 +1085,7 @@
                 <!-- Empty State -->
                 <div class="col-12"
                      th:if="${(pendingDriverApprovals == null or pendingDriverApprovals.isEmpty()) and
+                             (pendingCabRequests == null or pendingCabRequests.isEmpty()) and
                              (pendingServerRooms == null or pendingServerRooms.isEmpty()) and
                              (pendingInfraRequests == null or pendingInfraRequests.isEmpty())}">
                     <div class="booking-panel">
@@ -1425,6 +1551,17 @@
         }
 
         // ============================================
+        // Ellipsis Action Dropdowns
+        // ============================================
+        function initActionDropdowns() {
+            document.querySelectorAll('.action-dropdown [data-bs-toggle="dropdown"]').forEach(function (toggle) {
+                if (toggle.dataset.ddInit === '1') return;
+                toggle.dataset.ddInit = '1';
+                bootstrap.Dropdown.getOrCreateInstance(toggle, { popperConfig: { strategy: 'fixed' } });
+            });
+        }
+
+        // ============================================
         // Form Locking
         // ============================================
         function lockSubmitButton(btn) {
@@ -1469,7 +1606,7 @@
                 body: params.toString()
             })
             .then(function (response) {
-                // ✅ Parse response as JSON
+                // Parse response as JSON
                 return response.json().then(function (data) {
                     if (response.ok) {
                         // Success
@@ -1561,6 +1698,9 @@
                     paginateList('roomBookingsList', 'roomBookingsPagination', 8);
                 }
             }
+
+            // Initialize the ellipsis action dropdowns (Accept/Reject, Approve/Decline menus)
+            initActionDropdowns();
         });
 
         // ============================================
@@ -1741,28 +1881,37 @@
             });
         }
 
-        function rejectDriverRequest(requestId, driverId) {
-            const reason = document.getElementById('rejectReason_' + requestId)?.value || 'No reason provided';
-
-            showConfirm('Reject this driver request?', function () {
-                const formData = new FormData();
-                formData.append('driverId', driverId);
-                formData.append('reason', reason);
-
-                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showToast('Request rejected successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
-                    } else {
-                        return response.text().then(text => { showToast('Error: ' + text, 'error'); });
-                    }
-                })
-                .catch(error => showToast('Error: ' + error.message, 'error'));
+        // Opens the reason modal, then submits the rejection with the given reason
+        function openRejectDriverPrompt(requestId, driverId) {
+            showReasonPrompt({
+                title: 'Reject Driver Request',
+                label: 'Reason for rejecting',
+                placeholder: 'Provide a reason for rejecting this request...',
+                confirmLabel: 'Reject Request'
+            }, function (reason) {
+                rejectDriverRequest(requestId, driverId, reason);
             });
+        }
+
+        function rejectDriverRequest(requestId, driverId, reason) {
+            reason = reason || 'No reason provided';
+            const formData = new FormData();
+            formData.append('driverId', driverId);
+            formData.append('reason', reason);
+
+            fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    showCornerToast('Request rejected successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 900);
+                } else {
+                    return response.text().then(text => { showCornerToast('Error: ' + text, 'error'); });
+                }
+            })
+            .catch(error => showCornerToast('Error: ' + error.message, 'error'));
         }
 
         function completeDriverTrip(requestId, driverId) {
@@ -1831,6 +1980,59 @@
                     })
                     .catch(error => showCornerToast('Error: ' + error.message, 'error'));
                 });
+            });
+        }
+
+        // ============================================
+        // Cab (External Driver) Approval Functions
+        // ============================================
+
+        function approveCabRequest(requestId) {
+            showConfirm('Approve this cab request? An external cab will be arranged for the requester.', function () {
+                // For cab requests, we use driverId = -1
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/accept?driverId=-1', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Cab request approved successfully! The requester has been notified.', 'success');
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        return response.text().then(text => {
+                            showToast('Failed to approve cab request: ' + text, 'error');
+                        });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
+            });
+        }
+
+        function rejectCabRequest(requestId) {
+            showReasonPrompt({
+                title: 'Reject Cab Request',
+                label: 'Reason for rejecting',
+                placeholder: 'Please provide a reason for rejecting this cab request...',
+                confirmLabel: 'Reject Request'
+            }, function (reason) {
+                const formData = new FormData();
+                formData.append('driverId', '-1');
+                formData.append('reason', reason);
+
+                fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/decline', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Cab request rejected successfully!', 'success');
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        return response.text().then(text => {
+                            showToast('Failed to reject cab request: ' + text, 'error');
+                        });
+                    }
+                })
+                .catch(error => showToast('Error: ' + error.message, 'error'));
             });
         }
 
