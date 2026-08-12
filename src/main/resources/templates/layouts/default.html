@@ -257,49 +257,55 @@
             font-weight: 600;
         }
 
-        /* ========== DROPDOWN IN SIDEBAR ========== */
-        .sidebar .nav-link.dropdown-toggle::after {
+        /* ========== COLLAPSIBLE SECTIONS IN SIDEBAR (replaces dropdowns) ========== */
+        /* Trailing area (badge + chevron) pinned to the right of a collapsible toggle */
+        .sidebar .nav-link .collapse-toggle-trailing {
             margin-left: auto;
-            border-top-color: rgba(255,255,255,0.4);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .sidebar .dropdown-menu {
-            background: var(--sidebar-bg);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px;
-            padding: 6px 0;
-            backdrop-filter: blur(8px);
-            width: 100%;
-            position: relative;
-            box-shadow: none;
-            margin: 4px 0 8px 0;
-            max-height: 240px;
-            overflow-y: auto;
+        .sidebar .nav-link .collapse-arrow {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            transition: transform 0.25s ease;
         }
 
-        .sidebar .dropdown-item {
+        .sidebar .nav-link[aria-expanded="true"] .collapse-arrow {
+            transform: rotate(180deg);
+        }
+
+        .sidebar .collapse-menu {
+            list-style: none;
+            padding: 4px 0 6px 0;
+            margin: 0;
+        }
+
+        .sidebar .collapse-item {
             color: var(--sidebar-text);
-            padding: 8px 16px 8px 44px;
+            padding: 8px 16px 8px 18px;
             font-size: 13px;
             border-radius: 6px;
             transition: all 0.2s ease;
             text-decoration: none;
             display: flex;
             align-items: center;
+            margin: 0 12px 2px 32px;
         }
 
-        .sidebar .dropdown-item:hover {
+        .sidebar .collapse-item:hover {
             background: var(--sidebar-hover);
             color: white;
         }
 
-        .sidebar .dropdown-item.active {
+        .sidebar .collapse-item.active {
             background: var(--sidebar-active);
             color: white;
         }
-        .sidebar .dropdown-item.active i { color: white; }
+        .sidebar .collapse-item.active i { color: white; }
 
-        .sidebar .dropdown-item i {
+        .sidebar .collapse-item i {
             width: 18px;
             margin-right: 10px;
             font-size: 13px;
@@ -540,7 +546,7 @@
             background: var(--hover-bg);
         }
 
-        /* Dropdown with theme support */
+        /* Dropdown with theme support (header notifications / user menu) */
         .dropdown-menu {
             background: var(--dropdown-bg) !important;
             border: 1px solid var(--border-color) !important;
@@ -638,7 +644,7 @@
         <h3><i class="fas fa-cubes"></i> Asset<span>IQ</span></h3>
         <small>Interswitch Asset Management</small>
     </div>
-    <nav class="nav flex-column">
+    <nav class="nav flex-column" id="sidebarNav">
         <!-- Dashboard - Everyone -->
         <div class="nav-item">
             <a class="nav-link" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''" href="/assetIQ-pro/dashboard">
@@ -646,19 +652,25 @@
             </a>
         </div>
 
-        <!-- ========== RESOURCES DROPDOWN ========== -->
+        <!-- ========== RESOURCES COLLAPSIBLE ========== -->
         <div class="nav-item">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link collapse-toggle" href="#resourcesCollapse" role="button"
+               data-bs-toggle="collapse" aria-expanded="false" aria-controls="resourcesCollapse">
                 <i class="fas fa-boxes"></i> Resources
+                <span class="collapse-toggle-trailing">
+                    <i class="fas fa-chevron-down collapse-arrow"></i>
+                </span>
             </a>
-            <ul class="dropdown-menu">
-                <li sec:authorize="hasAnyAuthority('INFRA_REQUEST_VIEW', 'ADMIN')">
-                    <a class="dropdown-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a>
-                </li>
-                <li sec:authorize="hasAnyAuthority('RESOURCE_REQUEST_VIEW', 'ADMIN')">
-                    <a class="dropdown-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a>
-                </li>
-            </ul>
+            <div class="collapse" id="resourcesCollapse" data-bs-parent="#sidebarNav">
+                <ul class="collapse-menu">
+                    <li sec:authorize="hasAnyAuthority('INFRA_REQUEST_VIEW', 'ADMIN')">
+                        <a class="collapse-item" href="/assetIQ-pro/infra-requests"><i class="fas fa-tools"></i> Infrastructure</a>
+                    </li>
+                    <li sec:authorize="hasAnyAuthority('RESOURCE_REQUEST_VIEW', 'ADMIN')">
+                        <a class="collapse-item" href="/assetIQ-pro/resources/list"><i class="fas fa-clipboard-list"></i> Administration</a>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         <!-- ========== BOOKINGS ========== -->
@@ -687,26 +699,34 @@
         <!-- ========== BOTTOM SECTION: Assets, Transfers, Admin ========== -->
         <!-- Assets & Transfers - Admin only -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'ASSET_VIEW', 'ASSET_EDIT', 'DELETE_ASSETS', 'TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS')">
-            <!-- Assets - now a dropdown: Asset Mgt / Disposal Mgt -->
+            <!-- Assets - now a collapsible: Asset Mgt / Disposal Mgt -->
             <div class="nav-item">
-                <a class="nav-link dropdown-toggle"
+                <a class="nav-link collapse-toggle"
                    th:classappend="${currentPage == 'assets' or currentPage == 'disposal-dashboard'} ? 'active' : ''"
-                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                   href="#assetsCollapse" role="button" data-bs-toggle="collapse"
+                   th:aria-expanded="${currentPage == 'assets' or currentPage == 'disposal-dashboard'} ? 'true' : 'false'"
+                   aria-controls="assetsCollapse">
                     <i class="fas fa-laptop"></i> Assets
-                    <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+                    <span class="collapse-toggle-trailing">
+                        <span class="badge" th:if="${warrantyExpiringCount != null and warrantyExpiringCount > 0}" th:text="${warrantyExpiringCount}">0</span>
+                        <i class="fas fa-chevron-down collapse-arrow"></i>
+                    </span>
                 </a>
-                <ul class="dropdown-menu">
-                    <li>
-                        <a class="dropdown-item" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
-                            <i class="fas fa-laptop"></i> Asset Mgt
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" th:classappend="${currentPage == 'disposal-dashboard'} ? 'active' : ''" href="/assetIQ-pro/admin/disposal">
-                            <i class="fas fa-trash-alt"></i> Disposal Mgt
-                        </a>
-                    </li>
-                </ul>
+                <div class="collapse" id="assetsCollapse" data-bs-parent="#sidebarNav"
+                     th:classappend="${currentPage == 'assets' or currentPage == 'disposal-dashboard'} ? 'show' : ''">
+                    <ul class="collapse-menu">
+                        <li>
+                            <a class="collapse-item" th:classappend="${currentPage == 'assets'} ? 'active' : ''" href="/assetIQ-pro/assets">
+                                <i class="fas fa-laptop"></i> Asset Mgt
+                            </a>
+                        </li>
+                        <li>
+                            <a class="collapse-item" th:classappend="${currentPage == 'disposal-dashboard'} ? 'active' : ''" href="/assetIQ-pro/admin/disposal">
+                                <i class="fas fa-trash-alt"></i> Disposal Mgt
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
             <div class="nav-item">
                 <a class="nav-link" th:classappend="${currentPage == 'transfers'} ? 'active' : ''" href="/assetIQ-pro/transfers">
@@ -715,69 +735,78 @@
             </div>
         </div>
 
-        <!-- ========== ADMIN DROPDOWN - Moved to Bottom ========== -->
+        <!-- ========== ADMIN COLLAPSIBLE - Moved to Bottom ========== -->
         <!-- Only users with actual admin permissions can see this -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS', 'ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'USER_VIEW', 'EMPLOYEE_VIEW', 'DEPARTMENT_VIEW', 'CATEGORY_VIEW', 'LOCATION_VIEW', 'SUPPLIER_VIEW', 'COMPANY_VIEW', 'MANAGE_INVENTORY', 'VIEW_AUDIT')">
             <div class="nav-item">
-                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link collapse-toggle" href="#adminCollapse" role="button"
+                   data-bs-toggle="collapse"
+                   th:aria-expanded="${currentPage == 'sla-config'} ? 'true' : 'false'"
+                   aria-controls="adminCollapse">
                     <i class="fas fa-cog"></i> Admin
+                    <span class="collapse-toggle-trailing">
+                        <i class="fas fa-chevron-down collapse-arrow"></i>
+                    </span>
                 </a>
-                <ul class="dropdown-menu">
-                    <!-- Users - requires USER_VIEW or CREATE_USERS or MANAGE_ROLES -->
-                    <li sec:authorize="hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_ROLES', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a>
-                    </li>
-                    <!-- Employees - requires EMPLOYEE_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('EMPLOYEE_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
-                    </li>
-                    <!-- Departments - requires DEPARTMENT_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('DEPARTMENT_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
-                    </li>
-                    <!-- Categories - requires CATEGORY_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('CATEGORY_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
-                    </li>
-                    <!-- Locations - requires LOCATION_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('LOCATION_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a>
-                    </li>
-                    <!-- Suppliers - requires SUPPLIER_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('SUPPLIER_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
-                    </li>
-                    <!-- Companies - requires COMPANY_VIEW -->
-                    <li sec:authorize="hasAnyAuthority('COMPANY_VIEW', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
-                    </li>
-                    <!-- Rooms - requires ROOM_CREATE, ROOM_EDIT, or ROOM_DELETE (NOT just ROOM_VIEW_ALL or ROOM_BOOK) -->
-                    <li sec:authorize="hasAnyAuthority('ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'MANAGE_BOOKINGS', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
-                    </li>
-                    <!-- Stock - requires MANAGE_INVENTORY -->
-                    <li sec:authorize="hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a>
-                    </li>
-                    <!-- Settings - requires MANAGE_CONFIG -->
-                    <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a>
-                    </li>
-                    <!-- SLA Management - requires MANAGE_CONFIG or ADMIN -->
-                    <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN', 'SUPER_ADMIN')">
-                        <a class="dropdown-item" th:classappend="${currentPage == 'sla-config'} ? 'active' : ''" href="/assetIQ-pro/admin/sla">
-                            <i class="fas fa-clock"></i> SLA Management
-                        </a>
-                    </li>
-                    <!-- Audit - requires VIEW_AUDIT -->
-                    <li sec:authorize="hasAnyAuthority('VIEW_AUDIT', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
-                    </li>
-                    <!-- Permissions - requires MANAGE_ROLES -->
-                    <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
-                        <a class="dropdown-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
-                    </li>
-                </ul>
+                <div class="collapse" id="adminCollapse" data-bs-parent="#sidebarNav"
+                     th:classappend="${currentPage == 'sla-config'} ? 'show' : ''">
+                    <ul class="collapse-menu">
+                        <!-- Users - requires USER_VIEW or CREATE_USERS or MANAGE_ROLES -->
+                        <li sec:authorize="hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_ROLES', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a>
+                        </li>
+                        <!-- Employees - requires EMPLOYEE_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('EMPLOYEE_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
+                        </li>
+                        <!-- Departments - requires DEPARTMENT_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('DEPARTMENT_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
+                        </li>
+                        <!-- Categories - requires CATEGORY_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('CATEGORY_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
+                        </li>
+                        <!-- Locations - requires LOCATION_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('LOCATION_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a>
+                        </li>
+                        <!-- Suppliers - requires SUPPLIER_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('SUPPLIER_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+                        </li>
+                        <!-- Companies - requires COMPANY_VIEW -->
+                        <li sec:authorize="hasAnyAuthority('COMPANY_VIEW', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
+                        </li>
+                        <!-- Rooms - requires ROOM_CREATE, ROOM_EDIT, or ROOM_DELETE (NOT just ROOM_VIEW_ALL or ROOM_BOOK) -->
+                        <li sec:authorize="hasAnyAuthority('ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'MANAGE_BOOKINGS', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
+                        </li>
+                        <!-- Stock - requires MANAGE_INVENTORY -->
+                        <li sec:authorize="hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a>
+                        </li>
+                        <!-- Settings - requires MANAGE_CONFIG -->
+                        <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a>
+                        </li>
+                        <!-- SLA Management - requires MANAGE_CONFIG or ADMIN -->
+                        <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN', 'SUPER_ADMIN')">
+                            <a class="collapse-item" th:classappend="${currentPage == 'sla-config'} ? 'active' : ''" href="/assetIQ-pro/admin/sla">
+                                <i class="fas fa-clock"></i> SLA Management
+                            </a>
+                        </li>
+                        <!-- Audit - requires VIEW_AUDIT -->
+                        <li sec:authorize="hasAnyAuthority('VIEW_AUDIT', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
+                        </li>
+                        <!-- Permissions - requires MANAGE_ROLES -->
+                        <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
+                            <a class="collapse-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -1131,19 +1160,43 @@
         }
     });
 
-    // Fix: bring an opened sidebar dropdown fully into view
-    document.addEventListener('shown.bs.dropdown', function (event) {
-        var toggle = event.target;
-        var sidebar = document.getElementById('sidebar');
-        if (sidebar && sidebar.contains(toggle)) {
-            var menu = toggle.nextElementSibling;
-            if (menu) {
-                setTimeout(function() {
-                    menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }, 50);
+    // ============================================================
+    // SIDEBAR COLLAPSIBLE SECTIONS (Resources / Assets / Admin)
+    // ============================================================
+    // These use Bootstrap's Collapse component with a shared
+    // data-bs-parent="#sidebarNav", so opening one automatically
+    // closes any other open section (accordion behaviour) - only
+    // one collapsible section is expanded at a time.
+    //
+    // When a section auto-opens on page load (th:classappend="show"
+    // for the active page), the arrow needs to start rotated too,
+    // since Bootstrap only flips aria-expanded on user interaction
+    // for toggles it initializes fresh - we keep the two in sync here.
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.sidebar .collapse-toggle').forEach(function (toggle) {
+            var targetSelector = toggle.getAttribute('href');
+            var targetEl = targetSelector ? document.querySelector(targetSelector) : null;
+            if (targetEl && targetEl.classList.contains('show')) {
+                toggle.setAttribute('aria-expanded', 'true');
             }
-        }
+        });
     });
+
+    // Keep each toggle's aria-expanded (and therefore its chevron rotation)
+    // in sync as sections open/close, including when Bootstrap closes a
+    // sibling section automatically via data-bs-parent.
+    document.addEventListener('shown.bs.collapse', function (event) {
+        syncSidebarToggleState(event.target);
+    });
+    document.addEventListener('hidden.bs.collapse', function (event) {
+        syncSidebarToggleState(event.target);
+    });
+    function syncSidebarToggleState(collapseEl) {
+        if (!collapseEl || !collapseEl.id) return;
+        var toggle = document.querySelector('.sidebar .collapse-toggle[href="#' + collapseEl.id + '"]');
+        if (!toggle) return;
+        toggle.setAttribute('aria-expanded', collapseEl.classList.contains('show') ? 'true' : 'false');
+    }
 
     // ============================================================
     // THEME MANAGEMENT

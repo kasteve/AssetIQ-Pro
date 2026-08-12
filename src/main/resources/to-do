@@ -17,10 +17,6 @@ asset status changes to disposed, those options should become inactive so that o
 
 8. Review and define default permissions for every user role so that they are assigned everytime a user is assigned that role
 
-10. Instead of sending links for one to track sla, should be just a notification but user should login to trackin the portal
-
 11. Make users get instant responses on UI not waiting for the backend activity like emails to be sent out to give the user a response.
-
-12. Make the cab requests appear under the Pending Approvals and Completions tab for the admin to approve them since they are not linked to any driver
 
 19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.
