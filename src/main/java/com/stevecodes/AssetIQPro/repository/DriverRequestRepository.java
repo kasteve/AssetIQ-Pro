@@ -83,4 +83,26 @@ public interface DriverRequestRepository extends JpaRepository<DriverRequest, Lo
 
     long countByStatus(String status);
 
+    // ✅ NEW METHODS FOR EXPIRY AND CATEGORY
+
+    @Query("SELECT d FROM DriverRequest d WHERE d.status = :status AND d.isExpired = false AND d.expiryTime < :now")
+    List<DriverRequest> findByStatusAndIsExpiredFalseAndExpiryTimeBefore(
+            @Param("status") String status,
+            @Param("now") LocalDateTime now);
+
+    List<DriverRequest> findByTripCategory(String tripCategory);
+
+    @Query("SELECT d FROM DriverRequest d WHERE d.driverId = :driverId " +
+            "AND d.status IN ('PENDING', 'PENDING_ADMIN', 'ACCEPTED') " +
+            "AND d.isExpired = false " +
+            "ORDER BY d.requestTime ASC")
+    List<DriverRequest> findActiveTripsForDriver(@Param("driverId") Long driverId);
+
+    @Query("SELECT d FROM DriverRequest d WHERE d.driverId = :driverId AND d.isExpired = true")
+    List<DriverRequest> findExpiredTripsForDriver(@Param("driverId") Long driverId);
+
+    @Query("SELECT d FROM DriverRequest d WHERE d.userId = :userId AND d.tripCategory = :category " +
+            "ORDER BY d.requestTime DESC")
+    List<DriverRequest> findTripsByCategoryForUser(@Param("userId") Long userId,
+                                                   @Param("category") String category);
 }

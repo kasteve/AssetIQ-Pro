@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,176 +32,232 @@ public class ReportApiController {
     private final DepartmentRepository departmentRepository;
 
     // ============================================
-    // 1. END OF LIFE REPORT
+    // 1. ASSETS REPORT (Unified)
     // ============================================
-    @GetMapping("/eol")
-    public Map<String, Object> getEOLReport(
-            @RequestParam(required = false) Long category,
-            @RequestParam(required = false) String status,
+    @GetMapping("/assets")
+    public Map<String, Object> getAssetsReport(
+            @RequestParam String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false) Long category,
+            @RequestParam(required = false) String status) {
 
         Map<String, Object> response = new HashMap<>();
         List<Asset> assets = assetRepository.findAll();
 
+        // Apply common filters
         if (category != null) {
             assets = assets.stream()
                     .filter(a -> a.getCategory() != null && a.getCategory().getCategoryId().equals(category))
-                    .collect(Collectors.toList());
-        }
-
-        if (status != null && !status.isEmpty()) {
-            assets = assets.stream()
-                    .filter(a -> a.getStatus() != null && a.getStatus().name().equalsIgnoreCase(status))
                     .collect(Collectors.toList());
         }
 
         if (dateFrom != null) {
             assets = assets.stream()
-                    .filter(a -> a.getEolDate() == null || !a.getEolDate().isBefore(dateFrom))
+                    .filter(a -> a.getPurchaseDate() != null && !a.getPurchaseDate().isBefore(dateFrom))
                     .collect(Collectors.toList());
         }
 
         if (dateTo != null) {
             assets = assets.stream()
-                    .filter(a -> a.getEolDate() == null || !a.getEolDate().isAfter(dateTo))
+                    .filter(a -> a.getPurchaseDate() != null && !a.getPurchaseDate().isAfter(dateTo))
                     .collect(Collectors.toList());
         }
 
-        long eolCount = assets.stream()
-                .filter(a -> a.getStatus() == Asset.AssetStatus.RETIRED)
-                .count();
+        if (status != null && !status.isEmpty()) {
+            try {
+                Asset.AssetStatus statusEnum = Asset.AssetStatus.valueOf(status.toUpperCase());
+                assets = assets.stream()
+                        .filter(a -> a.getStatus() == statusEnum)
+                        .collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid status - ignore filter
+            }
+        }
 
-        long activeCount = assets.stream()
-                .filter(a -> a.getStatus() == Asset.AssetStatus.AVAILABLE || a.getStatus() == Asset.AssetStatus.ASSIGNED)
-                .count();
+        // Apply type-specific logic
+        List<Map<String, Object>> assetList = new ArrayList<>();
+        long activeCount = 0, warningCount = 0, criticalCount = 0;
 
-        List<Map<String, Object>> assetList = assets.stream()
-                .map(a -> {
-                    Map<String, Object> item = new HashMap<>();
-                    Object assetNameObj = a.getName();
-                    item.put("name", assetNameObj != null ? assetNameObj.toString() : "N/A");
-                    item.put("tag", a.getTag() != null ? a.getTag() : "N/A");
-                    item.put("category", a.getCategory() != null ? a.getCategory().getName() : "N/A");
-                    item.put("purchaseDate", a.getPurchaseDate() != null ? a.getPurchaseDate().toString() : "N/A");
-                    item.put("eolDate", a.getEolDate() != null ? a.getEolDate().toString() : "N/A");
-                    item.put("status", a.getStatus() != null ? a.getStatus().name() : "UNKNOWN");
-
-                    if (a.getEolDate() != null) {
-                        long days = ChronoUnit.DAYS.between(LocalDate.now(), a.getEolDate());
-                        item.put("daysRemaining", days > 0 ? days + " days" : (days == 0 ? "Today" : Math.abs(days) + " days overdue"));
-                    } else {
-                        item.put("daysRemaining", "N/A");
-                    }
-                    return item;
-                })
-                .collect(Collectors.toList());
+        switch (type.toLowerCase()) {
+            case "warranty":
+                assetList = processWarrantyAssets(assets);
+                activeCount = assetList.stream().filter(a -> "ACTIVE".equals(a.get("status"))).count();
+                warningCount = assetList.stream().filter(a -> "EXPIRING".equals(a.get("status"))).count();
+                criticalCount = assetList.stream().filter(a -> "EXPIRED".equals(a.get("status"))).count();
+                break;
+            case "eol":
+                assetList = processEOLAssets(assets);
+                activeCount = assetList.stream().filter(a -> "ACTIVE".equals(a.get("status"))).count();
+                warningCount = assetList.stream().filter(a -> "EOL_SOON".equals(a.get("status"))).count();
+                criticalCount = assetList.stream().filter(a -> "EOL".equals(a.get("status"))).count();
+                break;
+            case "disposal":
+                assetList = processDisposalAssets(assets);
+                activeCount = assetList.stream().filter(a -> "ACTIVE".equals(a.get("status"))).count();
+                warningCount = assetList.stream().filter(a -> "RETIRED".equals(a.get("status")) || "TRANSFERRED".equals(a.get("status"))).count();
+                criticalCount = assetList.stream().filter(a -> "DISPOSED".equals(a.get("status"))).count();
+                break;
+            case "cost":
+                return getCostReport(dateFrom, dateTo, category, null);
+            default:
+                assetList = processWarrantyAssets(assets);
+        }
 
         response.put("total", assets.size());
-        response.put("eolCount", eolCount);
-        response.put("eosCount", 0);
         response.put("activeCount", activeCount);
+        response.put("warningCount", warningCount);
+        response.put("criticalCount", criticalCount);
         response.put("assets", assetList);
         return response;
     }
 
-    // ============================================
-    // 2. WARRANTY EXPIRY REPORT
-    // ============================================
-    @GetMapping("/warranty")
-    public Map<String, Object> getWarrantyReport(
-            @RequestParam(required = false) Long category,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-
-        Map<String, Object> response = new HashMap<>();
-        List<Asset> assets = assetRepository.findAll();
-
-        if (category != null) {
-            assets = assets.stream()
-                    .filter(a -> a.getCategory() != null && a.getCategory().getCategoryId().equals(category))
-                    .collect(Collectors.toList());
-        }
-
+    private List<Map<String, Object>> processWarrantyAssets(List<Asset> assets) {
+        List<Map<String, Object>> result = new ArrayList<>();
         LocalDate now = LocalDate.now();
-        List<Map<String, Object>> assetList = new ArrayList<>();
-        long activeCount = 0;
-        long expiringCount = 0;
-        long expiredCount = 0;
 
         for (Asset asset : assets) {
             Map<String, Object> item = new HashMap<>();
-            Object assetNameObj = asset.getName();
-            item.put("name", assetNameObj != null ? assetNameObj.toString() : "N/A");
+            item.put("id", asset.getAssetId());
+            item.put("name", asset.getName() != null ? asset.getName() : "N/A");
             item.put("tag", asset.getTag() != null ? asset.getTag() : "N/A");
             item.put("category", asset.getCategory() != null ? asset.getCategory().getName() : "N/A");
             item.put("purchaseDate", asset.getPurchaseDate() != null ? asset.getPurchaseDate().toString() : "N/A");
 
-            String warrantyStatus = "N/A";
-            long daysLeft = 0;
+            String status = "NO_WARRANTY";
+            long daysRemaining = 0;
 
             if (asset.getWarrantyEndDate() != null) {
-                LocalDate warrantyEnd = asset.getWarrantyEndDate();
-                daysLeft = ChronoUnit.DAYS.between(now, warrantyEnd);
-
-                if (daysLeft < 0) {
-                    warrantyStatus = "EXPIRED";
-                    expiredCount++;
-                } else if (daysLeft <= 30) {
-                    warrantyStatus = "EXPIRING";
-                    expiringCount++;
+                daysRemaining = ChronoUnit.DAYS.between(now, asset.getWarrantyEndDate());
+                if (daysRemaining < 0) {
+                    status = "EXPIRED";
+                } else if (daysRemaining <= 30) {
+                    status = "EXPIRING";
                 } else {
-                    warrantyStatus = "ACTIVE";
-                    activeCount++;
+                    status = "ACTIVE";
                 }
-
-                item.put("warrantyStart", asset.getPurchaseDate() != null ? asset.getPurchaseDate().toString() : "N/A");
-                item.put("warrantyEnd", asset.getWarrantyEndDate().toString());
-                item.put("status", warrantyStatus);
-                item.put("daysLeft", daysLeft > 0 ? daysLeft + " days" : (daysLeft == 0 ? "Today" : "Expired"));
+                item.put("daysRemaining", daysRemaining);
             } else {
-                item.put("warrantyStart", "N/A");
-                item.put("warrantyEnd", "N/A");
-                item.put("status", "NO WARRANTY");
-                item.put("daysLeft", "N/A");
+                item.put("daysRemaining", "N/A");
             }
 
-            if (status != null && !status.isEmpty() && !status.equals(item.get("status"))) {
-                continue;
-            }
-
-            if (dateFrom != null && asset.getWarrantyEndDate() != null) {
-                if (asset.getWarrantyEndDate().isBefore(dateFrom)) continue;
-            }
-            if (dateTo != null && asset.getWarrantyEndDate() != null) {
-                if (asset.getWarrantyEndDate().isAfter(dateTo)) continue;
-            }
-
-            assetList.add(item);
+            item.put("status", status);
+            result.add(item);
         }
+        return result;
+    }
 
-        response.put("total", assetList.size());
-        response.put("activeCount", activeCount);
-        response.put("expiringCount", expiringCount);
-        response.put("expiredCount", expiredCount);
-        response.put("assets", assetList);
-        return response;
+    private List<Map<String, Object>> processEOLAssets(List<Asset> assets) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        LocalDate now = LocalDate.now();
+
+        for (Asset asset : assets) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", asset.getAssetId());
+            item.put("name", asset.getName() != null ? asset.getName() : "N/A");
+            item.put("tag", asset.getTag() != null ? asset.getTag() : "N/A");
+            item.put("category", asset.getCategory() != null ? asset.getCategory().getName() : "N/A");
+            item.put("purchaseDate", asset.getPurchaseDate() != null ? asset.getPurchaseDate().toString() : "N/A");
+
+            String status = "ACTIVE";
+            long daysRemaining = 0;
+
+            if (asset.getEolDate() != null) {
+                daysRemaining = ChronoUnit.DAYS.between(now, asset.getEolDate());
+                if (daysRemaining < 0) {
+                    status = "EOL";
+                } else if (daysRemaining <= 90) {
+                    status = "EOL_SOON";
+                } else {
+                    status = "ACTIVE";
+                }
+                item.put("daysRemaining", daysRemaining);
+            } else {
+                item.put("daysRemaining", "N/A");
+            }
+
+            item.put("status", status);
+            result.add(item);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> processDisposalAssets(List<Asset> assets) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Asset asset : assets) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", asset.getAssetId());
+            item.put("name", asset.getName() != null ? asset.getName() : "N/A");
+            item.put("tag", asset.getTag() != null ? asset.getTag() : "N/A");
+            item.put("category", asset.getCategory() != null ? asset.getCategory().getName() : "N/A");
+            item.put("purchaseDate", asset.getPurchaseDate() != null ? asset.getPurchaseDate().toString() : "N/A");
+
+            String status = "ACTIVE";
+            if (asset.getStatus() != null) {
+                switch (asset.getStatus()) {
+                    case RETIRED:
+                        status = "RETIRED";
+                        break;
+                    case DISPOSED:
+                        status = "DISPOSED";
+                        break;
+                    case TRANSFERRED:
+                        status = "TRANSFERRED";
+                        break;
+                    case MAINTENANCE:
+                        status = "MAINTENANCE";
+                        break;
+                    case ASSIGNED:
+                        status = "ASSIGNED";
+                        break;
+                    case AVAILABLE:
+                    default:
+                        status = "ACTIVE";
+                        break;
+                }
+            }
+            item.put("status", status);
+            item.put("daysRemaining", "N/A");
+            result.add(item);
+        }
+        return result;
     }
 
     // ============================================
-    // 3. TRANSFERS REPORT
-    // ============================================
+// 2. TRANSFERS REPORT - FIXED
+// ============================================
     @GetMapping("/transfers")
     public Map<String, Object> getTransfersReport(
+            @RequestParam String category,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String type) {
+            @RequestParam(required = false) Integer department) {
 
         Map<String, Object> response = new HashMap<>();
         List<Transfer> transfers = transferRepository.findAll();
 
+        log.info("=== TRANSFERS REPORT ===");
+        log.info("Category filter: {}", category);
+        log.info("Date from: {}, Date to: {}", dateFrom, dateTo);
+        log.info("Status filter: {}", status);
+        log.info("Department filter: {}", department);
+        log.info("Total transfers before filtering: {}", transfers.size());
+
+        // Filter by category - FIXED: Use getCategory() method
+        if (category != null && !category.isEmpty() && !"ALL".equalsIgnoreCase(category)) {
+            transfers = transfers.stream()
+                    .filter(t -> {
+                        String transferCategory = t.getCategory();
+                        log.debug("Transfer {} category: {}", t.getTransferId(), transferCategory);
+                        return transferCategory != null && transferCategory.equalsIgnoreCase(category);
+                    })
+                    .collect(Collectors.toList());
+            log.info("After category filter: {} transfers", transfers.size());
+        }
+
+        // Apply date filters
         if (dateFrom != null) {
             transfers = transfers.stream()
                     .filter(t -> t.getTransferDate() != null && !t.getTransferDate().isBefore(dateFrom))
@@ -211,41 +268,96 @@ public class ReportApiController {
                     .filter(t -> t.getTransferDate() != null && !t.getTransferDate().isAfter(dateTo))
                     .collect(Collectors.toList());
         }
+        log.info("After date filter: {} transfers", transfers.size());
 
+        // Apply status filter - FIXED: Use getStatus() method
+        if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
+            transfers = transfers.stream()
+                    .filter(t -> {
+                        String transferStatus = t.getStatus();
+                        log.debug("Transfer {} status: {}", t.getTransferId(), transferStatus);
+                        return transferStatus != null && transferStatus.equalsIgnoreCase(status);
+                    })
+                    .collect(Collectors.toList());
+            log.info("After status filter: {} transfers", transfers.size());
+        }
+
+        // Apply department filter
+        if (department != null) {
+            transfers = transfers.stream()
+                    .filter(t -> (t.getNewDepartmentId() != null && t.getNewDepartmentId().equals(department)) ||
+                            (t.getOldDepartmentId() != null && t.getOldDepartmentId().equals(department)))
+                    .collect(Collectors.toList());
+            log.info("After department filter: {} transfers", transfers.size());
+        }
+
+        // Calculate statistics using getStatus()
+        long total = transfers.size();
         long pendingCount = transfers.stream()
-                .filter(t -> t.getIsFullySigned() != null && !t.getIsFullySigned())
+                .filter(t -> "PENDING".equalsIgnoreCase(t.getStatus()))
                 .count();
         long completedCount = transfers.stream()
-                .filter(t -> t.getIsFullySigned() != null && t.getIsFullySigned())
+                .filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus()))
+                .count();
+        long rejectedCount = transfers.stream()
+                .filter(t -> "REJECTED".equalsIgnoreCase(t.getStatus()))
                 .count();
 
         List<Map<String, Object>> transferList = transfers.stream()
                 .map(t -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", t.getTransferId());
-                    item.put("type", "ASSET");
+                    item.put("category", t.getCategory() != null ? t.getCategory() : "ASSET");
                     item.put("from", getDepartmentName(t.getOldDepartmentId()));
                     item.put("to", getDepartmentName(t.getNewDepartmentId()));
-                    item.put("asset", t.getAssetTag() != null ? t.getAssetTag() : "N/A");
+                    item.put("item", t.getAssetTag() != null ? t.getAssetTag() : "N/A");
                     item.put("date", t.getTransferDate() != null ? t.getTransferDate().toString() : "N/A");
-                    item.put("status", t.getIsFullySigned() != null && t.getIsFullySigned() ? "COMPLETED" : "PENDING");
-                    item.put("amount", "N/A");
+                    item.put("status", t.getStatus() != null ? t.getStatus() : "PENDING");
+                    item.put("amount", t.getAmount() != null ? t.getAmount().toString() : "N/A");
                     return item;
                 })
                 .collect(Collectors.toList());
 
-        response.put("total", transfers.size());
+        response.put("total", total);
         response.put("pendingCount", pendingCount);
         response.put("completedCount", completedCount);
-        response.put("rejectedCount", 0);
+        response.put("rejectedCount", rejectedCount);
         response.put("transfers", transferList);
+
+        log.info("Transfers report result: {} transfers returned", transferList.size());
         return response;
     }
 
     // ============================================
-    // 4. DRIVER BOOKINGS REPORT
+    // 3. BOOKINGS REPORT (Unified)
     // ============================================
-    @GetMapping("/driver-bookings")
+    @GetMapping("/bookings")
+    public Map<String, Object> getBookingsReport(
+            @RequestParam String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false) Long specificId,
+            @RequestParam(required = false) String status) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        if ("driver".equalsIgnoreCase(type)) {
+            return getDriverBookingsReport(dateFrom, dateTo, specificId, status);
+        } else if ("room".equalsIgnoreCase(type)) {
+            return getRoomBookingsReport(dateFrom, dateTo, specificId, status);
+        }
+
+        response.put("total", 0);
+        response.put("pendingCount", 0);
+        response.put("activeCount", 0);
+        response.put("completedCount", 0);
+        response.put("bookings", new ArrayList<>());
+        return response;
+    }
+
+    // ============================================
+// 4. DRIVER BOOKINGS REPORT - FIXED
+// ============================================
     public Map<String, Object> getDriverBookingsReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -254,6 +366,12 @@ public class ReportApiController {
 
         Map<String, Object> response = new HashMap<>();
         List<DriverRequest> requests = driverRequestRepository.findAll();
+
+        log.info("=== DRIVER BOOKINGS REPORT ===");
+        log.info("Date from: {}, Date to: {}", dateFrom, dateTo);
+        log.info("Driver ID filter: {}", driverId);
+        log.info("Status filter: {}", status);
+        log.info("Total requests before filtering: {}", requests.size());
 
         if (dateFrom != null) {
             requests = requests.stream()
@@ -265,25 +383,31 @@ public class ReportApiController {
                     .filter(r -> r.getRequestTime() != null && !r.getRequestTime().toLocalDate().isAfter(dateTo))
                     .collect(Collectors.toList());
         }
+        log.info("After date filter: {} requests", requests.size());
+
         if (driverId != null) {
             requests = requests.stream()
                     .filter(r -> r.getDriverId() != null && r.getDriverId().equals(driverId))
                     .collect(Collectors.toList());
+            log.info("After driver filter: {} requests", requests.size());
         }
-        if (status != null && !status.isEmpty()) {
+
+        // FIXED: Status filter using equalsIgnoreCase
+        if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
             requests = requests.stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().equalsIgnoreCase(status))
                     .collect(Collectors.toList());
+            log.info("After status filter: {} requests", requests.size());
         }
 
         long pendingCount = requests.stream()
-                .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
+                .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()) || "PENDING_ADMIN".equalsIgnoreCase(r.getStatus()))
+                .count();
+        long activeCount = requests.stream()
+                .filter(r -> "ACCEPTED".equalsIgnoreCase(r.getStatus()))
                 .count();
         long completedCount = requests.stream()
                 .filter(r -> "COMPLETED".equalsIgnoreCase(r.getStatus()))
-                .count();
-        long declinedCount = requests.stream()
-                .filter(r -> "DECLINED".equalsIgnoreCase(r.getStatus()))
                 .count();
 
         List<Map<String, Object>> bookingList = requests.stream()
@@ -291,27 +415,27 @@ public class ReportApiController {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", r.getRequestId());
                     item.put("requester", r.getRequestedBy() != null ? r.getRequestedBy() : getUserName(r.getUserId()));
-                    item.put("driverName", getUserName(r.getDriverId()));
+                    item.put("driver", getUserName(r.getDriverId()));
                     item.put("destination", r.getDestination() != null ? r.getDestination() : "N/A");
-                    item.put("requestTime", r.getRequestTime() != null ? r.getRequestTime().toString() : "N/A");
+                    item.put("requested", r.getRequestTime() != null ? r.getRequestTime().toString() : "N/A");
                     item.put("status", r.getStatus() != null ? r.getStatus() : "UNKNOWN");
-                    item.put("completedAt", r.getResponseTime() != null ? r.getResponseTime().toString() : "N/A");
                     return item;
                 })
                 .collect(Collectors.toList());
 
         response.put("total", requests.size());
         response.put("pendingCount", pendingCount);
+        response.put("activeCount", activeCount);
         response.put("completedCount", completedCount);
-        response.put("declinedCount", declinedCount);
         response.put("bookings", bookingList);
+
+        log.info("Driver bookings report: {} bookings returned", bookingList.size());
         return response;
     }
 
     // ============================================
-    // 5. ROOM BOOKINGS REPORT
-    // ============================================
-    @GetMapping("/room-bookings")
+// 5. ROOM BOOKINGS REPORT - FIXED
+// ============================================
     public Map<String, Object> getRoomBookingsReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -320,6 +444,12 @@ public class ReportApiController {
 
         Map<String, Object> response = new HashMap<>();
         List<Booking> bookings = bookingRepository.findAll();
+
+        log.info("=== ROOM BOOKINGS REPORT ===");
+        log.info("Date from: {}, Date to: {}", dateFrom, dateTo);
+        log.info("Room ID filter: {}", roomId);
+        log.info("Status filter: {}", status);
+        log.info("Total bookings before filtering: {}", bookings.size());
 
         if (dateFrom != null) {
             bookings = bookings.stream()
@@ -331,40 +461,50 @@ public class ReportApiController {
                     .filter(b -> b.getEndTime() != null && !b.getEndTime().toLocalDate().isAfter(dateTo))
                     .collect(Collectors.toList());
         }
+        log.info("After date filter: {} bookings", bookings.size());
+
         if (roomId != null) {
             bookings = bookings.stream()
                     .filter(b -> b.getRoomId() != null && b.getRoomId().equals(roomId))
                     .collect(Collectors.toList());
+            log.info("After room filter: {} bookings", bookings.size());
         }
-        if (status != null && !status.isEmpty()) {
-            bookings = bookings.stream()
-                    .filter(b -> b.getStatus() != null && b.getStatus().name().equalsIgnoreCase(status))
-                    .collect(Collectors.toList());
+
+        // FIXED: Status filter using enum name comparison
+        if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
+            try {
+                Booking.BookingStatus statusEnum = Booking.BookingStatus.valueOf(status.toUpperCase());
+                bookings = bookings.stream()
+                        .filter(b -> b.getStatus() == statusEnum)
+                        .collect(Collectors.toList());
+                log.info("After status filter: {} bookings", bookings.size());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status value: {}", status);
+            }
         }
 
         long pendingCount = bookings.stream()
                 .filter(b -> b.getStatus() == Booking.BookingStatus.PENDING)
                 .count();
+        long activeCount = bookings.stream()
+                .filter(b -> b.getStatus() == Booking.BookingStatus.BOOKED || b.getStatus() == Booking.BookingStatus.ACTIVE)
+                .count();
         long completedCount = bookings.stream()
                 .filter(b -> b.getStatus() == Booking.BookingStatus.CONFIRMED)
-                .count();
-        long cancelledCount = bookings.stream()
-                .filter(b -> b.getStatus() == Booking.BookingStatus.CANCELLED)
                 .count();
 
         List<Map<String, Object>> bookingList = bookings.stream()
                 .map(b -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", b.getBookingId());
-                    item.put("roomName", getRoomName(b.getRoomId()));
                     item.put("bookedBy", getUserName(b.getUserId()));
-                    item.put("startTime", b.getStartTime() != null ? b.getStartTime().toString() : "N/A");
-                    item.put("endTime", b.getEndTime() != null ? b.getEndTime().toString() : "N/A");
-                    long hours = 0;
+                    item.put("room", getRoomName(b.getRoomId()));
+                    String timeSlot = "";
                     if (b.getStartTime() != null && b.getEndTime() != null) {
-                        hours = ChronoUnit.HOURS.between(b.getStartTime(), b.getEndTime());
+                        timeSlot = b.getStartTime().toLocalTime() + " - " + b.getEndTime().toLocalTime();
                     }
-                    item.put("duration", hours + "h");
+                    item.put("timeSlot", timeSlot);
+                    item.put("date", b.getStartTime() != null ? b.getStartTime().toLocalDate().toString() : "N/A");
                     item.put("status", b.getStatus() != null ? b.getStatus().name() : "UNKNOWN");
                     return item;
                 })
@@ -372,9 +512,11 @@ public class ReportApiController {
 
         response.put("total", bookings.size());
         response.put("pendingCount", pendingCount);
+        response.put("activeCount", activeCount);
         response.put("completedCount", completedCount);
-        response.put("cancelledCount", cancelledCount);
         response.put("bookings", bookingList);
+
+        log.info("Room bookings report: {} bookings returned", bookingList.size());
         return response;
     }
 
@@ -418,8 +560,8 @@ public class ReportApiController {
         List<Map<String, Object>> assetList = assets.stream()
                 .map(a -> {
                     Map<String, Object> item = new HashMap<>();
-                    Object assetNameObj = a.getName();
-                    item.put("name", assetNameObj != null ? assetNameObj.toString() : "N/A");
+                    item.put("id", a.getAssetId());
+                    item.put("name", a.getName() != null ? a.getName() : "N/A");
                     item.put("tag", a.getTag() != null ? a.getTag() : "N/A");
                     item.put("category", a.getCategory() != null ? a.getCategory().getName() : "N/A");
                     item.put("purchaseDate", a.getPurchaseDate() != null ? a.getPurchaseDate().toString() : "N/A");
@@ -502,6 +644,45 @@ public class ReportApiController {
         response.put("deleteCount", deleteCount);
         response.put("logs", logList);
         return response;
+    }
+
+    // ============================================
+    // 8. DROPDOWN DATA ENDPOINTS
+    // ============================================
+    @GetMapping("/drivers")
+    public List<Map<String, Object>> getDrivers() {
+        return userRepository.findByRole("DRIVER").stream()
+                .map(u -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("userId", u.getUserId());
+                    item.put("fullName", u.getFullName() != null ? u.getFullName() : u.getUsername());
+                    return item;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @GetMapping("/rooms")
+    public List<Map<String, Object>> getRooms() {
+        return roomRepository.findAll().stream()
+                .map(r -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("roomId", r.getRoomId());
+                    item.put("roomName", r.getRoomName());
+                    return item;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @GetMapping("/departments")
+    public List<Map<String, Object>> getDepartments() {
+        return departmentRepository.findAll().stream()
+                .map(d -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("departmentId", d.getDepartmentId());
+                    item.put("name", d.getName());
+                    return item;
+                })
+                .collect(Collectors.toList());
     }
 
     // ============================================

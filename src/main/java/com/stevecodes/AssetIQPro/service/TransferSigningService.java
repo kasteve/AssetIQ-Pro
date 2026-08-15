@@ -27,9 +27,10 @@ public class TransferSigningService {
     private final PdfGenerationService pdfGenerationService;
     private final EmailService emailService;
     private final EmployeeRepository employeeRepository;
-    private final BaseUrlService baseUrlService;  // ✅ ADDED
+    private final BaseUrlService baseUrlService;
 
-    public void initiateTransferSigning(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public void initiateTransferSigning(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
@@ -42,7 +43,6 @@ public class TransferSigningService {
         List<TransferToken> tokens = tokenRepository.findByTransferId(transferId);
         log.info("📋 ALL SIGNING LINKS FOR TRANSFER {}:", transferId);
         for (TransferToken token : tokens) {
-            // ✅ DYNAMIC URL
             String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
             log.info("   👤 {}: {}", token.getSignerRole(), signingLink);
             log.info("   📧 Email: {}", token.getSignerEmail());
@@ -54,7 +54,8 @@ public class TransferSigningService {
         log.info("=========================================");
     }
 
-    public void signTransferWithSignature(Integer transferId, String tokenValue, String base64Signature) {
+    // FIXED: Changed Integer to Long
+    public void signTransferWithSignature(Long transferId, String tokenValue, String base64Signature) {
         TransferToken token = tokenRepository.findByToken(tokenValue)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
 
@@ -75,7 +76,8 @@ public class TransferSigningService {
         }
     }
 
-    public String determineSignerRole(Integer transferId, Long employeeId) {
+    // FIXED: Changed Integer to Long
+    public String determineSignerRole(Long transferId, Long employeeId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
@@ -119,30 +121,28 @@ public class TransferSigningService {
         return token;
     }
 
-    public boolean isTransferFullySigned(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public boolean isTransferFullySigned(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
+        // First check: If isFullySigned flag is true
         if (Boolean.TRUE.equals(transfer.getIsFullySigned())) {
             return true;
         }
 
+        // Second check: All tokens used
         List<TransferToken> allTokens = tokenRepository.findByTransferId(transferId);
-        int requiredSigners = countRequiredSigners(transfer);
-
-        log.info("Transfer {} has {} required signers and {} tokens",
-                transferId, requiredSigners, allTokens.size());
-
-        if (!allTokens.isEmpty() && allTokens.size() == requiredSigners) {
+        if (!allTokens.isEmpty() && allTokens.size() == countRequiredSigners(transfer)) {
             boolean allTokensUsed = allTokens.stream().allMatch(TransferToken::getIsUsed);
             if (allTokensUsed) {
-                log.info("Transfer {} fully signed via tokens - all {} tokens used",
-                        transferId, allTokens.size());
+                log.info("Transfer {} fully signed via tokens - all {} tokens used", transferId, allTokens.size());
                 completeTransferSigning(transfer);
                 return true;
             }
         }
 
+        // Third check: All timestamps are present
         boolean timestampsSigned = isTransferFullySignedByTimestamps(transfer);
         if (timestampsSigned) {
             log.info("Transfer {} fully signed via timestamps", transferId);
@@ -150,7 +150,8 @@ public class TransferSigningService {
             return true;
         }
 
-        if (!allTokens.isEmpty() && requiredSigners > 0) {
+        // Fourth check: Hybrid approach (some tokens, some timestamps)
+        if (!allTokens.isEmpty() && countRequiredSigners(transfer) > 0) {
             boolean hybridComplete = isTransferCompleteByHybridApproach(transfer, allTokens);
             if (hybridComplete) {
                 log.info("Transfer {} fully signed via hybrid approach", transferId);
@@ -240,7 +241,7 @@ public class TransferSigningService {
 
         log.info("Transfer {} hybrid check: {}/{} signers completed",
                 transfer.getTransferId(), signedCount, requiredCount);
-        return allSigned;
+        return allSigned && signedCount == requiredCount;
     }
 
     private boolean isSignerSignedHybrid(List<TransferToken> tokens, Long signerId, LocalDateTime timestamp) {
@@ -271,13 +272,14 @@ public class TransferSigningService {
         return allSigned;
     }
 
-    public boolean isTransferFullySignedByTokens(Integer transferId) {
+    public boolean isTransferFullySignedByTokens(Long transferId) {
         List<TransferToken> allTokens = tokenRepository.findByTransferId(transferId);
         if (allTokens.isEmpty()) return false;
         return allTokens.stream().allMatch(TransferToken::getIsUsed);
     }
 
-    public boolean isTransferFullySignedByTimestamps(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public boolean isTransferFullySignedByTimestamps(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
         return isTransferFullySignedByTimestamps(transfer);
@@ -303,7 +305,8 @@ public class TransferSigningService {
         }
     }
 
-    public void saveSignature(Integer transferId, String role, String base64Signature) {
+    // FIXED: Changed Integer to Long
+    public void saveSignature(Long transferId, String role, String base64Signature) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
         LocalDateTime now = LocalDateTime.now();
@@ -350,7 +353,8 @@ public class TransferSigningService {
         log.info("Saved signature for role {} on transfer {}", role, transferId);
     }
 
-    public void generateFullySignedPdf(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public void generateFullySignedPdf(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
         try {
@@ -369,7 +373,8 @@ public class TransferSigningService {
         }
     }
 
-    private void sendCompletedTransferNotification(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    private void sendCompletedTransferNotification(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
@@ -408,7 +413,7 @@ public class TransferSigningService {
 
         if (!signerEmails.isEmpty()) {
             try {
-                byte[] pdfBytes = Base64.getDecoder().decode(transfer.getFullySignedPdf());
+                byte[] pdfBytes = Base64.getDecoder().decode(transfer.getFullySignedPDF());
                 log.info("Sending completed transfer email to {} recipients for transfer {}", signerEmails.size(), transferId);
                 emailService.sendCompletedTransferReport(signerEmails, transfer, pdfBytes);
             } catch (Exception e) {
@@ -431,19 +436,21 @@ public class TransferSigningService {
         }
     }
 
-    public boolean manuallyCheckTransferCompletion(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public boolean manuallyCheckTransferCompletion(Long transferId) {
         log.info("Manual completion check triggered for transfer {}", transferId);
         return isTransferFullySigned(transferId);
     }
 
-    public byte[] getFullySignedPdf(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public byte[] getFullySignedPdf(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
-        if (transfer.getFullySignedPdf() == null) {
+        if (transfer.getFullySignedPDF() == null) {
             throw new IllegalStateException("PDF not generated yet for transfer: " + transferId);
         }
 
-        return Base64.getDecoder().decode(transfer.getFullySignedPdf());
+        return Base64.getDecoder().decode(transfer.getFullySignedPDF());
     }
 }

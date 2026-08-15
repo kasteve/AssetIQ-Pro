@@ -28,15 +28,9 @@
     <!-- ============================================ -->
     <ul class="nav nav-tabs report-tabs" id="reportTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="eol-tab" data-bs-toggle="tab" data-bs-target="#eol-pane"
-                    type="button" role="tab" aria-controls="eol-pane" aria-selected="true">
-                <i class="fas fa-clock"></i> End of Life
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="warranty-tab" data-bs-toggle="tab" data-bs-target="#warranty-pane"
-                    type="button" role="tab" aria-controls="warranty-pane" aria-selected="false">
-                <i class="fas fa-shield-alt"></i> Warranty Expiry
+            <button class="nav-link active" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane"
+                    type="button" role="tab" aria-controls="assets-pane" aria-selected="true">
+                <i class="fas fa-laptop"></i> Assets
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -46,21 +40,15 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="driver-bookings-tab" data-bs-toggle="tab" data-bs-target="#driver-bookings-pane"
-                    type="button" role="tab" aria-controls="driver-bookings-pane" aria-selected="false">
-                <i class="fas fa-car"></i> Driver Bookings
+            <button class="nav-link" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings-pane"
+                    type="button" role="tab" aria-controls="bookings-pane" aria-selected="false">
+                <i class="fas fa-calendar-check"></i> Bookings
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="room-bookings-tab" data-bs-toggle="tab" data-bs-target="#room-bookings-pane"
-                    type="button" role="tab" aria-controls="room-bookings-pane" aria-selected="false">
-                <i class="fas fa-calendar-check"></i> Room Bookings
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="cost-tab" data-bs-toggle="tab" data-bs-target="#cost-pane"
-                    type="button" role="tab" aria-controls="cost-pane" aria-selected="false">
-                <i class="fas fa-coins"></i> Asset Costs
+            <button class="nav-link" id="vouchers-tab" data-bs-toggle="tab" data-bs-target="#vouchers-pane"
+                    type="button" role="tab" aria-controls="vouchers-pane" aria-selected="false">
+                <i class="fas fa-ticket-alt"></i> Vouchers
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -74,88 +62,79 @@
     <div class="tab-content report-tab-content" id="reportTabsContent">
 
         <!-- ============================================ -->
-        <!-- 1. END OF LIFE REPORT -->
+        <!-- 1. ASSETS TAB -->
         <!-- ============================================ -->
-        <div class="tab-pane fade show active" id="eol-pane" role="tabpanel" aria-labelledby="eol-tab">
+        <div class="tab-pane fade show active" id="assets-pane" role="tabpanel" aria-labelledby="assets-tab">
             <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
+                <!-- Single-line filter bar -->
+                <div class="report-filters primary-filters">
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label class="form-label fw-bold">Report Type *</label>
+                            <select id="assetReportType" class="form-select" onchange="toggleAssetFilters()">
+                                <option value="">Select Report Type</option>
+                                <option value="warranty">Warranty Report</option>
+                                <option value="eol">End of Life Report</option>
+                                <option value="disposal">Disposal Report</option>
+                                <option value="cost">Asset Costs Report</option>
+                            </select>
+                        </div>
+                        <div class="filter-field" id="assetDateFromWrap" style="display:none;">
+                            <label class="form-label" id="assetDateFromLabel">Date From</label>
+                            <input type="date" id="assetDateFrom" class="form-control">
+                        </div>
+                        <div class="filter-field" id="assetDateToWrap" style="display:none;">
+                            <label class="form-label" id="assetDateToLabel">Date To</label>
+                            <input type="date" id="assetDateTo" class="form-control">
+                        </div>
+                        <div class="filter-field" id="assetCategoryWrap" style="display:none;">
                             <label class="form-label">Category</label>
-                            <select id="eolCategory" class="form-select">
+                            <select id="assetCategory" class="form-select">
                                 <option value="">All Categories</option>
                                 <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}">Category</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Status</label>
-                            <select id="eolStatus" class="form-select">
+                        <div class="filter-field" id="assetStatusWrap" style="display:none;">
+                            <label class="form-label" id="assetStatusLabel">Status</label>
+                            <select id="assetStatus" class="form-select">
                                 <option value="">All Status</option>
                                 <option value="ACTIVE">Active</option>
                                 <option value="EOL">End of Life</option>
                                 <option value="EOS">End of Support</option>
+                                <option value="DISPOSED">Disposed</option>
+                                <option value="IN_TRANSIT">In Transit</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Date Range</label>
-                            <input type="date" id="eolDateFrom" class="form-control" placeholder="From">
+                        <div class="filter-actions" id="assetFilterActions" style="display:none;">
+                            <button class="btn btn-primary" onclick="loadAssetReport()">
+                                <i class="fas fa-search me-2"></i>Generate
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="resetAssetFilters()">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <input type="date" id="eolDateTo" class="form-control" placeholder="To">
-                        </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadEOLReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetEOLFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="eolTotalAssets">0</div>
-                            <div class="stat-label">Total Assets</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #fd7e14;">
-                            <div class="stat-number" id="eolEolCount">0</div>
-                            <div class="stat-label">End of Life</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="eolEosCount">0</div>
-                            <div class="stat-label">End of Support</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="eolActiveCount">0</div>
-                            <div class="stat-label">Active</div>
+                        <div class="filter-info" id="assetFilterInfo">
+                            <i class="fas fa-info-circle me-2"></i>Select a report type above to view data
                         </div>
                     </div>
                 </div>
+
+                <!-- Table -->
                 <div class="table-responsive">
-                    <table id="eolTable" class="table table-hover report-table">
+                    <table id="assetsTable" class="table table-hover report-table">
                         <thead>
-                        <tr>
-                            <th>Asset Name</th>
+                        <tr id="assetsTableHeaders">
+                            <th>Name</th>
                             <th>Tag</th>
                             <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>EOL Date</th>
+                            <th id="assetsDateHeader">Purchase Date</th>
                             <th>Status</th>
                             <th>Days Remaining</th>
                         </tr>
                         </thead>
-                        <tbody id="eolTableBody">
+                        <tbody id="assetsTableBody">
                         <tr>
-                            <td colspan="7" class="text-center text-muted">Click "Generate Report" to load data</td>
+                            <td colspan="6" class="text-center text-muted">Select a report type and click "Generate"</td>
                         </tr>
                         </tbody>
                     </table>
@@ -164,174 +143,71 @@
         </div>
 
         <!-- ============================================ -->
-        <!-- 2. WARRANTY EXPIRY REPORT -->
-        <!-- ============================================ -->
-        <div class="tab-pane fade" id="warranty-pane" role="tabpanel" aria-labelledby="warranty-tab">
-            <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">Category</label>
-                            <select id="warrantyCategory" class="form-select">
-                                <option value="">All Categories</option>
-                                <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}">Category</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Warranty Status</label>
-                            <select id="warrantyStatus" class="form-select">
-                                <option value="">All</option>
-                                <option value="ACTIVE">Active</option>
-                                <option value="EXPIRING">Expiring Soon (30 days)</option>
-                                <option value="EXPIRED">Expired</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">From Date</label>
-                            <input type="date" id="warrantyDateFrom" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">To Date</label>
-                            <input type="date" id="warrantyDateTo" class="form-control">
-                        </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadWarrantyReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetWarrantyFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="warrantyTotal">0</div>
-                            <div class="stat-label">Total Assets</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="warrantyActive">0</div>
-                            <div class="stat-label">Under Warranty</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="warrantyExpiring">0</div>
-                            <div class="stat-label">Expiring Soon</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="warrantyExpired">0</div>
-                            <div class="stat-label">Expired</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="table-responsive">
-                    <table id="warrantyTable" class="table table-hover report-table">
-                        <thead>
-                        <tr>
-                            <th>Asset Name</th>
-                            <th>Tag</th>
-                            <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>Warranty Start</th>
-                            <th>Warranty End</th>
-                            <th>Status</th>
-                            <th>Days Left</th>
-                        </tr>
-                        </thead>
-                        <tbody id="warrantyTableBody">
-                        <tr>
-                            <td colspan="8" class="text-center text-muted">Click "Generate Report" to load data</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- 3. TRANSFERS REPORT -->
+        <!-- 2. TRANSFERS TAB -->
         <!-- ============================================ -->
         <div class="tab-pane fade" id="transfers-pane" role="tabpanel" aria-labelledby="transfers-tab">
             <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">From Date</label>
+                <!-- Single-line filter bar -->
+                <div class="report-filters primary-filters">
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label class="form-label fw-bold">Category *</label>
+                            <select id="transferCategory" class="form-select" onchange="toggleTransferFilters()">
+                                <option value="">Select Category</option>
+                                <option value="ASSET">Asset Transfer</option>
+                                <option value="CASH">Cash Transfer</option>
+                                <option value="INVENTORY">Inventory Transfer</option>
+                            </select>
+                        </div>
+                        <div class="filter-field" id="transferDateFromWrap" style="display:none;">
+                            <label class="form-label" id="transferDateFromLabel">Date From</label>
                             <input type="date" id="transferDateFrom" class="form-control">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">To Date</label>
+                        <div class="filter-field" id="transferDateToWrap" style="display:none;">
+                            <label class="form-label" id="transferDateToLabel">Date To</label>
                             <input type="date" id="transferDateTo" class="form-control">
                         </div>
-                        <div class="col-md-3">
+                        <div class="filter-field" id="transferStatusWrap" style="display:none;">
                             <label class="form-label">Status</label>
                             <select id="transferStatus" class="form-select">
-                                <option value="">All</option>
+                                <option value="">All Status</option>
                                 <option value="PENDING">Pending</option>
                                 <option value="APPROVED">Approved</option>
                                 <option value="COMPLETED">Completed</option>
                                 <option value="REJECTED">Rejected</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Transfer Type</label>
-                            <select id="transferType" class="form-select">
-                                <option value="">All</option>
-                                <option value="ASSET">Asset</option>
-                                <option value="CASH">Cash</option>
+                        <div class="filter-field" id="transferDepartmentWrap" style="display:none;">
+                            <label class="form-label">Department</label>
+                            <select id="transferDepartment" class="form-select">
+                                <option value="">All Departments</option>
+                                <option th:each="dept : ${departments}" th:value="${dept.departmentId}" th:text="${dept.name}">Department</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadTransfersReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetTransferFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="transferTotal">0</div>
-                            <div class="stat-label">Total Transfers</div>
+                        <div class="filter-actions" id="transferFilterActions" style="display:none;">
+                            <button class="btn btn-primary" onclick="loadTransfersReport()">
+                                <i class="fas fa-search me-2"></i>Generate
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="resetTransferFilters()">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="transferPending">0</div>
-                            <div class="stat-label">Pending</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="transferCompleted">0</div>
-                            <div class="stat-label">Completed</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="transferRejected">0</div>
-                            <div class="stat-label">Rejected</div>
+                        <div class="filter-info" id="transferFilterInfo">
+                            <i class="fas fa-info-circle me-2"></i>Select a category above to view transfer data
                         </div>
                     </div>
                 </div>
+
+                <!-- Table -->
                 <div class="table-responsive">
                     <table id="transfersTable" class="table table-hover report-table">
                         <thead>
                         <tr>
-                            <th>Transfer ID</th>
-                            <th>Type</th>
+                            <th>ID</th>
+                            <th>Category</th>
                             <th>From</th>
                             <th>To</th>
-                            <th>Asset</th>
+                            <th>Item</th>
                             <th>Date</th>
                             <th>Status</th>
                             <th>Amount</th>
@@ -339,7 +215,7 @@
                         </thead>
                         <tbody id="transfersTableBody">
                         <tr>
-                            <td colspan="8" class="text-center text-muted">Click "Generate Report" to load data</td>
+                            <td colspan="8" class="text-center text-muted">Select a category and click "Generate"</td>
                         </tr>
                         </tbody>
                     </table>
@@ -348,181 +224,78 @@
         </div>
 
         <!-- ============================================ -->
-        <!-- 4. DRIVER BOOKINGS REPORT -->
+        <!-- 3. BOOKINGS TAB -->
         <!-- ============================================ -->
-        <div class="tab-pane fade" id="driver-bookings-pane" role="tabpanel" aria-labelledby="driver-bookings-tab">
+        <div class="tab-pane fade" id="bookings-pane" role="tabpanel" aria-labelledby="bookings-tab">
             <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">From Date</label>
-                            <input type="date" id="driverBookingDateFrom" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">To Date</label>
-                            <input type="date" id="driverBookingDateTo" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Driver</label>
-                            <select id="driverBookingDriver" class="form-select">
-                                <option value="">All Drivers</option>
-                                <option th:each="driver : ${drivers}" th:value="${driver.userId}" th:text="${driver.fullName}">Driver</option>
+                <!-- Single-line filter bar -->
+                <div class="report-filters primary-filters">
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label class="form-label fw-bold">Booking Type *</label>
+                            <select id="bookingType" class="form-select" onchange="toggleBookingFilters()">
+                                <option value="">Select Booking Type</option>
+                                <option value="driver">Driver Bookings</option>
+                                <option value="room">Room Bookings</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Status</label>
-                            <select id="driverBookingStatus" class="form-select">
+                        <div class="filter-field" id="bookingDateFromWrap" style="display:none;">
+                            <label class="form-label">Date From</label>
+                            <input type="date" id="bookingDateFrom" class="form-control">
+                        </div>
+                        <div class="filter-field" id="bookingDateToWrap" style="display:none;">
+                            <label class="form-label">Date To</label>
+                            <input type="date" id="bookingDateTo" class="form-control">
+                        </div>
+                        <div class="filter-field" id="bookingSpecificFilter" style="display:none;">
+                            <label class="form-label" id="bookingSpecificLabel">Driver</label>
+                            <select id="bookingSpecificValue" class="form-select">
                                 <option value="">All</option>
+                                <!-- Dynamically populated by JavaScript -->
+                            </select>
+                        </div>
+                        <div class="filter-field" id="bookingStatusWrap" style="display:none;">
+                            <label class="form-label">Status</label>
+                            <select id="bookingStatus" class="form-select">
+                                <option value="">All Status</option>
                                 <option value="PENDING">Pending</option>
-                                <option value="ACCEPTED">Accepted</option>
+                                <option value="ACCEPTED">Accepted / Booked</option>
+                                <option value="ACTIVE">Active</option>
                                 <option value="COMPLETED">Completed</option>
                                 <option value="DECLINED">Declined</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadDriverBookingsReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetDriverBookingFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="driverBookingTotal">0</div>
-                            <div class="stat-label">Total Bookings</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="driverBookingPending">0</div>
-                            <div class="stat-label">Pending</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="driverBookingCompleted">0</div>
-                            <div class="stat-label">Completed</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="driverBookingDeclined">0</div>
-                            <div class="stat-label">Declined</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="table-responsive">
-                    <table id="driverBookingsTable" class="table table-hover report-table">
-                        <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Requester</th>
-                            <th>Driver</th>
-                            <th>Destination</th>
-                            <th>Requested</th>
-                            <th>Status</th>
-                            <th>Completed At</th>
-                        </tr>
-                        </thead>
-                        <tbody id="driverBookingsTableBody">
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">Click "Generate Report" to load data</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- 5. ROOM BOOKINGS REPORT -->
-        <!-- ============================================ -->
-        <div class="tab-pane fade" id="room-bookings-pane" role="tabpanel" aria-labelledby="room-bookings-tab">
-            <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">From Date</label>
-                            <input type="date" id="roomBookingDateFrom" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">To Date</label>
-                            <input type="date" id="roomBookingDateTo" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Room</label>
-                            <select id="roomBookingRoom" class="form-select">
-                                <option value="">All Rooms</option>
-                                <option th:each="room : ${rooms}" th:value="${room.roomId}" th:text="${room.roomName}">Room</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Status</label>
-                            <select id="roomBookingStatus" class="form-select">
-                                <option value="">All</option>
-                                <option value="PENDING">Pending</option>
-                                <option value="BOOKED">Booked</option>
-                                <option value="ACTIVE">Active</option>
-                                <option value="CONFIRMED">Completed</option>
                                 <option value="CANCELLED">Cancelled</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadRoomBookingsReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetRoomBookingFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="roomBookingTotal">0</div>
-                            <div class="stat-label">Total Bookings</div>
+                        <div class="filter-actions" id="bookingFilterActions" style="display:none;">
+                            <button class="btn btn-primary" onclick="loadBookingsReport()">
+                                <i class="fas fa-search me-2"></i>Generate
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="resetBookingFilters()">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="roomBookingPending">0</div>
-                            <div class="stat-label">Pending</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="roomBookingCompleted">0</div>
-                            <div class="stat-label">Completed</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="roomBookingCancelled">0</div>
-                            <div class="stat-label">Cancelled</div>
+                        <div class="filter-info" id="bookingFilterInfo">
+                            <i class="fas fa-info-circle me-2"></i>Select a booking type above to view data
                         </div>
                     </div>
                 </div>
+
+                <!-- Table -->
                 <div class="table-responsive">
-                    <table id="roomBookingsTable" class="table table-hover report-table">
+                    <table id="bookingsTable" class="table table-hover report-table">
                         <thead>
-                        <tr>
+                        <tr id="bookingTableHeaders">
                             <th>#</th>
-                            <th>Room</th>
-                            <th>Booked By</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Duration</th>
+                            <th>Requester / Booked By</th>
+                            <th>Type</th>
+                            <th>Details</th>
+                            <th>Date</th>
                             <th>Status</th>
                         </tr>
                         </thead>
-                        <tbody id="roomBookingsTableBody">
+                        <tbody id="bookingsTableBody">
                         <tr>
-                            <td colspan="7" class="text-center text-muted">Click "Generate Report" to load data</td>
+                            <td colspan="6" class="text-center text-muted">Select a booking type and click "Generate"</td>
                         </tr>
                         </tbody>
                     </table>
@@ -531,104 +304,52 @@
         </div>
 
         <!-- ============================================ -->
-        <!-- 6. ASSET COSTS REPORT -->
+        <!-- 4. VOUCHERS TAB -->
         <!-- ============================================ -->
-        <div class="tab-pane fade" id="cost-pane" role="tabpanel" aria-labelledby="cost-tab">
+        <div class="tab-pane fade" id="vouchers-pane" role="tabpanel" aria-labelledby="vouchers-tab">
             <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">From Date</label>
-                            <input type="date" id="costDateFrom" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">To Date</label>
-                            <input type="date" id="costDateTo" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Category</label>
-                            <select id="costCategory" class="form-select">
-                                <option value="">All Categories</option>
-                                <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}">Category</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Currency</label>
-                            <select id="costCurrency" class="form-select">
-                                <option value="UGX">UGX</option>
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadCostReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetCostFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-tools me-2"></i>
+                    <strong>Under Development:</strong> The Vouchers module is currently being built. This report will be available soon.
                 </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-4">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="costTotal">0</div>
-                            <div class="stat-label">Total Assets</div>
+                <div class="report-filters primary-filters">
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label class="form-label fw-bold">Voucher Type</label>
+                            <select class="form-select" disabled>
+                                <option>Meal Voucher</option>
+                                <option>Transport Voucher</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="costTotalValue">0</div>
-                            <div class="stat-label">Total Cost</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="costAverage">0</div>
-                            <div class="stat-label">Average Cost</div>
+                        <div class="filter-info">
+                            <i class="fas fa-clock me-2"></i>Coming soon...
                         </div>
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table id="costTable" class="table table-hover report-table">
-                        <thead>
-                        <tr>
-                            <th>Asset Name</th>
-                            <th>Tag</th>
-                            <th>Category</th>
-                            <th>Purchase Date</th>
-                            <th>Cost</th>
-                            <th>Currency</th>
-                            <th>Department</th>
-                        </tr>
-                        </thead>
-                        <tbody id="costTableBody">
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">Click "Generate Report" to load data</td>
-                        </tr>
-                        </tbody>
-                    </table>
+                <div class="text-center py-5">
+                    <i class="fas fa-ticket-alt" style="font-size: 64px; color: #dee2e6;"></i>
+                    <h5 class="mt-3 text-muted">Voucher Reports Coming Soon</h5>
+                    <p class="text-muted">This feature is currently under active development</p>
                 </div>
             </div>
         </div>
 
         <!-- ============================================ -->
-        <!-- 7. AUDIT LOGS REPORT -->
+        <!-- 5. AUDIT LOGS TAB -->
         <!-- ============================================ -->
         <div class="tab-pane fade" id="audit-pane" role="tabpanel" aria-labelledby="audit-tab">
             <div class="report-panel">
-                <div class="report-filters">
-                    <div class="row g-3">
-                        <div class="col-md-3">
+                <div class="report-filters primary-filters">
+                    <div class="filter-row">
+                        <div class="filter-field">
                             <label class="form-label">From Date</label>
                             <input type="date" id="auditDateFrom" class="form-control">
                         </div>
-                        <div class="col-md-3">
+                        <div class="filter-field">
                             <label class="form-label">To Date</label>
                             <input type="date" id="auditDateTo" class="form-control">
                         </div>
-                        <div class="col-md-3">
+                        <div class="filter-field">
                             <label class="form-label">Action Type</label>
                             <select id="auditActionType" class="form-select">
                                 <option value="">All Actions</option>
@@ -642,46 +363,22 @@
                                 <option value="TRANSFER">Transfer</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="filter-field">
                             <label class="form-label">User</label>
                             <input type="text" id="auditUser" class="form-control" placeholder="Username">
                         </div>
-                    </div>
-                    <div class="filter-actions mt-3">
-                        <button class="btn btn-primary" onclick="loadAuditReport()">
-                            <i class="fas fa-search me-2"></i>Generate Report
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetAuditFilters()">
-                            <i class="fas fa-undo me-2"></i>Reset
-                        </button>
-                    </div>
-                </div>
-                <div class="report-stats row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #0d6efd;">
-                            <div class="stat-number" id="auditTotal">0</div>
-                            <div class="stat-label">Total Events</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #198754;">
-                            <div class="stat-number" id="auditCreates">0</div>
-                            <div class="stat-label">Creates</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #ffc107;">
-                            <div class="stat-number" id="auditUpdates">0</div>
-                            <div class="stat-label">Updates</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #dc3545;">
-                            <div class="stat-number" id="auditDeletes">0</div>
-                            <div class="stat-label">Deletes</div>
+                        <div class="filter-actions">
+                            <button class="btn btn-primary" onclick="loadAuditReport()">
+                                <i class="fas fa-search me-2"></i>Generate
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="resetAuditFilters()">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
                         </div>
                     </div>
                 </div>
+
+                <!-- Table -->
                 <div class="table-responsive">
                     <table id="auditTable" class="table table-hover report-table">
                         <thead>
@@ -696,7 +393,7 @@
                         </thead>
                         <tbody id="auditTableBody">
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Click "Generate Report" to load data</td>
+                            <td colspan="6" class="text-center text-muted">Click "Generate" to load data</td>
                         </tr>
                         </tbody>
                     </table>
@@ -756,28 +453,40 @@
         }
 
         .report-filters {
-            background: #f8f9fb;
+            background: #eef2f7;
+            border-left: 4px solid var(--primary-color);
             border-radius: 12px;
-            padding: 18px 20px;
-            margin-bottom: 20px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
         }
-        .report-filters .form-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
-        .report-filters .form-control, .report-filters .form-select {
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .filter-field {
+            flex: 1 1 150px;
+            min-width: 140px;
+        }
+        .filter-field .form-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .filter-field .form-control, .filter-field .form-select {
             border-radius: 8px !important;
             padding: 8px 12px !important;
             font-size: 13px !important;
         }
-        .filter-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 14px 18px;
-            border-left: 4px solid #0d6efd;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            flex: 0 0 auto;
         }
-        .stat-number { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.2; }
-        .stat-label { font-size: 11.5px; color: #6c757d; font-weight: 600; }
+        .filter-info {
+            flex: 1 1 220px;
+            font-size: 13px;
+            color: #0d6efd;
+            display: flex;
+            align-items: center;
+        }
 
         .report-table { width: 100% !important; }
         .report-table thead th {
@@ -816,14 +525,16 @@
         .status-badge.booked { background: #e6f7ec; color: #198754; }
         .status-badge.accepted { background: #e6f7ec; color: #198754; }
         .status-badge.declined { background: #fdeeee; color: #dc3545; }
-
-        .report-stats { margin-bottom: 16px; }
+        .status-badge.expired { background: #fdeeee; color: #dc3545; }
+        .status-badge.warning { background: #fff4e0; color: #fd7e14; }
 
         @media (max-width: 768px) {
             .report-tabs { flex-wrap: nowrap; }
             .report-tabs .nav-link { font-size: 12px; padding: 10px 14px !important; }
-            .stat-number { font-size: 18px; }
             .report-filters { padding: 14px; }
+            .filter-field { flex: 1 1 100%; }
+            .filter-actions { flex: 1 1 100%; }
+            .filter-info { flex: 1 1 100%; }
         }
     </style>
 </div>
@@ -843,251 +554,448 @@
 
     <script th:inline="none">
         // ============================================
-        // EOL REPORT
+        // GLOBAL VARIABLES
         // ============================================
-        let eolDataTable = null;
-
-        function loadEOLReport() {
-            const category = document.getElementById('eolCategory').value;
-            const status = document.getElementById('eolStatus').value;
-            const dateFrom = document.getElementById('eolDateFrom').value;
-            const dateTo = document.getElementById('eolDateTo').value;
-
-            const params = new URLSearchParams();
-            if (category) params.append('category', category);
-            if (status) params.append('status', status);
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            if (dateTo) params.append('dateTo', dateTo);
-
-            fetch('/assetIQ-pro/api/reports/eol?' + params.toString())
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('eolTotalAssets').textContent = data.total || 0;
-                    document.getElementById('eolEolCount').textContent = data.eolCount || 0;
-                    document.getElementById('eolEosCount').textContent = data.eosCount || 0;
-                    document.getElementById('eolActiveCount').textContent = data.activeCount || 0;
-
-                    renderTable('eolTable', 'eolTableBody', data.assets, [
-                        'name', 'tag', 'category', 'purchaseDate', 'eolDate', 'status', 'daysRemaining'
-                    ]);
-                })
-                .catch(err => console.error('Error loading EOL report:', err));
-        }
-
-        function resetEOLFilters() {
-            document.getElementById('eolCategory').value = '';
-            document.getElementById('eolStatus').value = '';
-            document.getElementById('eolDateFrom').value = '';
-            document.getElementById('eolDateTo').value = '';
-            loadEOLReport();
-        }
-
-        // ============================================
-        // WARRANTY REPORT
-        // ============================================
-        let warrantyDataTable = null;
-
-        function loadWarrantyReport() {
-            const category = document.getElementById('warrantyCategory').value;
-            const status = document.getElementById('warrantyStatus').value;
-            const dateFrom = document.getElementById('warrantyDateFrom').value;
-            const dateTo = document.getElementById('warrantyDateTo').value;
-
-            const params = new URLSearchParams();
-            if (category) params.append('category', category);
-            if (status) params.append('status', status);
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            if (dateTo) params.append('dateTo', dateTo);
-
-            fetch('/assetIQ-pro/api/reports/warranty?' + params.toString())
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('warrantyTotal').textContent = data.total || 0;
-                    document.getElementById('warrantyActive').textContent = data.activeCount || 0;
-                    document.getElementById('warrantyExpiring').textContent = data.expiringCount || 0;
-                    document.getElementById('warrantyExpired').textContent = data.expiredCount || 0;
-
-                    renderTable('warrantyTable', 'warrantyTableBody', data.assets, [
-                        'name', 'tag', 'category', 'purchaseDate', 'warrantyStart', 'warrantyEnd', 'status', 'daysLeft'
-                    ]);
-                })
-                .catch(err => console.error('Error loading warranty report:', err));
-        }
-
-        function resetWarrantyFilters() {
-            document.getElementById('warrantyCategory').value = '';
-            document.getElementById('warrantyStatus').value = '';
-            document.getElementById('warrantyDateFrom').value = '';
-            document.getElementById('warrantyDateTo').value = '';
-            loadWarrantyReport();
-        }
-
-        // ============================================
-        // TRANSFERS REPORT
-        // ============================================
+        let assetsDataTable = null;
         let transfersDataTable = null;
+        let bookingsDataTable = null;
+        let auditDataTable = null;
 
+        // ============================================
+        // TOGGLE FUNCTIONS WITH DYNAMIC LABELS
+        // ============================================
+        function toggleAssetFilters() {
+            const type = document.getElementById('assetReportType').value;
+            const show = type ? 'flex' : 'none';
+
+            // Show/hide filter fields
+            document.getElementById('assetDateFromWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('assetDateToWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('assetCategoryWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('assetStatusWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('assetFilterActions').style.display = show;
+            document.getElementById('assetFilterInfo').style.display = type ? 'none' : 'flex';
+
+            // Update labels based on report type
+            updateAssetLabels(type);
+
+            // Update table headers
+            updateAssetTableHeaders(type);
+
+            if (type) loadAssetReport();
+        }
+
+        function updateAssetLabels(type) {
+            const dateFromLabel = document.getElementById('assetDateFromLabel');
+            const dateToLabel = document.getElementById('assetDateToLabel');
+            const statusLabel = document.getElementById('assetStatusLabel');
+
+            switch(type) {
+                case 'warranty':
+                    dateFromLabel.textContent = 'Warranty End From';
+                    dateToLabel.textContent = 'Warranty End To';
+                    statusLabel.textContent = 'Warranty Status';
+                    break;
+                case 'eol':
+                    dateFromLabel.textContent = 'EOL Date From';
+                    dateToLabel.textContent = 'EOL Date To';
+                    statusLabel.textContent = 'EOL Status';
+                    break;
+                case 'disposal':
+                    dateFromLabel.textContent = 'Disposal Date From';
+                    dateToLabel.textContent = 'Disposal Date To';
+                    statusLabel.textContent = 'Disposal Status';
+                    break;
+                case 'cost':
+                    dateFromLabel.textContent = 'Purchase Date From';
+                    dateToLabel.textContent = 'Purchase Date To';
+                    statusLabel.textContent = 'Status';
+                    break;
+                default:
+                    dateFromLabel.textContent = 'Date From';
+                    dateToLabel.textContent = 'Date To';
+                    statusLabel.textContent = 'Status';
+            }
+        }
+
+        function updateAssetTableHeaders(type) {
+            const dateHeader = document.getElementById('assetsDateHeader');
+
+            switch(type) {
+                case 'warranty':
+                    dateHeader.textContent = 'Warranty End Date';
+                    break;
+                case 'eol':
+                    dateHeader.textContent = 'EOL Date';
+                    break;
+                case 'disposal':
+                    dateHeader.textContent = 'Disposal Date';
+                    break;
+                case 'cost':
+                    dateHeader.textContent = 'Purchase Date';
+                    break;
+                default:
+                    dateHeader.textContent = 'Date';
+            }
+        }
+
+        function toggleTransferFilters() {
+            const category = document.getElementById('transferCategory').value;
+            const show = category ? 'flex' : 'none';
+            document.getElementById('transferDateFromWrap').style.display = category ? 'block' : 'none';
+            document.getElementById('transferDateToWrap').style.display = category ? 'block' : 'none';
+            document.getElementById('transferStatusWrap').style.display = category ? 'block' : 'none';
+            document.getElementById('transferDepartmentWrap').style.display = category ? 'block' : 'none';
+            document.getElementById('transferFilterActions').style.display = show;
+            document.getElementById('transferFilterInfo').style.display = category ? 'none' : 'flex';
+
+            // Update transfer date labels
+            updateTransferLabels(category);
+
+            if (category) loadTransfersReport();
+        }
+
+        function updateTransferLabels(category) {
+            const dateFromLabel = document.getElementById('transferDateFromLabel');
+            const dateToLabel = document.getElementById('transferDateToLabel');
+
+            if (category) {
+                dateFromLabel.textContent = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() + ' Date From';
+                dateToLabel.textContent = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() + ' Date To';
+            } else {
+                dateFromLabel.textContent = 'Date From';
+                dateToLabel.textContent = 'Date To';
+            }
+        }
+
+        function toggleBookingFilters() {
+            const type = document.getElementById('bookingType').value;
+            const show = type ? 'flex' : 'none';
+            document.getElementById('bookingDateFromWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('bookingDateToWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('bookingSpecificFilter').style.display = type ? 'block' : 'none';
+            document.getElementById('bookingStatusWrap').style.display = type ? 'block' : 'none';
+            document.getElementById('bookingFilterActions').style.display = show;
+            document.getElementById('bookingFilterInfo').style.display = type ? 'none' : 'flex';
+
+            if (type) {
+                populateBookingSpecificFilter(type);
+                updateBookingTableHeaders(type);
+                updateBookingLabels(type);
+                loadBookingsReport();
+            }
+        }
+
+        function updateBookingLabels(type) {
+            const specificLabel = document.getElementById('bookingSpecificLabel');
+            if (type === 'driver') {
+                specificLabel.textContent = 'Driver';
+            } else if (type === 'room') {
+                specificLabel.textContent = 'Room';
+            }
+        }
+
+        // ============================================
+        // POPULATE BOOKING SPECIFIC FILTER
+        // ============================================
+        function populateBookingSpecificFilter(type) {
+            const label = document.getElementById('bookingSpecificLabel');
+            const select = document.getElementById('bookingSpecificValue');
+
+            if (type === 'driver') {
+                label.textContent = 'Driver';
+                fetch('/assetIQ-pro/api/reports/drivers')
+                    .then(response => response.json())
+                    .then(data => {
+                        select.innerHTML = '<option value="">All Drivers</option>';
+                        data.forEach(driver => {
+                            select.innerHTML += `<option value="${driver.userId}">${driver.fullName}</option>`;
+                        });
+                    })
+                    .catch(() => {
+                        select.innerHTML = '<option value="">All Drivers</option>';
+                    });
+            } else if (type === 'room') {
+                label.textContent = 'Room';
+                fetch('/assetIQ-pro/api/reports/rooms')
+                    .then(response => response.json())
+                    .then(data => {
+                        select.innerHTML = '<option value="">All Rooms</option>';
+                        data.forEach(room => {
+                            select.innerHTML += `<option value="${room.roomId}">${room.roomName}</option>`;
+                        });
+                    })
+                    .catch(() => {
+                        select.innerHTML = '<option value="">All Rooms</option>';
+                    });
+            }
+        }
+
+        // ============================================
+        // UPDATE BOOKING TABLE HEADERS
+        // ============================================
+        function updateBookingTableHeaders(type) {
+            const headers = document.getElementById('bookingTableHeaders');
+            if (type === 'driver') {
+                headers.innerHTML = `
+                    <th>#</th>
+                    <th>Requester</th>
+                    <th>Driver</th>
+                    <th>Destination</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                `;
+            } else if (type === 'room') {
+                headers.innerHTML = `
+                    <th>#</th>
+                    <th>Booked By</th>
+                    <th>Room</th>
+                    <th>Time Slot</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                `;
+            }
+        }
+
+        // ============================================
+        // 1. ASSETS REPORT
+        // ============================================
+        function loadAssetReport() {
+            const type = document.getElementById('assetReportType').value;
+            if (!type) return;
+
+            const dateFrom = document.getElementById('assetDateFrom').value;
+            const dateTo = document.getElementById('assetDateTo').value;
+            const category = document.getElementById('assetCategory').value;
+            const status = document.getElementById('assetStatus').value;
+
+            const params = new URLSearchParams();
+            params.append('type', type);
+
+            // Only add filters if they have values
+            if (dateFrom) params.append('dateFrom', dateFrom);
+            if (dateTo) params.append('dateTo', dateTo);
+            if (category) params.append('category', category);
+            if (status) params.append('status', status);
+
+            fetch('/assetIQ-pro/api/reports/assets?' + params.toString())
+                .then(response => response.json())
+                .then(data => {
+                    renderAssetsTable(data.assets || []);
+                })
+                .catch(err => console.error('Error loading asset report:', err));
+        }
+
+        function renderAssetsTable(data) {
+            const tbody = document.getElementById('assetsTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No data found</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(row => {
+                const statusClass = row.status ? row.status.toLowerCase() : '';
+                html += '<tr>';
+                html += `<td>${row.name || '-'}</td>`;
+                html += `<td>${row.tag || '-'}</td>`;
+                html += `<td>${row.category || '-'}</td>`;
+                html += `<td>${row.purchaseDate || '-'}</td>`;
+                html += `<td><span class="status-badge ${statusClass}">${row.status || '-'}</span></td>`;
+                html += `<td>${row.daysRemaining !== undefined ? row.daysRemaining : '-'}</td>`;
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+
+            if (assetsDataTable) {
+                assetsDataTable.destroy();
+            }
+            assetsDataTable = $('#assetsTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ]
+            });
+        }
+
+        function resetAssetFilters() {
+            document.getElementById('assetReportType').value = '';
+            document.getElementById('assetDateFrom').value = '';
+            document.getElementById('assetDateTo').value = '';
+            document.getElementById('assetCategory').value = '';
+            document.getElementById('assetStatus').value = '';
+            toggleAssetFilters();
+            document.getElementById('assetsTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Select a report type and click "Generate"</td></tr>';
+        }
+
+        // ============================================
+        // 2. TRANSFERS REPORT
+        // ============================================
         function loadTransfersReport() {
+            const category = document.getElementById('transferCategory').value;
+            if (!category) return;
+
             const dateFrom = document.getElementById('transferDateFrom').value;
             const dateTo = document.getElementById('transferDateTo').value;
             const status = document.getElementById('transferStatus').value;
-            const type = document.getElementById('transferType').value;
+            const department = document.getElementById('transferDepartment').value;
 
             const params = new URLSearchParams();
+            params.append('category', category);
             if (dateFrom) params.append('dateFrom', dateFrom);
             if (dateTo) params.append('dateTo', dateTo);
             if (status) params.append('status', status);
-            if (type) params.append('type', type);
+            if (department) params.append('department', department);
 
             fetch('/assetIQ-pro/api/reports/transfers?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('transferTotal').textContent = data.total || 0;
-                    document.getElementById('transferPending').textContent = data.pendingCount || 0;
-                    document.getElementById('transferCompleted').textContent = data.completedCount || 0;
-                    document.getElementById('transferRejected').textContent = data.rejectedCount || 0;
-
-                    renderTable('transfersTable', 'transfersTableBody', data.transfers, [
-                        'id', 'type', 'from', 'to', 'asset', 'date', 'status', 'amount'
-                    ]);
+                    renderTransfersTable(data.transfers || []);
                 })
                 .catch(err => console.error('Error loading transfers report:', err));
         }
 
+        function renderTransfersTable(data) {
+            const tbody = document.getElementById('transfersTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No data found</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(row => {
+                const statusClass = row.status ? row.status.toLowerCase() : '';
+                html += '<tr>';
+                html += `<td>${row.id || '-'}</td>`;
+                html += `<td>${row.category || '-'}</td>`;
+                html += `<td>${row.from || '-'}</td>`;
+                html += `<td>${row.to || '-'}</td>`;
+                html += `<td>${row.item || '-'}</td>`;
+                html += `<td>${row.date || '-'}</td>`;
+                html += `<td><span class="status-badge ${statusClass}">${row.status || '-'}</span></td>`;
+                html += `<td>${row.amount || '-'}</td>`;
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+
+            if (transfersDataTable) {
+                transfersDataTable.destroy();
+            }
+            transfersDataTable = $('#transfersTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ]
+            });
+        }
+
         function resetTransferFilters() {
+            document.getElementById('transferCategory').value = '';
             document.getElementById('transferDateFrom').value = '';
             document.getElementById('transferDateTo').value = '';
             document.getElementById('transferStatus').value = '';
-            document.getElementById('transferType').value = '';
-            loadTransfersReport();
+            document.getElementById('transferDepartment').value = '';
+            toggleTransferFilters();
+            document.getElementById('transfersTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted">Select a category and click "Generate"</td></tr>';
         }
 
         // ============================================
-        // DRIVER BOOKINGS REPORT
+        // 3. BOOKINGS REPORT
         // ============================================
-        let driverBookingsDataTable = null;
+        function loadBookingsReport() {
+            const type = document.getElementById('bookingType').value;
+            if (!type) return;
 
-        function loadDriverBookingsReport() {
-            const dateFrom = document.getElementById('driverBookingDateFrom').value;
-            const dateTo = document.getElementById('driverBookingDateTo').value;
-            const driver = document.getElementById('driverBookingDriver').value;
-            const status = document.getElementById('driverBookingStatus').value;
+            const dateFrom = document.getElementById('bookingDateFrom').value;
+            const dateTo = document.getElementById('bookingDateTo').value;
+            const specificValue = document.getElementById('bookingSpecificValue').value;
+            const status = document.getElementById('bookingStatus').value;
 
             const params = new URLSearchParams();
+            params.append('type', type);
             if (dateFrom) params.append('dateFrom', dateFrom);
             if (dateTo) params.append('dateTo', dateTo);
-            if (driver) params.append('driverId', driver);
+            if (specificValue) params.append('specificId', specificValue);
             if (status) params.append('status', status);
 
-            fetch('/assetIQ-pro/api/reports/driver-bookings?' + params.toString())
+            fetch('/assetIQ-pro/api/reports/bookings?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('driverBookingTotal').textContent = data.total || 0;
-                    document.getElementById('driverBookingPending').textContent = data.pendingCount || 0;
-                    document.getElementById('driverBookingCompleted').textContent = data.completedCount || 0;
-                    document.getElementById('driverBookingDeclined').textContent = data.declinedCount || 0;
-
-                    renderTable('driverBookingsTable', 'driverBookingsTableBody', data.bookings, [
-                        'id', 'requester', 'driverName', 'destination', 'requestTime', 'status', 'completedAt'
-                    ]);
+                    renderBookingsTable(data.bookings || [], type);
                 })
-                .catch(err => console.error('Error loading driver bookings report:', err));
+                .catch(err => console.error('Error loading bookings report:', err));
         }
 
-        function resetDriverBookingFilters() {
-            document.getElementById('driverBookingDateFrom').value = '';
-            document.getElementById('driverBookingDateTo').value = '';
-            document.getElementById('driverBookingDriver').value = '';
-            document.getElementById('driverBookingStatus').value = '';
-            loadDriverBookingsReport();
+        function renderBookingsTable(data, type) {
+            const tbody = document.getElementById('bookingsTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No data found</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(row => {
+                const statusClass = row.status ? row.status.toLowerCase() : '';
+                html += '<tr>';
+                html += `<td>${row.id || '-'}</td>`;
+                if (type === 'driver') {
+                    html += `<td>${row.requester || '-'}</td>`;
+                    html += `<td>${row.driver || '-'}</td>`;
+                    html += `<td>${row.destination || '-'}</td>`;
+                    html += `<td>${row.requested || '-'}</td>`;
+                } else {
+                    html += `<td>${row.bookedBy || '-'}</td>`;
+                    html += `<td>${row.room || '-'}</td>`;
+                    html += `<td>${row.timeSlot || '-'}</td>`;
+                    html += `<td>${row.date || '-'}</td>`;
+                }
+                html += `<td><span class="status-badge ${statusClass}">${row.status || '-'}</span></td>`;
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+
+            if (bookingsDataTable) {
+                bookingsDataTable.destroy();
+            }
+            bookingsDataTable = $('#bookingsTable').DataTable({
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ]
+            });
         }
 
-        // ============================================
-        // ROOM BOOKINGS REPORT
-        // ============================================
-        let roomBookingsDataTable = null;
-
-        function loadRoomBookingsReport() {
-            const dateFrom = document.getElementById('roomBookingDateFrom').value;
-            const dateTo = document.getElementById('roomBookingDateTo').value;
-            const room = document.getElementById('roomBookingRoom').value;
-            const status = document.getElementById('roomBookingStatus').value;
-
-            const params = new URLSearchParams();
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            if (dateTo) params.append('dateTo', dateTo);
-            if (room) params.append('roomId', room);
-            if (status) params.append('status', status);
-
-            fetch('/assetIQ-pro/api/reports/room-bookings?' + params.toString())
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('roomBookingTotal').textContent = data.total || 0;
-                    document.getElementById('roomBookingPending').textContent = data.pendingCount || 0;
-                    document.getElementById('roomBookingCompleted').textContent = data.completedCount || 0;
-                    document.getElementById('roomBookingCancelled').textContent = data.cancelledCount || 0;
-
-                    renderTable('roomBookingsTable', 'roomBookingsTableBody', data.bookings, [
-                        'id', 'roomName', 'bookedBy', 'startTime', 'endTime', 'duration', 'status'
-                    ]);
-                })
-                .catch(err => console.error('Error loading room bookings report:', err));
-        }
-
-        function resetRoomBookingFilters() {
-            document.getElementById('roomBookingDateFrom').value = '';
-            document.getElementById('roomBookingDateTo').value = '';
-            document.getElementById('roomBookingRoom').value = '';
-            document.getElementById('roomBookingStatus').value = '';
-            loadRoomBookingsReport();
-        }
-
-        // ============================================
-        // ASSET COSTS REPORT
-        // ============================================
-        let costDataTable = null;
-
-        function loadCostReport() {
-            const dateFrom = document.getElementById('costDateFrom').value;
-            const dateTo = document.getElementById('costDateTo').value;
-            const category = document.getElementById('costCategory').value;
-            const currency = document.getElementById('costCurrency').value;
-
-            const params = new URLSearchParams();
-            if (dateFrom) params.append('dateFrom', dateFrom);
-            if (dateTo) params.append('dateTo', dateTo);
-            if (category) params.append('category', category);
-            if (currency) params.append('currency', currency);
-
-            fetch('/assetIQ-pro/api/reports/costs?' + params.toString())
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('costTotal').textContent = data.totalAssets || 0;
-                    document.getElementById('costTotalValue').textContent =
-                        (data.currency || 'UGX') + ' ' + (data.totalCost || 0).toLocaleString();
-                    document.getElementById('costAverage').textContent =
-                        (data.currency || 'UGX') + ' ' + (data.averageCost || 0).toLocaleString();
-
-                    renderTable('costTable', 'costTableBody', data.assets, [
-                        'name', 'tag', 'category', 'purchaseDate', 'cost', 'currency', 'department'
-                    ]);
-                })
-                .catch(err => console.error('Error loading costs report:', err));
-        }
-
-        function resetCostFilters() {
-            document.getElementById('costDateFrom').value = '';
-            document.getElementById('costDateTo').value = '';
-            document.getElementById('costCategory').value = '';
-            document.getElementById('costCurrency').value = 'UGX';
-            loadCostReport();
+        function resetBookingFilters() {
+            document.getElementById('bookingType').value = '';
+            document.getElementById('bookingDateFrom').value = '';
+            document.getElementById('bookingDateTo').value = '';
+            document.getElementById('bookingSpecificValue').innerHTML = '<option value="">All</option>';
+            document.getElementById('bookingStatus').value = '';
+            toggleBookingFilters();
+            document.getElementById('bookingsTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Select a booking type and click "Generate"</td></tr>';
         }
 
         // ============================================
-        // AUDIT REPORT
+        // 4. AUDIT REPORT
         // ============================================
-        let auditDataTable = null;
-
         function loadAuditReport() {
             const dateFrom = document.getElementById('auditDateFrom').value;
             const dateTo = document.getElementById('auditDateTo').value;
@@ -1103,70 +1011,35 @@
             fetch('/assetIQ-pro/api/reports/audit?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('auditTotal').textContent = data.total || 0;
-                    document.getElementById('auditCreates').textContent = data.createCount || 0;
-                    document.getElementById('auditUpdates').textContent = data.updateCount || 0;
-                    document.getElementById('auditDeletes').textContent = data.deleteCount || 0;
-
-                    renderTable('auditTable', 'auditTableBody', data.logs, [
-                        'timestamp', 'user', 'action', 'type', 'details', 'ipAddress'
-                    ]);
+                    renderAuditTable(data.logs || []);
                 })
                 .catch(err => console.error('Error loading audit report:', err));
         }
 
-        function resetAuditFilters() {
-            document.getElementById('auditDateFrom').value = '';
-            document.getElementById('auditDateTo').value = '';
-            document.getElementById('auditActionType').value = '';
-            document.getElementById('auditUser').value = '';
-            loadAuditReport();
-        }
-
-        // ============================================
-        // UTILITY: Render DataTable
-        // ============================================
-        function renderTable(tableId, bodyId, data, columns) {
-            const tbody = document.getElementById(bodyId);
+        function renderAuditTable(data) {
+            const tbody = document.getElementById('auditTableBody');
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="' + columns.length + '" class="text-center text-muted">No data found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No data found</td></tr>';
                 return;
             }
 
             let html = '';
             data.forEach(row => {
                 html += '<tr>';
-                columns.forEach(col => {
-                    let value = row[col] !== undefined && row[col] !== null ? row[col] : '';
-                    if (col.includes('Date') || col.includes('Time') || col.includes('At')) {
-                        try {
-                            if (value) {
-                                const date = new Date(value);
-                                if (!isNaN(date.getTime())) {
-                                    value = date.toLocaleString();
-                                }
-                            }
-                        } catch(e) {}
-                    }
-                    if (col === 'status' && value) {
-                        const statusClass = value.toLowerCase();
-                        html += '<td><span class="status-badge ' + statusClass + '">' + value + '</span></td>';
-                    } else {
-                        html += '<td>' + value + '</td>';
-                    }
-                });
+                html += `<td>${row.timestamp || '-'}</td>`;
+                html += `<td>${row.user || '-'}</td>`;
+                html += `<td>${row.action || '-'}</td>`;
+                html += `<td>${row.type || '-'}</td>`;
+                html += `<td>${row.details || '-'}</td>`;
+                html += `<td>${row.ipAddress || '-'}</td>`;
                 html += '</tr>';
             });
             tbody.innerHTML = html;
 
-            const table = document.getElementById(tableId);
-            const tableIdSelector = '#' + tableId;
-
-            if ($.fn.DataTable.isDataTable(tableIdSelector)) {
-                $(tableIdSelector).DataTable().destroy();
+            if (auditDataTable) {
+                auditDataTable.destroy();
             }
-
-            $(tableIdSelector).DataTable({
+            auditDataTable = $('#auditTable').DataTable({
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 dom: 'Bfrtip',
@@ -1176,15 +1049,16 @@
                     { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
                     { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
                     { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
-                ],
-                language: {
-                    search: "Search:",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                    infoEmpty: "No records found",
-                    infoFiltered: "(filtered from _MAX_ total records)"
-                }
+                ]
             });
+        }
+
+        function resetAuditFilters() {
+            document.getElementById('auditDateFrom').value = '';
+            document.getElementById('auditDateTo').value = '';
+            document.getElementById('auditActionType').value = '';
+            document.getElementById('auditUser').value = '';
+            document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Click "Generate" to load data</td></tr>';
         }
 
         // ============================================
@@ -1198,13 +1072,11 @@
             let tableId = '';
 
             switch(tabId) {
-                case 'eol-tab': tableId = 'eolTable'; break;
-                case 'warranty-tab': tableId = 'warrantyTable'; break;
+                case 'assets-tab': tableId = 'assetsTable'; break;
                 case 'transfers-tab': tableId = 'transfersTable'; break;
-                case 'driver-bookings-tab': tableId = 'driverBookingsTable'; break;
-                case 'room-bookings-tab': tableId = 'roomBookingsTable'; break;
-                case 'cost-tab': tableId = 'costTable'; break;
+                case 'bookings-tab': tableId = 'bookingsTable'; break;
                 case 'audit-tab': tableId = 'auditTable'; break;
+                default: return;
             }
 
             if (tableId && $.fn.DataTable.isDataTable('#' + tableId)) {
@@ -1216,19 +1088,22 @@
         // AUTO-LOAD REPORTS ON TAB ACTIVATION
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
-            loadEOLReport();
-
             document.querySelectorAll('.report-tabs .nav-link').forEach(tab => {
                 tab.addEventListener('shown.bs.tab', function(e) {
                     const id = this.id;
                     switch(id) {
-                        case 'eol-tab': loadEOLReport(); break;
-                        case 'warranty-tab': loadWarrantyReport(); break;
-                        case 'transfers-tab': loadTransfersReport(); break;
-                        case 'driver-bookings-tab': loadDriverBookingsReport(); break;
-                        case 'room-bookings-tab': loadRoomBookingsReport(); break;
-                        case 'cost-tab': loadCostReport(); break;
-                        case 'audit-tab': loadAuditReport(); break;
+                        case 'assets-tab':
+                            // Don't auto-load, wait for user to select report type
+                            break;
+                        case 'transfers-tab':
+                            // Don't auto-load, wait for user to select category
+                            break;
+                        case 'bookings-tab':
+                            // Don't auto-load, wait for user to select booking type
+                            break;
+                        case 'audit-tab':
+                            loadAuditReport();
+                            break;
                     }
                 });
             });

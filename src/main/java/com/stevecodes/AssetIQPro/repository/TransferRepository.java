@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface TransferRepository extends JpaRepository<Transfer, Integer> {
+public interface TransferRepository extends JpaRepository<Transfer, Long> {  // FIXED: Changed Integer to Long
 
     List<Transfer> findByAssetTag(String assetTag);
 
@@ -32,6 +32,7 @@ public interface TransferRepository extends JpaRepository<Transfer, Integer> {
     @Query("SELECT t.transferDate, COUNT(t) FROM Transfer t GROUP BY t.transferDate ORDER BY t.transferDate DESC")
     List<Object[]> countTransfersByDate();
 
+    // FIXED: Changed excludeId from Integer to Long
     @Query("SELECT t FROM Transfer t WHERE t.transferId <> :excludeId AND (" +
             "  (:assetTag IS NOT NULL AND TRIM(t.assetTag) <> '' " +
             "     AND LOWER(TRIM(t.assetTag)) = LOWER(TRIM(:assetTag))) " +
@@ -41,7 +42,7 @@ public interface TransferRepository extends JpaRepository<Transfer, Integer> {
             ") ORDER BY t.transferDate ASC, t.transferId ASC")
     List<Transfer> findRelatedTransfers(@Param("assetTag") String assetTag,
                                         @Param("serialNumber") String serialNumber,
-                                        @Param("excludeId") Integer excludeId);
+                                        @Param("excludeId") Long excludeId);  // FIXED: Changed to Long
 
     List<Transfer> findTop5ByOrderByTransferDateDesc();
 

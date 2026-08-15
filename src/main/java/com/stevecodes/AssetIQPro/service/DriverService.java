@@ -9,6 +9,7 @@ import com.stevecodes.AssetIQPro.repository.DriverRequestRepository;
 import com.stevecodes.AssetIQPro.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,10 +87,11 @@ public class DriverService {
 
     @Transactional
     public DriverRequest createDriverRequest(Long userId, String destination, Long driverId,
-                                             String reason, String requestedBy, LocalDateTime requestTime) {
+                                             String reason, String requestedBy, LocalDateTime requestTime,
+                                             String tripType) {  // ✅ NEW PARAMETER
         log.info("=== CREATE DRIVER REQUEST START ===");
         log.info("📝 Creating driver request for user: {}, request time: {}", userId, requestTime);
-        log.info("📝 Destination: {}, Driver: {}, Reason: {}", destination, driverId, reason);
+        log.info("📝 Destination: {}, Driver: {}, Reason: {}, Trip Type: {}", destination, driverId, reason, tripType);
 
         try {
             if (driverId != null && driverId == -1) {
@@ -129,19 +131,42 @@ public class DriverService {
             request.setPickupDatetime(requestTime);
             request.setStatus("PENDING");
             request.setRequestedBy(requestedBy);
+            request.setTripType(tripType);  // ✅ SET TRIP TYPE
+
+            // Set category based on trip type
+            if (tripType != null) {
+                request.setTripCategory(tripType);
+            } else {
+                // Auto-calculate if not provided (fallback)
+                LocalDate today = LocalDate.now();
+                LocalDate requestDate = requestTime.toLocalDate();
+                if (requestDate.equals(today)) {
+                    request.setTripCategory("TODAY");
+                } else if (requestDate.isAfter(today) && requestDate.isBefore(today.plusDays(1))) {
+                    request.setTripCategory("TODAY");
+                } else if (requestDate.isAfter(today)) {
+                    request.setTripCategory("ADVANCE");
+                } else {
+                    request.setTripCategory("FUTURE");
+                }
+            }
+
+            // Set expiry time: 30 minutes before the trip for TODAY trips
+            if ("TODAY".equals(request.getTripCategory())) {
+                request.setExpiryTime(requestTime.minusMinutes(30));
+            }
 
             log.info("💾 Saving driver request");
             DriverRequest saved = driverRequestRepository.save(request);
             log.info("✅ Driver request saved with ID: {}", saved.getRequestId());
 
-            // ✅ START SLA TRACKING
+            // START SLA TRACKING
             log.info("📊 Starting SLA tracking for driver request: {}", saved.getRequestId());
             try {
                 slaService.startSLATracking(saved.getRequestId(), "DRIVER_REQUEST", userId);
                 log.info("✅ SLA tracking started for driver request: {}", saved.getRequestId());
             } catch (Exception e) {
                 log.error("❌ Failed to start SLA tracking for driver request: {}", e.getMessage(), e);
-                // Don't re-throw - the request is already saved
             }
 
             // Notify drivers
@@ -858,6 +883,70 @@ public class DriverService {
             }
         }
         return true;
+    }
+
+    // ============================================
+    // Trip Categorization & Expiry - Add to DriverService.java
+    // ============================================
+
+    /**
+     * Categorize a trip based on request time
+     */
+    public String categorizeTrip(LocalDateTime requestTime) {
+        LocalDate today = LocalDate.now();
+        LocalDate requestDate = requestTime.toLocalDate();
+
+        if (requestDate.equals(today)) {
+            return "TODAY";
+        } else if (requestDate.isAfter(today) && requestDate.isBefore(today.plusDays(1))) {
+            return "TODAY";
+        } else if (requestDate.isAfter(today)) {
+            return "ADVANCE";
+        } else {
+            return "FUTURE";
+        }
+    }
+
+    /**
+     * Check and expire expired trips
+     * This should be run by a scheduled job
+     */
+    @Scheduled(fixedDelay = 60000) // Run every minute
+    @Transactional
+    public void expireExpiredTrips() {
+        log.info("Running scheduled expiry check for driver trips...");
+        LocalDateTime now = LocalDateTime.now();
+
+        // Find all PENDING trips that are expired
+        List<DriverRequest> expiredTrips = driverRequestRepository
+                .findByStatusAndIsExpiredFalseAndExpiryTimeBefore("PENDING", now);
+
+        // Also find PENDING_ADMIN trips that are expired
+        expiredTrips.addAll(driverRequestRepository
+                .findByStatusAndIsExpiredFalseAndExpiryTimeBefore("PENDING_ADMIN", now));
+
+        for (DriverRequest trip : expiredTrips) {
+            trip.setStatus("EXPIRED");
+            trip.setIsExpired(true);
+            trip.setDeclineReason("Trip request expired as it was not actioned in time.");
+            driverRequestRepository.save(trip);
+            log.info("Expired trip {} for user {} to {}", trip.getRequestId(),
+                    trip.getUserId(), trip.getDestination());
+
+            // Notify user that their request expired
+            try {
+                String userEmail = getUserEmail(trip.getUserId());
+                emailService.sendSimpleEmail(
+                        userEmail,
+                        "Driver Request Expired",
+                        "Your driver request to " + trip.getDestination() +
+                                " has expired because it was not actioned in time.\n\n" +
+                                "Please submit a new request if you still need a driver."
+                );
+            } catch (Exception e) {
+                log.error("Failed to send expiry notification: {}", e.getMessage());
+            }
+        }
     }
 
     // ============================================

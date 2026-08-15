@@ -327,6 +327,7 @@ public class UserRequestController {
     public ResponseEntity<?> createDriverRequest(
             @RequestParam Long userId,
             @RequestParam String destination,
+            @RequestParam String tripType,  // ✅ NEW PARAMETER
             @RequestParam(required = false) Long driverId,
             @RequestParam(required = false) String reason,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime requestTime) {
@@ -341,18 +342,34 @@ public class UserRequestController {
                 requestTime = LocalDateTime.now().plusHours(1);
             }
 
+            // Validate driver is selected
+            if (driverId == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Please select a driver. 'Any Available Driver' is not allowed."));
+            }
+
+            // Validate trip type
+            if (tripType == null || tripType.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Please select a trip type."));
+            }
+
             log.info("=== CREATE DRIVER REQUEST ===");
-            log.info("userId: {}, destination: {}, driverId: {}, requestTime: {}", userId, destination, driverId, requestTime);
+            log.info("userId: {}, destination: {}, tripType: {}, driverId: {}, requestTime: {}",
+                    userId, destination, tripType, driverId, requestTime);
 
             String requestedBy = userService.getUserById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"))
                     .getUsername();
 
-            driverService.createDriverRequest(userId, destination, driverId, reason, requestedBy, requestTime);
+            // Pass tripType to service
+            DriverRequest saved = driverService.createDriverRequest(
+                    userId, destination, driverId, reason, requestedBy, requestTime, tripType);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Driver requested successfully!"
+                    "message", "Driver requested successfully!",
+                    "requestId", saved.getRequestId()
             ));
 
         } catch (IllegalStateException e) {

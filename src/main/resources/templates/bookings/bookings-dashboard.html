@@ -101,6 +101,7 @@
         .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
         .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
         .status-badge.active { background: #e6f7ec; color: #198754; }
+        .status-badge.expired { background: #fdeeee; color: #dc3545; }
 
         /* Room grid styles */
         .room-grid {
@@ -235,6 +236,32 @@
         .room-booking-table tbody tr:hover {
             background: #f8f9fc;
         }
+
+        /* Modal detail tables (driver/room bookings lists inside detail modals) */
+        .detail-table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+        .detail-table thead th {
+            background: #f8f9fb;
+            border-bottom: 1px solid #eef0f3;
+            color: #6c757d;
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            white-space: nowrap;
+        }
+        .detail-table tbody td {
+            padding: 10px 12px;
+            vertical-align: middle;
+            font-size: 12.5px;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .detail-table tbody tr:hover { background: #f8f9fc; }
+        .detail-table .btn { width: 100%; margin-bottom: 4px; }
+        .detail-table .btn:last-child { margin-bottom: 0; }
 
         .center-alert-overlay {
             position: fixed; inset: 0; z-index: 1080;
@@ -481,6 +508,27 @@
         .action-dropdown .dropdown-item.text-warning { color: #fd7e14 !important; }
         .action-dropdown .dropdown-item.text-warning:hover { background: #fff4e0; }
         .action-dropdown .dropdown-divider { margin: 4px 0; }
+
+        /* Category badge styles */
+        .category-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .category-badge.today { background: #fdeeee; color: #dc3545; }
+        .category-badge.advance { background: #fff4e0; color: #fd7e14; }
+        .category-badge.future { background: #cfe2ff; color: #0d6efd; }
+
+        .expiry-warning {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #fdeeee;
+            color: #dc3545;
+            margin-left: 4px;
+        }
     </style>
 </head>
 
@@ -589,84 +637,110 @@
                             </button>
                         </div>
                         <div class="panel-body">
-                            <div th:if="${driverRequests != null and !driverRequests.isEmpty()}">
-                                <div class="table-container">
-                                    <table class="requests-table">
-                                        <thead>
-                                        <tr>
-                                            <th>Destination</th>
-                                            <th>Requested</th>
-                                            <th>Status</th>
-                                            <th>SLA Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="req : ${driverRequests}">
-                                            <td>
-                                                <div class="fw-bold" th:text="${req.destination}">Destination</div>
-                                                <small class="text-muted" th:text="${req.requestedBy}">Requester</small>
-                                            </td>
-                                            <td>
-                                                <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                            </td>
-                                            <td>
+                            <!-- ============================================ -->
+                            <!-- id="driverRequestsContainer" is the silent-refresh -->
+                            <!-- target: after a driver request is submitted, this -->
+                            <!-- block's innerHTML is swapped in from a background -->
+                            <!-- fetch instead of doing a full page reload. -->
+                            <!-- ============================================ -->
+                            <div id="driverRequestsContainer">
+                                <div th:if="${driverRequests != null and !driverRequests.isEmpty()}">
+                                    <div class="table-container">
+                                        <table class="requests-table">
+                                            <thead>
+                                            <tr>
+                                                <th>Destination</th>
+                                                <th>Set Off Time</th>
+                                                <th>Category</th>
+                                                <th>Status</th>
+                                                <th>SLA Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="req : ${driverRequests}">
+                                                <td>
+                                                    <div class="fw-bold" th:text="${req.destination}">Destination</div>
+                                                    <small class="text-muted" th:text="${req.requestedBy}">Requester</small>
+                                                </td>
+                                                <td>
+                                                    <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
+                                                    <!-- Show expiry warning for today's trips -->
+                                                    <span th:if="${req.tripCategory == 'TODAY' and req.status == 'PENDING' and !req.isExpired}"
+                                                          class="expiry-warning">
+                                                        <i class="fas fa-clock me-1"></i>Expires soon
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="category-badge"
+                                                          th:classappend="${req.tripCategory == 'TODAY'} ? 'today' :
+                                                                         (${req.tripCategory == 'ADVANCE'} ? 'advance' : 'future')"
+                                                          th:text="${req.tripCategoryDisplay}">Category</span>
+                                                    <span th:if="${req.isExpired}" class="status-badge cancelled ms-1">Expired</span>
+                                                </td>
+                                                <td>
                                                     <span class="status-badge"
                                                           th:classappend="${req.status} == 'PENDING' ? 'pending' :
                                                                           (${req.status} == 'ACCEPTED' ? 'accepted' :
-                                                                          (${req.status} == 'RECALLED' ? 'recalled' : 'rejected'))"
-                                                          th:text="${req.status}">PENDING</span>
-                                            </td>
-                                            <td>
-                                                <!-- SLA Status Badge -->
-                                                <span th:if="${req.slaStatus == 'IN_PROGRESS'}" class="sla-status-badge sla-in-progress" th:text="${req.slaStatusDisplay}">In Progress</span>
-                                                <span th:if="${req.slaStatus == 'COMPLETED'}" class="sla-status-badge sla-completed" th:text="${req.slaStatusDisplay}">Completed</span>
-                                                <span th:if="${req.slaStatus == 'BREACHED'}" class="sla-status-badge sla-breached" th:text="${req.slaStatusDisplay}">Breached</span>
-                                                <span th:if="${req.slaStatus == 'ESCALATED'}" class="sla-status-badge sla-escalated" th:text="${req.slaStatusDisplay}">Escalated</span>
-                                                <span th:if="${req.slaStatus == null or req.slaStatus == 'N/A'}" class="sla-status-badge sla-na">N/A</span>
+                                                                          (${req.status} == 'RECALLED' ? 'recalled' :
+                                                                          (${req.status} == 'EXPIRED' ? 'cancelled' : 'rejected')))"
+                                                          th:text="${req.statusDisplay}">PENDING</span>
+                                                </td>
+                                                <td>
+                                                    <!-- SLA Status Badge -->
+                                                    <span th:if="${req.slaStatus == 'IN_PROGRESS'}" class="sla-status-badge sla-in-progress" th:text="${req.slaStatusDisplay}">In Progress</span>
+                                                    <span th:if="${req.slaStatus == 'COMPLETED'}" class="sla-status-badge sla-completed" th:text="${req.slaStatusDisplay}">Completed</span>
+                                                    <span th:if="${req.slaStatus == 'BREACHED'}" class="sla-status-badge sla-breached" th:text="${req.slaStatusDisplay}">Breached</span>
+                                                    <span th:if="${req.slaStatus == 'ESCALATED'}" class="sla-status-badge sla-escalated" th:text="${req.slaStatusDisplay}">Escalated</span>
+                                                    <span th:if="${req.slaStatus == null or req.slaStatus == 'N/A'}" class="sla-status-badge sla-na">N/A</span>
 
-                                                <!-- Progress Bar -->
-                                                <div th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED'}" class="sla-progress-mini">
-                                                    <div class="sla-progress-bar"
-                                                         th:class="${req.slaPercentage != null and req.slaPercentage > 90} ? 'bg-danger' : ((${req.slaPercentage != null and req.slaPercentage > 75}) ? 'bg-warning' : 'bg-success')"
-                                                         th:style="'width: ' + ${req.slaPercentage != null ? req.slaPercentage : 0} + '%;'">
+                                                    <!-- Progress Bar -->
+                                                    <div th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED'}" class="sla-progress-mini">
+                                                        <div class="sla-progress-bar"
+                                                             th:class="${req.slaPercentage != null and req.slaPercentage > 90} ? 'bg-danger' : ((${req.slaPercentage != null and req.slaPercentage > 75}) ? 'bg-warning' : 'bg-success')"
+                                                             th:style="'width: ' + ${req.slaPercentage != null ? req.slaPercentage : 0} + '%;'">
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <small class="text-muted ms-1" th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED' and req.slaPercentage != null}"
-                                                       th:text="${#numbers.formatDecimal(req.slaPercentage, 0, 0)} + '%'">
-                                                    0%
-                                                </small>
-                                                <small class="text-danger ms-1" th:if="${req.slaStatus == 'BREACHED'}">
-                                                    <i class="fas fa-exclamation-triangle"></i>
-                                                </small>
-                                                <small class="text-success ms-1" th:if="${req.slaStatus == 'COMPLETED'}">
-                                                    <i class="fas fa-check-circle"></i>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <!-- Complete Trip button for ACCEPTED requests -->
-                                                <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
-                                                    <button class="btn btn-sm btn-success w-100"
-                                                            th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
-                                                        <i class="fas fa-check-circle"></i> Complete
-                                                    </button>
-                                                </div>
-                                                <!-- Recall button for PENDING requests -->
-                                                <div th:if="${req.status} == 'PENDING'">
-                                                    <button class="btn btn-sm btn-warning w-100 recall-btn"
-                                                            th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
-                                                        <i class="fas fa-undo"></i> Recall
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
+                                                    <small class="text-muted ms-1" th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED' and req.slaPercentage != null}"
+                                                           th:text="${#numbers.formatDecimal(req.slaPercentage, 0, 0)} + '%'">
+                                                        0%
+                                                    </small>
+                                                    <small class="text-danger ms-1" th:if="${req.slaStatus == 'BREACHED'}">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                    </small>
+                                                    <small class="text-success ms-1" th:if="${req.slaStatus == 'COMPLETED'}">
+                                                        <i class="fas fa-check-circle"></i>
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    <!-- Complete Trip button for ACCEPTED requests -->
+                                                    <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
+                                                        <button class="btn btn-sm btn-success w-100"
+                                                                th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                            <i class="fas fa-check-circle"></i> Complete
+                                                        </button>
+                                                    </div>
+                                                    <!-- Recall button for PENDING requests (not expired) -->
+                                                    <div th:if="${req.status == 'PENDING' and (req.isExpired == null or !req.isExpired)}">
+                                                        <button class="btn btn-sm btn-warning w-100 recall-btn"
+                                                                th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
+                                                            <i class="fas fa-undo"></i> Recall
+                                                        </button>
+                                                    </div>
+                                                    <!-- Show expired message -->
+                                                    <div th:if="${req.status == 'EXPIRED'}">
+                                                        <span class="text-muted small">Request expired</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                            <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
-                                <i class="fas fa-car"></i>
-                                No driver requests
+                                <div th:if="${driverRequests == null or driverRequests.isEmpty()}" class="empty-state-sm">
+                                    <i class="fas fa-car"></i>
+                                    No driver requests
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -674,7 +748,7 @@
             </div>
         </div>
 
-        <!-- ================= ROOMS TAB - UPDATED WITH TABLE ================= -->
+        <!-- ================= ROOMS TAB ================= -->
         <div class="tab-pane fade" id="rooms-pane" role="tabpanel" aria-labelledby="rooms-tab-btn">
             <div class="row g-4">
                 <div class="col-xl-4">
@@ -723,88 +797,95 @@
                             </div>
                         </div>
                         <div class="panel-body">
-                            <div th:if="${roomBookings != null and !roomBookings.isEmpty()}">
-                                <div class="table-container">
-                                    <table class="room-booking-table">
-                                        <thead>
-                                        <tr>
-                                            <th>Room</th>
-                                            <th>Booked By</th>
-                                            <th>Date &amp; Time</th>
-                                            <th>Purpose</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="booking : ${roomBookings}">
-                                            <td>
-                                                <div class="fw-bold" th:text="${booking.roomName}">Room Name</div>
-                                                <small class="text-muted" th:text="${booking.roomType}">Room Type</small>
-                                            </td>
-                                            <td th:text="${booking.bookedBy}">Booked By</td>
-                                            <td>
-                                                <span th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">Start</span>
-                                                <span class="text-muted"> - </span>
-                                                <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">End</span>
-                                            </td>
-                                            <td>
-                                                <span th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</span>
-                                            </td>
-                                            <td>
-                                                <span class="status-badge"
-                                                      th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
-                                                                      (${booking.status} == 'BOOKED' ? 'booked' :
-                                                                      (${booking.status} == 'ACTIVE' ? 'booked' :
-                                                                      (${booking.status} == 'PENDING' ? 'pending' :
-                                                                      (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
-                                                      th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
-                                            </td>
-                                            <td>
-                                                <!-- Recall button for BOOKED/PENDING bookings by owner -->
-                                                <div th:if="${(booking.status == 'BOOKED' or booking.status == 'PENDING') and booking.userId == session.userId}">
-                                                    <button class="btn btn-sm btn-warning recall-btn"
-                                                            th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
-                                                        <i class="fas fa-undo"></i> Recall
-                                                    </button>
-                                                </div>
-
-                                                <!-- Request Slot button for BOOKED bookings by other users (non-server room) -->
-                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
-                                                    <button class="btn btn-sm btn-info recall-btn"
-                                                            th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
-                                                        <i class="fas fa-handshake"></i> Request
-                                                    </button>
-                                                </div>
-
-                                                <!-- Sign Out button for INFRA and ADMIN users on server rooms -->
-                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
-                                                    <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post">
-                                                        <input type="hidden" name="infraComment" value="Signing out user">
-                                                        <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                            <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                            <!-- ============================================ -->
+                            <!-- id="roomBookingsContainer" is the silent-refresh -->
+                            <!-- target for room booking submissions (see note above -->
+                            <!-- driverRequestsContainer). -->
+                            <!-- ============================================ -->
+                            <div id="roomBookingsContainer">
+                                <div th:if="${roomBookings != null and !roomBookings.isEmpty()}">
+                                    <div class="table-container">
+                                        <table class="room-booking-table">
+                                            <thead>
+                                            <tr>
+                                                <th>Room</th>
+                                                <th>Booked By</th>
+                                                <th>Date &amp; Time</th>
+                                                <th>Purpose</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="booking : ${roomBookings}">
+                                                <td>
+                                                    <div class="fw-bold" th:text="${booking.roomName}">Room Name</div>
+                                                    <small class="text-muted" th:text="${booking.roomType}">Room Type</small>
+                                                </td>
+                                                <td th:text="${booking.bookedBy}">Booked By</td>
+                                                <td>
+                                                    <span th:text="${#temporals.format(booking.startTime, 'dd/MM/yyyy HH:mm')}">Start</span>
+                                                    <span class="text-muted"> - </span>
+                                                    <span th:text="${#temporals.format(booking.endTime, 'HH:mm')}">End</span>
+                                                </td>
+                                                <td>
+                                                    <span th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</span>
+                                                </td>
+                                                <td>
+                                                    <span class="status-badge"
+                                                          th:classappend="${booking.status} == 'CONFIRMED' ? 'completed' :
+                                                                          (${booking.status} == 'BOOKED' ? 'booked' :
+                                                                          (${booking.status} == 'ACTIVE' ? 'booked' :
+                                                                          (${booking.status} == 'PENDING' ? 'pending' :
+                                                                          (${booking.status} == 'CANCELLED' ? 'cancelled' : 'completed'))))"
+                                                          th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
+                                                </td>
+                                                <td>
+                                                    <!-- Recall button for BOOKED/PENDING bookings by owner -->
+                                                    <div th:if="${(booking.status == 'BOOKED' or booking.status == 'PENDING') and booking.userId == session.userId}">
+                                                        <button class="btn btn-sm btn-warning recall-btn"
+                                                                th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
+                                                            <i class="fas fa-undo"></i> Recall
                                                         </button>
-                                                    </form>
-                                                </div>
+                                                    </div>
 
-                                                <!-- Admin Cancel button for INFRA users -->
-                                                <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
-                                                    <button class="btn btn-sm btn-danger mt-1 w-100"
-                                                            th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
-                                                        <i class="fas fa-times me-1"></i>Cancel
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
+                                                    <!-- Request Slot button for BOOKED bookings by other users (non-server room) -->
+                                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
+                                                        <button class="btn btn-sm btn-info recall-btn"
+                                                                th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
+                                                            <i class="fas fa-handshake"></i> Request
+                                                        </button>
+                                                    </div>
+
+                                                    <!-- Sign Out button for INFRA and ADMIN users on server rooms -->
+                                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
+                                                        <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post">
+                                                            <input type="hidden" name="infraComment" value="Signing out user">
+                                                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                                <i class="fas fa-sign-out-alt me-1"></i>Sign Out
+                                                            </button>
+                                                        </form>
+                                                    </div>
+
+                                                    <!-- Admin Cancel button for INFRA users -->
+                                                    <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
+                                                        <button class="btn btn-sm btn-danger mt-1 w-100"
+                                                                th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
+                                                            <i class="fas fa-times me-1"></i>Cancel
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
+                                <div th:if="${roomBookings == null or roomBookings.isEmpty()}" class="empty-state-sm">
+                                    <i class="fas fa-calendar-check"></i>
+                                    No room bookings
+                                </div>
+                                <div class="pagination-controls" id="roomBookingsPagination"></div>
                             </div>
-                            <div th:if="${roomBookings == null or roomBookings.isEmpty()}" class="empty-state-sm">
-                                <i class="fas fa-calendar-check"></i>
-                                No room bookings
-                            </div>
-                            <div class="pagination-controls" id="roomBookingsPagination"></div>
                         </div>
                     </div>
                 </div>
@@ -974,9 +1055,7 @@
                     </div>
                 </div>
 
-                <!-- ============================================================ -->
-                <!-- CAB (External Driver) Requests Pending Approval - NEW -->
-                <!-- ============================================================ -->
+                <!-- CAB (External Driver) Requests Pending Approval -->
                 <div class="col-12" th:if="${pendingCabRequests != null and !pendingCabRequests.isEmpty()}">
                     <div class="booking-panel">
                         <div class="panel-header">
@@ -1032,56 +1111,6 @@
                     </div>
                 </div>
 
-                <!-- Infrastructure Requests Pending Approval -->
-                <!-- <div class="col-12" th:if="${pendingInfraRequests != null and !pendingInfraRequests.isEmpty()}">
-                    <div class="booking-panel">
-                        <div class="panel-header">
-                            <h6><i class="fas fa-tools me-2"></i>Infrastructure Requests Pending Your Approval</h6>
-                            <span class="badge bg-warning" th:text="${pendingInfraRequests.size()}">0</span>
-                        </div>
-                        <div class="panel-body">
-                            <div class="table-container">
-                                <table class="requests-table">
-                                    <thead>
-                                    <tr>
-                                        <th>Requester</th>
-                                        <th>Resource</th>
-                                        <th>Status</th>
-                                        <th>Specification</th>
-                                        <th>Justification</th>
-                                        <th>Qty</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    <tr th:each="req : ${pendingInfraRequests}">
-                                        <td th:text="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}">Requester</td>
-                                        <td th:text="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}">Resource</td>
-                                        <td><span class="status-badge pending" th:text="${req.statusDisplay}">PENDING</span></td>
-                                        <td class="text-truncate" style="max-width: 180px;" th:text="${req.specification != null ? req.specification : '-'}">Specification</td>
-                                        <td class="text-truncate" style="max-width: 180px;" th:text="${req.justification != null ? req.justification : '-'}">Justification</td>
-                                        <td th:text="${req.quantity != null ? req.quantity : '-'}">1</td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-primary view-infra-btn"
-                                                    th:data-requestid="${req.requestId}"
-                                                    th:data-requester="${req.requesterName != null ? req.requesterName : 'User #' + req.requesterId}"
-                                                    th:data-resource="${req.resourceType != null ? req.resourceType : 'Infrastructure Request'}"
-                                                    th:data-status="${req.statusDisplay}"
-                                                    th:data-specification="${req.specification}"
-                                                    th:data-justification="${req.justification}"
-                                                    th:data-quantity="${req.quantity}"
-                                                    onclick="viewInfraRequest(this)">
-                                                <i class="fas fa-eye"></i> View
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div> -->
-
                 <!-- Empty State -->
                 <div class="col-12"
                      th:if="${(pendingDriverApprovals == null or pendingDriverApprovals.isEmpty()) and
@@ -1115,7 +1144,10 @@
                     <h5 class="modal-title"><i class="fas fa-car me-2" style="color: #0d6efd;"></i>Request Driver</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/bookings/driver-request}" method="post" id="requestDriverForm" data-ajax-form="true">
+                <form th:action="@{/bookings/driver-request}" method="post" id="requestDriverForm"
+                      data-ajax-form="true"
+                      data-refresh-target="driverRequestsContainer"
+                      data-success-message="Driver request submitted!">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
 
@@ -1125,18 +1157,30 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="requestTimeInput" class="form-label">Request Time *</label>
-                            <input type="datetime-local" id="requestTimeInput" name="requestTime" class="form-control" required>
-                            <small class="text-muted">Bookings are allowed within 5 days from today</small>
+                            <label for="tripTypeSelect" class="form-label">Trip Type *</label>
+                            <select id="tripTypeSelect" name="tripType" class="form-select" required>
+                                <option value="">-- Select Trip Type --</option>
+                                <option value="TODAY">Today - Immediate/Urgent</option>
+                                <option value="ADVANCE">Advance Booking (Tomorrow or later)</option>
+                                <option value="FUTURE">Future Booking</option>
+                            </select>
+                            <small class="text-muted" id="tripTypeHelpText">Select the type of trip to help drivers prioritize</small>
                         </div>
 
                         <div class="mb-3">
-                            <label for="driverSelect" class="form-label">Driver (Optional)</label>
-                            <select id="driverSelect" name="driverId" class="form-select">
-                                <option value="">Any Available Driver</option>
+                            <label for="requestTimeInput" class="form-label">Set Off Time *</label>
+                            <input type="datetime-local" id="requestTimeInput" name="requestTime" class="form-control" required>
+                            <small class="text-muted">Select the time you need the driver to be ready</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="driverSelect" class="form-label">Driver *</label>
+                            <select id="driverSelect" name="driverId" class="form-select" required>
+                                <option value="">-- Select a driver --</option>
                                 <option th:each="driver : ${allDrivers}" th:value="${driver.userId}" th:text="${driver.fullName}"></option>
                                 <option value="-1" class="text-primary fw-bold">🚕 Cab (External)</option>
                             </select>
+                            <small class="text-muted">Please select a specific driver or choose "Cab (External)"</small>
                         </div>
 
                         <div class="mb-3">
@@ -1161,7 +1205,10 @@
                     <h5 class="modal-title"><i class="fas fa-calendar-plus me-2" style="color: #28a745;"></i>Book Room</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/bookings/room}" method="post" id="bookRoomForm" data-ajax-form="true">
+                <form th:action="@{/bookings/room}" method="post" id="bookRoomForm"
+                      data-ajax-form="true"
+                      data-refresh-target="roomBookingsContainer"
+                      data-success-message="Room booked successfully!">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
                         <div class="mb-3">
@@ -1212,7 +1259,11 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-success" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#bookRoomModal">
+                    <!-- id + data-roomid: JS handles the transition to the Book
+                         Room modal manually (see bookThisRoomBtn wiring in
+                         scripts) so the room field is reliably pre-filled
+                         before the modal is shown. -->
+                    <button type="button" class="btn btn-success" id="bookThisRoomBtn">
                         <i class="fas fa-calendar-plus me-1"></i>Book This Room
                     </button>
                 </div>
@@ -1237,7 +1288,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#requestDriverModal">
+                    <!-- id + data-driverid: JS handles the transition to the
+                         Request Driver modal manually (see
+                         requestThisDriverBtn wiring in scripts) so the
+                         driver field is reliably pre-filled before the modal
+                         is shown. -->
+                    <button type="button" class="btn btn-primary" id="requestThisDriverBtn">
                         <i class="fas fa-car me-1"></i>Request This Driver
                     </button>
                 </div>
@@ -1289,7 +1345,7 @@
         </div>
     </div>
 
-    <!-- Decline Reason Modal (replaces native window.prompt) -->
+    <!-- Decline Reason Modal -->
     <div class="modal fade" id="declineReasonModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -1424,6 +1480,16 @@
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
         const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
 
+        // Tracks the driver whose "Request This Driver" button was clicked
+        // in the driver-details modal, so the Request Driver modal can
+        // auto-populate its driver dropdown the next time it opens.
+        let driverToPreselect = null;
+
+        // Same idea, but for the room whose "Book This Room" button was
+        // clicked in the room-details modal - lets the Book Room modal
+        // auto-populate its room dropdown the next time it opens.
+        let roomToPreselect = null;
+
         // ============================================
         // Center Alert
         // ============================================
@@ -1455,7 +1521,7 @@
         }
 
         // ============================================
-        // Corner Toast Stack (non-blocking notices)
+        // Corner Toast Stack
         // ============================================
         function showCornerToast(message, type, durationMs) {
             type = type || 'success';
@@ -1511,7 +1577,7 @@
         }
 
         // ============================================
-        // Decline Reason Modal (replaces window.prompt)
+        // Decline Reason Modal
         // ============================================
         function showReasonPrompt(options, onSubmit) {
             options = options || {};
@@ -1577,8 +1643,47 @@
         }
 
         // ============================================
-        // AJAX Form Submission - FIXED for JSON responses
+        // Silent Partial Refresh
         // ============================================
+        // Re-fetches the current page in the background and swaps just the
+        // innerHTML of #containerId in from the fresh response. This keeps
+        // the on-screen table authoritative (correct IDs, SLA calculations,
+        // server-computed categories, etc.) after a background POST succeeds,
+        // WITHOUT doing a window.location.reload() / full navigation - no
+        // white flash, no scroll jump, no loss of which tab is active.
+        function silentRefreshContainer(containerId) {
+            if (!containerId) return Promise.resolve();
+            return fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (response) { return response.text(); })
+                .then(function (html) {
+                    const freshDoc = new DOMParser().parseFromString(html, 'text/html');
+                    const freshEl = freshDoc.getElementById(containerId);
+                    const liveEl = document.getElementById(containerId);
+                    if (freshEl && liveEl) {
+                        liveEl.innerHTML = freshEl.innerHTML;
+                        initActionDropdowns();
+                    }
+                })
+                .catch(function (err) {
+                    console.error('Silent refresh failed for #' + containerId, err);
+                });
+        }
+
+        // ============================================
+        // AJAX Form Submission (waits for the real response)
+        // ============================================
+        // Submits in the background (no full page reload) but no longer
+        // celebrates before the server has actually confirmed the request.
+        // This matters for things like room bookings, where the same slot
+        // can be taken by someone else - flashing "Room booked
+        // successfully!" and then contradicting it a moment later with a
+        // corner error was confusing. Now:
+        //   - success: modal closes, form resets, a success toast shows,
+        //     and the relevant table silently refreshes.
+        //   - failure: the modal stays open, the form keeps whatever the
+        //     user typed, and the *actual* server error message is shown
+        //     in the same center toast used for success (not a generic
+        //     "Error Occurred" off in the corner).
         document.addEventListener('submit', function (e) {
             const form = e.target;
             if (form.tagName !== 'FORM') return;
@@ -1589,13 +1694,17 @@
 
             const btn = form.querySelector('button[type="submit"]');
             if (btn && btn.disabled) return;
-            lockSubmitButton(btn);
+
+            const refreshTargetId = form.dataset.refreshTarget;
+            const successMessage = form.dataset.successMessage || 'Request submitted!';
+            const modalEl = form.closest('.modal');
 
             const formData = new FormData(form);
             const params = new URLSearchParams();
             for (const [key, value] of formData.entries()) {
                 if (value !== '') params.append(key, value);
             }
+            if (btn) lockSubmitButton(btn);
 
             fetch(form.getAttribute('action'), {
                 method: 'POST',
@@ -1606,27 +1715,27 @@
                 body: params.toString()
             })
             .then(function (response) {
-                // Parse response as JSON
-                return response.json().then(function (data) {
-                    if (response.ok) {
-                        // Success
-                        const message = data.message || 'Request submitted successfully!';
-                        showToast(message, 'success');
-                        const modalEl = form.closest('.modal');
-                        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-                        setTimeout(function () { window.location.reload(); }, 900);
-                        unlockSubmitButton(btn);
-                    } else {
-                        // Error - show error message from JSON response
-                        const errorMsg = data.error || 'An error occurred. Please try again.';
-                        showCornerToast(errorMsg, 'error', 6000);
-                        unlockSubmitButton(btn);
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (btn) unlockSubmitButton(btn);
+
+                    if (!response.ok) {
+                        const errorMsg = data.error || 'The request could not be saved. Please try again.';
+                        showToast(errorMsg, 'error');
+                        return;
+                    }
+
+                    // Success: now it's safe to close the modal and reset.
+                    showToast(successMessage, 'success');
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    form.reset();
+                    if (refreshTargetId) {
+                        silentRefreshContainer(refreshTargetId);
                     }
                 });
             })
             .catch(function (err) {
-                showCornerToast('Error: ' + err.message, 'error', 6000);
-                unlockSubmitButton(btn);
+                if (btn) unlockSubmitButton(btn);
+                showToast('Error: ' + err.message, 'error');
             });
         }, true);
 
@@ -1658,36 +1767,133 @@
             render();
         }
 
-        // Set default request time to current time + 1 hour
-        document.addEventListener('DOMContentLoaded', function() {
+        // ============================================
+        // Trip-Type Driven Date/Time Locking
+        // ============================================
+        // TODAY    -> calendar locked to today only (from "now" through 23:59 today)
+        // ADVANCE  -> calendar locked to exactly tomorrow (00:00 - 23:59)
+        // FUTURE   -> calendar unlocked from the day after tomorrow through
+        //             5 days from today (i.e. it picks up where ADVANCE ends)
+        // No trip type selected yet -> falls back to a 1hr-from-now to
+        // 5-days-out window so the field still has sane bounds.
+        function configureTripTypeDateConstraints() {
+            const tripTypeSelect = document.getElementById('tripTypeSelect');
             const requestTimeInput = document.getElementById('requestTimeInput');
-            if (requestTimeInput) {
-                const now = new Date();
-                now.setHours(now.getHours() + 1);
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const dateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
-                requestTimeInput.value = dateTimeString;
+            const helpText = document.getElementById('tripTypeHelpText');
+            if (!tripTypeSelect || !requestTimeInput) return;
 
-                const minDate = new Date();
-                minDate.setHours(minDate.getHours() + 1);
-                const minYear = minDate.getFullYear();
-                const minMonth = String(minDate.getMonth() + 1).padStart(2, '0');
-                const minDay = String(minDate.getDate()).padStart(2, '0');
-                const minHours = String(minDate.getHours()).padStart(2, '0');
-                const minMinutes = String(minDate.getMinutes()).padStart(2, '0');
-                requestTimeInput.min = `${minYear}-${minMonth}-${minDay}T${minHours}:${minMinutes}`;
-
-                const maxDate = new Date();
-                maxDate.setDate(maxDate.getDate() + 5);
-                const maxYear = maxDate.getFullYear();
-                const maxMonth = String(maxDate.getMonth() + 1).padStart(2, '0');
-                const maxDay = String(maxDate.getDate()).padStart(2, '0');
-                requestTimeInput.max = `${maxYear}-${maxMonth}-${maxDay}T23:59`;
+            function pad(n) { return String(n).padStart(2, '0'); }
+            function toLocalInputValue(date) {
+                return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+                    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
             }
+            function startOfDay(date) { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; }
+            function endOfDay(date) { const d = new Date(date); d.setHours(23, 59, 0, 0); return d; }
+            function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+
+            function applyConstraints() {
+                const now = new Date();
+                const tripType = tripTypeSelect.value;
+                let minDate, maxDate, defaultDate, help;
+
+                if (tripType === 'TODAY') {
+                    minDate = now;
+                    maxDate = endOfDay(now);
+                    defaultDate = new Date(now.getTime() + 60 * 60 * 1000);
+                    if (defaultDate > maxDate) defaultDate = maxDate;
+                    help = 'Locked to today - set off any time before midnight.';
+                } else if (tripType === 'ADVANCE') {
+                    const tomorrow = addDays(now, 1);
+                    minDate = startOfDay(tomorrow);
+                    maxDate = endOfDay(tomorrow);
+                    defaultDate = new Date(minDate.getTime() + 9 * 60 * 60 * 1000);
+                    help = 'Locked to tomorrow\'s date only.';
+                } else if (tripType === 'FUTURE') {
+                    minDate = startOfDay(addDays(now, 2));
+                    maxDate = endOfDay(addDays(now, 5));
+                    defaultDate = new Date(minDate.getTime() + 9 * 60 * 60 * 1000);
+                    help = 'Choose any date from the day after tomorrow up to 5 days from today.';
+                } else {
+                    minDate = new Date(now.getTime() + 60 * 60 * 1000);
+                    maxDate = endOfDay(addDays(now, 5));
+                    defaultDate = minDate;
+                    help = 'Select the type of trip to help drivers prioritize';
+                }
+
+                requestTimeInput.min = toLocalInputValue(minDate);
+                requestTimeInput.max = toLocalInputValue(maxDate);
+                if (helpText) helpText.textContent = help;
+
+                // Snap the field back into range if the trip type changed
+                // after a time was already picked, so a mismatched
+                // trip-type / date pair can never be submitted.
+                const current = requestTimeInput.value ? new Date(requestTimeInput.value) : null;
+                if (!current || isNaN(current.getTime()) || current < minDate || current > maxDate) {
+                    requestTimeInput.value = toLocalInputValue(defaultDate);
+                }
+            }
+
+            tripTypeSelect.addEventListener('change', applyConstraints);
+            applyConstraints();
+
+            // Re-establish "now"-relative bounds every time the modal is
+            // reopened (in case it's opened later in the day/next day). Also
+            // resolves the driver dropdown: if the modal was opened via
+            // "Request This Driver" from the driver-details modal, pre-select
+            // that driver; otherwise reset the trip type / driver selection
+            // so the user picks deliberately each time.
+            const modalEl = document.getElementById('requestDriverModal');
+            if (modalEl) {
+                modalEl.addEventListener('show.bs.modal', function () {
+                    tripTypeSelect.value = '';
+                    applyConstraints();
+
+                    const driverSelect = document.getElementById('driverSelect');
+                    if (driverSelect) {
+                        if (driverToPreselect) {
+                            driverSelect.value = String(driverToPreselect);
+                            // If the value didn't actually match an <option>
+                            // (e.g. stale id), fall back to the blank option.
+                            if (driverSelect.value !== String(driverToPreselect)) {
+                                driverSelect.value = '';
+                            }
+                            driverToPreselect = null;
+                        } else {
+                            driverSelect.value = '';
+                        }
+                    }
+                });
+            }
+        }
+
+        // ============================================
+        // Room Pre-selection for Book Room Modal
+        // ============================================
+        // Mirrors the driver pre-selection behavior above: if the modal was
+        // opened via "Book This Room" from the room-details modal, pre-select
+        // that room; otherwise reset the dropdown so the user picks
+        // deliberately each time.
+        function configureRoomModalPreselect() {
+            const bookRoomModalEl = document.getElementById('bookRoomModal');
+            const roomSelect = document.getElementById('roomSelect');
+            if (!bookRoomModalEl || !roomSelect) return;
+
+            bookRoomModalEl.addEventListener('show.bs.modal', function () {
+                if (roomToPreselect) {
+                    roomSelect.value = String(roomToPreselect);
+                    if (roomSelect.value !== String(roomToPreselect)) {
+                        roomSelect.value = '';
+                    }
+                    roomToPreselect = null;
+                } else {
+                    roomSelect.value = '';
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            configureTripTypeDateConstraints();
+            configureRoomModalPreselect();
 
             // Paginate room bookings if they exist
             const roomBookingsList = document.getElementById('roomBookingsList');
@@ -1699,8 +1905,58 @@
                 }
             }
 
-            // Initialize the ellipsis action dropdowns (Accept/Reject, Approve/Decline menus)
             initActionDropdowns();
+
+            // ============================================
+            // Cross-Modal Handoff (Details modal -> Booking modal)
+            // ============================================
+            // Handles both "Request This Driver" and "Book This Room":
+            // explicitly hide the details modal, wait for it to fully
+            // finish hiding, THEN set the pre-select variable and show the
+            // booking modal. Doing this by hand (rather than letting
+            // Bootstrap's data-bs-dismiss/data-bs-toggle attributes race
+            // each other) guarantees the pre-select value is set before the
+            // booking modal's 'show.bs.modal' handler runs.
+            function switchModal(fromModalEl, toModalEl, onBeforeShow) {
+                const toInstance = bootstrap.Modal.getOrCreateInstance(toModalEl);
+                function openTarget() {
+                    onBeforeShow();
+                    toInstance.show();
+                }
+                if (fromModalEl && fromModalEl.classList.contains('show')) {
+                    fromModalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                        fromModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                        openTarget();
+                    });
+                    bootstrap.Modal.getOrCreateInstance(fromModalEl).hide();
+                } else {
+                    openTarget();
+                }
+            }
+
+            const requestThisDriverBtn = document.getElementById('requestThisDriverBtn');
+            const driverDetailsModalEl = document.getElementById('driverDetailsModal');
+            const requestDriverModalEl = document.getElementById('requestDriverModal');
+            if (requestThisDriverBtn && driverDetailsModalEl && requestDriverModalEl) {
+                requestThisDriverBtn.addEventListener('click', function () {
+                    const driverId = requestThisDriverBtn.dataset.driverid;
+                    switchModal(driverDetailsModalEl, requestDriverModalEl, function () {
+                        driverToPreselect = driverId || null;
+                    });
+                });
+            }
+
+            const bookThisRoomBtn = document.getElementById('bookThisRoomBtn');
+            const roomDetailsModalEl = document.getElementById('roomDetailsModal');
+            const bookRoomModalEl = document.getElementById('bookRoomModal');
+            if (bookThisRoomBtn && roomDetailsModalEl && bookRoomModalEl) {
+                bookThisRoomBtn.addEventListener('click', function () {
+                    const roomId = bookThisRoomBtn.dataset.roomid;
+                    switchModal(roomDetailsModalEl, bookRoomModalEl, function () {
+                        roomToPreselect = roomId || null;
+                    });
+                });
+            }
         });
 
         // ============================================
@@ -1711,6 +1967,12 @@
             const body = document.getElementById('driverDetailBody');
             const nameSpan = document.getElementById('driverDetailName');
             nameSpan.textContent = driverName || 'Driver';
+
+            // Remember this driver on the "Request This Driver" button so
+            // that clicking it later pre-populates the Request Driver modal.
+            const requestThisDriverBtn = document.getElementById('requestThisDriverBtn');
+            if (requestThisDriverBtn) requestThisDriverBtn.dataset.driverid = driverId;
+
             body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
             modal.show();
             fetch('/assetIQ-pro/bookings/driver/' + driverId + '/bookings')
@@ -1721,13 +1983,20 @@
                         body.innerHTML = '<div class="text-center py-4"><i class="fas fa-calendar-check text-muted" style="font-size: 32px;"></i><p class="text-muted mt-2">No bookings found for this driver</p><small class="text-muted">This driver is available for new bookings</small></div>';
                         return;
                     }
-                    let html = '<div class="mb-3"><small class="text-muted">Total Bookings: <strong>' + allBookings.length + '</strong></small></div><div class="list-group">';
+                    let html = '<div class="mb-3"><small class="text-muted">Total Bookings: <strong>' + allBookings.length + '</strong></small></div>';
+                    html += '<div class="table-container"><table class="detail-table">';
+                    html += '<thead><tr><th>Destination</th><th>Requester</th><th>Set Off Time</th><th>Status</th></tr></thead><tbody>';
                     allBookings.forEach(booking => {
                         const statusClass = booking.status === 'ACCEPTED' ? 'booked' : booking.status === 'COMPLETED' ? 'completed' : booking.status === 'PENDING' ? 'pending' : 'cancelled';
                         const bookingDate = new Date(booking.requestTime);
-                        html += '<div class="booking-list-item"><div><div class="requester">' + (booking.destination || 'N/A') + '</div><div class="time-slot">' + bookingDate.toLocaleString() + '</div>' + (booking.requestedBy ? '<div class="time-slot">Requester: ' + booking.requestedBy + '</div>' : '') + '</div><span class="status-badge ' + statusClass + '">' + (booking.status || 'PENDING') + '</span></div>';
+                        html += '<tr>' +
+                            '<td>' + (booking.destination || 'N/A') + '</td>' +
+                            '<td>' + (booking.requestedBy || '-') + '</td>' +
+                            '<td>' + bookingDate.toLocaleString() + '</td>' +
+                            '<td><span class="status-badge ' + statusClass + '">' + (booking.status || 'PENDING') + '</span></td>' +
+                            '</tr>';
                     });
-                    html += '</div>';
+                    html += '</tbody></table></div>';
                     body.innerHTML = html;
                 })
                 .catch(error => {
@@ -1741,6 +2010,12 @@
             const body = document.getElementById('roomDetailBody');
             const nameSpan = document.getElementById('roomDetailName');
             nameSpan.textContent = roomName || 'Room';
+
+            // Remember this room on the "Book This Room" button so that
+            // clicking it later pre-populates the Book Room modal.
+            const bookThisRoomBtn = document.getElementById('bookThisRoomBtn');
+            if (bookThisRoomBtn) bookThisRoomBtn.dataset.roomid = roomId;
+
             body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
             modal.show();
             fetch('/assetIQ-pro/bookings/room/' + roomId + '/bookings')
@@ -1754,7 +2029,9 @@
                     }
                     const isInfra = USER_ROLE === 'INFRA' || USER_ROLE === 'INFRASTRUCTURE';
                     const isServerRoom = roomName && (roomName.toLowerCase().includes('server') || roomType === 'Server Room');
-                    let html = '<div class="mb-3"><small class="text-muted">Active & Future Bookings: <strong>' + bookings.length + '</strong></small><small class="text-muted d-block">Room Type: <strong>' + (roomType || 'N/A') + '</strong></small></div><div class="list-group">';
+                    let html = '<div class="mb-3"><small class="text-muted">Active & Future Bookings: <strong>' + bookings.length + '</strong></small><small class="text-muted d-block">Room Type: <strong>' + (roomType || 'N/A') + '</strong></small></div>';
+                    html += '<div class="table-container"><table class="detail-table">';
+                    html += '<thead><tr><th>Booked By</th><th>Time</th><th>Purpose / Notes</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                     bookings.forEach(booking => {
                         const start = new Date(booking.startTime);
                         const end = new Date(booking.endTime);
@@ -1766,9 +2043,31 @@
                         else if (booking.status === 'PENDING') { statusClass = 'pending'; }
                         else if (booking.status === 'CANCELLED') { statusClass = 'cancelled'; }
                         else if (booking.status === 'CONFIRMED') { statusClass = 'completed'; displayStatus = 'COMPLETED'; }
-                        html += '<div class="booking-list-item"><div><div class="requester">' + (booking.bookedBy || 'User') + '</div><div class="time-slot">' + start.toLocaleString() + ' - ' + end.toLocaleString() + '</div>' + (booking.purpose ? '<div class="time-slot">Purpose: ' + booking.purpose + '</div>' : '') + (booking.notes ? '<div class="time-slot">Notes: ' + booking.notes + '</div>' : '') + (isCurrentlyActive ? '<div class="time-slot fw-bold text-primary">🟢 Currently In Use</div>' : '') + (booking.status === 'CONFIRMED' ? '<div class="time-slot text-success">✅ Signed Out</div>' : '') + '</div><div class="text-end"><span class="status-badge ' + statusClass + '">' + displayStatus + '</span>' + (booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom ? '<button class="slot-request-btn d-block mt-1" onclick="openSlotRequest(' + booking.bookingId + ')"><i class="fas fa-handshake me-1"></i>Request Slot</button>' : '') + (isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE') ? '<form action="/assetIQ-pro/bookings/server-room/' + booking.bookingId + '/signout-link" method="post" class="mt-1"><input type="hidden" name="infraComment" value="Signing out user"><button type="submit" class="btn btn-sm btn-primary w-100"><i class="fas fa-sign-out-alt me-1"></i>Sign Out</button></form>' : '') + (isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING' || booking.status === 'ACTIVE') ? '<button class="btn btn-sm btn-danger mt-1 w-100" onclick="adminCancelBooking(' + booking.bookingId + ')"><i class="fas fa-times me-1"></i>Cancel</button>' : '') + '</div></div>';
+
+                        let actionsHtml = '';
+                        if (booking.status === 'BOOKED' && !isCurrentlyActive && !isOwner && !isServerRoom) {
+                            actionsHtml += '<button class="btn btn-sm btn-info recall-btn" onclick="openSlotRequest(' + booking.bookingId + ')"><i class="fas fa-handshake"></i> Request Slot</button>';
+                        }
+                        if (isServerRoom && isInfra && (booking.status === 'BOOKED' || booking.status === 'ACTIVE')) {
+                            actionsHtml += '<form action="/assetIQ-pro/bookings/server-room/' + booking.bookingId + '/signout-link" method="post"><input type="hidden" name="infraComment" value="Signing out user"><button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-sign-out-alt me-1"></i>Sign Out</button></form>';
+                        }
+                        if (isInfra && (booking.status === 'BOOKED' || booking.status === 'PENDING' || booking.status === 'ACTIVE')) {
+                            actionsHtml += '<button class="btn btn-sm btn-danger" onclick="adminCancelBooking(' + booking.bookingId + ')"><i class="fas fa-times"></i> Cancel</button>';
+                        }
+                        if (!actionsHtml) actionsHtml = '<span class="text-muted small">-</span>';
+
+                        html += '<tr>' +
+                            '<td>' + (booking.bookedBy || 'User') +
+                                (isCurrentlyActive ? ' <span title="Currently In Use">🟢</span>' : '') +
+                                (booking.status === 'CONFIRMED' ? ' <span title="Signed Out">✅</span>' : '') +
+                            '</td>' +
+                            '<td>' + start.toLocaleString() + ' - ' + end.toLocaleString() + '</td>' +
+                            '<td>' + (booking.purpose ? booking.purpose : '-') + (booking.notes ? '<br><small class="text-muted">Notes: ' + booking.notes + '</small>' : '') + '</td>' +
+                            '<td><span class="status-badge ' + statusClass + '">' + displayStatus + '</span></td>' +
+                            '<td>' + actionsHtml + '</td>' +
+                            '</tr>';
                     });
-                    html += '</div>';
+                    html += '</tbody></table></div>';
                     body.innerHTML = html;
                 })
                 .catch(error => {
@@ -1881,7 +2180,6 @@
             });
         }
 
-        // Opens the reason modal, then submits the rejection with the given reason
         function openRejectDriverPrompt(requestId, driverId) {
             showReasonPrompt({
                 title: 'Reject Driver Request',
@@ -1984,12 +2282,11 @@
         }
 
         // ============================================
-        // Cab (External Driver) Approval Functions - FIXED
+        // Cab (External Driver) Approval Functions
         // ============================================
 
         function approveCabRequest(requestId) {
             showConfirm('Approve this cab request? An external cab will be arranged for the requester.', function () {
-                // ✅ CORRECT: Use the approve-cab endpoint
                 fetch('/assetIQ-pro/bookings/driver-request/' + requestId + '/approve-cab', {
                     method: 'POST',
                     headers: {
@@ -2019,8 +2316,6 @@
                 placeholder: 'Please provide a reason for rejecting this cab request...',
                 confirmLabel: 'Reject Request'
             }, function (reason) {
-                // ✅ CORRECT: Use the approve-cab endpoint for rejection too
-                // Or create a separate endpoint if needed
                 const formData = new FormData();
                 formData.append('reason', reason);
 
@@ -2060,7 +2355,7 @@
         });
     </script>
 
-    <!-- Flash Messages - using corner toast for better visibility -->
+    <!-- Flash Messages -->
     <script th:if="${success != null}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {
             showCornerToast(/*[[${success}]]*/ 'Success', 'success', 4500);

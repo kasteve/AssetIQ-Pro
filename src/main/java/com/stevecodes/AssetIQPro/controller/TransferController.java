@@ -57,10 +57,11 @@ public class TransferController {
         return ResponseEntity.ok(transferService.getAllTransfers());
     }
 
+    // FIXED: Changed Integer to Long
     @GetMapping("/{transferId}")
     @Operation(summary = "Get transfer by ID")
     @PreAuthorize("hasAnyAuthority('TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS', 'ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<?> getTransferById(@PathVariable Integer transferId) {
+    public ResponseEntity<?> getTransferById(@PathVariable Long transferId) {
         try {
             return ResponseEntity.ok(transferService.getTransferById(transferId));
         } catch (Exception e) {
@@ -77,10 +78,11 @@ public class TransferController {
         return ResponseEntity.ok(transferService.getTransfersByAssetTag(assetTag));
     }
 
+    // FIXED: Changed Integer to Long
     @PostMapping("/{transferId}/initiate-signing")
     @Operation(summary = "Initiate signing process for a transfer")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<?> initiateSigning(@PathVariable Integer transferId) {
+    public ResponseEntity<?> initiateSigning(@PathVariable Long transferId) {
         try {
             signingService.initiateTransferSigning(transferId);
             return ResponseEntity.ok(Map.of("message", "Signing initiated successfully"));
@@ -95,7 +97,9 @@ public class TransferController {
     @Operation(summary = "Sign a transfer using token")
     public ResponseEntity<?> signTransfer(@RequestParam String token, @RequestParam String signature) {
         try {
-            signingService.signTransferWithSignature(null, token, signature);
+            // We need to get the transfer ID from the token
+            var tokenObj = signingService.validateToken(token);
+            signingService.signTransferWithSignature(tokenObj.getTransferId(), token, signature);
             return ResponseEntity.ok(Map.of("message", "Signature submitted successfully"));
         } catch (Exception e) {
             log.error("Error signing transfer: {}", e.getMessage());
@@ -116,16 +120,18 @@ public class TransferController {
         }
     }
 
+    // FIXED: Changed Integer to Long
     @GetMapping("/{transferId}/status")
     @Operation(summary = "Check if transfer is fully signed")
-    public ResponseEntity<Boolean> isFullySigned(@PathVariable Integer transferId) {
+    public ResponseEntity<Boolean> isFullySigned(@PathVariable Long transferId) {
         return ResponseEntity.ok(signingService.isTransferFullySigned(transferId));
     }
 
+    // FIXED: Changed Integer to Long
     @PostMapping("/{transferId}/complete")
     @Operation(summary = "Manually complete a transfer")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<?> completeTransfer(@PathVariable Integer transferId) {
+    public ResponseEntity<?> completeTransfer(@PathVariable Long transferId) {
         try {
             signingService.manuallyCheckTransferCompletion(transferId);
             return ResponseEntity.ok(Map.of("message", "Transfer completed successfully"));
@@ -136,9 +142,10 @@ public class TransferController {
         }
     }
 
+    // FIXED: Changed Integer to Long
     @GetMapping("/{transferId}/pdf")
     @Operation(summary = "Get fully signed transfer PDF")
-    public ResponseEntity<?> getTransferPdf(@PathVariable Integer transferId) {
+    public ResponseEntity<?> getTransferPdf(@PathVariable Long transferId) {
         try {
             byte[] pdf = signingService.getFullySignedPdf(transferId);
             return ResponseEntity.ok()

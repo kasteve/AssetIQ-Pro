@@ -246,8 +246,9 @@ public class TransferViewController {
         }
     }
 
+    // FIXED: Changed Integer to Long
     @PostMapping("/sign")
-    public String submitSignature(@RequestParam Integer transferId,
+    public String submitSignature(@RequestParam Long transferId,
                                   @RequestParam String token,
                                   @RequestParam String signature,
                                   RedirectAttributes redirectAttributes) {
@@ -322,9 +323,10 @@ public class TransferViewController {
         }
     }
 
+    // FIXED: Changed Integer to Long
     @PostMapping("/{transferId}/initiate-signing")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
-    public String initiateSigning(@PathVariable Integer transferId, RedirectAttributes redirectAttributes) {
+    public String initiateSigning(@PathVariable Long transferId, RedirectAttributes redirectAttributes) {
         try {
             AppUser currentUser = SecurityUtils.getCurrentUser();
             if (currentUser == null) {
@@ -344,8 +346,9 @@ public class TransferViewController {
         return "redirect:/transfers";
     }
 
+    // FIXED: Changed Integer to Long
     @GetMapping("/{transferId}/pdf")
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable Integer transferId) {
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable Long transferId) {
         try {
             byte[] pdf = transferSigningService.getFullySignedPdf(transferId);
             return ResponseEntity.ok()

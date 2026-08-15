@@ -22,7 +22,7 @@ public class TransferTokenService {
 
     private final TransferTokenRepository transferTokenRepository;
     private final EmployeeRepository employeeRepository;
-    private final EmailService emailService;      // ✅ replaces raw JavaMailSender
+    private final EmailService emailService;
     private final BaseUrlService baseUrlService;
 
     private static class SignerInfo {
@@ -310,11 +310,6 @@ public class TransferTokenService {
         }
     }
 
-    /**
-     * Now delegates the actual send to EmailService, which builds its
-     * JavaMailSender dynamically from the DB-stored email settings instead
-     * of relying on a Spring-managed JavaMailSender bean.
-     */
     private void sendSigningEmail(Transfer transfer, SignerInfo signer, TransferToken token) {
         try {
             log.debug("📧 Sending email to {} on thread: {}", signer.getEmail(), Thread.currentThread().getName());
@@ -427,11 +422,13 @@ public class TransferTokenService {
         return transferTokenRepository.findByToken(token);
     }
 
-    public List<TransferToken> findTokensByTransferId(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public List<TransferToken> findTokensByTransferId(Long transferId) {
         return transferTokenRepository.findByTransferId(transferId);
     }
 
-    public boolean hasValidToken(Integer transferId, Long signerEmployeeId) {
+    // FIXED: Changed Integer to Long
+    public boolean hasValidToken(Long transferId, Long signerEmployeeId) {
         return transferTokenRepository.hasValidTokenForSigner(transferId, signerEmployeeId, LocalDateTime.now());
     }
 
@@ -449,11 +446,13 @@ public class TransferTokenService {
         return transferTokenRepository.findTokensExpiringSoon(now, futureDate);
     }
 
-    public long countUnusedTokensForTransfer(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public long countUnusedTokensForTransfer(Long transferId) {
         return transferTokenRepository.countByTransferIdAndIsUsedFalse(transferId);
     }
 
-    public long countUsedTokensForTransfer(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public long countUsedTokensForTransfer(Long transferId) {
         return transferTokenRepository.countByTransferIdAndIsUsedTrue(transferId);
     }
 
@@ -461,7 +460,8 @@ public class TransferTokenService {
         return transferTokenRepository.findBySignerEmail(signerEmail);
     }
 
-    public Optional<TransferToken> getMostRecentTokenForSigner(Integer transferId, Long signerEmployeeId) {
+    // FIXED: Changed Integer to Long
+    public Optional<TransferToken> getMostRecentTokenForSigner(Long transferId, Long signerEmployeeId) {
         return transferTokenRepository.findTopByTransferIdAndSignerEmployeeIdOrderByCreatedAtDesc(transferId, signerEmployeeId);
     }
 

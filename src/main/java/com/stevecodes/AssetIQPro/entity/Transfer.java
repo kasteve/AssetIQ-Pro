@@ -16,7 +16,7 @@ public class Transfer {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "transferId")
-    private Integer transferId;
+    private Long transferId;
 
     // ============================================
     // Asset Information
@@ -35,6 +35,19 @@ public class Transfer {
 
     @Column(name = "transferDate")
     private LocalDate transferDate;
+
+    // ============================================
+    // Category - FIXED: Proper mapping to Category entity
+    // ============================================
+    @ManyToOne
+    @JoinColumn(name = "CategoryId", referencedColumnName = "CategoryId")
+    private Category category;
+
+    // ============================================
+    // Company
+    // ============================================
+    @Column(name = "CompanyId")
+    private Long companyId;
 
     // ============================================
     // Department IDs
@@ -151,15 +164,6 @@ public class Transfer {
     private String comments;
 
     // ============================================
-    // Category and Company
-    // ============================================
-    @Column(name = "CategoryId")
-    private Integer categoryId;
-
-    @Column(name = "CompanyId")
-    private Long companyId;
-
-    // ============================================
     // Signature Fields
     // ============================================
     @Column(name = "FromEmployeeSignature")
@@ -249,7 +253,7 @@ public class Transfer {
     private String newEmployeeName;
 
     // ============================================
-    // FIXED: Helper Methods
+    // Helper Methods
     // ============================================
 
     public boolean isSignedForRole(String role) {
@@ -273,6 +277,117 @@ public class Transfer {
     public boolean getFullySigned() {
         return Boolean.TRUE.equals(isFullySigned);
     }
+
+    // ============================================
+    // FIXED: These methods now return proper values
+    // ============================================
+
+    /**
+     * Returns the transfer status based on signature completion
+     */
+    public String getStatus() {
+        if (Boolean.TRUE.equals(isFullySigned)) {
+            return "COMPLETED";
+        }
+        // Check if any signatures are present
+        if (oldHandoverBySignedAt != null || oldReceivedBySignedAt != null ||
+                newHandoverBySignedAt != null || newReceivedBySignedAt != null ||
+                configuredBySignedAt != null || infraRepSignedAt != null || financeRepSignedAt != null) {
+            return "IN_PROGRESS";
+        }
+        return "PENDING";
+    }
+
+    /**
+     * Returns the transfer type based on category
+     * FIXED: Handles null category properly
+     */
+    public String getCategory() {
+        // First try to get from category entity
+        if (category != null) {
+            String categoryName = category.getName();
+            if (categoryName != null) {
+                String cat = categoryName.toUpperCase();
+                // Map based on your actual category names
+                if (cat.equals("LAPTOP") || cat.equals("HARDWARE2") ||
+                        cat.equals("SERVER") || cat.equals("NETWORK") ||
+                        cat.equals("HARDWARE12")) {
+                    return "ASSET";
+                } else if (cat.equals("CONSUMABLE") || cat.equals("TESTCATEGORY")) {
+                    return "INVENTORY";
+                } else if (cat.equals("ANOTHER ONE") || cat.equals("TP")) {
+                    return "OTHER";
+                }
+                // Default for unknown categories
+                return "ASSET";
+            }
+        }
+        // Default based on asset tag presence
+        if (assetTag != null && !assetTag.isEmpty()) {
+            return "ASSET";
+        }
+        return "OTHER";
+    }
+
+    /**
+     * Returns the transfer type (for backward compatibility)
+     */
+    public String getTransferType() {
+        return getCategory();
+    }
+
+    /**
+     * Returns the asset name or tag
+     */
+    public String getAsset() {
+        return assetTag != null ? assetTag : "N/A";
+    }
+
+    /**
+     * Returns amount (not applicable for asset transfers)
+     */
+    public String getAmount() {
+        return "N/A";
+    }
+
+    /**
+     * Returns from location (department name)
+     */
+    public String getFromLocation() {
+        return oldDepartmentName != null ? oldDepartmentName : "N/A";
+    }
+
+    /**
+     * Returns to location (department name)
+     */
+    public String getToLocation() {
+        return newDepartmentName != null ? newDepartmentName : "N/A";
+    }
+
+    /**
+     * Returns the created date (use transfer date)
+     */
+    public LocalDate getCreatedAt() {
+        return transferDate;
+    }
+
+    /**
+     * Returns the category name
+     */
+    public String getCategoryName() {
+        return category != null ? category.getName() : "N/A";
+    }
+
+    /**
+     * Returns the category ID
+     */
+    public Integer getCategoryId() {
+        return category != null ? category.getCategoryId() : null;
+    }
+
+    // ============================================
+    // Getters and Setters for missing fields
+    // ============================================
 
     public String getOldHandoverByName() {
         return oldHandoverByName != null ? oldHandoverByName : "";
@@ -338,65 +453,7 @@ public class Transfer {
         this.fullySignedPdf = pdfBase64;
     }
 
-    // ============================================
-    // FIXED: These methods now return proper values
-    // ============================================
-
-    /**
-     * Returns the transfer status based on signature completion
-     */
-    public String getStatus() {
-        if (Boolean.TRUE.equals(isFullySigned)) {
-            return "COMPLETED";
-        }
-        // Check if any signatures are present
-        if (oldHandoverBySignedAt != null || oldReceivedBySignedAt != null ||
-                newHandoverBySignedAt != null || newReceivedBySignedAt != null ||
-                configuredBySignedAt != null || infraRepSignedAt != null || financeRepSignedAt != null) {
-            return "IN_PROGRESS";
-        }
-        return "PENDING";
-    }
-
-    /**
-     * Returns the transfer type (always ASSET for now)
-     */
-    public String getTransferType() {
-        return "ASSET";
-    }
-
-    /**
-     * Returns a placeholder asset (you can enhance this to fetch from DB)
-     */
-    public String getAsset() {
-        return assetTag != null ? assetTag : "N/A";
-    }
-
-    /**
-     * Returns amount (not applicable for asset transfers)
-     */
-    public String getAmount() {
-        return "N/A";
-    }
-
-    /**
-     * Returns from location (department name)
-     */
-    public String getFromLocation() {
-        return oldDepartmentName != null ? oldDepartmentName : "N/A";
-    }
-
-    /**
-     * Returns to location (department name)
-     */
-    public String getToLocation() {
-        return newDepartmentName != null ? newDepartmentName : "N/A";
-    }
-
-    /**
-     * Returns the created date (use transfer date)
-     */
-    public LocalDate getCreatedAt() {
-        return transferDate;
+    public String getFullySignedPDF() {
+        return fullySignedPdf;
     }
 }

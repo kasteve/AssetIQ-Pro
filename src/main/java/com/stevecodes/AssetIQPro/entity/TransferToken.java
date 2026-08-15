@@ -15,11 +15,11 @@ public class TransferToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "TokenId")
+    @Column(name = "TokenId", columnDefinition = "uniqueidentifier")
     private UUID tokenId;
 
     @Column(name = "TransferId", nullable = false)
-    private Integer transferId;
+    private Long transferId;  // FIXED: Changed from Integer to Long
 
     @Column(name = "SignerEmployeeId")
     private Long signerEmployeeId;
@@ -42,7 +42,8 @@ public class TransferToken {
     @Column(name = "CreatedAt", nullable = false)
     private LocalDateTime createdAt;
 
-    public TransferToken(Integer transferId, Long signerEmployeeId, String signerEmail,
+    // FIXED: Constructor with Long transferId
+    public TransferToken(Long transferId, Long signerEmployeeId, String signerEmail,
                          String signerRole, String token, LocalDateTime expiresAt) {
         this.transferId = transferId;
         this.signerEmployeeId = signerEmployeeId;
@@ -52,5 +53,30 @@ public class TransferToken {
         this.expiresAt = expiresAt;
         this.isUsed = false;
         this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (token == null) {
+            token = UUID.randomUUID().toString();
+        }
+        if (expiresAt == null) {
+            expiresAt = LocalDateTime.now().plusHours(24);
+        }
+        if (isUsed == null) {
+            isUsed = false;
+        }
+    }
+
+    // Helper methods
+    public boolean isExpired() {
+        return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
+    }
+
+    public boolean isValid() {
+        return !isUsed && !isExpired();
     }
 }

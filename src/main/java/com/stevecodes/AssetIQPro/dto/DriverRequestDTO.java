@@ -18,7 +18,6 @@ public class DriverRequestDTO {
     private String driverName;
     private LocalDateTime requestTime;
 
-    // ✅ NEW: Date and Time fields
     private LocalDate requestDate;
     private LocalTime requestTimeOnly;
     private LocalDateTime pickupDatetime;
@@ -30,27 +29,28 @@ public class DriverRequestDTO {
     private String requestedBy;
     private LocalDateTime createdAt;
 
-    // Driver decision
     private LocalDateTime driverDecisionTime;
     private LocalDateTime responseTime;
     private LocalDateTime acceptedAt;
     private String declineReason;
     private String declinedReason;
 
-    // Trip details
     private String pickupLocation;
     private String dropoffLocation;
     private LocalDateTime tripStartTime;
     private LocalDateTime tripEndTime;
 
-    // Rating
     private Integer rating;
     private String feedback;
     private String notes;
 
-    // ============================================
-    // ✅ SLA Tracking Fields
-    // ============================================
+    // ✅ NEW FIELDS
+    private String tripCategory; // TODAY, FUTURE, ADVANCE
+    private String tripCategoryDisplay;
+    private LocalDateTime expiryTime;
+    private Boolean isExpired;
+
+    // SLA Tracking Fields
     private String slaStatus;
     private String slaStatusDisplay;
     private Double slaPercentage;
@@ -72,6 +72,7 @@ public class DriverRequestDTO {
             case "DECLINED": return "Declined";
             case "RECALLED": return "Recalled";
             case "COMPLETED": return "Completed";
+            case "EXPIRED": return "Expired";
             default: return status;
         }
     }
@@ -85,6 +86,7 @@ public class DriverRequestDTO {
             case "DECLINED": return "danger";
             case "RECALLED": return "secondary";
             case "COMPLETED": return "primary";
+            case "EXPIRED": return "danger";
             default: return "secondary";
         }
     }
@@ -94,7 +96,6 @@ public class DriverRequestDTO {
         return rating + "/5";
     }
 
-    // ✅ Helper method to get formatted date
     public String getFormattedDate() {
         if (requestDate != null) {
             return requestDate.toString();
@@ -102,7 +103,6 @@ public class DriverRequestDTO {
         return requestTime != null ? requestTime.toLocalDate().toString() : "";
     }
 
-    // ✅ Helper method to get formatted time
     public String getFormattedTime() {
         if (requestTimeOnly != null) {
             return requestTimeOnly.toString();
@@ -110,7 +110,6 @@ public class DriverRequestDTO {
         return requestTime != null ? requestTime.toLocalTime().toString() : "";
     }
 
-    // ✅ Helper method to check if booking is in the future
     public boolean isFutureBooking() {
         if (requestDate == null) {
             return false;
@@ -121,9 +120,42 @@ public class DriverRequestDTO {
                         requestTimeOnly.isAfter(LocalTime.now()));
     }
 
-    // ============================================
-    // ✅ SLA Status Helpers
-    // ============================================
+    public String getTripCategoryDisplay() {
+        if (tripCategory == null) return "";
+        switch (tripCategory) {
+            case "TODAY": return "Today";
+            case "ADVANCE": return "Advance Booking";
+            case "FUTURE": return "Future";
+            default: return tripCategory;
+        }
+    }
+
+    public String getTripCategoryColor() {
+        if (tripCategory == null) return "secondary";
+        switch (tripCategory) {
+            case "TODAY": return "danger";
+            case "ADVANCE": return "warning";
+            case "FUTURE": return "info";
+            default: return "secondary";
+        }
+    }
+
+    public boolean isTodayTrip() {
+        return "TODAY".equals(tripCategory);
+    }
+
+    public boolean isAdvanceTrip() {
+        return "ADVANCE".equals(tripCategory);
+    }
+
+    public boolean isFutureTrip() {
+        return "FUTURE".equals(tripCategory);
+    }
+
+    public boolean isExpired() {
+        return Boolean.TRUE.equals(isExpired);
+    }
+
     public String getSlaStatusDisplay() {
         if (slaStatus == null) return "N/A";
         switch (slaStatus) {

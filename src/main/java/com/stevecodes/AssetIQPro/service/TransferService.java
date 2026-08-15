@@ -26,6 +26,7 @@ public class TransferService {
     private final AssetHistoryRepository historyRepository;
     private final EmployeeRepository employeeRepository;
     private final AuditService auditService;
+    private final TransferSigningService signingService;  // ✅ ADDED
 
     @Transactional
     public Transfer createTransfer(Transfer transfer) {
@@ -44,6 +45,9 @@ public class TransferService {
 
         auditService.logAction("TRANSFER_CREATED",
                 "Transfer created for asset: " + transfer.getAssetTag(), null);
+
+        // ✅ Initiate signing process
+        signingService.initiateTransferSigning(saved.getTransferId());
 
         return saved;
     }
@@ -136,7 +140,8 @@ public class TransferService {
         return transferRepository.findAll();
     }
 
-    public Transfer getTransferById(Integer transferId) {
+    // FIXED: Changed Integer to Long
+    public Transfer getTransferById(Long transferId) {
         return transferRepository.findById(transferId)
                 .orElseThrow(() -> new RuntimeException("Transfer not found: " + transferId));
     }
@@ -145,12 +150,14 @@ public class TransferService {
         return transferRepository.findByAssetTag(assetTag);
     }
 
-    public List<Transfer> getRelatedTransfers(Integer excludeTransferId, String assetTag, String serialNumber) {
+    // FIXED: Changed Integer to Long
+    public List<Transfer> getRelatedTransfers(Long excludeTransferId, String assetTag, String serialNumber) {
         return transferRepository.findRelatedTransfers(assetTag, serialNumber, excludeTransferId);
     }
 
+    // FIXED: Changed Integer to Long
     @Transactional
-    public void completeTransfer(Integer transferId) {
+    public void completeTransfer(Long transferId) {
         Transfer transfer = getTransferById(transferId);
         transfer.setIsFullySigned(true);
         transferRepository.save(transfer);
@@ -187,7 +194,7 @@ public class TransferService {
                                 asset.getAssetId(),
                                 null,
                                 "Asset transferred from " + fromDepartment + " to " + toDepartment,
-                                transfer.getTransferId().longValue()
+                                transfer.getTransferId()
                         );
                         historyRepository.save(history);
                         log.info("Asset history created for transfer: {}", transfer.getTransferId());
@@ -205,10 +212,20 @@ public class TransferService {
                                 null,
                                 "Transfer completed for asset: " + transfer.getAssetTag()
                         );
-                        history.setTransferId(transfer.getTransferId().longValue());
+                        history.setTransferId(transfer.getTransferId());
                         historyRepository.save(history);
                         log.info("Completion history created for transfer: {}", transfer.getTransferId());
                     });
         }
+    }
+
+    @Transactional
+    public void deleteTransfer(Long transferId) {
+        Transfer transfer = getTransferById(transferId);
+        transferRepository.delete(transfer);
+        log.info("Deleted transfer: {}", transferId);
+
+        auditService.logAction("TRANSFER_DELETED",
+                "Transfer deleted: " + transferId, null);
     }
 }

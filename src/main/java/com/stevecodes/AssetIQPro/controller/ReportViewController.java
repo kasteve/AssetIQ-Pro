@@ -4,6 +4,7 @@ import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Category;
 import com.stevecodes.AssetIQPro.entity.Room;
 import com.stevecodes.AssetIQPro.repository.CategoryRepository;
+import com.stevecodes.AssetIQPro.repository.DepartmentRepository;
 import com.stevecodes.AssetIQPro.repository.RoomRepository;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.AppUserService;
@@ -26,6 +27,7 @@ public class ReportViewController {
 
     private final CategoryRepository categoryRepository;
     private final RoomRepository roomRepository;
+    private final DepartmentRepository departmentRepository;
     private final AppUserService userService;
 
     @GetMapping
@@ -46,6 +48,9 @@ public class ReportViewController {
 
         List<AppUser> drivers = userService.getUsersByRole("DRIVER");
         model.addAttribute("drivers", drivers);
+
+        // Add departments for transfer filters
+        model.addAttribute("departments", departmentRepository.findAll());
 
         return "reports/index";
     }

@@ -29,24 +29,20 @@ public class DriverRequest {
     @Column(name = "request_time", nullable = false)
     private LocalDateTime requestTime;
 
-    // ✅ NEW: Request Date (separate from time)
     @Column(name = "request_date")
     private LocalDate requestDate;
 
-    // ✅ NEW: Request Time Only (separate from date)
     @Column(name = "request_time_only")
     private LocalTime requestTimeOnly;
 
-    // ✅ NEW: Pickup Datetime (full datetime for pickup)
     @Column(name = "pickup_datetime")
     private LocalDateTime pickupDatetime;
 
-    // ✅ NEW: Dropoff Datetime (full datetime for dropoff)
     @Column(name = "dropoff_datetime")
     private LocalDateTime dropoffDatetime;
 
     @Column(nullable = false)
-    private String status; // PENDING, ACCEPTED, DECLINED, RECALLED, COMPLETED, PENDING_ADMIN
+    private String status; // PENDING, PENDING_ADMIN, ACCEPTED, DECLINED, RECALLED, COMPLETED, EXPIRED
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -77,7 +73,7 @@ public class DriverRequest {
     private String declinedReason;
 
     @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes; // Stores rating and feedback
+    private String notes;
 
     // Trip details
     @Column(name = "pickup_location")
@@ -99,6 +95,16 @@ public class DriverRequest {
     @Column(name = "feedback", columnDefinition = "TEXT")
     private String feedback;
 
+    // ✅ NEW FIELDS
+    @Column(name = "trip_category")
+    private String tripCategory; // TODAY, FUTURE, ADVANCE
+
+    @Column(name = "expiry_time")
+    private LocalDateTime expiryTime;
+
+    @Column(name = "is_expired")
+    private Boolean isExpired = false;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -110,16 +116,36 @@ public class DriverRequest {
         if (requestTime == null) {
             requestTime = LocalDateTime.now();
         }
-        // ✅ Auto-populate requestDate and requestTimeOnly from requestTime
+        if (isExpired == null) {
+            isExpired = false;
+        }
+        // Auto-populate requestDate and requestTimeOnly from requestTime
         if (requestDate == null && requestTime != null) {
             requestDate = requestTime.toLocalDate();
         }
         if (requestTimeOnly == null && requestTime != null) {
             requestTimeOnly = requestTime.toLocalTime();
         }
-        // Auto-populate pickupDatetime from requestTime if not set
         if (pickupDatetime == null && requestTime != null) {
             pickupDatetime = requestTime;
+        }
+        // ✅ Auto-calculate trip category
+        if (requestTime != null) {
+            LocalDate today = LocalDate.now();
+            LocalDate requestDate = requestTime.toLocalDate();
+            if (requestDate.equals(today)) {
+                tripCategory = "TODAY";
+            } else if (requestDate.isAfter(today) && requestDate.isBefore(today.plusDays(1))) {
+                tripCategory = "TODAY";
+            } else if (requestDate.isAfter(today)) {
+                tripCategory = "ADVANCE";
+            } else {
+                tripCategory = "FUTURE";
+            }
+            // Set expiry time: 30 minutes before the trip for TODAY trips
+            if ("TODAY".equals(tripCategory)) {
+                expiryTime = requestTime.minusMinutes(30);
+            }
         }
     }
 
@@ -127,7 +153,22 @@ public class DriverRequest {
         return driverId != null && driverId == -1L;
     }
 
-    // ✅ Helper method to get formatted date
+    public boolean isTodayTrip() {
+        return "TODAY".equals(tripCategory);
+    }
+
+    public boolean isAdvanceTrip() {
+        return "ADVANCE".equals(tripCategory);
+    }
+
+    public boolean isFutureTrip() {
+        return "FUTURE".equals(tripCategory);
+    }
+
+    public boolean isExpired() {
+        return Boolean.TRUE.equals(isExpired);
+    }
+
     public String getFormattedDate() {
         if (requestDate != null) {
             return requestDate.toString();
@@ -135,7 +176,6 @@ public class DriverRequest {
         return requestTime != null ? requestTime.toLocalDate().toString() : "";
     }
 
-    // ✅ Helper method to get formatted time
     public String getFormattedTime() {
         if (requestTimeOnly != null) {
             return requestTimeOnly.toString();
@@ -143,7 +183,6 @@ public class DriverRequest {
         return requestTime != null ? requestTime.toLocalTime().toString() : "";
     }
 
-    // ✅ Helper method to check if booking is in the future
     public boolean isFutureBooking() {
         if (requestDate == null) {
             return false;
@@ -154,11 +193,13 @@ public class DriverRequest {
                         requestTimeOnly.isAfter(LocalTime.now()));
     }
 
-    // ✅ Helper method to check if booking is today
     public boolean isToday() {
         if (requestDate == null) {
             return false;
         }
         return requestDate.isEqual(LocalDate.now());
+    }
+
+    public void setTripType(String tripType) {
     }
 }
