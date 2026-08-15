@@ -533,7 +533,7 @@
 </head>
 
 <body>
-<div layout:fragment="content" th:data-current-user-id="${session.userId}" th:data-user-role="${session.role}">
+<div layout:fragment="content" th:data-current-user-id="${session.userId}" th:data-user-role="${session.role}" th:data-username="${session.username}">
 
     <!-- ===== CENTER ALERT BOX ===== -->
     <div id="centerAlertOverlay" class="center-alert-overlay">
@@ -637,12 +637,6 @@
                             </button>
                         </div>
                         <div class="panel-body">
-                            <!-- ============================================ -->
-                            <!-- id="driverRequestsContainer" is the silent-refresh -->
-                            <!-- target: after a driver request is submitted, this -->
-                            <!-- block's innerHTML is swapped in from a background -->
-                            <!-- fetch instead of doing a full page reload. -->
-                            <!-- ============================================ -->
                             <div id="driverRequestsContainer">
                                 <div th:if="${driverRequests != null and !driverRequests.isEmpty()}">
                                     <div class="table-container">
@@ -665,7 +659,6 @@
                                                 </td>
                                                 <td>
                                                     <span th:text="${#temporals.format(req.requestTime, 'dd/MM/yyyy HH:mm')}">Time</span>
-                                                    <!-- Show expiry warning for today's trips -->
                                                     <span th:if="${req.tripCategory == 'TODAY' and req.status == 'PENDING' and !req.isExpired}"
                                                           class="expiry-warning">
                                                         <i class="fas fa-clock me-1"></i>Expires soon
@@ -687,14 +680,12 @@
                                                           th:text="${req.statusDisplay}">PENDING</span>
                                                 </td>
                                                 <td>
-                                                    <!-- SLA Status Badge -->
                                                     <span th:if="${req.slaStatus == 'IN_PROGRESS'}" class="sla-status-badge sla-in-progress" th:text="${req.slaStatusDisplay}">In Progress</span>
                                                     <span th:if="${req.slaStatus == 'COMPLETED'}" class="sla-status-badge sla-completed" th:text="${req.slaStatusDisplay}">Completed</span>
                                                     <span th:if="${req.slaStatus == 'BREACHED'}" class="sla-status-badge sla-breached" th:text="${req.slaStatusDisplay}">Breached</span>
                                                     <span th:if="${req.slaStatus == 'ESCALATED'}" class="sla-status-badge sla-escalated" th:text="${req.slaStatusDisplay}">Escalated</span>
                                                     <span th:if="${req.slaStatus == null or req.slaStatus == 'N/A'}" class="sla-status-badge sla-na">N/A</span>
 
-                                                    <!-- Progress Bar -->
                                                     <div th:if="${req.slaStatus != null and req.slaStatus != 'COMPLETED' and req.slaStatus != 'BREACHED'}" class="sla-progress-mini">
                                                         <div class="sla-progress-bar"
                                                              th:class="${req.slaPercentage != null and req.slaPercentage > 90} ? 'bg-danger' : ((${req.slaPercentage != null and req.slaPercentage > 75}) ? 'bg-warning' : 'bg-success')"
@@ -713,21 +704,21 @@
                                                     </small>
                                                 </td>
                                                 <td>
-                                                    <!-- Complete Trip button for ACCEPTED requests -->
                                                     <div th:if="${req.status == 'ACCEPTED' and (isDriver or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN' or req.driverId == session.userId)}">
-                                                        <button class="btn btn-sm btn-success w-100"
-                                                                th:onclick="'completeDriverTrip(' + ${req.requestId} + ', ' + ${req.driverId} + ')'">
+                                                        <button class="btn btn-sm btn-success w-100 action-btn"
+                                                                data-action="completeDriverTrip"
+                                                                th:data-requestid="${req.requestId}"
+                                                                th:data-driverid="${req.driverId}">
                                                             <i class="fas fa-check-circle"></i> Complete
                                                         </button>
                                                     </div>
-                                                    <!-- Recall button for PENDING requests (not expired) -->
                                                     <div th:if="${req.status == 'PENDING' and (req.isExpired == null or !req.isExpired)}">
-                                                        <button class="btn btn-sm btn-warning w-100 recall-btn"
-                                                                th:onclick="'recallDriverRequest(' + ${req.requestId} + ')'">
+                                                        <button class="btn btn-sm btn-warning w-100 recall-btn action-btn"
+                                                                data-action="recallDriverRequest"
+                                                                th:data-requestid="${req.requestId}">
                                                             <i class="fas fa-undo"></i> Recall
                                                         </button>
                                                     </div>
-                                                    <!-- Show expired message -->
                                                     <div th:if="${req.status == 'EXPIRED'}">
                                                         <span class="text-muted small">Request expired</span>
                                                     </div>
@@ -797,11 +788,6 @@
                             </div>
                         </div>
                         <div class="panel-body">
-                            <!-- ============================================ -->
-                            <!-- id="roomBookingsContainer" is the silent-refresh -->
-                            <!-- target for room booking submissions (see note above -->
-                            <!-- driverRequestsContainer). -->
-                            <!-- ============================================ -->
                             <div id="roomBookingsContainer">
                                 <div th:if="${roomBookings != null and !roomBookings.isEmpty()}">
                                     <div class="table-container">
@@ -841,25 +827,24 @@
                                                           th:text="${booking.status} == 'CONFIRMED' ? 'COMPLETED' : ${booking.status}">BOOKED</span>
                                                 </td>
                                                 <td>
-                                                    <!-- Recall button for BOOKED/PENDING bookings by owner -->
                                                     <div th:if="${(booking.status == 'BOOKED' or booking.status == 'PENDING') and booking.userId == session.userId}">
-                                                        <button class="btn btn-sm btn-warning recall-btn"
-                                                                th:onclick="'recallRoomBooking(' + ${booking.bookingId} + ')'">
+                                                        <button class="btn btn-sm btn-warning recall-btn action-btn"
+                                                                data-action="recallRoomBooking"
+                                                                th:data-bookingid="${booking.bookingId}">
                                                             <i class="fas fa-undo"></i> Recall
                                                         </button>
                                                     </div>
 
-                                                    <!-- Request Slot button for BOOKED bookings by other users (non-server room) -->
                                                     <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and booking.status == 'BOOKED' and booking.userId != session.userId and booking.roomType != 'Server Room' and !booking.roomName.toLowerCase().contains('server')}">
-                                                        <button class="btn btn-sm btn-info recall-btn"
-                                                                th:onclick="'openSlotRequest(' + ${booking.bookingId} + ')'">
+                                                        <button class="btn btn-sm btn-info recall-btn action-btn"
+                                                                data-action="openSlotRequest"
+                                                                th:data-bookingid="${booking.bookingId}">
                                                             <i class="fas fa-handshake"></i> Request
                                                         </button>
                                                     </div>
 
-                                                    <!-- Sign Out button for INFRA and ADMIN users on server rooms -->
                                                     <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN') and (booking.roomType == 'Server Room' or booking.roomName.toLowerCase().contains('server')) and (booking.status == 'BOOKED' or booking.status == 'ACTIVE')}">
-                                                        <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post">
+                                                        <form th:action="'/assetIQ-pro/bookings/server-room/' + ${booking.bookingId} + '/signout-link'" method="post" class="ajax-form" data-refresh-target="roomBookingsContainer" data-success-message="User signed out successfully!">
                                                             <input type="hidden" name="infraComment" value="Signing out user">
                                                             <button type="submit" class="btn btn-sm btn-primary w-100">
                                                                 <i class="fas fa-sign-out-alt me-1"></i>Sign Out
@@ -867,10 +852,10 @@
                                                         </form>
                                                     </div>
 
-                                                    <!-- Admin Cancel button for INFRA users -->
                                                     <div th:if="${booking.status != 'CONFIRMED' and booking.status != 'CANCELLED' and (session.role == 'INFRA' or session.role == 'INFRASTRUCTURE') and (booking.status == 'BOOKED' or booking.status == 'PENDING' or booking.status == 'ACTIVE')}">
-                                                        <button class="btn btn-sm btn-danger mt-1 w-100"
-                                                                th:onclick="'adminCancelBooking(' + ${booking.bookingId} + ')'">
+                                                        <button class="btn btn-sm btn-danger mt-1 w-100 action-btn"
+                                                                data-action="adminCancelBooking"
+                                                                th:data-bookingid="${booking.bookingId}">
                                                             <i class="fas fa-times me-1"></i>Cancel
                                                         </button>
                                                     </div>
@@ -924,8 +909,10 @@
                                         <td th:text="${#temporals.format(trip.requestTime, 'dd/MM/yyyy HH:mm')}">Time</td>
                                         <td><span class="status-badge accepted">ACCEPTED</span></td>
                                         <td>
-                                            <button class="btn btn-sm btn-success"
-                                                    th:onclick="'completeDriverTrip(' + ${trip.requestId} + ', ' + ${trip.driverId} + ')'">
+                                            <button class="btn btn-sm btn-success action-btn"
+                                                    data-action="completeDriverTrip"
+                                                    th:data-requestid="${trip.requestId}"
+                                                    th:data-driverid="${trip.driverId}">
                                                 <i class="fas fa-check-circle"></i> Complete
                                             </button>
                                         </td>
@@ -971,14 +958,18 @@
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end">
                                                     <li>
-                                                        <a class="dropdown-item text-success" href="#"
-                                                           th:onclick="'approveDriverRequest(' + ${req.requestId} + ', ' + ${req.driverId} + '); return false;'">
+                                                        <a class="dropdown-item text-success action-link" href="#"
+                                                           data-action="approveDriverRequest"
+                                                           th:data-requestid="${req.requestId}"
+                                                           th:data-driverid="${req.driverId}">
                                                             <i class="fas fa-check"></i> Accept
                                                         </a>
                                                     </li>
                                                     <li>
-                                                        <a class="dropdown-item text-danger" href="#"
-                                                           th:onclick="'openRejectDriverPrompt(' + ${req.requestId} + ', ' + ${req.driverId} + '); return false;'">
+                                                        <a class="dropdown-item text-danger action-link" href="#"
+                                                           data-action="openRejectDriverPrompt"
+                                                           th:data-requestid="${req.requestId}"
+                                                           th:data-driverid="${req.driverId}">
                                                             <i class="fas fa-times"></i> Reject
                                                         </a>
                                                     </li>
@@ -1021,7 +1012,6 @@
                                         <td><span class="status-badge pending">PENDING</span></td>
                                         <td th:text="${booking.purpose != null ? booking.purpose : '-'}">Purpose</td>
                                         <td class="text-center">
-                                            <!-- INFRA or ADMIN can approve/decline -->
                                             <div th:if="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}"
                                                  class="dropdown action-dropdown">
                                                 <button type="button" class="btn ellipsis-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions">
@@ -1029,20 +1019,21 @@
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end">
                                                     <li>
-                                                        <a class="dropdown-item text-success" href="#"
-                                                           th:onclick="'approveServerRoom(' + ${booking.bookingId} + '); return false;'">
+                                                        <a class="dropdown-item text-success action-link" href="#"
+                                                           data-action="approveServerRoom"
+                                                           th:data-bookingid="${booking.bookingId}">
                                                             <i class="fas fa-check"></i> Approve
                                                         </a>
                                                     </li>
                                                     <li>
-                                                        <a class="dropdown-item text-danger" href="#"
-                                                           th:onclick="'declineServerRoom(' + ${booking.bookingId} + '); return false;'">
+                                                        <a class="dropdown-item text-danger action-link" href="#"
+                                                           data-action="declineServerRoom"
+                                                           th:data-bookingid="${booking.bookingId}">
                                                             <i class="fas fa-times"></i> Decline
                                                         </a>
                                                     </li>
                                                 </ul>
                                             </div>
-                                            <!-- Show message for non-INFRA/ADMIN users -->
                                             <div th:unless="${session.role == 'INFRA' or session.role == 'INFRASTRUCTURE' or session.role == 'ADMIN' or session.role == 'SUPER_ADMIN'}">
                                                 <span class="text-muted small">Waiting for infrastructure approval</span>
                                             </div>
@@ -1089,14 +1080,16 @@
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end">
                                                     <li>
-                                                        <a class="dropdown-item text-success" href="#"
-                                                           th:onclick="'approveCabRequest(' + ${req.requestId} + '); return false;'">
+                                                        <a class="dropdown-item text-success action-link" href="#"
+                                                           data-action="approveCabRequest"
+                                                           th:data-requestid="${req.requestId}">
                                                             <i class="fas fa-check"></i> Approve
                                                         </a>
                                                     </li>
                                                     <li>
-                                                        <a class="dropdown-item text-danger" href="#"
-                                                           th:onclick="'rejectCabRequest(' + ${req.requestId} + '); return false;'">
+                                                        <a class="dropdown-item text-danger action-link" href="#"
+                                                           data-action="rejectCabRequest"
+                                                           th:data-requestid="${req.requestId}">
                                                             <i class="fas fa-times"></i> Reject
                                                         </a>
                                                     </li>
@@ -1221,10 +1214,12 @@
                         <div class="mb-3">
                             <label for="startTimeInput" class="form-label">Start Time *</label>
                             <input type="datetime-local" id="startTimeInput" name="startTime" class="form-control" required>
+                            <small class="text-muted" id="roomStartHelpText">Select the start time for your booking</small>
                         </div>
                         <div class="mb-3">
                             <label for="endTimeInput" class="form-label">End Time *</label>
                             <input type="datetime-local" id="endTimeInput" name="endTime" class="form-control" required>
+                            <small class="text-muted" id="roomEndHelpText">Select the end time for your booking</small>
                         </div>
                         <div class="mb-3">
                             <label for="purposeInput" class="form-label">Purpose</label>
@@ -1259,10 +1254,6 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <!-- id + data-roomid: JS handles the transition to the Book
-                         Room modal manually (see bookThisRoomBtn wiring in
-                         scripts) so the room field is reliably pre-filled
-                         before the modal is shown. -->
                     <button type="button" class="btn btn-success" id="bookThisRoomBtn">
                         <i class="fas fa-calendar-plus me-1"></i>Book This Room
                     </button>
@@ -1288,11 +1279,6 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <!-- id + data-driverid: JS handles the transition to the
-                         Request Driver modal manually (see
-                         requestThisDriverBtn wiring in scripts) so the
-                         driver field is reliably pre-filled before the modal
-                         is shown. -->
                     <button type="button" class="btn btn-primary" id="requestThisDriverBtn">
                         <i class="fas fa-car me-1"></i>Request This Driver
                     </button>
@@ -1316,7 +1302,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-info" id="sendSlotRequestBtn" onclick="confirmSlotRequest()">
+                    <button type="button" class="btn btn-info" id="sendSlotRequestBtn">
                         <i class="fas fa-paper-plane me-1"></i>Send Request
                     </button>
                 </div>
@@ -1471,6 +1457,10 @@
         .status-badge.completed { background: #eef0fd; color: #6610f2; }
         .status-badge.cancelled { background: #fdeeee; color: #dc3545; }
         .status-badge.inuse { background: #e8f4fd; color: #0dcaf0; }
+
+        /* Profile dropdown - show username and role */
+        .profile-username { font-weight: 600; font-size: 14px; color: var(--ink); }
+        .profile-role { font-size: 11px; color: var(--text-muted); }
     </style>
 </div>
 
@@ -1479,15 +1469,10 @@
     <script th:inline="none">
         const CURRENT_USER_ID = Number(document.querySelector('[data-current-user-id]')?.dataset.currentUserId || -1);
         const USER_ROLE = document.querySelector('[data-user-role]')?.dataset.userRole || '';
+        const USERNAME = document.querySelector('[data-username]')?.dataset.username || '';
 
         // Tracks the driver whose "Request This Driver" button was clicked
-        // in the driver-details modal, so the Request Driver modal can
-        // auto-populate its driver dropdown the next time it opens.
         let driverToPreselect = null;
-
-        // Same idea, but for the room whose "Book This Room" button was
-        // clicked in the room-details modal - lets the Book Room modal
-        // auto-populate its room dropdown the next time it opens.
         let roomToPreselect = null;
 
         // ============================================
@@ -1645,12 +1630,6 @@
         // ============================================
         // Silent Partial Refresh
         // ============================================
-        // Re-fetches the current page in the background and swaps just the
-        // innerHTML of #containerId in from the fresh response. This keeps
-        // the on-screen table authoritative (correct IDs, SLA calculations,
-        // server-computed categories, etc.) after a background POST succeeds,
-        // WITHOUT doing a window.location.reload() / full navigation - no
-        // white flash, no scroll jump, no loss of which tab is active.
         function silentRefreshContainer(containerId) {
             if (!containerId) return Promise.resolve();
             return fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -1662,6 +1641,7 @@
                     if (freshEl && liveEl) {
                         liveEl.innerHTML = freshEl.innerHTML;
                         initActionDropdowns();
+                        bindActionButtons();
                     }
                 })
                 .catch(function (err) {
@@ -1670,24 +1650,15 @@
         }
 
         // ============================================
-        // AJAX Form Submission (waits for the real response)
+        // AJAX Form Submission
         // ============================================
-        // Submits in the background (no full page reload) but no longer
-        // celebrates before the server has actually confirmed the request.
-        // This matters for things like room bookings, where the same slot
-        // can be taken by someone else - flashing "Room booked
-        // successfully!" and then contradicting it a moment later with a
-        // corner error was confusing. Now:
-        //   - success: modal closes, form resets, a success toast shows,
-        //     and the relevant table silently refreshes.
-        //   - failure: the modal stays open, the form keeps whatever the
-        //     user typed, and the *actual* server error message is shown
-        //     in the same center toast used for success (not a generic
-        //     "Error Occurred" off in the corner).
         document.addEventListener('submit', function (e) {
             const form = e.target;
             if (form.tagName !== 'FORM') return;
-            if (form.dataset.ajaxForm !== 'true') return;
+
+            // Check for either data-ajax-form or ajax-form class
+            const isAjaxForm = form.dataset.ajaxForm === 'true' || form.classList.contains('ajax-form');
+            if (!isAjaxForm) return;
 
             if (form.checkValidity && !form.checkValidity()) return;
             e.preventDefault();
@@ -1706,6 +1677,8 @@
             }
             if (btn) lockSubmitButton(btn);
 
+            let errorShown = false;
+
             fetch(form.getAttribute('action'), {
                 method: 'POST',
                 headers: {
@@ -1715,67 +1688,216 @@
                 body: params.toString()
             })
             .then(function (response) {
-                return response.json().catch(function () { return {}; }).then(function (data) {
-                    if (btn) unlockSubmitButton(btn);
-
-                    if (!response.ok) {
-                        const errorMsg = data.error || 'The request could not be saved. Please try again.';
-                        showToast(errorMsg, 'error');
-                        return;
-                    }
-
-                    // Success: now it's safe to close the modal and reset.
-                    showToast(successMessage, 'success');
-                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-                    form.reset();
-                    if (refreshTargetId) {
-                        silentRefreshContainer(refreshTargetId);
-                    }
+                return response.text().then(function (text) {
+                    let data = {};
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {}
+                    return { response: response, data: data, text: text };
                 });
+            })
+            .then(function (result) {
+                const response = result.response;
+                const data = result.data;
+                const text = result.text;
+                if (btn) unlockSubmitButton(btn);
+
+                if (!response.ok || (data && data.error)) {
+                    let errorMsg = null;
+
+                    if (data && typeof data === 'object') {
+                        errorMsg = data.error || data.message || data.reason ||
+                                   data.err || data.errMsg || data.errMessage ||
+                                   data.errorMessage || null;
+
+                        if (errorMsg && typeof errorMsg === 'object') {
+                            errorMsg = errorMsg.message || errorMsg.error || JSON.stringify(errorMsg);
+                        }
+
+                        if (!errorMsg && data.fieldErrors && typeof data.fieldErrors === 'object') {
+                            const fieldMsgs = Object.values(data.fieldErrors).filter(function(v) { return v; });
+                            if (fieldMsgs.length > 0) {
+                                errorMsg = fieldMsgs.join('; ');
+                            }
+                        }
+
+                        if (!errorMsg && data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+                            errorMsg = data.errors.map(function(e) { return e.message || e; }).join('; ');
+                        }
+                    }
+
+                    if (!errorMsg && text && text.length > 0 && !text.includes('<')) {
+                        errorMsg = text;
+                    }
+
+                    if (!errorMsg && text && text.includes('<')) {
+                        const match = text.match(/<title>([^<]*)<\/title>/) ||
+                                     text.match(/<h1[^>]*>([^<]*)<\/h1>/) ||
+                                     text.match(/<p[^>]*>([^<]*)<\/p>/);
+                        if (match) {
+                            errorMsg = match[1];
+                        }
+                    }
+
+                    if (!errorMsg) {
+                        errorMsg = 'The request could not be saved. Please try again.';
+                    }
+
+                    if (typeof errorMsg === 'string') {
+                        errorMsg = errorMsg.replace(/<[^>]*>/g, '').trim();
+                        if (errorMsg.length > 500) {
+                            errorMsg = errorMsg.substring(0, 500) + '...';
+                        }
+                    }
+
+                    if (!errorShown) {
+                        errorShown = true;
+                        showToast(errorMsg, 'error');
+                    }
+                    return;
+                }
+
+                showToast(successMessage, 'success');
+                if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                form.reset();
+                if (refreshTargetId) {
+                    silentRefreshContainer(refreshTargetId);
+                }
             })
             .catch(function (err) {
                 if (btn) unlockSubmitButton(btn);
-                showToast('Error: ' + err.message, 'error');
+                if (!errorShown) {
+                    errorShown = true;
+                    showToast('Error: ' + err.message, 'error');
+                }
             });
         }, true);
 
         // ============================================
-        // Pagination
+        // Room Booking Date Constraints
         // ============================================
-        function paginateList(listId, paginationId, pageSize) {
-            const list = document.getElementById(listId);
-            const paginationEl = document.getElementById(paginationId);
-            if (!list || !paginationEl) return;
-            const rows = Array.from(list.querySelectorAll(':scope > .booking-row'));
-            if (rows.length <= pageSize) { paginationEl.innerHTML = ''; return; }
-            const totalPages = Math.ceil(rows.length / pageSize);
-            let currentPage = 1;
-            function render() {
-                rows.forEach(function (row, idx) {
-                    const page = Math.floor(idx / pageSize) + 1;
-                    row.style.display = (page === currentPage) ? '' : 'none';
-                });
-                paginationEl.innerHTML = '<button type="button" class="page-btn" data-dir="prev"' + (currentPage === 1 ? ' disabled' : '') + '><i class="fas fa-chevron-left"></i></button><span class="page-indicator">Page ' + currentPage + ' of ' + totalPages + '</span><button type="button" class="page-btn" data-dir="next"' + (currentPage === totalPages ? ' disabled' : '') + '><i class="fas fa-chevron-right"></i></button>';
-                paginationEl.querySelectorAll('.page-btn').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        if (btn.dataset.dir === 'prev' && currentPage > 1) currentPage--;
-                        if (btn.dataset.dir === 'next' && currentPage < totalPages) currentPage++;
-                        render();
-                    });
+        function configureRoomDateConstraints() {
+            const startInput = document.getElementById('startTimeInput');
+            const endInput = document.getElementById('endTimeInput');
+            const startHelp = document.getElementById('roomStartHelpText');
+            const endHelp = document.getElementById('roomEndHelpText');
+
+            if (!startInput || !endInput) return;
+
+            function pad(n) { return String(n).padStart(2, '0'); }
+            function toLocalInputValue(date) {
+                return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+                    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+            }
+            function addMinutes(date, minutes) {
+                const d = new Date(date);
+                d.setMinutes(d.getMinutes() + minutes);
+                return d;
+            }
+
+            function applyConstraints() {
+                const now = new Date();
+                // Set min to current time + 30 minutes
+                const minDate = addMinutes(now, 30);
+                // Allow up to 30 days in advance
+                const maxDate = new Date(now);
+                maxDate.setDate(maxDate.getDate() + 30);
+
+                const minStr = toLocalInputValue(minDate);
+                const maxStr = toLocalInputValue(maxDate);
+
+                startInput.min = minStr;
+                startInput.max = maxStr;
+
+                // If start is set, set end min to start + 30 min
+                if (startInput.value) {
+                    const startDate = new Date(startInput.value);
+                    if (!isNaN(startDate.getTime())) {
+                        const endMin = addMinutes(startDate, 30);
+                        endInput.min = toLocalInputValue(endMin);
+                    }
+                } else {
+                    endInput.min = minStr;
+                }
+                endInput.max = maxStr;
+
+                if (startHelp) {
+                    startHelp.textContent = 'Select the start time (minimum 30 minutes from now, up to 30 days ahead)';
+                }
+                if (endHelp) {
+                    endHelp.textContent = 'Select the end time (minimum 30 minutes after start)';
+                }
+
+                // Snap out-of-range values
+                const currentStart = startInput.value ? new Date(startInput.value) : null;
+                if (currentStart && !isNaN(currentStart.getTime())) {
+                    if (currentStart < minDate) {
+                        startInput.value = toLocalInputValue(minDate);
+                    } else if (currentStart > maxDate) {
+                        startInput.value = toLocalInputValue(maxDate);
+                    }
+                }
+
+                const currentEnd = endInput.value ? new Date(endInput.value) : null;
+                if (currentEnd && !isNaN(currentEnd.getTime())) {
+                    const startVal = startInput.value ? new Date(startInput.value) : null;
+                    const endMinDate = startVal ? addMinutes(startVal, 30) : minDate;
+                    if (currentEnd < endMinDate) {
+                        endInput.value = toLocalInputValue(endMinDate);
+                    } else if (currentEnd > maxDate) {
+                        endInput.value = toLocalInputValue(maxDate);
+                    }
+                }
+            }
+
+            startInput.addEventListener('change', function() {
+                if (this.value) {
+                    const startDate = new Date(this.value);
+                    if (!isNaN(startDate.getTime())) {
+                        const endMin = addMinutes(startDate, 30);
+                        endInput.min = toLocalInputValue(endMin);
+                        // If end is before start + 30, update it
+                        const endVal = endInput.value ? new Date(endInput.value) : null;
+                        if (endVal && !isNaN(endVal.getTime()) && endVal < endMin) {
+                            endInput.value = toLocalInputValue(endMin);
+                        }
+                    }
+                }
+                applyConstraints();
+            });
+
+            // Re-apply constraints when modal opens
+            const modalEl = document.getElementById('bookRoomModal');
+            if (modalEl) {
+                modalEl.addEventListener('show.bs.modal', function() {
+                    // Reset fields
+                    startInput.value = '';
+                    endInput.value = '';
+                    applyConstraints();
+
+                    // Set default start time to 1 hour from now
+                    const now = new Date();
+                    const defaultStart = addMinutes(now, 60);
+                    // Round to nearest 30 minutes
+                    const minutes = defaultStart.getMinutes();
+                    const roundedMinutes = Math.ceil(minutes / 30) * 30;
+                    defaultStart.setMinutes(roundedMinutes);
+                    defaultStart.setSeconds(0);
+                    defaultStart.setMilliseconds(0);
+
+                    startInput.value = toLocalInputValue(defaultStart);
+                    const endDefault = addMinutes(defaultStart, 60);
+                    endInput.value = toLocalInputValue(endDefault);
+
+                    // Re-apply constraints
+                    setTimeout(applyConstraints, 50);
                 });
             }
-            render();
         }
 
         // ============================================
-        // Trip-Type Driven Date/Time Locking
+        // Trip-Type Driven Date/Time Locking for Driver Requests
         // ============================================
-        // TODAY    -> calendar locked to today only (from "now" through 23:59 today)
-        // ADVANCE  -> calendar locked to exactly tomorrow (00:00 - 23:59)
-        // FUTURE   -> calendar unlocked from the day after tomorrow through
-        //             5 days from today (i.e. it picks up where ADVANCE ends)
-        // No trip type selected yet -> falls back to a 1hr-from-now to
-        // 5-days-out window so the field still has sane bounds.
         function configureTripTypeDateConstraints() {
             const tripTypeSelect = document.getElementById('tripTypeSelect');
             const requestTimeInput = document.getElementById('requestTimeInput');
@@ -1824,9 +1946,6 @@
                 requestTimeInput.max = toLocalInputValue(maxDate);
                 if (helpText) helpText.textContent = help;
 
-                // Snap the field back into range if the trip type changed
-                // after a time was already picked, so a mismatched
-                // trip-type / date pair can never be submitted.
                 const current = requestTimeInput.value ? new Date(requestTimeInput.value) : null;
                 if (!current || isNaN(current.getTime()) || current < minDate || current > maxDate) {
                     requestTimeInput.value = toLocalInputValue(defaultDate);
@@ -1836,12 +1955,6 @@
             tripTypeSelect.addEventListener('change', applyConstraints);
             applyConstraints();
 
-            // Re-establish "now"-relative bounds every time the modal is
-            // reopened (in case it's opened later in the day/next day). Also
-            // resolves the driver dropdown: if the modal was opened via
-            // "Request This Driver" from the driver-details modal, pre-select
-            // that driver; otherwise reset the trip type / driver selection
-            // so the user picks deliberately each time.
             const modalEl = document.getElementById('requestDriverModal');
             if (modalEl) {
                 modalEl.addEventListener('show.bs.modal', function () {
@@ -1852,8 +1965,6 @@
                     if (driverSelect) {
                         if (driverToPreselect) {
                             driverSelect.value = String(driverToPreselect);
-                            // If the value didn't actually match an <option>
-                            // (e.g. stale id), fall back to the blank option.
                             if (driverSelect.value !== String(driverToPreselect)) {
                                 driverSelect.value = '';
                             }
@@ -1869,10 +1980,6 @@
         // ============================================
         // Room Pre-selection for Book Room Modal
         // ============================================
-        // Mirrors the driver pre-selection behavior above: if the modal was
-        // opened via "Book This Room" from the room-details modal, pre-select
-        // that room; otherwise reset the dropdown so the user picks
-        // deliberately each time.
         function configureRoomModalPreselect() {
             const bookRoomModalEl = document.getElementById('bookRoomModal');
             const roomSelect = document.getElementById('roomSelect');
@@ -1891,11 +1998,123 @@
             });
         }
 
+        // ============================================
+        // Bind Action Buttons (for silent actions)
+        // ============================================
+        function bindActionButtons() {
+            // Action buttons with data-action attribute
+            document.querySelectorAll('.action-btn').forEach(function(btn) {
+                if (btn.dataset.bound === '1') return;
+                btn.dataset.bound = '1';
+
+                const action = btn.dataset.action;
+                if (!action) return;
+
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    switch(action) {
+                        case 'completeDriverTrip':
+                            const reqId = btn.dataset.requestid;
+                            const driverId = btn.dataset.driverid;
+                            if (reqId && driverId) completeDriverTrip(reqId, driverId);
+                            break;
+                        case 'recallDriverRequest':
+                            const recallReqId = btn.dataset.requestid;
+                            if (recallReqId) recallDriverRequest(recallReqId);
+                            break;
+                        case 'recallRoomBooking':
+                            const bookingId = btn.dataset.bookingid;
+                            if (bookingId) recallRoomBooking(bookingId);
+                            break;
+                        case 'adminCancelBooking':
+                            const cancelId = btn.dataset.bookingid;
+                            if (cancelId) adminCancelBooking(cancelId);
+                            break;
+                        case 'openSlotRequest':
+                            const slotId = btn.dataset.bookingid;
+                            if (slotId) openSlotRequest(slotId);
+                            break;
+                    }
+                });
+            });
+
+            // Action links in dropdowns
+            document.querySelectorAll('.action-link').forEach(function(link) {
+                if (link.dataset.bound === '1') return;
+                link.dataset.bound = '1';
+
+                const action = link.dataset.action;
+                if (!action) return;
+
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    switch(action) {
+                        case 'approveDriverRequest':
+                            const reqId = link.dataset.requestid;
+                            const driverId = link.dataset.driverid;
+                            if (reqId && driverId) approveDriverRequest(reqId, driverId);
+                            break;
+                        case 'openRejectDriverPrompt':
+                            const rejectReqId = link.dataset.requestid;
+                            const rejectDriverId = link.dataset.driverid;
+                            if (rejectReqId && rejectDriverId) openRejectDriverPrompt(rejectReqId, rejectDriverId);
+                            break;
+                        case 'approveServerRoom':
+                            const approveId = link.dataset.bookingid;
+                            if (approveId) approveServerRoom(approveId);
+                            break;
+                        case 'declineServerRoom':
+                            const declineId = link.dataset.bookingid;
+                            if (declineId) declineServerRoom(declineId);
+                            break;
+                        case 'approveCabRequest':
+                            const cabApproveId = link.dataset.requestid;
+                            if (cabApproveId) approveCabRequest(cabApproveId);
+                            break;
+                        case 'rejectCabRequest':
+                            const cabRejectId = link.dataset.requestid;
+                            if (cabRejectId) rejectCabRequest(cabRejectId);
+                            break;
+                    }
+                });
+            });
+        }
+
+        // ============================================
+        // Pagination
+        // ============================================
+        function paginateList(listId, paginationId, pageSize) {
+            const list = document.getElementById(listId);
+            const paginationEl = document.getElementById(paginationId);
+            if (!list || !paginationEl) return;
+            const rows = Array.from(list.querySelectorAll(':scope > .booking-row'));
+            if (rows.length <= pageSize) { paginationEl.innerHTML = ''; return; }
+            const totalPages = Math.ceil(rows.length / pageSize);
+            let currentPage = 1;
+            function render() {
+                rows.forEach(function (row, idx) {
+                    const page = Math.floor(idx / pageSize) + 1;
+                    row.style.display = (page === currentPage) ? '' : 'none';
+                });
+                paginationEl.innerHTML = '<button type="button" class="page-btn" data-dir="prev"' + (currentPage === 1 ? ' disabled' : '') + '><i class="fas fa-chevron-left"></i></button><span class="page-indicator">Page ' + currentPage + ' of ' + totalPages + '</span><button type="button" class="page-btn" data-dir="next"' + (currentPage === totalPages ? ' disabled' : '') + '><i class="fas fa-chevron-right"></i></button>';
+                paginationEl.querySelectorAll('.page-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        if (btn.dataset.dir === 'prev' && currentPage > 1) currentPage--;
+                        if (btn.dataset.dir === 'next' && currentPage < totalPages) currentPage++;
+                        render();
+                    });
+                });
+            }
+            render();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             configureTripTypeDateConstraints();
+            configureRoomDateConstraints();
             configureRoomModalPreselect();
 
-            // Paginate room bookings if they exist
             const roomBookingsList = document.getElementById('roomBookingsList');
             const roomPagination = document.getElementById('roomBookingsPagination');
             if (roomBookingsList && roomPagination) {
@@ -1906,17 +2125,8 @@
             }
 
             initActionDropdowns();
+            bindActionButtons();
 
-            // ============================================
-            // Cross-Modal Handoff (Details modal -> Booking modal)
-            // ============================================
-            // Handles both "Request This Driver" and "Book This Room":
-            // explicitly hide the details modal, wait for it to fully
-            // finish hiding, THEN set the pre-select variable and show the
-            // booking modal. Doing this by hand (rather than letting
-            // Bootstrap's data-bs-dismiss/data-bs-toggle attributes race
-            // each other) guarantees the pre-select value is set before the
-            // booking modal's 'show.bs.modal' handler runs.
             function switchModal(fromModalEl, toModalEl, onBeforeShow) {
                 const toInstance = bootstrap.Modal.getOrCreateInstance(toModalEl);
                 function openTarget() {
@@ -1957,7 +2167,40 @@
                     });
                 });
             }
+
+            // Slot request modal button
+            const sendSlotBtn = document.getElementById('sendSlotRequestBtn');
+            if (sendSlotBtn) {
+                sendSlotBtn.addEventListener('click', confirmSlotRequest);
+            }
+
+            // Update profile to show username and role
+            updateProfileDisplay();
         });
+
+        // ============================================
+        // Update Profile Display (username + role)
+        // ============================================
+        function updateProfileDisplay() {
+            const userAvatar = document.querySelector('.user-avatar');
+            const userDropdownItems = document.querySelectorAll('.dropdown-item-text');
+
+            if (userAvatar) {
+                const initial = USERNAME ? USERNAME.charAt(0).toUpperCase() : 'U';
+                userAvatar.textContent = initial;
+            }
+
+            // Update the username and role in the dropdown
+            userDropdownItems.forEach(function(item) {
+                if (item.classList.contains('fw-semibold')) {
+                    item.textContent = USERNAME || 'User';
+                }
+                if (item.classList.contains('text-muted') && item.classList.contains('small')) {
+                    const roleDisplay = USER_ROLE ? USER_ROLE.replace('_', ' ').toUpperCase() : 'User';
+                    item.textContent = roleDisplay;
+                }
+            });
+        }
 
         // ============================================
         // View Functions
@@ -1968,8 +2211,6 @@
             const nameSpan = document.getElementById('driverDetailName');
             nameSpan.textContent = driverName || 'Driver';
 
-            // Remember this driver on the "Request This Driver" button so
-            // that clicking it later pre-populates the Request Driver modal.
             const requestThisDriverBtn = document.getElementById('requestThisDriverBtn');
             if (requestThisDriverBtn) requestThisDriverBtn.dataset.driverid = driverId;
 
@@ -2011,8 +2252,6 @@
             const nameSpan = document.getElementById('roomDetailName');
             nameSpan.textContent = roomName || 'Room';
 
-            // Remember this room on the "Book This Room" button so that
-            // clicking it later pre-populates the Book Room modal.
             const bookThisRoomBtn = document.getElementById('bookThisRoomBtn');
             if (bookThisRoomBtn) bookThisRoomBtn.dataset.roomid = roomId;
 
@@ -2096,7 +2335,7 @@
         }
 
         // ============================================
-        // Action Functions
+        // Action Functions (with silent refresh)
         // ============================================
         function openSlotRequest(bookingId) {
             document.getElementById('slotRequestBookingId').value = bookingId;
@@ -2119,7 +2358,7 @@
                     if (response.ok) {
                         showToast('Slot request sent successfully! The current booker will be notified.', 'success');
                         bootstrap.Modal.getInstance(document.getElementById('slotRequestModal')).hide();
-                        setTimeout(() => window.location.reload(), 900);
+                        silentRefreshContainer('roomBookingsContainer');
                     } else {
                         return response.text().then(text => {
                             showToast('Failed to send slot request: ' + text, 'error');
@@ -2137,7 +2376,10 @@
             showConfirm('Are you sure you want to cancel this booking?', function () {
                 fetch('/assetIQ-pro/bookings/admin/booking/' + bookingId + '/cancel', { method: 'POST' })
                     .then(response => {
-                        if (response.ok) { showToast('Booking cancelled successfully!', 'success'); setTimeout(() => window.location.reload(), 900); }
+                        if (response.ok) {
+                            showToast('Booking cancelled successfully!', 'success');
+                            silentRefreshContainer('roomBookingsContainer');
+                        }
                         else { return response.text().then(text => { showToast('Failed to cancel booking: ' + text, 'error'); }); }
                     })
                     .catch(error => showToast('Error: ' + error.message, 'error'));
@@ -2147,7 +2389,7 @@
         function recallDriverRequest(id) {
             showConfirm('Recall this driver request?', function () {
                 fetch('/assetIQ-pro/bookings/driver-request/' + id + '/recall', { method: 'POST' })
-                    .then(() => window.location.reload())
+                    .then(() => silentRefreshContainer('driverRequestsContainer'))
                     .catch(err => showToast('Failed: ' + err.message, 'error'));
             });
         }
@@ -2155,7 +2397,7 @@
         function recallRoomBooking(id) {
             showConfirm('Recall this room booking?', function () {
                 fetch('/assetIQ-pro/bookings/room/' + id + '/recall', { method: 'POST' })
-                    .then(() => window.location.reload())
+                    .then(() => silentRefreshContainer('roomBookingsContainer'))
                     .catch(err => showToast('Failed: ' + err.message, 'error'));
             });
         }
@@ -2171,7 +2413,7 @@
                 .then(response => {
                     if (response.ok) {
                         showToast('Request accepted successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
+                        silentRefreshContainer('driverRequestsContainer');
                     } else {
                         return response.text().then(text => { showToast('Error: ' + text, 'error'); });
                     }
@@ -2204,7 +2446,7 @@
             .then(response => {
                 if (response.ok) {
                     showCornerToast('Request rejected successfully!', 'success');
-                    setTimeout(() => window.location.reload(), 900);
+                    silentRefreshContainer('driverRequestsContainer');
                 } else {
                     return response.text().then(text => { showCornerToast('Error: ' + text, 'error'); });
                 }
@@ -2224,7 +2466,7 @@
                 .then(response => {
                     if (response.ok) {
                         showToast('Trip completed successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
+                        silentRefreshContainer('driverRequestsContainer');
                     } else {
                         return response.text().then(text => { showToast('Error: ' + text, 'error'); });
                     }
@@ -2245,7 +2487,7 @@
                 .then(response => {
                     if (response.ok) {
                         showToast('Server room booking approved successfully!', 'success');
-                        setTimeout(() => window.location.reload(), 900);
+                        silentRefreshContainer('roomBookingsContainer');
                     } else {
                         return response.text().then(text => { showToast('Error: ' + text, 'error'); });
                     }
@@ -2271,7 +2513,7 @@
                     .then(response => {
                         if (response.ok) {
                             showCornerToast('Server room booking declined successfully!', 'success');
-                            setTimeout(() => window.location.reload(), 900);
+                            silentRefreshContainer('roomBookingsContainer');
                         } else {
                             return response.text().then(text => { showCornerToast('Error: ' + text, 'error'); });
                         }
@@ -2297,7 +2539,7 @@
                     return response.json().then(function(data) {
                         if (response.ok) {
                             showToast('Cab request approved successfully! The requester has been notified.', 'success');
-                            setTimeout(function() { window.location.reload(); }, 1200);
+                            silentRefreshContainer('driverRequestsContainer');
                         } else {
                             showToast('Failed to approve cab request: ' + (data.error || 'Unknown error'), 'error');
                         }
@@ -2330,7 +2572,7 @@
                     return response.json().then(function(data) {
                         if (response.ok) {
                             showToast('Cab request rejected successfully!', 'success');
-                            setTimeout(function() { window.location.reload(); }, 1200);
+                            silentRefreshContainer('driverRequestsContainer');
                         } else {
                             showToast('Failed to reject cab request: ' + (data.error || 'Unknown error'), 'error');
                         }
