@@ -866,11 +866,11 @@
             <!-- User Dropdown -->
             <div class="dropdown">
                 <button class="btn btn-link p-0" data-bs-toggle="dropdown">
-                    <div class="user-avatar" th:text="${#strings.substring(session.fullName, 0, 1)} ?: 'U'">U</div>
+                    <div class="user-avatar" th:text="${#strings.substring(session.username, 0, 1)} ?: 'U'">U</div>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 14px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 6px 0; min-width: 200px;">
-                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.fullName}" style="color: var(--ink);">User Name</span></li>
-                    <li><span class="dropdown-item-text text-muted small" th:text="${session.username}" style="color: var(--text-muted);">username</span></li>
+                    <li><span class="dropdown-item-text fw-semibold" th:text="${session.username}" style="color: var(--ink);">Username</span></li>
+                    <li><span class="dropdown-item-text text-muted small" th:text="${session.role}" style="color: var(--text-muted);">Role</span></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="/assetIQ-pro/change-password"><i class="fas fa-key me-2"></i> Change Password</a></li>
                     <li><hr class="dropdown-divider"></li>

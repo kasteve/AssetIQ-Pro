@@ -20,3 +20,49 @@ asset status changes to disposed, those options should become inactive so that o
 11. Make users get instant responses on UI not waiting for the backend activity like emails to be sent out to give the user a response.
 
 19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.
+
+
+
+changes made
+
+
+-- Add foreign key constraint from Transfers to Categories
+ALTER TABLE Transfers
+ADD CONSTRAINT FK_Transfers_Categories
+FOREIGN KEY (CategoryId) REFERENCES Categories(CategoryId);
+
+
+-- ============================================
+-- DRIVER BOOKING ENHANCEMENTS - MIGRATION
+-- ============================================
+
+-- Step 1: Add new columns to tbl_driver_requests
+ALTER TABLE tbl_driver_requests ADD
+    trip_category VARCHAR(20) NULL,  -- TODAY, FUTURE, ADVANCE
+    expiry_time DATETIME2 NULL,
+    is_expired BIT DEFAULT 0;
+
+-- Step 2: Create indexes for performance
+CREATE INDEX idx_driver_requests_category ON tbl_driver_requests(trip_category);
+CREATE INDEX idx_driver_requests_expiry ON tbl_driver_requests(is_expired, expiry_time);
+
+-- Step 3: Update existing rows with category based on request_time
+UPDATE tbl_driver_requests
+SET trip_category = CASE
+    WHEN CAST(request_time AS DATE) = CAST(GETDATE() AS DATE) THEN 'TODAY'
+    WHEN CAST(request_time AS DATE) > CAST(GETDATE() AS DATE) THEN 'ADVANCE'
+    ELSE 'FUTURE'
+END;
+
+-- Step 4: Set expiry_time for TODAY trips (30 minutes before request time)
+UPDATE tbl_driver_requests
+SET expiry_time = DATEADD(MINUTE, -30, request_time)
+WHERE trip_category = 'TODAY';
+
+-- Step 5: Mark expired trips (past expiry time and still pending)
+UPDATE tbl_driver_requests
+SET is_expired = 1,
+    status = 'EXPIRED'
+WHERE trip_category = 'TODAY'
+AND expiry_time < GETDATE()
+AND status IN ('PENDING', 'PENDING_ADMIN');
