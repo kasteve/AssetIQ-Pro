@@ -54,4 +54,28 @@ public class SystemSetting {
         this.category = category;
         this.description = description;
     }
+
+    // Fix: Complete the getValue() method
+    public String getValue() {
+        return this.settingValue;
+    }
+
+    // Fix: Add setValue() for convenience
+    public void setValue(String value) {
+        this.settingValue = value;
+    }
+
+    // Fix: Helper method to get integer value
+    public int getIntValue() {
+        try {
+            return Integer.parseInt(this.settingValue);
+        } catch (NumberFormatException e) {
+            return 1800; // Default 30 minutes in seconds
+        }
+    }
+
+    // Fix: Helper method to get boolean value
+    public boolean getBooleanValue() {
+        return "true".equalsIgnoreCase(this.settingValue) || "1".equals(this.settingValue);
+    }
 }

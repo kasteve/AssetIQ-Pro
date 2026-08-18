@@ -2,6 +2,7 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.UserDTO;
 import com.stevecodes.AssetIQPro.exception.PasswordReuseException;
+import com.stevecodes.AssetIQPro.repository.SystemSettingRepository;
 import com.stevecodes.AssetIQPro.service.AppUserService;
 import com.stevecodes.AssetIQPro.service.SystemSettingService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Controller
@@ -26,6 +29,10 @@ public class LoginController {
 
     private final AppUserService userService;
     private final SystemSettingService settingService;
+    private final SystemSettingRepository systemSettingRepository;
+
+    private static final String KEY_SESSION_TIMEOUT = "SESSION_TIMEOUT";
+    private static final int DEFAULT_SESSION_TIMEOUT_SECONDS = 300; // 5 minutes
 
     @GetMapping("/login")
     public String showLoginPage() {
@@ -75,20 +82,28 @@ public class LoginController {
             session.setAttribute("permissions", user.getPermissions());
             session.setAttribute("isFirstLogin", user.isFirstLogin());
             session.setAttribute("mustChangePassword", user.isMustChangePassword());
+            session.setAttribute("sessionCreatedAt", System.currentTimeMillis());
 
             if (user.getPermissions() != null) {
                 session.setAttribute("permissionNames", user.getPermissions());
                 log.info("User permissions: {}", user.getPermissions());
             }
 
-            int timeoutMinutes = settingService.getInt(SystemSettingService.KEY_SESSION_TIMEOUT);
-            if (timeoutMinutes > 0) {
-                session.setMaxInactiveInterval(timeoutMinutes * 60);
-                log.info("Session timeout set to {} minutes", timeoutMinutes);
-            }
+            // Get session timeout from system settings using the repository
+            int timeoutSeconds = getSessionTimeout();
+            session.setMaxInactiveInterval(timeoutSeconds);
+            session.setAttribute("sessionTimeoutSet", true);
+            session.setAttribute("sessionTimeoutSeconds", timeoutSeconds);
+
+            log.info("=========================================");
+            log.info("SESSION DETAILS FOR USER: {}", user.getUsername());
+            log.info("Session ID: {}", session.getId());
+            log.info("MaxInactiveInterval: {} seconds ({} minutes)",
+                    session.getMaxInactiveInterval(),
+                    session.getMaxInactiveInterval() / 60);
+            log.info("=========================================");
 
             log.info("Authenticated user: {}, userType: {}", user.getUsername(), user.getUserType());
-            log.info("Session ID: {}", session.getId());
 
             if (user.isMustChangePassword() || user.isFirstLogin()) {
                 log.info("Password change required for user: {}", username);
@@ -105,6 +120,22 @@ public class LoginController {
         }
     }
 
+    /**
+     * Get session timeout from system settings
+     */
+    private int getSessionTimeout() {
+        try {
+            Optional<String> timeoutValue = systemSettingRepository.findSettingValueByKey(KEY_SESSION_TIMEOUT);
+            if (timeoutValue.isPresent()) {
+                int timeoutMinutes = Integer.parseInt(timeoutValue.get());
+                return timeoutMinutes * 60;
+            }
+        } catch (NumberFormatException e) {
+            log.warn("Invalid session timeout value, using default: {} seconds", DEFAULT_SESSION_TIMEOUT_SECONDS);
+        }
+        return DEFAULT_SESSION_TIMEOUT_SECONDS;
+    }
+
     @GetMapping("/logout")
     public String logout(HttpSession session) {
         if (session != null) {
@@ -113,6 +144,168 @@ public class LoginController {
         }
         return "redirect:/login?logout=true";
     }
+
+    // ================================================================
+    // SESSION MANAGEMENT API ENDPOINTS
+    // ================================================================
+
+    /**
+     * Get current session status - used by client-side session manager
+     * IMPORTANT: This method DOES NOT modify the session or reset the timeout
+     */
+    @GetMapping(value = "/api/session/status", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> getSessionStatus(HttpServletRequest request) {
+        // Use getSession(false) - DO NOT create a new session
+        HttpSession session = request.getSession(false);
+        Map<String, Object> status = new HashMap<>();
+
+        if (session != null) {
+            try {
+                // Get attributes WITHOUT modifying the session
+                String username = (String) session.getAttribute("username");
+                Long userId = (Long) session.getAttribute("userId");
+
+                if (username != null && userId != null) {
+                    // Get the timeout - this doesn't modify the session
+                    int maxInactiveInterval = session.getMaxInactiveInterval();
+                    long lastAccessTime = session.getLastAccessedTime();
+                    long currentTime = System.currentTimeMillis();
+                    long elapsedSeconds = (currentTime - lastAccessTime) / 1000;
+                    long remainingSeconds = Math.max(0, maxInactiveInterval - elapsedSeconds);
+
+                    status.put("authenticated", true);
+                    status.put("username", username);
+                    status.put("userId", userId);
+                    status.put("remainingSeconds", remainingSeconds);
+                    status.put("maxInactiveInterval", maxInactiveInterval);
+                    status.put("lastAccessTime", Instant.ofEpochMilli(lastAccessTime).toString());
+
+                    // Determine warning level (adjusted for 5-minute timeout)
+                    if (remainingSeconds < 15) {
+                        status.put("status", "critical");
+                    } else if (remainingSeconds < 60) {
+                        status.put("status", "warning");
+                    } else {
+                        status.put("status", "active");
+                    }
+
+                    log.debug("Session status for user {}: {} seconds remaining (not modifying session)",
+                            username, remainingSeconds);
+                } else {
+                    status.put("authenticated", false);
+                    status.put("message", "Session incomplete or invalid");
+                }
+            } catch (Exception e) {
+                log.error("Error checking session status: {}", e.getMessage());
+                status.put("authenticated", false);
+                status.put("message", "Error checking session");
+            }
+        } else {
+            status.put("authenticated", false);
+            status.put("message", "No active session found");
+        }
+
+        return status;
+    }
+
+    /**
+     * Extend current session - called when user clicks "Extend Session"
+     * This is the ONLY endpoint that should touch/modify the session
+     */
+    @PostMapping(value = "/api/session/extend", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> extendSession(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        Map<String, Object> response = new HashMap<>();
+
+        if (session != null) {
+            try {
+                // ONLY extend the session when user explicitly requests it
+                // This resets the timeout
+                session.setAttribute("lastActivity", System.currentTimeMillis());
+                session.setAttribute("sessionExtendedAt", System.currentTimeMillis());
+
+                // Touch the session to reset timeout
+                int maxInactiveInterval = session.getMaxInactiveInterval();
+
+                response.put("success", true);
+                response.put("remainingSeconds", maxInactiveInterval);
+                response.put("message", "Session extended successfully");
+                response.put("extendedAt", Instant.now().toString());
+
+                String username = (String) session.getAttribute("username");
+                log.info("Session EXTENDED for user: {}", username);
+
+            } catch (Exception e) {
+                log.error("Error extending session: {}", e.getMessage());
+                response.put("success", false);
+                response.put("message", "Failed to extend session: " + e.getMessage());
+            }
+        } else {
+            response.put("success", false);
+            response.put("message", "No active session found");
+        }
+
+        return response;
+    }
+
+    /**
+     * Ping session - simple keep-alive endpoint
+     * IMPORTANT: This method DOES NOT modify the session or reset the timeout
+     */
+    @GetMapping(value = "/api/session/ping", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> pingSession(HttpServletRequest request) {
+        // Use getSession(false) - DO NOT create or modify the session
+        HttpSession session = request.getSession(false);
+        Map<String, Object> response = new HashMap<>();
+
+        if (session != null) {
+            // Just check if session exists - don't modify it
+            response.put("active", true);
+            response.put("sessionId", session.getId());
+            // Get the timeout without modifying
+            response.put("timeoutSeconds", session.getMaxInactiveInterval());
+            response.put("lastAccessTime", Instant.ofEpochMilli(session.getLastAccessedTime()).toString());
+
+            String username = (String) session.getAttribute("username");
+            if (username != null) {
+                response.put("username", username);
+            }
+        } else {
+            response.put("active", false);
+        }
+
+        return response;
+    }
+
+    /**
+     * Logout via API - used by client-side session manager
+     */
+    @PostMapping(value = "/api/session/logout", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> logoutViaApi(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        Map<String, Object> response = new HashMap<>();
+
+        if (session != null) {
+            String username = (String) session.getAttribute("username");
+            session.invalidate();
+            log.info("User {} logged out via session API", username);
+            response.put("success", true);
+            response.put("message", "Logged out successfully");
+        } else {
+            response.put("success", false);
+            response.put("message", "No active session to log out");
+        }
+
+        return response;
+    }
+
+    // ================================================================
+    // EXISTING METHODS BELOW (unchanged)
+    // ================================================================
 
     @GetMapping("/change-password")
     public String showChangePasswordForm(@RequestParam(required = false) boolean firstLogin,

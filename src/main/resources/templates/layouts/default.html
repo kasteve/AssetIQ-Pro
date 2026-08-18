@@ -258,7 +258,6 @@
         }
 
         /* ========== COLLAPSIBLE SECTIONS IN SIDEBAR (replaces dropdowns) ========== */
-        /* Trailing area (badge + chevron) pinned to the right of a collapsible toggle */
         .sidebar .nav-link .collapse-toggle-trailing {
             margin-left: auto;
             display: flex;
@@ -422,6 +421,29 @@
             padding: 0 6px;
         }
 
+        /* Session Timer in Header */
+        .session-timer {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            background: var(--bg-color);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .session-timer i {
+            font-size: 12px;
+        }
+
+        .session-timer #sessionTimeDisplay {
+            min-width: 40px;
+            font-family: monospace;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -433,6 +455,14 @@
             .header .page-title { font-size: 15px; }
             .content { padding: 16px; }
             .sidebar-toggle { display: block !important; }
+            .session-timer {
+                font-size: 10px;
+                padding: 2px 8px;
+            }
+            .session-timer #sessionTimeDisplay {
+                min-width: 30px;
+                font-size: 10px;
+            }
         }
 
         /* ========== CONTENT ========== */
@@ -546,7 +576,7 @@
             background: var(--hover-bg);
         }
 
-        /* Dropdown with theme support (header notifications / user menu) */
+        /* Dropdown with theme support */
         .dropdown-menu {
             background: var(--dropdown-bg) !important;
             border: 1px solid var(--border-color) !important;
@@ -637,6 +667,15 @@
     <th:block layout:fragment="styles"></th:block>
 </head>
 <body>
+
+<!-- ============================================================ -->
+<!-- SET CONTEXT PATH FOR ALL JAVASCRIPT                          -->
+<!-- ============================================================ -->
+<script>
+    // Set the context path for all JavaScript to use
+    window.CONTEXT_PATH = '/assetIQ-pro';
+    console.log('📍 Context path set to:', window.CONTEXT_PATH);
+</script>
 
 <!-- ========== SIDEBAR ========== -->
 <div class="sidebar" id="sidebar">
@@ -736,7 +775,6 @@
         </div>
 
         <!-- ========== ADMIN COLLAPSIBLE - Moved to Bottom ========== -->
-        <!-- Only users with actual admin permissions can see this -->
         <div sec:authorize="hasAnyAuthority('ROLE_ADMIN', 'SUPERADMIN', 'ADMIN', 'CREATE_USERS', 'MANAGE_ROLES', 'MANAGE_CONFIG', 'MANAGE_BOOKINGS', 'ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'USER_VIEW', 'EMPLOYEE_VIEW', 'DEPARTMENT_VIEW', 'CATEGORY_VIEW', 'LOCATION_VIEW', 'SUPPLIER_VIEW', 'COMPANY_VIEW', 'MANAGE_INVENTORY', 'VIEW_AUDIT')">
             <div class="nav-item">
                 <a class="nav-link collapse-toggle" href="#adminCollapse" role="button"
@@ -751,57 +789,44 @@
                 <div class="collapse" id="adminCollapse" data-bs-parent="#sidebarNav"
                      th:classappend="${currentPage == 'sla-config'} ? 'show' : ''">
                     <ul class="collapse-menu">
-                        <!-- Users - requires USER_VIEW or CREATE_USERS or MANAGE_ROLES -->
                         <li sec:authorize="hasAnyAuthority('USER_VIEW', 'CREATE_USERS', 'MANAGE_ROLES', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/users"><i class="fas fa-users-cog"></i> Users</a>
                         </li>
-                        <!-- Employees - requires EMPLOYEE_VIEW -->
                         <li sec:authorize="hasAnyAuthority('EMPLOYEE_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/employees"><i class="fas fa-user-tie"></i> Employees</a>
                         </li>
-                        <!-- Departments - requires DEPARTMENT_VIEW -->
                         <li sec:authorize="hasAnyAuthority('DEPARTMENT_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/departments"><i class="fas fa-sitemap"></i> Departments</a>
                         </li>
-                        <!-- Categories - requires CATEGORY_VIEW -->
                         <li sec:authorize="hasAnyAuthority('CATEGORY_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/categories"><i class="fas fa-tags"></i> Categories</a>
                         </li>
-                        <!-- Locations - requires LOCATION_VIEW -->
                         <li sec:authorize="hasAnyAuthority('LOCATION_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/locations"><i class="fas fa-map-marker-alt"></i> Locations</a>
                         </li>
-                        <!-- Suppliers - requires SUPPLIER_VIEW -->
                         <li sec:authorize="hasAnyAuthority('SUPPLIER_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
                         </li>
-                        <!-- Companies - requires COMPANY_VIEW -->
                         <li sec:authorize="hasAnyAuthority('COMPANY_VIEW', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/companies"><i class="fas fa-building"></i> Companies</a>
                         </li>
-                        <!-- Rooms - requires ROOM_CREATE, ROOM_EDIT, or ROOM_DELETE (NOT just ROOM_VIEW_ALL or ROOM_BOOK) -->
                         <li sec:authorize="hasAnyAuthority('ROOM_CREATE', 'ROOM_EDIT', 'ROOM_DELETE', 'MANAGE_BOOKINGS', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/rooms"><i class="fas fa-door-open"></i> Rooms</a>
                         </li>
-                        <!-- Stock - requires MANAGE_INVENTORY -->
                         <li sec:authorize="hasAnyAuthority('MANAGE_INVENTORY', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/stock"><i class="fas fa-boxes"></i> Stock Mgt</a>
                         </li>
-                        <!-- Settings - requires MANAGE_CONFIG -->
                         <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/settings"><i class="fas fa-sliders-h"></i> Settings</a>
                         </li>
-                        <!-- SLA Management - requires MANAGE_CONFIG or ADMIN -->
                         <li sec:authorize="hasAnyAuthority('MANAGE_CONFIG', 'ADMIN', 'SUPER_ADMIN')">
                             <a class="collapse-item" th:classappend="${currentPage == 'sla-config'} ? 'active' : ''" href="/assetIQ-pro/admin/sla">
                                 <i class="fas fa-clock"></i> SLA Management
                             </a>
                         </li>
-                        <!-- Audit - requires VIEW_AUDIT -->
                         <li sec:authorize="hasAnyAuthority('VIEW_AUDIT', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
                         </li>
-                        <!-- Permissions - requires MANAGE_ROLES -->
                         <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
                             <a class="collapse-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
                         </li>
@@ -835,6 +860,12 @@
         </div>
 
         <div class="user-info">
+            <!-- Session Timer -->
+            <div class="session-timer">
+                <i class="fas fa-clock"></i>
+                <span id="sessionTimeDisplay">5:00</span>
+            </div>
+
             <!-- Notifications -->
             <div class="dropdown">
                 <button class="notif-btn" data-bs-toggle="dropdown" aria-expanded="false">
@@ -915,6 +946,9 @@
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Session Management JS -->
+<script src="/assetIQ-pro/js/session-manager.js"></script>
 
 <!-- ============================================================ -->
 <!-- GLOBAL ERROR HANDLER - Automatically shows popup for errors -->
@@ -1161,17 +1195,8 @@
     });
 
     // ============================================================
-    // SIDEBAR COLLAPSIBLE SECTIONS (Resources / Assets / Admin)
+    // SIDEBAR COLLAPSIBLE SECTIONS
     // ============================================================
-    // These use Bootstrap's Collapse component with a shared
-    // data-bs-parent="#sidebarNav", so opening one automatically
-    // closes any other open section (accordion behaviour) - only
-    // one collapsible section is expanded at a time.
-    //
-    // When a section auto-opens on page load (th:classappend="show"
-    // for the active page), the arrow needs to start rotated too,
-    // since Bootstrap only flips aria-expanded on user interaction
-    // for toggles it initializes fresh - we keep the two in sync here.
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.sidebar .collapse-toggle').forEach(function (toggle) {
             var targetSelector = toggle.getAttribute('href');
@@ -1182,9 +1207,6 @@
         });
     });
 
-    // Keep each toggle's aria-expanded (and therefore its chevron rotation)
-    // in sync as sections open/close, including when Bootstrap closes a
-    // sibling section automatically via data-bs-parent.
     document.addEventListener('shown.bs.collapse', function (event) {
         syncSidebarToggleState(event.target);
     });
@@ -1202,7 +1224,6 @@
     // THEME MANAGEMENT
     // ============================================================
 
-    // Get the default theme from server
     function loadDefaultTheme() {
         fetch('/assetIQ-pro/api/theme/default')
             .then(function(response) { return response.json(); })
@@ -1212,37 +1233,30 @@
                 applyTheme(theme);
             })
             .catch(function() {
-                // Fallback to light theme
                 var savedTheme = localStorage.getItem('userTheme') || 'light';
                 applyTheme(savedTheme);
             });
     }
 
-    // Apply theme to the page
     function applyTheme(theme) {
         var html = document.documentElement;
         var icon = document.getElementById('themeIcon');
 
-        // Remove all theme attributes
         html.removeAttribute('data-theme');
 
-        // System theme detection
         if (theme === 'system') {
             var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             theme = prefersDark ? 'dark' : 'light';
         }
 
-        // Apply theme
         if (theme !== 'light') {
             html.setAttribute('data-theme', theme);
         }
 
-        // Update icon
         if (icon) {
             icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         }
 
-        // Update meta theme-color
         var metaThemeColor = document.querySelector('meta[name="theme-color"]');
         if (metaThemeColor) {
             if (theme === 'dark') {
@@ -1252,21 +1266,17 @@
             }
         }
 
-        // Save to localStorage
         localStorage.setItem('userTheme', theme);
     }
 
-    // Toggle between light and dark
     function toggleTheme() {
         var currentTheme = localStorage.getItem('userTheme') || 'light';
         var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         applyTheme(newTheme);
     }
 
-    // Set specific theme
     function setTheme(theme) {
         applyTheme(theme);
-        // Close dropdown if open
         var dropdown = document.querySelector('.dropdown-menu');
         if (dropdown && dropdown.classList.contains('show')) {
             var parent = dropdown.closest('.dropdown');
@@ -1282,7 +1292,6 @@
         }
     }
 
-    // Listen for system theme changes
     if (window.matchMedia) {
         var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         mediaQuery.addEventListener('change', function() {
@@ -1293,12 +1302,10 @@
         });
     }
 
-    // Load theme when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadDefaultTheme();
     });
 
-    // Also load theme after any HTMX or AJAX content updates
     document.addEventListener('htmx:afterSwap', function() {
         loadDefaultTheme();
     });
@@ -1306,19 +1313,11 @@
     // ============================================================
     // AUTO-INITIALIZE DATATABLES WITH EXPORT BUTTONS
     // ============================================================
-    // Each table.dataTable gets its OWN export/pagination toolbar via
-    // DataTables' Bfrtip "dom" (Buttons + filter + table + info + pagination).
-    // There is intentionally no separate global export button row in the
-    // layout anymore — it used to render on every page (including pages
-    // with no table at all) and duplicate these per-table buttons.
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if any data table exists without DataTable initialized
         var tables = document.querySelectorAll('table.dataTable');
         tables.forEach(function(tableEl) {
-            // Skip if already initialized
             if ($.fn.DataTable.isDataTable(tableEl)) return;
 
-            // Determine column definitions
             var columnDefs = [{ orderable: false, targets: [-1] }];
 
             $(tableEl).DataTable({
@@ -1349,7 +1348,6 @@
         });
     });
 
-    // Re-initialize DataTables after HTMX or AJAX content load (if applicable)
     document.addEventListener('htmx:afterSwap', function() {
         var tables = document.querySelectorAll('table.dataTable');
         tables.forEach(function(tableEl) {
@@ -1357,7 +1355,6 @@
                 $(tableEl).DataTable().destroy();
             }
         });
-        // Manually trigger re-init
         var event = new Event('DOMContentLoaded');
         document.dispatchEvent(event);
     });

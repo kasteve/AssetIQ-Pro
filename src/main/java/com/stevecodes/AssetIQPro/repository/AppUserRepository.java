@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.repository;
 
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.SystemSetting;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,4 +60,5 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     @Query(value = "SELECT * FROM app_users WHERE employee_id = :employeeId", nativeQuery = true)
     Optional<AppUser> findByEmployeeIdNative(@Param("employeeId") Long employeeId);
+
 }
