@@ -94,6 +94,8 @@ public class LoginController {
             session.setMaxInactiveInterval(timeoutSeconds);
             session.setAttribute("sessionTimeoutSet", true);
             session.setAttribute("sessionTimeoutSeconds", timeoutSeconds);
+            // Store the session creation time for reference
+            session.setAttribute("sessionCreationTime", System.currentTimeMillis());
 
             log.info("=========================================");
             log.info("SESSION DETAILS FOR USER: {}", user.getUsername());
@@ -128,11 +130,14 @@ public class LoginController {
             Optional<String> timeoutValue = systemSettingRepository.findSettingValueByKey(KEY_SESSION_TIMEOUT);
             if (timeoutValue.isPresent()) {
                 int timeoutMinutes = Integer.parseInt(timeoutValue.get());
+                log.info("✅ SESSION_TIMEOUT from database: {} minutes", timeoutMinutes);
                 return timeoutMinutes * 60;
             }
         } catch (NumberFormatException e) {
             log.warn("Invalid session timeout value, using default: {} seconds", DEFAULT_SESSION_TIMEOUT_SECONDS);
         }
+        log.info("⚠️ Using default session timeout: {} seconds ({} minutes)",
+                DEFAULT_SESSION_TIMEOUT_SECONDS, DEFAULT_SESSION_TIMEOUT_SECONDS / 60);
         return DEFAULT_SESSION_TIMEOUT_SECONDS;
     }
 
@@ -151,27 +156,38 @@ public class LoginController {
 
     /**
      * Get current session status - used by client-side session manager
-     * IMPORTANT: This method DOES NOT modify the session or reset the timeout
+     *
+     * CRITICAL: This method uses a special approach to get session info
+     * WITHOUT resetting the timeout. We store the session creation time
+     * and calculate remaining time based on that, not on lastAccessedTime.
      */
     @GetMapping(value = "/api/session/status", produces = "application/json")
     @ResponseBody
     public Map<String, Object> getSessionStatus(HttpServletRequest request) {
-        // Use getSession(false) - DO NOT create a new session
         HttpSession session = request.getSession(false);
         Map<String, Object> status = new HashMap<>();
 
         if (session != null) {
             try {
-                // Get attributes WITHOUT modifying the session
                 String username = (String) session.getAttribute("username");
                 Long userId = (Long) session.getAttribute("userId");
 
                 if (username != null && userId != null) {
-                    // Get the timeout - this doesn't modify the session
+                    // Get the max inactive interval (timeout)
                     int maxInactiveInterval = session.getMaxInactiveInterval();
-                    long lastAccessTime = session.getLastAccessedTime();
+
+                    // Get the session creation time we stored during login
+                    Long sessionCreationTime = (Long) session.getAttribute("sessionCreationTime");
+                    if (sessionCreationTime == null) {
+                        // Fallback to actual creation time
+                        sessionCreationTime = session.getCreationTime();
+                    }
+
+                    // Calculate elapsed time since session creation
                     long currentTime = System.currentTimeMillis();
-                    long elapsedSeconds = (currentTime - lastAccessTime) / 1000;
+                    long elapsedSeconds = (currentTime - sessionCreationTime) / 1000;
+
+                    // Calculate remaining time based on creation time, NOT lastAccessedTime
                     long remainingSeconds = Math.max(0, maxInactiveInterval - elapsedSeconds);
 
                     status.put("authenticated", true);
@@ -179,9 +195,10 @@ public class LoginController {
                     status.put("userId", userId);
                     status.put("remainingSeconds", remainingSeconds);
                     status.put("maxInactiveInterval", maxInactiveInterval);
-                    status.put("lastAccessTime", Instant.ofEpochMilli(lastAccessTime).toString());
+                    status.put("sessionCreationTime", Instant.ofEpochMilli(sessionCreationTime).toString());
+                    status.put("lastAccessTime", Instant.ofEpochMilli(session.getLastAccessedTime()).toString());
 
-                    // Determine warning level (adjusted for 5-minute timeout)
+                    // Determine warning level
                     if (remainingSeconds < 15) {
                         status.put("status", "critical");
                     } else if (remainingSeconds < 60) {
@@ -190,8 +207,11 @@ public class LoginController {
                         status.put("status", "active");
                     }
 
-                    log.debug("Session status for user {}: {} seconds remaining (not modifying session)",
-                            username, remainingSeconds);
+                    // Log only when significant
+                    if (remainingSeconds < 60 || remainingSeconds % 30 == 0) {
+                        log.info("⏱️ Session for {}: {}s remaining ({}m {}s) - using creation time",
+                                username, remainingSeconds, remainingSeconds / 60, remainingSeconds % 60);
+                    }
                 } else {
                     status.put("authenticated", false);
                     status.put("message", "Session incomplete or invalid");
@@ -222,11 +242,11 @@ public class LoginController {
         if (session != null) {
             try {
                 // ONLY extend the session when user explicitly requests it
-                // This resets the timeout
+                // Reset the session creation time to now
+                session.setAttribute("sessionCreationTime", System.currentTimeMillis());
                 session.setAttribute("lastActivity", System.currentTimeMillis());
                 session.setAttribute("sessionExtendedAt", System.currentTimeMillis());
 
-                // Touch the session to reset timeout
                 int maxInactiveInterval = session.getMaxInactiveInterval();
 
                 response.put("success", true);
@@ -235,7 +255,8 @@ public class LoginController {
                 response.put("extendedAt", Instant.now().toString());
 
                 String username = (String) session.getAttribute("username");
-                log.info("Session EXTENDED for user: {}", username);
+                log.info("✅ Session EXTENDED for user: {} (reset to {} seconds)",
+                        username, maxInactiveInterval);
 
             } catch (Exception e) {
                 log.error("Error extending session: {}", e.getMessage());
@@ -252,22 +273,26 @@ public class LoginController {
 
     /**
      * Ping session - simple keep-alive endpoint
-     * IMPORTANT: This method DOES NOT modify the session or reset the timeout
+     * This uses the same creation-time approach as status
      */
     @GetMapping(value = "/api/session/ping", produces = "application/json")
     @ResponseBody
     public Map<String, Object> pingSession(HttpServletRequest request) {
-        // Use getSession(false) - DO NOT create or modify the session
         HttpSession session = request.getSession(false);
         Map<String, Object> response = new HashMap<>();
 
         if (session != null) {
-            // Just check if session exists - don't modify it
             response.put("active", true);
             response.put("sessionId", session.getId());
-            // Get the timeout without modifying
             response.put("timeoutSeconds", session.getMaxInactiveInterval());
-            response.put("lastAccessTime", Instant.ofEpochMilli(session.getLastAccessedTime()).toString());
+
+            // Get remaining time using creation time
+            Long sessionCreationTime = (Long) session.getAttribute("sessionCreationTime");
+            if (sessionCreationTime != null) {
+                long elapsedSeconds = (System.currentTimeMillis() - sessionCreationTime) / 1000;
+                long remainingSeconds = Math.max(0, session.getMaxInactiveInterval() - elapsedSeconds);
+                response.put("remainingSeconds", remainingSeconds);
+            }
 
             String username = (String) session.getAttribute("username");
             if (username != null) {
