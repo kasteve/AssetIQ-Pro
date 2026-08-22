@@ -73,4 +73,7 @@ public class AuditLog {
     public void setUsername(String username) {
         this.username = username;
     }
+
+    public void debug(String s, String action) {
+    }
 }

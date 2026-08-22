@@ -25,6 +25,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,13 +41,16 @@ public class InfraRequestService {
     private final AuditService auditService;
     private final PdfGenerationService pdfGenerationService;
     private final BaseUrlService baseUrlService;
-    private final SLAService slaService;  // ✅ ADDED
+    private final SLAService slaService;
+    private final AsyncNotificationService asyncNotificationService;
+    private final AsyncAuditService asyncAuditService;
+    private final AsyncPdfService asyncPdfService;
 
     private static final String UPLOAD_DIR = "uploads/infra/quotations/";
     private static final String REPORT_DIR = "uploads/infra/reports/";
 
     // ============================================
-    // Query Methods
+    // Query Methods (unchanged - synchronous)
     // ============================================
 
     public InfraRequestDTO getRequestById(Long requestId) {
@@ -105,14 +109,14 @@ public class InfraRequestService {
     }
 
     // ============================================
-    // Request Lifecycle Management
+    // Request Lifecycle Management (Async-optimized)
     // ============================================
 
     @Transactional
     public InfraRequestDTO createRequest(InfraRequestDTO dto, Long requesterId) {
         log.info("Creating infrastructure request for user: {}", requesterId);
 
-        // ✅ Get employee for the requester
+        // Get employee for the requester (synchronous - fast)
         Employee employee = employeeRepository.findByUserId(requesterId)
                 .orElseThrow(() -> new RuntimeException("Employee not found for user ID: " + requesterId));
 
@@ -120,11 +124,7 @@ public class InfraRequestService {
 
         if (employee.getLineManager() != null) {
             Employee lineManager = employee.getLineManager();
-
-            // ✅ Try to get user ID from the employee's user_id field
-            // Use reflection or a custom query to get the user_id directly
             try {
-                // First try: check if the employee has a user_id through the user relationship
                 if (lineManager.getUser() != null) {
                     lineManagerId = lineManager.getUser().getUserId();
                     log.info("Line manager found via user relationship: {}", lineManagerId);
@@ -133,10 +133,8 @@ public class InfraRequestService {
                 log.warn("Could not get user from relationship: {}", e.getMessage());
             }
 
-            // ✅ If that fails, use a direct query to get the user_id
             if (lineManagerId == null) {
                 try {
-                    // Use a direct query to get the user_id from the employee
                     Long employeeUserId = employeeRepository.findUserIdByEmployeeId(lineManager.getEmployeeId());
                     if (employeeUserId != null) {
                         lineManagerId = employeeUserId;
@@ -147,19 +145,16 @@ public class InfraRequestService {
                 }
             }
 
-            // ✅ If still null, fallback to admin
             if (lineManagerId == null) {
                 log.warn("Line manager {} does not have a user account. Using admin fallback.",
                         lineManager.getFirstName() + " " + lineManager.getSurName());
 
-                // Fallback: Find an admin user
                 AppUser adminUser = userRepository.findByRole("ADMIN").stream().findFirst()
                         .orElse(null);
                 if (adminUser != null) {
                     lineManagerId = adminUser.getUserId();
                     log.info("Using admin user {} as fallback line manager", adminUser.getUsername());
                 } else {
-                    // Final fallback: use the first user with INFRA role
                     adminUser = userRepository.findByRole("INFRA").stream().findFirst().orElse(null);
                     if (adminUser != null) {
                         lineManagerId = adminUser.getUserId();
@@ -172,7 +167,6 @@ public class InfraRequestService {
         }
 
         if (lineManagerId == null) {
-            // Final fallback: assign to the first admin
             AppUser adminUser = userRepository.findByRole("ADMIN").stream().findFirst()
                     .orElseThrow(() -> new RuntimeException("No admin user found in system"));
             lineManagerId = adminUser.getUserId();
@@ -181,7 +175,7 @@ public class InfraRequestService {
 
         log.info("Final line manager ID: {}", lineManagerId);
 
-        // Create the request
+        // ✅ IMMEDIATE: Create the request
         InfraRequest request = new InfraRequest();
         request.setRequesterId(requesterId);
         request.setLineManagerId(lineManagerId);
@@ -193,28 +187,49 @@ public class InfraRequestService {
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
+        log.info("✅ Infrastructure request created with ID: {}", saved.getRequestId());
 
-        // ✅ START SLA TRACKING FOR INFRA REQUEST
-        try {
-            slaService.startSLATracking(saved.getRequestId(), "INFRA_REQUEST", requesterId);
-            log.info("SLA tracking started for infra request: {}", saved.getRequestId());
-        } catch (Exception e) {
-            log.error("Failed to start SLA tracking for infra request: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final InfraRequest finalSaved = saved;
+        final Long finalRequesterId = requesterId;
+        final Long finalLineManagerId = lineManagerId;
 
-        // Notify line manager
-        try {
-            notifyLineManager(saved);
-            sendEmailNotification(lineManagerId,
-                    "Infrastructure Request Pending Approval",
-                    "Request #" + saved.getRequestId() + " for " + saved.getResourceType() + " requires your approval.");
-        } catch (Exception e) {
-            log.error("Failed to send email notification: {}", e.getMessage());
-        }
+        // ✅ ASYNC: Start SLA tracking
+        CompletableFuture.runAsync(() -> {
+            try {
+                slaService.startSLATracking(finalSaved.getRequestId(), "INFRA_REQUEST", finalRequesterId);
+                log.info("SLA tracking started for infra request: {}", finalSaved.getRequestId());
+            } catch (Exception e) {
+                log.error("Failed to start SLA tracking: {}", e.getMessage());
+            }
+        });
 
-        auditService.logAction("INFRA_REQUEST_CREATED",
-                "Request #" + saved.getRequestId() + " created by user " + requesterId,
-                requesterId);
+        // ✅ ASYNC: Notify line manager
+        CompletableFuture.runAsync(() -> {
+            try {
+                notifyLineManager(finalSaved);
+            } catch (Exception e) {
+                log.error("Failed to notify line manager: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendEmailNotification(finalLineManagerId,
+                        "Infrastructure Request Pending Approval",
+                        "Request #" + finalSaved.getRequestId() + " for " + finalSaved.getResourceType() + " requires your approval.");
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_CREATED",
+                "Request #" + finalSaved.getRequestId() + " created by user " + finalRequesterId,
+                finalRequesterId
+        );
 
         return result;
     }
@@ -226,6 +241,7 @@ public class InfraRequestService {
         InfraRequest request = validateRequest(requestId);
         validateStatus(request, RequestStatus.PENDING_LM_APPROVAL);
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.PENDING_INFRA_REVIEW);
         request.setLmApprovedAt(LocalDateTime.now());
         request.setLmApprovedBy(managerId);
@@ -234,18 +250,38 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            notifyRequester(saved, "Your request has been approved by your line manager.");
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Approved by Line Manager",
-                    "Your request #" + saved.getRequestId() + " has been approved by your line manager and is now pending infrastructure review.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequesterId = saved.getRequesterId();
+        final Long finalRequestId = requestId;
+        final String finalComment = comment;
+        final Long finalManagerId = managerId;
 
-        auditService.logAction("INFRA_REQUEST_LM_APPROVED",
-                "Request #" + requestId + " approved by line manager " + managerId,
-                managerId);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request Approved by LM",
+                "Your request #" + finalRequestId + " has been approved by your line manager.",
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendEmailNotification(finalRequesterId,
+                        "Infrastructure Request Approved by Line Manager",
+                        "Your request #" + finalRequestId + " has been approved by your line manager and is now pending infrastructure review.");
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_LM_APPROVED",
+                "Request #" + finalRequestId + " approved by line manager " + finalManagerId,
+                finalManagerId
+        );
 
         return result;
     }
@@ -257,6 +293,7 @@ public class InfraRequestService {
         InfraRequest request = validateRequest(requestId);
         validateStatus(request, RequestStatus.PENDING_LM_APPROVAL);
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.LM_REJECTED);
         request.setLmApprovedAt(LocalDateTime.now());
         request.setLmApprovedBy(managerId);
@@ -265,18 +302,38 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            notifyRequester(saved, "Your request has been rejected by your line manager. Reason: " + reason);
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Rejected by Line Manager",
-                    "Your request #" + saved.getRequestId() + " has been rejected by your line manager. Reason: " + reason);
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequesterId = saved.getRequesterId();
+        final Long finalRequestId = requestId;
+        final String finalReason = reason;
+        final Long finalManagerId = managerId;
 
-        auditService.logAction("INFRA_REQUEST_LM_REJECTED",
-                "Request #" + requestId + " rejected by line manager " + managerId,
-                managerId);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request Rejected by LM",
+                "Your request #" + finalRequestId + " has been rejected by your line manager. Reason: " + finalReason,
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendEmailNotification(finalRequesterId,
+                        "Infrastructure Request Rejected by Line Manager",
+                        "Your request #" + finalRequestId + " has been rejected by your line manager. Reason: " + finalReason);
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_LM_REJECTED",
+                "Request #" + finalRequestId + " rejected by line manager " + finalManagerId,
+                finalManagerId
+        );
 
         return result;
     }
@@ -288,44 +345,60 @@ public class InfraRequestService {
         InfraRequest request = validateRequest(requestId);
         validateStatus(request, RequestStatus.PENDING_INFRA_REVIEW);
 
+        // ✅ IMMEDIATE: Update request
         request.setInfraReviewedAt(LocalDateTime.now());
         request.setInfraReviewedBy(infraId);
         request.setInfraComment(comment);
 
         if (approved) {
             request.setStatus(RequestStatus.PENDING_FINANCE_APPROVAL);
-            try {
-                notifyFinanceTeam(request);
-                sendEmailNotification(infraId,
-                        "Infrastructure Request Approved",
-                        "Request #" + requestId + " has been approved and is now pending finance approval.");
-            } catch (Exception e) {
-                log.error("Failed to send email: {}", e.getMessage());
-            }
         } else {
             request.setStatus(RequestStatus.INFRA_REJECTED);
-            try {
-                notifyRequester(request, "Your request has been rejected by Infrastructure. Reason: " + comment);
-                sendEmailNotification(request.getRequesterId(),
-                        "Infrastructure Request Rejected by Infrastructure",
-                        "Your request #" + request.getRequestId() + " has been rejected by Infrastructure. Reason: " + comment);
-            } catch (Exception e) {
-                log.error("Failed to send email: {}", e.getMessage());
-            }
         }
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        auditService.logAction("INFRA_REQUEST_REVIEWED",
-                "Request #" + requestId + " reviewed by infra " + infraId + " (approved: " + approved + ")",
-                infraId);
+        // ✅ FIX: Capture final variables for lambdas
+        final InfraRequest finalSaved = saved;
+        final Long finalRequestId = requestId;
+        final Long finalInfraId = infraId;
+        final String finalComment = comment;
+        final boolean finalApproved = approved;
+
+        if (finalApproved) {
+            // ✅ ASYNC: Notify finance team
+            CompletableFuture.runAsync(() -> {
+                try {
+                    notifyFinanceTeam(finalSaved);
+                } catch (Exception e) {
+                    log.error("Failed to notify finance team: {}", e.getMessage());
+                }
+            });
+        } else {
+            // ✅ ASYNC: Notify requester
+            final Long finalRequesterId = finalSaved.getRequesterId();
+            asyncNotificationService.createNotificationAsync(
+                    finalRequesterId,
+                    "REQUEST_STATUS",
+                    "Infrastructure Request Rejected by Infrastructure",
+                    "Your request #" + finalRequestId + " has been rejected by Infrastructure. Reason: " + finalComment,
+                    "/infra-requests/" + finalRequestId
+            );
+        }
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_REVIEWED",
+                "Request #" + finalRequestId + " reviewed by infra " + finalInfraId + " (approved: " + finalApproved + ")",
+                finalInfraId
+        );
 
         return result;
     }
 
     // ============================================
-    // Finance Sequential Workflow
+    // Finance Sequential Workflow (Async-optimized)
     // ============================================
 
     @Transactional
@@ -335,6 +408,7 @@ public class InfraRequestService {
         InfraRequest request = validateRequest(requestId);
         validateStatus(request, RequestStatus.PENDING_FINANCE_APPROVAL);
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.PROCUREMENT);
         request.setFinanceApprovedAt(LocalDateTime.now());
         request.setFinanceApprovedBy(financeId);
@@ -343,18 +417,38 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            notifyRequester(saved, "Your request has been approved by Finance and is now in procurement.");
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Approved by Finance",
-                    "Your request #" + saved.getRequestId() + " has been approved by Finance and is now in procurement.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequesterId = saved.getRequesterId();
+        final Long finalRequestId = requestId;
+        final String finalComment = comment;
+        final Long finalFinanceId = financeId;
 
-        auditService.logAction("INFRA_REQUEST_FINANCE_APPROVED",
-                "Request #" + requestId + " approved by finance " + financeId,
-                financeId);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request Approved by Finance",
+                "Your request #" + finalRequestId + " has been approved by Finance and is now in procurement.",
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendEmailNotification(finalRequesterId,
+                        "Infrastructure Request Approved by Finance",
+                        "Your request #" + finalRequestId + " has been approved by Finance and is now in procurement.");
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_FINANCE_APPROVED",
+                "Request #" + finalRequestId + " approved by finance " + finalFinanceId,
+                finalFinanceId
+        );
 
         return result;
     }
@@ -366,6 +460,7 @@ public class InfraRequestService {
         InfraRequest request = validateRequest(requestId);
         validateStatus(request, RequestStatus.PENDING_FINANCE_APPROVAL);
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.FINANCE_REJECTED);
         request.setFinanceApprovedAt(LocalDateTime.now());
         request.setFinanceApprovedBy(financeId);
@@ -374,18 +469,27 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            notifyRequester(saved, "Your request has been rejected by Finance. Reason: " + reason);
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Rejected by Finance",
-                    "Your request #" + saved.getRequestId() + " has been rejected by Finance. Reason: " + reason);
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequesterId = saved.getRequesterId();
+        final Long finalRequestId = requestId;
+        final String finalReason = reason;
+        final Long finalFinanceId = financeId;
 
-        auditService.logAction("INFRA_REQUEST_FINANCE_REJECTED",
-                "Request #" + requestId + " rejected by finance " + financeId,
-                financeId);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request Rejected by Finance",
+                "Your request #" + finalRequestId + " has been rejected by Finance. Reason: " + finalReason,
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_FINANCE_REJECTED",
+                "Request #" + finalRequestId + " rejected by finance " + finalFinanceId,
+                finalFinanceId
+        );
 
         return result;
     }
@@ -402,6 +506,7 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in PENDING_FINANCE_APPROVAL or PROCUREMENT status. Current: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.PROCUREMENT);
         if (request.getFinanceApprovedAt() == null) {
             request.setFinanceApprovedAt(LocalDateTime.now());
@@ -414,18 +519,26 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            notifyRequester(saved, "Your request has been moved to procurement.");
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request - Procurement",
-                    "Your request #" + saved.getRequestId() + " is now in procurement.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequesterId = saved.getRequesterId();
+        final Long finalRequestId = requestId;
+        final Long finalFinanceId = financeId;
 
-        auditService.logAction("INFRA_REQUEST_PROCUREMENT",
-                "Request #" + requestId + " moved to procurement by " + financeId,
-                financeId);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request - Procurement",
+                "Your request #" + finalRequestId + " has been moved to procurement.",
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_PROCUREMENT",
+                "Request #" + finalRequestId + " moved to procurement by " + finalFinanceId,
+                finalFinanceId
+        );
 
         return result;
     }
@@ -440,31 +553,42 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in PROCUREMENT status. Current: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.DELIVERED);
         request.setDeliveredAt(LocalDateTime.now());
         request.setDeliveredBy(deliveredBy);
         requestRepository.save(request);
 
-        // Generate signing link for requester
-        try {
-            String signingLink = generateSigningLink(requestId);
-            log.info("Signing link generated for request {}: {}", requestId, signingLink);
-        } catch (Exception e) {
-            log.error("Failed to generate signing link: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequestId = requestId;
+        final Long finalDeliveredBy = deliveredBy;
+        final Long finalRequesterId = request.getRequesterId();
 
-        try {
-            notifyRequester(request, "Your requested items have been delivered. Please sign to complete.");
-            sendEmailNotification(request.getRequesterId(),
-                    "Infrastructure Request Delivered - Please Sign",
-                    "Your request #" + request.getRequestId() + " has been delivered. Please sign to complete.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ ASYNC: Generate signing link
+        CompletableFuture.runAsync(() -> {
+            try {
+                String signingLink = generateSigningLink(finalRequestId);
+                log.info("Signing link generated for request {}: {}", finalRequestId, signingLink);
+            } catch (Exception e) {
+                log.error("Failed to generate signing link: {}", e.getMessage());
+            }
+        });
 
-        auditService.logAction("INFRA_REQUEST_DELIVERED",
-                "Request #" + requestId + " marked as delivered by " + deliveredBy,
-                deliveredBy);
+        // ✅ ASYNC: Notify requester
+        asyncNotificationService.createNotificationAsync(
+                finalRequesterId,
+                "REQUEST_STATUS",
+                "Infrastructure Request Delivered",
+                "Your request #" + finalRequestId + " has been delivered. Please sign to complete.",
+                "/infra-requests/" + finalRequestId
+        );
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_DELIVERED",
+                "Request #" + finalRequestId + " marked as delivered by " + finalDeliveredBy,
+                finalDeliveredBy
+        );
 
         return convertToDTO(request);
     }
@@ -477,6 +601,7 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in DELIVERED status to sign. Current: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Generate token and update
         String token = UUID.randomUUID().toString();
         request.setSigningToken(token);
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
@@ -484,6 +609,7 @@ public class InfraRequestService {
 
         String signingLink = baseUrlService.buildUrl("/infra-requests/sign?token=%s", token);
 
+        // ✅ ASYNC: Send email
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
             emailService.sendSimpleEmail(
                     user.getEmail(),
@@ -497,6 +623,8 @@ public class InfraRequestService {
 
     @Transactional
     public void saveRequesterSignature(Long requestId, String token, String signature) {
+        log.info("Saving signature for request: {}", requestId);
+
         InfraRequest request = validateRequest(requestId);
 
         if (!token.equals(request.getSigningToken())) {
@@ -507,6 +635,7 @@ public class InfraRequestService {
             throw new RuntimeException("Token has expired");
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setRequesterSignature(signature);
         request.setRequesterSignedAt(LocalDateTime.now());
         request.setSigningToken(null);
@@ -514,25 +643,31 @@ public class InfraRequestService {
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
 
-        // ✅ Complete SLA tracking
-        try {
-            slaService.completeSLATracking(requestId, "INFRA_REQUEST");
-            log.info("SLA tracking completed for infra request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to complete SLA tracking for infra request: {}", e.getMessage());
-        }
-
-        // Generate PDF with signature
-        try {
-            byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
-            String pdfPath = savePdfToFile(pdfBytes, requestId);
-            request.setPdfReportPath(pdfPath);
-            log.info("PDF generated for request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to generate PDF for request {}: {}", requestId, e.getMessage());
-        }
-
         requestRepository.save(request);
+
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequestId = requestId;
+        final Long finalRequesterId = request.getRequesterId();
+
+        // ✅ ASYNC: Complete SLA tracking
+        CompletableFuture.runAsync(() -> {
+            try {
+                slaService.completeSLATracking(finalRequestId, "INFRA_REQUEST");
+                log.info("SLA tracking completed for infra request: {}", finalRequestId);
+            } catch (Exception e) {
+                log.error("Failed to complete SLA tracking: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Generate PDF with signature
+        asyncPdfService.generateInfraRequestPdfAsync(finalRequestId);
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_SIGNED",
+                "Request #" + finalRequestId + " signed by requester",
+                finalRequesterId
+        );
     }
 
     @Transactional
@@ -545,45 +680,50 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in DELIVERED status. Current: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
-
-        // ✅ Complete SLA tracking
-        try {
-            slaService.completeSLATracking(requestId, "INFRA_REQUEST");
-            log.info("SLA tracking completed for infra request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to complete SLA tracking for infra request: {}", e.getMessage());
-        }
-
-        // Generate PDF on completion
-        try {
-            byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
-            String pdfPath = savePdfToFile(pdfBytes, requestId);
-            request.setPdfReportPath(pdfPath);
-            log.info("PDF generated for request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to generate PDF for request {}: {}", requestId, e.getMessage());
-        }
 
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            sendCompletionReport(saved);
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Completed",
-                    "Your request #" + saved.getRequestId() + " has been completed.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequestId = requestId;
+        final Long finalCompletedBy = completedBy;
+        final Long finalRequesterId = saved.getRequesterId();
 
-        auditService.logAction("INFRA_REQUEST_COMPLETED",
-                "Request #" + requestId + " completed by " + completedBy,
-                completedBy);
+        // ✅ ASYNC: Complete SLA tracking
+        CompletableFuture.runAsync(() -> {
+            try {
+                slaService.completeSLATracking(finalRequestId, "INFRA_REQUEST");
+                log.info("SLA tracking completed for infra request: {}", finalRequestId);
+            } catch (Exception e) {
+                log.error("Failed to complete SLA tracking: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Generate PDF
+        asyncPdfService.generateInfraRequestPdfAsync(finalRequestId);
+
+        // ✅ ASYNC: Send completion report
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendCompletionReport(saved);
+            } catch (Exception e) {
+                log.error("Failed to send completion report: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_COMPLETED",
+                "Request #" + finalRequestId + " completed by " + finalCompletedBy,
+                finalCompletedBy
+        );
 
         return result;
     }
+
     @Transactional
     public InfraRequestDTO acknowledgeReceipt(Long requestId, Long acknowledgedBy) {
         log.info("User {} acknowledging receipt for request: {}", acknowledgedBy, requestId);
@@ -594,11 +734,12 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in DELIVERED status. Current: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setStatus(RequestStatus.COMPLETED);
         request.setAcknowledgedAt(LocalDateTime.now());
         request.setAcknowledgedBy(acknowledgedBy);
 
-        // Generate PDF on completion
+        // ✅ IMMEDIATE: Generate PDF
         try {
             byte[] pdfBytes = pdfGenerationService.generateInfraRequestReport(request);
             String pdfPath = savePdfToFile(pdfBytes, requestId);
@@ -611,18 +752,36 @@ public class InfraRequestService {
         InfraRequest saved = requestRepository.save(request);
         InfraRequestDTO result = convertToDTO(saved);
 
-        try {
-            sendCompletionReport(saved);
-            sendEmailNotification(saved.getRequesterId(),
-                    "Infrastructure Request Completed",
-                    "Your request #" + saved.getRequestId() + " has been completed. Thank you for using AssetIQ-Pro.");
-        } catch (Exception e) {
-            log.error("Failed to send email: {}", e.getMessage());
-        }
+        // ✅ FIX: Capture final variables for lambdas
+        final Long finalRequestId = requestId;
+        final Long finalRequesterId = saved.getRequesterId();
 
-        auditService.logAction("INFRA_REQUEST_COMPLETED",
-                "Request #" + requestId + " completed - acknowledged by " + acknowledgedBy,
-                acknowledgedBy);
+        // ✅ ASYNC: Send completion report
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendCompletionReport(saved);
+            } catch (Exception e) {
+                log.error("Failed to send completion report: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Send email notification
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendEmailNotification(finalRequesterId,
+                        "Infrastructure Request Completed",
+                        "Your request #" + finalRequestId + " has been completed. Thank you for using AssetIQ-Pro.");
+            } catch (Exception e) {
+                log.error("Failed to send email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "INFRA_REQUEST_COMPLETED",
+                "Request #" + finalRequestId + " completed - acknowledged by " + acknowledgedBy,
+                acknowledgedBy
+        );
 
         return result;
     }
@@ -663,8 +822,47 @@ public class InfraRequestService {
     }
 
     // ============================================
-    // Helper Methods
+    // Helper Methods (Async-optimized)
     // ============================================
+
+    private void notifyLineManager(InfraRequest request) {
+        userRepository.findById(request.getLineManagerId()).ifPresent(manager -> {
+            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
+            asyncNotificationService.createNotificationAsync(
+                    request.getLineManagerId(),
+                    "REQUEST_STATUS",
+                    "Infrastructure Request Pending Approval",
+                    "Request #" + request.getRequestId() + " for " + request.getResourceType() + " requires your approval.",
+                    approvalLink
+            );
+        });
+    }
+
+    private void notifyFinanceTeam(InfraRequest request) {
+        log.info("Notifying finance team about request: {}", request.getRequestId());
+        List<AppUser> financeUsers = userRepository.findUsersWithPermission("APPROVE_FINANCE");
+        for (AppUser user : financeUsers) {
+            String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
+            asyncNotificationService.createNotificationAsync(
+                    user.getUserId(),
+                    "REQUEST_STATUS",
+                    "Infrastructure Request Pending Finance Approval",
+                    "Request #" + request.getRequestId() + " for " + request.getResourceType() + " requires your approval.",
+                    requestLink
+            );
+        }
+    }
+
+    private void sendEmailNotification(Long userId, String subject, String body) {
+        userRepository.findById(userId).ifPresent(user -> {
+            emailService.sendSimpleEmail(user.getEmail(), subject, body);
+        });
+    }
+
+    private void sendCompletionReport(InfraRequest request) {
+        log.info("Sending completion report for request: {}", request.getRequestId());
+        // Implementation for sending completion report
+    }
 
     private InfraRequest validateRequest(Long requestId) {
         return requestRepository.findById(requestId)
@@ -691,72 +889,8 @@ public class InfraRequestService {
         return filePath.toString();
     }
 
-    private void notifyLineManager(InfraRequest request) {
-        userRepository.findById(request.getLineManagerId()).ifPresent(manager -> {
-            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
-            createNotification(
-                    request.getLineManagerId(),
-                    Notification.NotificationType.REQUEST_STATUS,
-                    "Infrastructure Request Pending Approval",
-                    "Request #" + request.getRequestId() + " for " + request.getResourceType() + " requires your approval.",
-                    approvalLink
-            );
-        });
-    }
-
-    private void notifyRequester(InfraRequest request, String message) {
-        String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
-        createNotification(
-                request.getRequesterId(),
-                Notification.NotificationType.REQUEST_STATUS,
-                "Infrastructure Request Update",
-                message,
-                requestLink
-        );
-    }
-
-    private void notifyFinanceTeam(InfraRequest request) {
-        log.info("Notifying finance team about request: {}", request.getRequestId());
-        // Get finance users and notify them
-        List<AppUser> financeUsers = userRepository.findUsersWithPermission("APPROVE_FINANCE");
-        for (AppUser user : financeUsers) {
-            String requestLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
-            createNotification(
-                    user.getUserId(),
-                    Notification.NotificationType.REQUEST_STATUS,
-                    "Infrastructure Request Pending Finance Approval",
-                    "Request #" + request.getRequestId() + " for " + request.getResourceType() + " requires your approval.",
-                    requestLink
-            );
-        }
-    }
-
-    private void sendEmailNotification(Long userId, String subject, String body) {
-        userRepository.findById(userId).ifPresent(user -> {
-            emailService.sendSimpleEmail(user.getEmail(), subject, body);
-        });
-    }
-
-    private void sendCompletionReport(InfraRequest request) {
-        log.info("Sending completion report for request: {}", request.getRequestId());
-        // Implement PDF generation and email sending if needed
-    }
-
-    private void createNotification(Long userId, Notification.NotificationType type,
-                                    String title, String message, String link) {
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setType(type.name());
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setLink(link != null ? link : "/infra-requests");
-        notification.setRead(false);
-        notification.setCreatedAt(LocalDateTime.now());
-        notificationRepository.save(notification);
-    }
-
     // ============================================
-    // Conversion Methods
+    // Conversion Methods (unchanged)
     // ============================================
 
     private InfraRequestDTO convertToDTO(InfraRequest request) {
@@ -796,19 +930,16 @@ public class InfraRequestService {
         dto.setSigningToken(request.getSigningToken());
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
 
-        // Get requester details with staff ID
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
             dto.setRequesterName(user.getFullName());
             dto.setRequesterDepartment(user.getDepartment());
             dto.setRequesterStaffId(user.getStaffId());
         });
 
-        // Get line manager staff ID
         userRepository.findById(request.getLineManagerId()).ifPresent(user -> {
             dto.setLineManagerStaffId(user.getStaffId());
         });
 
-        // Get approver staff IDs
         if (request.getLmApprovedBy() != null) {
             userRepository.findById(request.getLmApprovedBy()).ifPresent(user -> {
                 dto.setLmApprovedByName(user.getFullName());
@@ -830,9 +961,6 @@ public class InfraRequestService {
             });
         }
 
-        // ============================================
-        // ✅ ADD SLA TRACKING DATA
-        // ============================================
         try {
             RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "INFRA_REQUEST");
             if (slaTracking != null) {

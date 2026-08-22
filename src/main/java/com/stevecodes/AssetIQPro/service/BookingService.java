@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,11 +33,13 @@ public class BookingService {
     private final AppUserService appUserService;
     private final NotificationRepository notificationRepository;
     private final BaseUrlService baseUrlService;
+    private final AsyncNotificationService asyncNotificationService;
+    private final AsyncAuditService asyncAuditService;
 
     private static final int MAX_BOOKING_DAYS = 7;
 
     // ============================================
-    // Room Bookings
+    // Room Bookings (Async-optimized)
     // ============================================
 
     @Transactional
@@ -75,6 +78,7 @@ public class BookingService {
                 "Server".equalsIgnoreCase(room.getRoomType()) ||
                 (room.getRoomName() != null && room.getRoomName().toLowerCase().contains("server"));
 
+        // ✅ IMMEDIATE: Create and save booking
         Booking booking = new Booking();
         booking.setUserId(dto.getUserId());
         booking.setRoomId(dto.getRoomId());
@@ -82,11 +86,8 @@ public class BookingService {
         booking.setEndTime(dto.getEndTime());
         booking.setPurpose(dto.getPurpose());
         booking.setCreatedAt(LocalDateTime.now());
-
-        // ✅ FIXED: Set roomType and roomName on the booking
         booking.setRoomType(room.getRoomType());
         booking.setRoomName(room.getRoomName());
-        log.info("Setting booking roomType: {}, roomName: {}", room.getRoomType(), room.getRoomName());
 
         if (isServerRoom) {
             booking.setStatus(BookingStatus.PENDING);
@@ -100,15 +101,31 @@ public class BookingService {
         log.info("✅ Booking saved with ID: {}, Status: {}, roomType: {}",
                 saved.getBookingId(), saved.getStatus(), saved.getRoomType());
 
+        // ✅ ASYNC: Notifications
         if (isServerRoom) {
-            notifyInfrastructureTeam(saved, room);
+            CompletableFuture.runAsync(() -> {
+                try {
+                    notifyInfrastructureTeam(saved, room);
+                } catch (Exception e) {
+                    log.error("Failed to notify infrastructure team: {}", e.getMessage());
+                }
+            });
         } else {
-            sendBookingConfirmation(saved, room);
+            CompletableFuture.runAsync(() -> {
+                try {
+                    sendBookingConfirmation(saved, room);
+                } catch (Exception e) {
+                    log.error("Failed to send booking confirmation: {}", e.getMessage());
+                }
+            });
         }
 
-        auditService.logAction("ROOM_BOOKING_CREATED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "ROOM_BOOKING_CREATED",
                 "Room booking created for user: " + dto.getUserId() + ", room: " + dto.getRoomId(),
-                dto.getUserId());
+                dto.getUserId()
+        );
 
         return convertToBookingDTO(saved);
     }
@@ -187,6 +204,7 @@ public class BookingService {
             throw new IllegalStateException("Booking is not pending approval. Current status: " + booking.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update booking
         booking.setStatus(BookingStatus.BOOKED);
         booking.setApprovedBy(approverId);
         booking.setApprovedAt(LocalDateTime.now());
@@ -198,21 +216,30 @@ public class BookingService {
         Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
         String roomName = room != null ? room.getRoomName() : "Server Room";
 
+        // ✅ ASYNC: Send email
         String requesterEmail = getEmailForUser(booking.getUserId());
-        emailService.sendSimpleEmail(
-                requesterEmail,
-                "Server Room Booking Approved",
-                "Your server room booking for " + roomName + " has been approved.\n\n" +
-                        "Booking Details:\n" +
-                        "Date: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "\n" +
-                        "Time: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) +
-                        " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")) + "\n" +
-                        "Purpose: " + (booking.getPurpose() != null ? booking.getPurpose() : "N/A") + "\n" +
-                        "Infra Comment: " + (comment != null ? comment : "N/A") + "\n\n" +
-                        "After using the server room, you will receive a link to sign out."
-        );
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Server Room Booking Approved",
+                        "Your server room booking for " + roomName + " has been approved.\n\n" +
+                                "Booking Details:\n" +
+                                "Date: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "\n" +
+                                "Time: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) +
+                                " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")) + "\n" +
+                                "Purpose: " + (booking.getPurpose() != null ? booking.getPurpose() : "N/A") + "\n" +
+                                "Infra Comment: " + (comment != null ? comment : "N/A") + "\n\n" +
+                                "After using the server room, you will receive a link to sign out."
+                );
+                log.info("Approval email sent to: {}", requesterEmail);
+            } catch (Exception e) {
+                log.error("Failed to send approval email: {}", e.getMessage());
+            }
+        });
 
-        createNotification(
+        // ✅ ASYNC: Create notification
+        asyncNotificationService.createNotificationAsync(
                 booking.getUserId(),
                 "SERVER_ROOM_APPROVED",
                 "Server Room Approved",
@@ -220,9 +247,12 @@ public class BookingService {
                 baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
-        auditService.logAction("SERVER_ROOM_APPROVED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SERVER_ROOM_APPROVED",
                 "Server room booking approved: " + bookingId + " by: " + approverId,
-                approverId);
+                approverId
+        );
 
         return convertToBookingDTO(saved);
     }
@@ -238,6 +268,7 @@ public class BookingService {
             throw new IllegalStateException("Booking is not pending approval. Current status: " + booking.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update booking
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setDeclinedBy(approverId);
         booking.setDeclinedAt(LocalDateTime.now());
@@ -250,16 +281,25 @@ public class BookingService {
         Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
         String roomName = room != null ? room.getRoomName() : "Server Room";
 
+        // ✅ ASYNC: Send email
         String requesterEmail = getEmailForUser(booking.getUserId());
-        emailService.sendSimpleEmail(
-                requesterEmail,
-                "Server Room Booking Declined",
-                "Your server room booking for " + roomName + " has been declined.\n\n" +
-                        "Reason: " + reason + "\n\n" +
-                        "Please contact Infrastructure Team for more information."
-        );
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Server Room Booking Declined",
+                        "Your server room booking for " + roomName + " has been declined.\n\n" +
+                                "Reason: " + reason + "\n\n" +
+                                "Please contact Infrastructure Team for more information."
+                );
+                log.info("Decline email sent to: {}", requesterEmail);
+            } catch (Exception e) {
+                log.error("Failed to send decline email: {}", e.getMessage());
+            }
+        });
 
-        createNotification(
+        // ✅ ASYNC: Create notification
+        asyncNotificationService.createNotificationAsync(
                 booking.getUserId(),
                 "SERVER_ROOM_DECLINED",
                 "Server Room Declined",
@@ -267,9 +307,12 @@ public class BookingService {
                 baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
-        auditService.logAction("SERVER_ROOM_DECLINED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SERVER_ROOM_DECLINED",
                 "Server room booking declined: " + bookingId + " by: " + approverId,
-                approverId);
+                approverId
+        );
 
         return convertToBookingDTO(saved);
     }
@@ -285,6 +328,7 @@ public class BookingService {
             throw new IllegalStateException("Booking must be in BOOKED status to generate sign-out link. Current: " + booking.getStatus());
         }
 
+        // ✅ IMMEDIATE: Generate token and update
         String token = UUID.randomUUID().toString();
         booking.setSignoutToken(token);
         booking.setSignoutTokenExpiry(LocalDateTime.now().plusHours(24));
@@ -298,25 +342,34 @@ public class BookingService {
 
         String signOutLink = baseUrlService.buildUrl("/bookings/server-room/sign-out?token=%s", token);
 
+        // ✅ ASYNC: Send email
         String requesterEmail = getEmailForUser(booking.getUserId());
         String roomName = roomRepository.findById(booking.getRoomId())
                 .map(Room::getRoomName)
                 .orElse("Server Room");
 
-        emailService.sendSimpleEmail(
-                requesterEmail,
-                "Server Room - Please Sign Out",
-                "Dear User,\n\n" +
-                        "Your server room usage session is complete. Please sign out by clicking the link below:\n\n" +
-                        signOutLink + "\n\n" +
-                        "Room: " + roomName + "\n" +
-                        "Booking Date: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
-                        " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")) + "\n\n" +
-                        "If you did not use the server room, please contact Infrastructure Team immediately.\n\n" +
-                        "Thank you,\nAssetIQ-Pro Team"
-        );
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Server Room - Please Sign Out",
+                        "Dear User,\n\n" +
+                                "Your server room usage session is complete. Please sign out by clicking the link below:\n\n" +
+                                signOutLink + "\n\n" +
+                                "Room: " + roomName + "\n" +
+                                "Booking Date: " + booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                                " - " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")) + "\n\n" +
+                                "If you did not use the server room, please contact Infrastructure Team immediately.\n\n" +
+                                "Thank you,\nAssetIQ-Pro Team"
+                );
+                log.info("Sign-out email sent to: {}", requesterEmail);
+            } catch (Exception e) {
+                log.error("Failed to send sign-out email: {}", e.getMessage());
+            }
+        });
 
-        createNotification(
+        // ✅ ASYNC: Create notification
+        asyncNotificationService.createNotificationAsync(
                 booking.getUserId(),
                 "SERVER_ROOM_SIGNOUT",
                 "Server Room - Please Sign Out",
@@ -324,9 +377,12 @@ public class BookingService {
                 signOutLink
         );
 
-        auditService.logAction("SERVER_ROOM_SIGNOUT_GENERATED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SERVER_ROOM_SIGNOUT_GENERATED",
                 "Server room sign-out link generated for booking: " + bookingId + " by: " + approverId,
-                approverId);
+                approverId
+        );
 
         return signOutLink;
     }
@@ -345,6 +401,7 @@ public class BookingService {
             throw new RuntimeException("Sign-out token has expired");
         }
 
+        // ✅ IMMEDIATE: Update booking
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setSignature(signature);
         booking.setSignedOutAt(LocalDateTime.now());
@@ -357,9 +414,12 @@ public class BookingService {
                 (requesterComment != null ? " | Comment: " + requesterComment : ""));
         bookingRepository.save(booking);
 
-        auditService.logAction("SERVER_ROOM_SIGNOUT_COMPLETED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SERVER_ROOM_SIGNOUT_COMPLETED",
                 "Server room sign-out completed for booking: " + booking.getBookingId(),
-                booking.getUserId());
+                booking.getUserId()
+        );
     }
 
     public Booking findBySignoutToken(String token) {
@@ -396,7 +456,7 @@ public class BookingService {
     }
 
     // ============================================
-    // Slot Request (Request a booked slot)
+    // Slot Request (Request a booked slot) - Async-optimized
     // ============================================
 
     @Transactional
@@ -429,6 +489,7 @@ public class BookingService {
         String timeSlot = booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
                 " to " + booking.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
 
+        // ✅ IMMEDIATE: Update booking
         booking.setSlotRequestUserId(requesterId);
         booking.setSlotRequestUserName(requesterName);
         booking.setSlotRequestAt(LocalDateTime.now());
@@ -436,20 +497,28 @@ public class BookingService {
         bookingRepository.save(booking);
 
         String responseLink = baseUrlService.buildUrl("/bookings/slot-request/%s/respond?requesterId=%s", bookingId, requesterId);
-
         String currentBookerEmail = getEmailForUser(booking.getUserId());
 
-        emailService.sendSimpleEmail(
-                currentBookerEmail,
-                "Slot Request for " + roomName,
-                "Dear User,\n\n" +
-                        requesterName + " has requested to use your booked slot for " + roomName + ".\n\n" +
-                        "Time Slot: " + timeSlot + "\n\n" +
-                        "Please login to respond to this request: " + responseLink + "\n\n" +
-                        "Thank you,\nAssetIQ-Pro Team"
-        );
+        // ✅ ASYNC: Send email to current booker
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        currentBookerEmail,
+                        "Slot Request for " + roomName,
+                        "Dear User,\n\n" +
+                                requesterName + " has requested to use your booked slot for " + roomName + ".\n\n" +
+                                "Time Slot: " + timeSlot + "\n\n" +
+                                "Please login to respond to this request: " + responseLink + "\n\n" +
+                                "Thank you,\nAssetIQ-Pro Team"
+                );
+                log.info("Slot request email sent to: {}", currentBookerEmail);
+            } catch (Exception e) {
+                log.error("Failed to send slot request email: {}", e.getMessage());
+            }
+        });
 
-        createNotification(
+        // ✅ ASYNC: Create notifications
+        asyncNotificationService.createNotificationAsync(
                 booking.getUserId(),
                 "SLOT_REQUEST_RECEIVED",
                 "Slot Request Received",
@@ -457,7 +526,7 @@ public class BookingService {
                 responseLink
         );
 
-        createNotification(
+        asyncNotificationService.createNotificationAsync(
                 requesterId,
                 "SLOT_REQUEST_SENT",
                 "Slot Request Sent",
@@ -465,9 +534,12 @@ public class BookingService {
                 baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
 
-        auditService.logAction("SLOT_REQUESTED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SLOT_REQUESTED",
                 "Slot requested for booking: " + bookingId + " by user: " + requesterId,
-                requesterId);
+                requesterId
+        );
     }
 
     @Transactional
@@ -483,6 +555,7 @@ public class BookingService {
 
         String requesterName = booking.getSlotRequestUserName();
 
+        // ✅ IMMEDIATE: Transfer booking ownership
         booking.setUserId(requesterId);
         booking.setSlotRequestUserId(null);
         booking.setSlotRequestUserName(null);
@@ -492,18 +565,30 @@ public class BookingService {
         bookingRepository.save(booking);
 
         String newUserEmail = getEmailForUser(requesterId);
-        emailService.sendSimpleEmail(
-                newUserEmail,
-                "Slot Approved - " + booking.getBookingId(),
-                "Your slot request has been approved! The booking is now in your name.\n\n" +
-                        "Booking Details:\n" +
-                        "Room: " + roomRepository.findById(booking.getRoomId()).map(Room::getRoomName).orElse("Room") + "\n" +
-                        "Time: " + booking.getStartTime() + " - " + booking.getEndTime()
-        );
 
-        auditService.logAction("SLOT_APPROVED",
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        newUserEmail,
+                        "Slot Approved - " + booking.getBookingId(),
+                        "Your slot request has been approved! The booking is now in your name.\n\n" +
+                                "Booking Details:\n" +
+                                "Room: " + roomRepository.findById(booking.getRoomId()).map(Room::getRoomName).orElse("Room") + "\n" +
+                                "Time: " + booking.getStartTime() + " - " + booking.getEndTime()
+                );
+                log.info("Slot approval email sent to: {}", newUserEmail);
+            } catch (Exception e) {
+                log.error("Failed to send slot approval email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SLOT_APPROVED",
                 "Slot request approved for booking: " + bookingId + " by requester: " + requesterId,
-                requesterId);
+                requesterId
+        );
     }
 
     @Transactional
@@ -517,6 +602,7 @@ public class BookingService {
             throw new IllegalStateException("No pending slot request found for this user.");
         }
 
+        // ✅ IMMEDIATE: Clear slot request
         booking.setSlotRequestUserId(null);
         booking.setSlotRequestUserName(null);
         booking.setSlotRequestAt(null);
@@ -524,19 +610,31 @@ public class BookingService {
         bookingRepository.save(booking);
 
         String requesterEmail = getEmailForUser(requesterId);
-        emailService.sendSimpleEmail(
-                requesterEmail,
-                "Slot Request Declined",
-                "Your slot request has been declined by the current booker."
-        );
 
-        auditService.logAction("SLOT_DECLINED",
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        requesterEmail,
+                        "Slot Request Declined",
+                        "Your slot request has been declined by the current booker."
+                );
+                log.info("Slot decline email sent to: {}", requesterEmail);
+            } catch (Exception e) {
+                log.error("Failed to send slot decline email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "SLOT_DECLINED",
                 "Slot request declined for booking: " + bookingId + " by requester: " + requesterId,
-                requesterId);
+                requesterId
+        );
     }
 
     // ============================================
-    // Admin Cancel Booking
+    // Admin Cancel Booking - Async-optimized
     // ============================================
 
     @Transactional
@@ -546,6 +644,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
+        // ✅ IMMEDIATE: Cancel booking
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setNotes("Cancelled by admin: " + adminId + " at " + LocalDateTime.now());
         bookingRepository.save(booking);
@@ -554,18 +653,29 @@ public class BookingService {
         Room room = roomRepository.findById(booking.getRoomId()).orElse(null);
         String roomName = room != null ? room.getRoomName() : "Room #" + booking.getRoomId();
 
-        emailService.sendSimpleEmail(
-                userEmail,
-                "Booking Cancelled by Admin",
-                "Your booking for " + roomName + " on " +
-                        booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
-                        " has been cancelled by an administrator.\n\n" +
-                        "If you have any questions, please contact the administrator."
-        );
+        // ✅ ASYNC: Send email
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendSimpleEmail(
+                        userEmail,
+                        "Booking Cancelled by Admin",
+                        "Your booking for " + roomName + " on " +
+                                booking.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) +
+                                " has been cancelled by an administrator.\n\n" +
+                                "If you have any questions, please contact the administrator."
+                );
+                log.info("Cancellation email sent to: {}", userEmail);
+            } catch (Exception e) {
+                log.error("Failed to send cancellation email: {}", e.getMessage());
+            }
+        });
 
-        auditService.logAction("BOOKING_ADMIN_CANCELLED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "BOOKING_ADMIN_CANCELLED",
                 "Booking cancelled by admin: " + bookingId + " by admin: " + adminId,
-                adminId);
+                adminId
+        );
     }
 
     // ============================================
@@ -579,7 +689,7 @@ public class BookingService {
     }
 
     // ============================================
-    // Query Methods
+    // Query Methods (synchronous - fast)
     // ============================================
 
     public boolean isRoomAvailable(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
@@ -656,7 +766,7 @@ public class BookingService {
     }
 
     // ============================================
-    // Booking Management
+    // Booking Management - Async-optimized
     // ============================================
 
     @Transactional
@@ -666,11 +776,16 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
+        // ✅ IMMEDIATE: Cancel
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
-        auditService.logAction("BOOKING_CANCELLED",
-                "Booking cancelled: " + bookingId, booking.getUserId());
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "BOOKING_CANCELLED",
+                "Booking cancelled: " + bookingId,
+                booking.getUserId()
+        );
     }
 
     @Transactional
@@ -684,12 +799,16 @@ public class BookingService {
             throw new IllegalStateException("Cannot recall - booking already processed");
         }
 
+        // ✅ IMMEDIATE: Recall
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
-        auditService.logAction("ROOM_BOOKING_RECALLED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "ROOM_BOOKING_RECALLED",
                 "Room booking recalled: " + bookingId,
-                booking.getUserId());
+                booking.getUserId()
+        );
     }
 
     // ============================================
@@ -759,7 +878,7 @@ public class BookingService {
             );
             log.info("Email sent to infrastructure approver: {}", user.getEmail());
 
-            createNotification(
+            asyncNotificationService.createNotificationAsync(
                     user.getUserId(),
                     "SERVER_ROOM_PENDING",
                     "Server Room Booking Pending",
@@ -787,25 +906,13 @@ public class BookingService {
                         "Thank you for using AssetIQ-Pro!"
         );
 
-        createNotification(
+        asyncNotificationService.createNotificationAsync(
                 booking.getUserId(),
                 "ROOM_BOOKING_CONFIRMED",
                 "Room Booking Confirmed",
                 "Your booking for " + roomName + " has been confirmed.",
                 baseUrlService.buildUrl("/bookings/bookings-dashboard")
         );
-    }
-
-    private void createNotification(Long userId, String type, String title, String message, String link) {
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setType(type);
-        notification.setTitle(title);
-        notification.setMessage(message);
-        notification.setLink(link);
-        notification.setCreatedAt(LocalDateTime.now());
-        notification.setRead(false);
-        notificationRepository.save(notification);
     }
 
     private BookingDTO convertToBookingDTO(Booking booking) {

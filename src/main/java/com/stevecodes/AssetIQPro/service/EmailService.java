@@ -6,6 +6,7 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -14,6 +15,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
@@ -85,6 +89,9 @@ public class EmailService {
     // Core Email Methods
     // ============================================
 
+    /**
+     * Send a simple text email
+     */
     public void sendSimpleEmail(String toEmail, String subject, String body) {
         try {
             logEmailContent("Simple Email", toEmail, subject, body);
@@ -100,7 +107,6 @@ public class EmailService {
             logEmailSent("Simple Email", toEmail, subject);
         } catch (Exception e) {
             log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Simple Email (FAILED)", toEmail, subject, body);
         }
     }
 
@@ -132,7 +138,7 @@ public class EmailService {
     }
 
     /**
-     * Send email with attachment
+     * Send email with attachment (byte array)
      */
     public void sendEmailWithAttachment(String toEmail, String subject, String body, byte[] attachment, String fileName) {
         try {
@@ -165,8 +171,55 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send email with attachment (file path)
+     */
+    public void sendEmailWithAttachment(String toEmail, String subject, String body, String attachmentPath) {
+        try {
+            if (attachmentPath == null || attachmentPath.isEmpty()) {
+                sendSimpleEmail(toEmail, subject, body);
+                return;
+            }
+
+            Path path = Paths.get(attachmentPath);
+            if (!Files.exists(path)) {
+                log.warn("⚠️ Attachment file not found: {}", attachmentPath);
+                sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment file not found.)");
+                return;
+            }
+
+            byte[] attachmentBytes = Files.readAllBytes(path);
+            String fileName = path.getFileName().toString();
+            sendEmailWithAttachment(toEmail, subject, body, attachmentBytes, fileName);
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send email with attachment from path: {}", e.getMessage());
+            sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent. Please download from the portal.)");
+        }
+    }
+
+    /**
+     * Send email with attachment (File object)
+     */
+    public void sendEmailWithAttachment(String toEmail, String subject, String body, File attachment) {
+        try {
+            if (attachment == null || !attachment.exists()) {
+                log.warn("⚠️ Attachment file not found: {}", attachment != null ? attachment.getPath() : "null");
+                sendSimpleEmail(toEmail, subject, body);
+                return;
+            }
+
+            byte[] attachmentBytes = Files.readAllBytes(attachment.toPath());
+            sendEmailWithAttachment(toEmail, subject, body, attachmentBytes, attachment.getName());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send email with attachment: {}", e.getMessage());
+            sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent.)");
+        }
+    }
+
     // ============================================
-    // User Management Emails
+    // User Management Emails (Async)
     // ============================================
 
     @Async
@@ -256,7 +309,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Infrastructure Request Emails
+    // Infrastructure Request Emails (Async)
     // ============================================
 
     @Async
@@ -336,7 +389,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Driver Request Emails
+    // Driver Request Emails (Async)
     // ============================================
 
     @Async
@@ -358,7 +411,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Resource Request Emails
+    // Resource Request Emails (Async)
     // ============================================
 
     @Async
@@ -397,7 +450,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Transfer/Asset Emails
+    // Transfer/Asset Emails (Async)
     // ============================================
 
     @Async
@@ -458,8 +511,10 @@ public class EmailService {
             helper.setText(body);
             helper.setFrom(getFromAddress());
 
-            helper.addAttachment("Transfer_" + assetTag + ".pdf",
-                    new ByteArrayResource(pdfBytes));
+            if (pdfBytes != null && pdfBytes.length > 0) {
+                helper.addAttachment("Transfer_" + assetTag + ".pdf",
+                        new ByteArrayResource(pdfBytes));
+            }
 
             mailSender.send(message);
             logEmailSent("Transfer Completion", String.join(", ", toEmails), subject);
@@ -503,8 +558,10 @@ public class EmailService {
             helper.setText(body);
             helper.setFrom(getFromAddress());
 
-            helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
-                    new ByteArrayResource(pdfBytes));
+            if (pdfBytes != null && pdfBytes.length > 0) {
+                helper.addAttachment("Transfer_" + transfer.getAssetTag() + ".pdf",
+                        new ByteArrayResource(pdfBytes));
+            }
 
             mailSender.send(message);
             logEmailSent("Transfer Completion Report", String.join(", ", signerEmails), subject);
@@ -514,7 +571,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Booking/Resource Emails
+    // Booking/Resource Emails (Async)
     // ============================================
 
     @Async
@@ -539,7 +596,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Warranty/EOL Notifications
+    // Warranty/EOL Notifications (Async)
     // ============================================
 
     @Async
@@ -579,7 +636,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Voucher/Meal Coupon Emails
+    // Voucher/Meal Coupon Emails (Async)
     // ============================================
 
     @Async
@@ -622,12 +679,12 @@ public class EmailService {
             logEmailSent("Voucher Generated", toEmail, subject);
         } catch (Exception e) {
             log.error("❌ Failed to send voucher email to {}: {}", toEmail, e.getMessage());
-            logEmailContent("Voucher Generated (FAILED)", toEmail, subject, body);
+            sendSimpleEmail(toEmail, subject, body + "\n\n(QR code attachment could not be sent.)");
         }
     }
 
     // ============================================
-    // Room Booking Emails
+    // Room Booking Emails (Async)
     // ============================================
 
     @Async
@@ -665,5 +722,28 @@ public class EmailService {
             """, requesterName, resourceType, requestId);
 
         sendSimpleEmail(toEmail, subject, body);
+    }
+
+    // ============================================
+    // Send Email (Internal use)
+    // ============================================
+
+    /**
+     * Internal method to send email - delegates to sendSimpleEmail
+     */
+    public void sendEmail(String to, String subject, String body) {
+        sendSimpleEmail(to, subject, body);
+    }
+
+    // ============================================
+    // Process Pending Emails - Called by scheduler
+    // ============================================
+
+    /**
+     * Process pending emails from queue - called by EmailRetryService
+     */
+    public void processPendingEmails() {
+        // This method is now handled by EmailRetryService.processPendingEmails()
+        log.debug("EmailService.processPendingEmails() - Delegated to EmailRetryService");
     }
 }

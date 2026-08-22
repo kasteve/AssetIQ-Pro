@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,11 +34,14 @@ public class ResourceRequestService {
     private final PdfGenerationService pdfGenerationService;
     private final BaseUrlService baseUrlService;
     private final SLAService slaService;
+    private final AsyncNotificationService asyncNotificationService;
+    private final AsyncAuditService asyncAuditService;
+    private final AsyncPdfService asyncPdfService;
 
     private static final String REPORT_DIR = "uploads/resources/reports/";
 
     // ============================================
-    // Query Methods
+    // Query Methods (unchanged - synchronous)
     // ============================================
 
     public List<ResourceRequestDTO> getAllResourceRequests() {
@@ -120,7 +124,7 @@ public class ResourceRequestService {
     }
 
     // ============================================
-    // Request Management
+    // Request Management (Async-optimized)
     // ============================================
 
     @Transactional
@@ -146,19 +150,23 @@ public class ResourceRequestService {
             }
         }
 
+        // ✅ IMMEDIATE: Save to database
         ResourceRequest saved = resourceRequestRepository.save(request);
+        log.info("✅ Resource request created with ID: {}", saved.getRequestId());
 
-        // ✅ START SLA TRACKING FOR RESOURCE REQUEST
-        try {
-            slaService.startSLATracking(saved.getRequestId(), "RESOURCE_REQUEST", dto.getUserId());
-            log.info("SLA tracking started for resource request: {}", saved.getRequestId());
-        } catch (Exception e) {
-            log.error("Failed to start SLA tracking for resource request: {}", e.getMessage());
-        }
+        // ✅ ASYNC: Start SLA tracking
+        CompletableFuture.runAsync(() -> {
+            try {
+                slaService.startSLATracking(saved.getRequestId(), "RESOURCE_REQUEST", dto.getUserId());
+                log.info("SLA tracking started for resource request: {}", saved.getRequestId());
+            } catch (Exception e) {
+                log.error("Failed to start SLA tracking: {}", e.getMessage());
+            }
+        });
 
+        // ✅ ASYNC: Send email notification
         String stockInfo = request.getStockItemName() != null ?
                 "\nStock Item: " + request.getStockItemName() + "\n" : "";
-
         emailService.sendResourceRequestNotification(
                 "admin@company.com",
                 "New Resource Request Pending Approval",
@@ -168,10 +176,22 @@ public class ResourceRequestService {
                         stockInfo
         );
 
-        auditService.logAction("RESOURCE_REQUEST_CREATED",
+        // ✅ ASYNC: Create notification
+        asyncNotificationService.createNotificationAsync(
+                dto.getUserId(),
+                "RESOURCE_REQUEST_CREATED",
+                "Resource Request Created",
+                "Your resource request for " + dto.getResourceType() + " has been submitted.",
+                "/resources"
+        );
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_CREATED",
                 "Resource request created by user: " + dto.getUserId() + ", type: " + dto.getResourceType() +
                         (request.getStockItemId() != null ? ", stock item: " + request.getStockItemName() : ""),
-                dto.getUserId());
+                dto.getUserId()
+        );
 
         return convertToDTO(saved);
     }
@@ -226,16 +246,17 @@ public class ResourceRequestService {
             }
         }
 
+        // ✅ IMMEDIATE: Update request status
         request.setStatus("ACCEPTED");
         request.setAcceptedAt(LocalDateTime.now());
         request.setAdminComment(adminComment);
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
+        // ✅ ASYNC: Send email
         String requesterEmail = getEmailForUser(request.getUserId());
         String stockInfo = request.getStockItemName() != null ?
                 "\nStock Item: " + request.getStockItemName() + "\n" : "";
-
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Accepted",
@@ -244,9 +265,12 @@ public class ResourceRequestService {
                         "Quantity: " + request.getQuantity()
         );
 
-        auditService.logAction("RESOURCE_REQUEST_ACCEPTED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_ACCEPTED",
                 "Resource request accepted: " + requestId + " by admin",
-                request.getUserId());
+                request.getUserId()
+        );
 
         return convertToDTO(saved);
     }
@@ -260,12 +284,14 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request is not pending approval. Current status: " + request.getStatus());
         }
 
+        // ✅ IMMEDIATE: Update request status
         request.setStatus("REJECTED");
         request.setDeclinedAt(LocalDateTime.now());
         request.setDeclinedReason(reason);
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
+        // ✅ ASYNC: Send email
         String requesterEmail = getEmailForUser(request.getUserId());
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
@@ -273,9 +299,12 @@ public class ResourceRequestService {
                 "Your request for " + request.getResourceType() + " has been declined. Reason: " + reason
         );
 
-        auditService.logAction("RESOURCE_REQUEST_DECLINED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_DECLINED",
                 "Resource request declined: " + requestId + " by admin",
-                request.getUserId());
+                request.getUserId()
+        );
 
         return convertToDTO(saved);
     }
@@ -289,7 +318,7 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request must be ACCEPTED to complete. Current status: " + request.getStatus());
         }
 
-        // Deduct stock
+        // ✅ IMMEDIATE: Deduct stock (must be synchronous)
         if (request.getStockItemId() != null && request.getQuantity() != null && request.getQuantity() > 0) {
             StockItem stockItem = stockItemRepository.findById(request.getStockItemId()).orElse(null);
             if (stockItem != null) {
@@ -313,12 +342,6 @@ public class ResourceRequestService {
                 log.info("Stock deducted: {} - {} (new quantity: {})",
                         stockItem.getName(), request.getQuantity(), newQuantity);
 
-                auditService.logAction("STOCK_DEDUCTED_RESOURCE_REQUEST",
-                        "Stock deducted for resource request #" + requestId +
-                                ": " + request.getQuantity() + " of " + stockItem.getName() +
-                                " (new quantity: " + newQuantity + ")",
-                        request.getUserId());
-
                 if (newQuantity <= stockItem.getLowStockThreshold()) {
                     stockService.checkAndSendLowStockAlert(stockItem);
                 }
@@ -327,17 +350,10 @@ public class ResourceRequestService {
             }
         }
 
+        // ✅ IMMEDIATE: Update request status
         request.setStatus("COMPLETED");
         request.setCompletedAt(LocalDateTime.now());
         request.setDeliveryNotes(deliveryNotes);
-
-        // ✅ Complete SLA tracking
-        try {
-            slaService.completeSLATracking(requestId, "RESOURCE_REQUEST");
-            log.info("SLA tracking completed for resource request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to complete SLA tracking for resource request: {}", e.getMessage());
-        }
 
         String token = UUID.randomUUID().toString();
         request.setSigningToken(token);
@@ -345,23 +361,24 @@ public class ResourceRequestService {
 
         ResourceRequest saved = resourceRequestRepository.save(request);
 
-        // Generate PDF
-        try {
-            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(saved);
-            String pdfPath = savePdfToFile(pdfBytes, requestId);
-            saved.setPdfReportPath(pdfPath);
-            resourceRequestRepository.save(saved);
-            log.info("PDF generated for resource request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to generate PDF for resource request {}: {}", requestId, e.getMessage());
-        }
+        // ✅ ASYNC: Complete SLA tracking
+        CompletableFuture.runAsync(() -> {
+            try {
+                slaService.completeSLATracking(requestId, "RESOURCE_REQUEST");
+                log.info("SLA tracking completed for resource request: {}", requestId);
+            } catch (Exception e) {
+                log.error("Failed to complete SLA tracking: {}", e.getMessage());
+            }
+        });
 
+        // ✅ ASYNC: Generate PDF
+        asyncPdfService.generateResourceRequestPdfAsync(requestId);
+
+        // ✅ ASYNC: Send email
         String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
-
         String requesterEmail = getEmailForUser(request.getUserId());
         String stockInfo = request.getStockItemName() != null ?
                 "\nStock Item: " + request.getStockItemName() + "\n" : "";
-
         emailService.sendResourceRequestStatusUpdate(
                 requesterEmail,
                 "Resource Request Completed - Please Sign",
@@ -371,10 +388,13 @@ public class ResourceRequestService {
                         "Please sign to acknowledge receipt: " + signatureLink
         );
 
-        auditService.logAction("RESOURCE_REQUEST_COMPLETED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_COMPLETED",
                 "Resource request completed: " + requestId + " by admin" +
                         (request.getStockItemId() != null ? " (Stock deducted)" : ""),
-                request.getUserId());
+                request.getUserId()
+        );
 
         return convertToDTO(saved);
     }
@@ -401,34 +421,33 @@ public class ResourceRequestService {
             throw new RuntimeException("Request has already been signed");
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setRequesterSignature(signature);
         request.setSignatoryName(signatoryName);
         request.setAcknowledgedAt(LocalDateTime.now());
         request.setSigningToken(null);
         request.setSigningTokenExpiry(null);
 
-        // Regenerate PDF with signature
-        try {
-            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(request);
-            String pdfPath = savePdfToFile(pdfBytes, requestId);
-            request.setPdfReportPath(pdfPath);
-            log.info("PDF regenerated with signature for request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
-        }
-
         resourceRequestRepository.save(request);
 
-        // Send email with PDF attachment
-        try {
-            sendSignedConfirmationEmail(request);
-        } catch (Exception e) {
-            log.error("Failed to send confirmation email with PDF: {}", e.getMessage());
-        }
+        // ✅ ASYNC: Regenerate PDF with signature
+        asyncPdfService.generateResourceRequestPdfAsync(requestId);
 
-        auditService.logAction("RESOURCE_REQUEST_SIGNED",
+        // ✅ ASYNC: Send email with PDF attachment
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendSignedConfirmationEmail(request);
+            } catch (Exception e) {
+                log.error("Failed to send confirmation email with PDF: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_SIGNED",
                 "Resource request signed by: " + signatoryName + " for request: " + requestId,
-                request.getUserId());
+                request.getUserId()
+        );
     }
 
     @Transactional
@@ -445,13 +464,13 @@ public class ResourceRequestService {
             throw new IllegalStateException("Request has already been signed");
         }
 
-        // Generate new token
+        // ✅ IMMEDIATE: Generate new token
         String token = UUID.randomUUID().toString();
         request.setSigningToken(token);
         request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
         resourceRequestRepository.save(request);
 
-        // Resend email
+        // ✅ ASYNC: Resend email
         String requesterEmail = getEmailForUser(request.getUserId());
         String signatureLink = baseUrlService.buildUrl("/resources/sign?token=%s", token);
         emailService.sendResourceRequestStatusUpdate(
@@ -462,9 +481,12 @@ public class ResourceRequestService {
                         "This link will expire in 48 hours."
         );
 
-        auditService.logAction("RESOURCE_REQUEST_LINK_RESENT",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_LINK_RESENT",
                 "Signing link resent for request: " + requestId,
-                request.getUserId());
+                request.getUserId()
+        );
     }
 
     @Transactional
@@ -485,6 +507,7 @@ public class ResourceRequestService {
             throw new IllegalStateException("You are not authorized to sign this request");
         }
 
+        // ✅ IMMEDIATE: Update request
         request.setRequesterSignature(signature);
         request.setSignatoryName(signatoryName);
         request.setAcknowledgedAt(LocalDateTime.now());
@@ -492,22 +515,26 @@ public class ResourceRequestService {
         request.setSigningToken(null);
         request.setSigningTokenExpiry(null);
 
-        try {
-            byte[] pdfBytes = pdfGenerationService.generateResourceRequestReport(request);
-            String pdfPath = savePdfToFile(pdfBytes, requestId);
-            request.setPdfReportPath(pdfPath);
-            log.info("PDF regenerated with signature for request: {}", requestId);
-        } catch (Exception e) {
-            log.error("Failed to regenerate PDF for request {}: {}", requestId, e.getMessage());
-        }
-
         resourceRequestRepository.save(request);
 
-        sendSignedConfirmationEmail(request);
+        // ✅ ASYNC: Regenerate PDF with signature
+        asyncPdfService.generateResourceRequestPdfAsync(requestId);
 
-        auditService.logAction("RESOURCE_REQUEST_ACKNOWLEDGED",
+        // ✅ ASYNC: Send confirmation email
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendSignedConfirmationEmail(request);
+            } catch (Exception e) {
+                log.error("Failed to send confirmation email: {}", e.getMessage());
+            }
+        });
+
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_ACKNOWLEDGED",
                 "Resource request acknowledged by user: " + userId + ", signatory: " + signatoryName,
-                userId);
+                userId
+        );
     }
 
     @Transactional
@@ -521,16 +548,20 @@ public class ResourceRequestService {
             throw new IllegalStateException("Cannot recall - request already processed");
         }
 
+        // ✅ IMMEDIATE: Update status
         request.setStatus("RECALLED");
         resourceRequestRepository.save(request);
 
-        auditService.logAction("RESOURCE_REQUEST_RECALLED",
+        // ✅ ASYNC: Audit log
+        asyncAuditService.logActionAsync(
+                "RESOURCE_REQUEST_RECALLED",
                 "Resource request recalled: " + requestId,
-                request.getUserId());
+                request.getUserId()
+        );
     }
 
     // ============================================
-    // Stock Check Helper
+    // Stock Check Helper (synchronous - fast)
     // ============================================
 
     public boolean isStockAvailable(Long requestId) {
@@ -558,7 +589,7 @@ public class ResourceRequestService {
     }
 
     // ============================================
-    // Email with PDF Attachment
+    // Email with PDF Attachment (unchanged)
     // ============================================
     private void sendSignedConfirmationEmail(ResourceRequest request) {
         try {
@@ -575,14 +606,12 @@ public class ResourceRequestService {
                     "- Signed on: " + request.getAcknowledgedAt() + "\n\n" +
                     "You can also download the PDF from the portal at any time.";
 
-            // Get PDF bytes
             if (request.getPdfReportPath() != null) {
                 Path pdfPath = Paths.get(request.getPdfReportPath());
                 if (Files.exists(pdfPath)) {
                     byte[] pdfBytes = Files.readAllBytes(pdfPath);
                     String fileName = "resource-request-" + request.getRequestId() + "-signed.pdf";
 
-                    // Send email with attachment
                     emailService.sendEmailWithAttachment(
                             requesterEmail,
                             subject,
@@ -592,18 +621,15 @@ public class ResourceRequestService {
                     );
                     log.info("Signed confirmation email with PDF attachment sent to: {}", requesterEmail);
                 } else {
-                    // Fallback - send without attachment
                     emailService.sendResourceRequestStatusUpdate(requesterEmail, subject, body);
                     log.warn("PDF file not found, sent email without attachment");
                 }
             } else {
-                // Fallback - send without attachment
                 emailService.sendResourceRequestStatusUpdate(requesterEmail, subject, body);
                 log.warn("PDF path is null, sent email without attachment");
             }
         } catch (Exception e) {
             log.error("Failed to send signed confirmation email: {}", e.getMessage());
-            // Try to send without attachment as fallback
             try {
                 String requesterEmail = getEmailForUser(request.getUserId());
                 String subject = "Resource Request Signed - Completed #" + request.getRequestId();
@@ -617,7 +643,7 @@ public class ResourceRequestService {
     }
 
     // ============================================
-    // PDF Generation Methods
+    // PDF Generation Methods (synchronous - called from async service)
     // ============================================
 
     private String savePdfToFile(byte[] pdfBytes, Long requestId) throws java.io.IOException {
@@ -672,17 +698,14 @@ public class ResourceRequestService {
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
         dto.setPdfReportPath(request.getPdfReportPath());
 
-        // Stock item fields
         dto.setStockItemId(request.getStockItemId());
         dto.setStockItemName(request.getStockItemName());
 
-        // Get current stock quantity
         if (request.getStockItemId() != null) {
             stockItemRepository.findById(request.getStockItemId())
                     .ifPresent(item -> dto.setCurrentStockQuantity(item.getQuantity()));
         }
 
-        // ✅ ADD SLA TRACKING DATA
         try {
             RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "RESOURCE_REQUEST");
             if (slaTracking != null) {
