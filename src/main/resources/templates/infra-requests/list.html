@@ -54,6 +54,32 @@
         font-weight: 600;
         text-transform: uppercase;
     }
+
+    /* Loading button states */
+    .btn-loading {
+        pointer-events: none !important;
+        opacity: 0.7 !important;
+        position: relative;
+    }
+    .btn-loading .btn-text {
+        visibility: hidden;
+    }
+    .btn-loading .spinner-wrapper {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn .spinner-wrapper {
+        display: none;
+    }
+    .btn-loading .spinner-wrapper {
+        display: inline-flex !important;
+    }
+    .btn-loading .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
   </style>
 </head>
 
@@ -569,7 +595,13 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">Submit Request</button>
+            <button type="submit" class="btn btn-primary" id="createRequestBtn">
+              <span class="spinner-wrapper">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                <span>Submitting...</span>
+              </span>
+              <span class="btn-text">Submit Request</span>
+            </button>
           </div>
         </form>
       </div>
@@ -616,7 +648,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-success" onclick="submitApproveLM()">Approve</button>
+          <button type="button" class="btn btn-success" id="approveLMBtn" onclick="submitApproveLM()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Approving...</span>
+            </span>
+            <span class="btn-text">Approve</span>
+          </button>
         </div>
       </div>
     </div>
@@ -639,7 +677,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-danger" onclick="submitRejectLM()">Reject</button>
+          <button type="button" class="btn btn-danger" id="rejectLMBtn" onclick="submitRejectLM()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Rejecting...</span>
+            </span>
+            <span class="btn-text">Reject</span>
+          </button>
         </div>
       </div>
     </div>
@@ -666,8 +710,20 @@
             <small class="text-muted">Upload quotation for finance review (optional)</small>
           </div>
           <div class="d-flex gap-2">
-            <button type="button" class="btn btn-success w-50" onclick="submitReviewInfra(true)">Approve</button>
-            <button type="button" class="btn btn-danger w-50" onclick="submitReviewInfra(false)">Reject</button>
+            <button type="button" class="btn btn-success w-50" id="reviewInfraApproveBtn" onclick="submitReviewInfra(true)">
+              <span class="spinner-wrapper">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                <span>Processing...</span>
+              </span>
+              <span class="btn-text">Approve</span>
+            </button>
+            <button type="button" class="btn btn-danger w-50" id="reviewInfraRejectBtn" onclick="submitReviewInfra(false)">
+              <span class="spinner-wrapper">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                <span>Processing...</span>
+              </span>
+              <span class="btn-text">Reject</span>
+            </button>
           </div>
         </div>
       </div>
@@ -691,7 +747,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-success" onclick="submitApproveFinance()">Approve</button>
+          <button type="button" class="btn btn-success" id="approveFinanceBtn" onclick="submitApproveFinance()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Approving...</span>
+            </span>
+            <span class="btn-text">Approve</span>
+          </button>
         </div>
       </div>
     </div>
@@ -714,7 +776,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-danger" onclick="submitRejectFinance()">Reject</button>
+          <button type="button" class="btn btn-danger" id="rejectFinanceBtn" onclick="submitRejectFinance()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Rejecting...</span>
+            </span>
+            <span class="btn-text">Reject</span>
+          </button>
         </div>
       </div>
     </div>
@@ -745,7 +813,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-info" onclick="submitProcurement()">Mark Procurement</button>
+          <button type="button" class="btn btn-info" id="procurementBtn" onclick="submitProcurement()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Processing...</span>
+            </span>
+            <span class="btn-text">Mark Procurement</span>
+          </button>
         </div>
       </div>
     </div>
@@ -768,7 +842,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning" onclick="submitDelivered()">Mark Delivered</button>
+          <button type="button" class="btn btn-warning" id="deliveredBtn" onclick="submitDelivered()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Processing...</span>
+            </span>
+            <span class="btn-text">Mark Delivered</span>
+          </button>
         </div>
       </div>
     </div>
@@ -788,7 +868,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-secondary" onclick="submitComplete()">Complete</button>
+          <button type="button" class="btn btn-secondary" id="completeBtn" onclick="submitComplete()">
+            <span class="spinner-wrapper">
+              <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span>Completing...</span>
+            </span>
+            <span class="btn-text">Complete</span>
+          </button>
         </div>
       </div>
     </div>
@@ -976,6 +1062,32 @@
         border-color: var(--primary-color) !important;
     }
 
+    /* Button loading states */
+    .btn-loading {
+        pointer-events: none !important;
+        opacity: 0.7 !important;
+        position: relative;
+    }
+    .btn-loading .btn-text {
+        visibility: hidden;
+    }
+    .btn-loading .spinner-wrapper {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn .spinner-wrapper {
+        display: none;
+    }
+    .btn-loading .spinner-wrapper {
+        display: inline-flex !important;
+    }
+    .btn-loading .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+
     @media (max-width: 768px) {
         #toastContainer { max-width: calc(100% - 24px); }
         .sla-detail-row { flex-wrap: wrap; }
@@ -991,6 +1103,45 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
   <script th:inline="none">
+    // ============================================
+    // Button Loading State Helpers
+    // ============================================
+    function setButtonLoading(btnId, loading) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (loading) {
+            btn.classList.add('btn-loading');
+            btn.disabled = true;
+        } else {
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+        }
+    }
+
+    function setButtonLoadingWithText(btn, loading, loadingText) {
+        if (!btn) return;
+        if (loading) {
+            const originalHtml = btn.innerHTML;
+            btn.dataset.originalHtml = originalHtml;
+            btn.classList.add('btn-loading');
+            btn.disabled = true;
+            // Update spinner text if provided
+            if (loadingText) {
+                const spinnerWrapper = btn.querySelector('.spinner-wrapper span:last-child');
+                if (spinnerWrapper) {
+                    spinnerWrapper.textContent = loadingText;
+                }
+            }
+        } else {
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+            if (btn.dataset.originalHtml) {
+                btn.innerHTML = btn.dataset.originalHtml;
+                delete btn.dataset.originalHtml;
+            }
+        }
+    }
+
     // ============================================
     // Actions dropdown init (must survive DataTables redraws)
     // ============================================
@@ -1123,17 +1274,12 @@
     function getQuotationUrl(path) {
         if (!path) return null;
         let clean = path;
-        // Remove leading './' or '.\' or '\'
         clean = clean.replace(/^[\.\\\/]+/, '');
-        // Replace backslashes with forward slashes
         clean = clean.replace(/\\/g, '/');
-        // Remove duplicate slashes
         clean = clean.replace(/\/\//g, '/');
-        // Ensure it starts with uploads/
         if (!clean.startsWith('uploads/')) {
             clean = 'uploads/' + clean;
         }
-        // Return with context path
         return '/assetIQ-pro/' + clean;
     }
 
@@ -1323,10 +1469,17 @@
     }
 
     // ============================================
-    // Create Request
+    // Create Request - With button locking
     // ============================================
     document.getElementById('infraRequestForm').addEventListener('submit', function(e) {
         e.preventDefault();
+
+        const submitBtn = document.getElementById('createRequestBtn');
+        // Prevent multiple submissions
+        if (submitBtn.disabled) return;
+
+        // Lock button and show loading state
+        setButtonLoadingWithText(submitBtn, true, 'Submitting...');
 
         const formData = new FormData(this);
         const data = Object.fromEntries(formData.entries());
@@ -1350,11 +1503,19 @@
         })
         .catch(error => {
             showToast('Error: ' + error.message, 'error');
+            // Unlock button on error so user can retry
+            setButtonLoadingWithText(submitBtn, false);
         });
     });
 
+    // Reset button state when modal is hidden
+    document.getElementById('createRequestModal').addEventListener('hidden.bs.modal', function() {
+        const submitBtn = document.getElementById('createRequestBtn');
+        setButtonLoadingWithText(submitBtn, false);
+    });
+
     // ============================================
-    // Line Manager Actions
+    // Line Manager Actions - With button locking
     // ============================================
     function showApproveLM(id) {
         document.getElementById('approveLMId').value = id;
@@ -1363,6 +1524,10 @@
     }
 
     function submitApproveLM() {
+        const btn = document.getElementById('approveLMBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Approving...');
+
         const id = document.getElementById('approveLMId').value;
         const comment = document.getElementById('approveLMComment').value;
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-lm?comment=' + encodeURIComponent(comment || ''), {
@@ -1375,10 +1540,19 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to approve request.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    // Reset button on modal hide
+    document.getElementById('approveLMModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('approveLMBtn'), false);
+    });
 
     function showRejectLM(id) {
         document.getElementById('rejectLMId').value = id;
@@ -1387,9 +1561,17 @@
     }
 
     function submitRejectLM() {
+        const btn = document.getElementById('rejectLMBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Rejecting...');
+
         const id = document.getElementById('rejectLMId').value;
         const reason = document.getElementById('rejectLMReason').value;
-        if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
+        if (!reason.trim()) {
+            showToast('Reason is required!', 'error');
+            setButtonLoadingWithText(btn, false);
+            return;
+        }
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-lm?reason=' + encodeURIComponent(reason), {
             method: 'POST'
         })
@@ -1400,13 +1582,21 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to reject request.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
 
+    document.getElementById('rejectLMModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('rejectLMBtn'), false);
+    });
+
     // ============================================
-    // Infrastructure Actions
+    // Infrastructure Actions - With button locking
     // ============================================
     function showReviewInfra(id) {
         document.getElementById('reviewInfraId').value = id;
@@ -1415,7 +1605,7 @@
         new bootstrap.Modal(document.getElementById('reviewInfraModal')).show();
     }
 
-    function submitReviewRequest(id, comment, approved) {
+    function submitReviewRequest(id, comment, approved, btn) {
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/review-infra?comment=' + encodeURIComponent(comment || '') + '&approved=' + approved, {
             method: 'POST'
         })
@@ -1426,12 +1616,20 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to review request.', 'error');
+                if (btn) setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            if (btn) setButtonLoadingWithText(btn, false);
+        });
     }
 
     function submitReviewInfra(approved) {
+        const btn = approved ? document.getElementById('reviewInfraApproveBtn') : document.getElementById('reviewInfraRejectBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Processing...');
+
         const id = document.getElementById('reviewInfraId').value;
         const comment = document.getElementById('reviewInfraComment').value;
         const fileInput = document.getElementById('quotationFile');
@@ -1447,20 +1645,27 @@
             })
             .then(response => {
                 if (response.ok) {
-                    return submitReviewRequest(id, comment, approved);
+                    return submitReviewRequest(id, comment, approved, btn);
                 } else {
                     showToast('Failed to upload quotation.', 'error');
+                    setButtonLoadingWithText(btn, false);
                     throw new Error('Upload failed');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 showToast('Error uploading quotation: ' + error.message, 'error');
+                setButtonLoadingWithText(btn, false);
             });
         } else {
-            submitReviewRequest(id, comment, approved);
+            submitReviewRequest(id, comment, approved, btn);
         }
     }
+
+    document.getElementById('reviewInfraModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('reviewInfraApproveBtn'), false);
+        setButtonLoadingWithText(document.getElementById('reviewInfraRejectBtn'), false);
+    });
 
     function showRejectInfra(id) {
         document.getElementById('reviewInfraId').value = id;
@@ -1470,7 +1675,7 @@
     }
 
     // ============================================
-    // Finance Actions (Sequential)
+    // Finance Actions (Sequential) - With button locking
     // ============================================
 
     // Step 1: Approve Finance
@@ -1481,6 +1686,10 @@
     }
 
     function submitApproveFinance() {
+        const btn = document.getElementById('approveFinanceBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Approving...');
+
         const id = document.getElementById('approveFinanceId').value;
         const comment = document.getElementById('approveFinanceComment').value;
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/approve-finance?comment=' + encodeURIComponent(comment || ''), {
@@ -1493,10 +1702,18 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to approve request.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    document.getElementById('approveFinanceModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('approveFinanceBtn'), false);
+    });
 
     // Reject Finance
     function showRejectFinance(id) {
@@ -1506,9 +1723,17 @@
     }
 
     function submitRejectFinance() {
+        const btn = document.getElementById('rejectFinanceBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Rejecting...');
+
         const id = document.getElementById('rejectFinanceId').value;
         const reason = document.getElementById('rejectFinanceReason').value;
-        if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
+        if (!reason.trim()) {
+            showToast('Reason is required!', 'error');
+            setButtonLoadingWithText(btn, false);
+            return;
+        }
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/reject-finance?reason=' + encodeURIComponent(reason), {
             method: 'POST'
         })
@@ -1519,10 +1744,18 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to reject request.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    document.getElementById('rejectFinanceModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('rejectFinanceBtn'), false);
+    });
 
     // Step 2: Mark Procurement
     function showProcurement(id) {
@@ -1534,6 +1767,10 @@
     }
 
     function submitProcurement() {
+        const btn = document.getElementById('procurementBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Processing...');
+
         const id = document.getElementById('procurementId').value;
         const orderRef = document.getElementById('procurementOrderRef').value;
         const cost = document.getElementById('procurementCost').value;
@@ -1564,10 +1801,18 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to move request to procurement.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    document.getElementById('procurementModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('procurementBtn'), false);
+    });
 
     // Step 3: Mark Delivered
     function showDelivered(id) {
@@ -1577,6 +1822,10 @@
     }
 
     function submitDelivered() {
+        const btn = document.getElementById('deliveredBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Processing...');
+
         const id = document.getElementById('deliveredId').value;
         const notes = document.getElementById('deliveredNotes').value;
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/mark-delivered?notes=' + encodeURIComponent(notes || ''), {
@@ -1589,10 +1838,18 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to mark request as delivered.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    document.getElementById('deliveredModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('deliveredBtn'), false);
+    });
 
     // Step 4: Complete
     function showComplete(id) {
@@ -1601,6 +1858,10 @@
     }
 
     function submitComplete() {
+        const btn = document.getElementById('completeBtn');
+        if (btn.disabled) return;
+        setButtonLoadingWithText(btn, true, 'Completing...');
+
         const id = document.getElementById('completeId').value;
         fetch('/assetIQ-pro/api/infra-requests/' + id + '/complete', {
             method: 'POST'
@@ -1612,10 +1873,18 @@
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showToast('Failed to complete request.', 'error');
+                setButtonLoadingWithText(btn, false);
             }
         })
-        .catch(error => showToast('Error: ' + error.message, 'error'));
+        .catch(error => {
+            showToast('Error: ' + error.message, 'error');
+            setButtonLoadingWithText(btn, false);
+        });
     }
+
+    document.getElementById('completeModal').addEventListener('hidden.bs.modal', function() {
+        setButtonLoadingWithText(document.getElementById('completeBtn'), false);
+    });
 
     // View Quotation - Fixed with context path
     function viewQuotation(id) {

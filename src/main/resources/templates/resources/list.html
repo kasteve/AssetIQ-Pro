@@ -56,14 +56,40 @@
             font-weight: 600;
             text-transform: uppercase;
         }
+
+        /* Button loading states */
+        .btn-loading {
+            pointer-events: none !important;
+            opacity: 0.7 !important;
+            position: relative;
+        }
+        .btn-loading .btn-text {
+            visibility: hidden;
+        }
+        .btn-loading .spinner-wrapper {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn .spinner-wrapper {
+            display: none;
+        }
+        .btn-loading .spinner-wrapper {
+            display: inline-flex !important;
+        }
+        .btn-loading .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
+        }
     </style>
 </head>
 
 <body>
 <div layout:fragment="content">
 
-    <!-- ===== TOAST CONTAINER ===== -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080;"></div>
+    <!-- ===== TOAST CONTAINER (centered) ===== -->
+    <div class="toast-container position-fixed p-3" id="toastContainer" style="z-index: 1080;"></div>
 
     <div class="page-header-row">
         <h4><i class="fas fa-clipboard-list me-2"></i>Administration - Resource Requests</h4>
@@ -496,7 +522,7 @@
                     <h5 class="modal-title"><i class="fas fa-box-open me-2" style="color: #0d6efd;"></i>New Resource Request</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/resources/request}" method="post">
+                <form id="createResourceForm" th:action="@{/resources/request}" method="post">
                     <div class="modal-body">
                         <input type="hidden" name="userId" th:value="${session.userId}">
                         <input type="hidden" name="requestedBy" th:value="${session.username}">
@@ -557,7 +583,13 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                        <button type="submit" class="btn btn-primary" id="createResourceBtn">
+                            <span class="spinner-wrapper">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Submitting...</span>
+                            </span>
+                            <span class="btn-text">Submit Request</span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -606,8 +638,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success" onclick="submitAdminApprove()">
-                        <i class="fas fa-check"></i> Accept
+                    <button type="button" class="btn btn-success" id="adminApproveBtn" onclick="submitAdminApprove()">
+                        <span class="spinner-wrapper">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Accepting...</span>
+                        </span>
+                        <span class="btn-text"><i class="fas fa-check"></i> Accept</span>
                     </button>
                 </div>
             </div>
@@ -631,8 +667,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" onclick="submitAdminReject()">
-                        <i class="fas fa-times"></i> Reject
+                    <button type="button" class="btn btn-danger" id="adminRejectBtn" onclick="submitAdminReject()">
+                        <span class="spinner-wrapper">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Rejecting...</span>
+                        </span>
+                        <span class="btn-text"><i class="fas fa-times"></i> Reject</span>
                     </button>
                 </div>
             </div>
@@ -657,8 +697,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success" onclick="submitMarkComplete()">
-                        <i class="fas fa-check-double"></i> Mark as Completed
+                    <button type="button" class="btn btn-success" id="markCompleteBtn" onclick="submitMarkComplete()">
+                        <span class="spinner-wrapper">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Processing...</span>
+                        </span>
+                        <span class="btn-text"><i class="fas fa-check-double"></i> Mark as Completed</span>
                     </button>
                 </div>
             </div>
@@ -693,8 +737,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success" onclick="submitAcknowledge()">
-                        <i class="fas fa-check"></i> Confirm Receipt
+                    <button type="button" class="btn btn-success" id="acknowledgeBtn" onclick="submitAcknowledge()">
+                        <span class="spinner-wrapper">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Submitting...</span>
+                        </span>
+                        <span class="btn-text"><i class="fas fa-check"></i> Confirm Receipt</span>
                     </button>
                 </div>
             </div>
@@ -715,8 +763,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-warning" onclick="submitResendLink()">
-                        <i class="fas fa-envelope"></i> Send Reminder
+                    <button type="button" class="btn btn-warning" id="resendLinkBtn" onclick="submitResendLink()">
+                        <span class="spinner-wrapper">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Sending...</span>
+                        </span>
+                        <span class="btn-text"><i class="fas fa-envelope"></i> Send Reminder</span>
                     </button>
                 </div>
             </div>
@@ -883,6 +935,32 @@
             text-transform: uppercase;
         }
 
+        /* Button loading states */
+        .btn-loading {
+            pointer-events: none !important;
+            opacity: 0.7 !important;
+            position: relative;
+        }
+        .btn-loading .btn-text {
+            visibility: hidden;
+        }
+        .btn-loading .spinner-wrapper {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn .spinner-wrapper {
+            display: none;
+        }
+        .btn-loading .spinner-wrapper {
+            display: inline-flex !important;
+        }
+        .btn-loading .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
+        }
+
         /* Toasts */
         #toastContainer { max-width: 380px; }
         .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
@@ -941,6 +1019,28 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <!-- ============================================ -->
+    <!-- Button Loading State Helpers -->
+    <!-- ============================================ -->
+    <script>
+        function setButtonLoading(btn, loading, loadingText) {
+            if (!btn) return;
+            if (loading) {
+                btn.classList.add('btn-loading');
+                btn.disabled = true;
+                if (loadingText) {
+                    const spinnerText = btn.querySelector('.spinner-wrapper span:last-child');
+                    if (spinnerText) {
+                        spinnerText.textContent = loadingText;
+                    }
+                }
+            } else {
+                btn.classList.remove('btn-loading');
+                btn.disabled = false;
+            }
+        }
+    </script>
+
+    <!-- ============================================ -->
     <!-- Dynamic Stock Items by Category -->
     <!-- ============================================ -->
     <script>
@@ -949,7 +1049,6 @@
 
         // Load all stock items from the server
         function loadAllStockItems() {
-            // ✅ Use the public endpoint instead of admin endpoint
             fetch('/assetIQ-pro/admin/stock/api/public')
                 .then(response => {
                     if (!response.ok) {
@@ -964,7 +1063,6 @@
                 })
                 .catch(error => {
                     console.error('Error loading stock items:', error);
-                    // Still show the dropdown with "None" option
                     const dropdown = document.getElementById('requestStockItem');
                     if (dropdown) {
                         dropdown.innerHTML = '<option value="">None - Generic Resource</option>';
@@ -977,7 +1075,6 @@
             const dropdown = document.getElementById('requestStockItem');
             if (!dropdown) return;
 
-            // Clear existing options (keep the first "None" option)
             dropdown.innerHTML = '<option value="">None - Generic Resource</option>';
 
             let filteredItems = allStockItems;
@@ -985,10 +1082,8 @@
                 filteredItems = allStockItems.filter(item =>
                     item.category && item.category.id == categoryId
                 );
-                console.log('Filtered to ' + filteredItems.length + ' items for category ' + categoryId);
             }
 
-            // Sort by name
             filteredItems.sort((a, b) => a.name.localeCompare(b.name));
 
             filteredItems.forEach(item => {
@@ -1002,22 +1097,17 @@
 
         // Called when category selection changes
         function loadStockItemsByCategory(categoryId) {
-            console.log('Category changed to:', categoryId);
             populateStockItemsDropdown(categoryId);
         }
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Initializing stock item dropdowns...');
             loadAllStockItems();
 
-            // Also load when modal opens
             const createModal = document.getElementById('createResourceModal');
             if (createModal) {
                 createModal.addEventListener('shown.bs.modal', function() {
-                    console.log('Modal opened, reloading stock items...');
                     loadAllStockItems();
-                    // Reset category dropdown
                     const categoryDropdown = document.getElementById('requestCategory');
                     if (categoryDropdown) {
                         categoryDropdown.value = '';
@@ -1189,14 +1279,7 @@
                                 <div class="detail-item">
                                     <span class="label">SLA Status</span>
                                     <span class="value">
-                                        <span class="sla-status-badge"
-                                              th:class="${request.slaStatus == 'IN_PROGRESS' ? 'sla-in-progress' :
-                                                        (request.slaStatus == 'COMPLETED' ? 'sla-completed' :
-                                                        (request.slaStatus == 'BREACHED' ? 'sla-breached' :
-                                                        (request.slaStatus == 'ESCALATED' ? 'sla-escalated' : 'sla-na')))}"
-                                              th:text="${request.slaStatusDisplay != null ? request.slaStatusDisplay : 'N/A'}">
-                                            N/A
-                                        </span>
+                                        <span class="sla-status-badge" id="viewSlaBadge"></span>
                                     </span>
                                 </div>
                             </div>
@@ -1226,6 +1309,20 @@
                             </span>
                         </div>` : ''}
                     `;
+
+                    // Set SLA badge
+                    const slaBadge = document.getElementById('viewSlaBadge');
+                    if (slaBadge) {
+                        const slaMap = {
+                            'IN_PROGRESS': { class: 'sla-in-progress', text: 'In Progress' },
+                            'COMPLETED': { class: 'sla-completed', text: 'Completed' },
+                            'BREACHED': { class: 'sla-breached', text: 'Breached' },
+                            'ESCALATED': { class: 'sla-escalated', text: 'Escalated' }
+                        };
+                        const sla = slaMap[request.slaStatus] || { class: 'sla-na', text: 'N/A' };
+                        slaBadge.className = 'sla-status-badge ' + sla.class;
+                        slaBadge.textContent = sla.text;
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -1239,7 +1336,77 @@
         }
 
         // ============================================
-        // Admin Approve
+        // Create Resource Request - Standard form submission with toast
+        // ============================================
+        document.getElementById('createResourceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('createResourceBtn');
+            if (submitBtn.disabled) return;
+
+            // Show loading state
+            setButtonLoading(submitBtn, true, 'Submitting...');
+
+            const form = this;
+            const formData = new FormData(form);
+
+            // Convert to URLSearchParams for form-urlencoded
+            const params = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+                if (value && value !== '') {
+                    params.append(key, value);
+                }
+            }
+
+            fetch(form.action, {
+                method: form.method || 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
+                },
+                body: params.toString()
+            })
+            .then(response => {
+                // Try to parse as JSON first
+                return response.text().then(text => {
+                    let data = {};
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        // If not JSON, use the text as message
+                        data = { message: text };
+                    }
+                    return { response: response, data: data };
+                });
+            })
+            .then(({ response, data }) => {
+                if (response.ok) {
+                    // Success
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createResourceModal'));
+                    if (modal) modal.hide();
+                    showToast(data.message || 'Resource request submitted successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    // Error response
+                    const errorMsg = data.message || data.error || data.reason || 'Failed to submit request. Please try again.';
+                    showToast('Error: ' + errorMsg, 'error');
+                    setButtonLoading(submitBtn, false);
+                }
+            })
+            .catch(error => {
+                console.error('Submission error:', error);
+                showToast('Error: ' + error.message, 'error');
+                setButtonLoading(submitBtn, false);
+            });
+        });
+
+        // Reset button on modal hide
+        document.getElementById('createResourceModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('createResourceBtn'), false);
+        });
+
+        // ============================================
+        // Admin Approve - With toast
         // ============================================
         function showAdminApprove(id) {
             document.getElementById('adminApproveId').value = id;
@@ -1248,6 +1415,10 @@
         }
 
         function submitAdminApprove() {
+            const btn = document.getElementById('adminApproveBtn');
+            if (btn.disabled) return;
+            setButtonLoading(btn, true, 'Accepting...');
+
             const id = document.getElementById('adminApproveId').value;
             const comment = document.getElementById('adminApproveComment').value;
             fetch('/assetIQ-pro/api/resource-requests/' + id + '/accept?adminComment=' + encodeURIComponent(comment || ''), {
@@ -1260,13 +1431,21 @@
                     setTimeout(() => window.location.reload(), 1200);
                 } else {
                     showToast('Failed to accept request.', 'error');
+                    setButtonLoading(btn, false);
                 }
             })
-            .catch(error => showToast('Error: ' + error.message, 'error'));
+            .catch(error => {
+                showToast('Error: ' + error.message, 'error');
+                setButtonLoading(btn, false);
+            });
         }
 
+        document.getElementById('adminApproveModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('adminApproveBtn'), false);
+        });
+
         // ============================================
-        // Admin Reject
+        // Admin Reject - With toast
         // ============================================
         function showAdminReject(id) {
             document.getElementById('adminRejectId').value = id;
@@ -1275,9 +1454,17 @@
         }
 
         function submitAdminReject() {
+            const btn = document.getElementById('adminRejectBtn');
+            if (btn.disabled) return;
+            setButtonLoading(btn, true, 'Rejecting...');
+
             const id = document.getElementById('adminRejectId').value;
             const reason = document.getElementById('adminRejectReason').value;
-            if (!reason.trim()) { showToast('Reason is required!', 'error'); return; }
+            if (!reason.trim()) {
+                showToast('Reason is required!', 'error');
+                setButtonLoading(btn, false);
+                return;
+            }
             fetch('/assetIQ-pro/api/resource-requests/' + id + '/decline?declinedReason=' + encodeURIComponent(reason), {
                 method: 'POST'
             })
@@ -1288,13 +1475,21 @@
                     setTimeout(() => window.location.reload(), 1200);
                 } else {
                     showToast('Failed to reject request.', 'error');
+                    setButtonLoading(btn, false);
                 }
             })
-            .catch(error => showToast('Error: ' + error.message, 'error'));
+            .catch(error => {
+                showToast('Error: ' + error.message, 'error');
+                setButtonLoading(btn, false);
+            });
         }
 
+        document.getElementById('adminRejectModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('adminRejectBtn'), false);
+        });
+
         // ============================================
-        // Mark Complete
+        // Mark Complete - With toast
         // ============================================
         function showMarkComplete(id) {
             document.getElementById('completeId').value = id;
@@ -1303,6 +1498,10 @@
         }
 
         function submitMarkComplete() {
+            const btn = document.getElementById('markCompleteBtn');
+            if (btn.disabled) return;
+            setButtonLoading(btn, true, 'Processing...');
+
             const id = document.getElementById('completeId').value;
             const notes = document.getElementById('completeNotes').value;
             fetch('/assetIQ-pro/api/resource-requests/' + id + '/complete?deliveryNotes=' + encodeURIComponent(notes || ''), {
@@ -1315,13 +1514,21 @@
                     setTimeout(() => window.location.reload(), 1500);
                 } else {
                     showToast('Failed to mark request as completed.', 'error');
+                    setButtonLoading(btn, false);
                 }
             })
-            .catch(error => showToast('Error: ' + error.message, 'error'));
+            .catch(error => {
+                showToast('Error: ' + error.message, 'error');
+                setButtonLoading(btn, false);
+            });
         }
 
+        document.getElementById('markCompleteModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('markCompleteBtn'), false);
+        });
+
         // ============================================
-        // Acknowledge Signature - No manual name field
+        // Acknowledge Signature - With toast
         // ============================================
         let canvas = null;
         let ctx = null;
@@ -1419,6 +1626,8 @@
         }
 
         function submitAcknowledge() {
+            const btn = document.getElementById('acknowledgeBtn');
+            if (btn.disabled) return;
             if (!canvas) return;
 
             const dataUrl = canvas.toDataURL('image/png');
@@ -1426,6 +1635,8 @@
                 showToast('Please draw your signature first.', 'error');
                 return;
             }
+
+            setButtonLoading(btn, true, 'Submitting...');
 
             const id = document.getElementById('acknowledgeId').value;
             document.getElementById('signatureData').value = dataUrl;
@@ -1447,13 +1658,21 @@
                     setTimeout(() => window.location.reload(), 1500);
                 } else {
                     showToast('Failed to acknowledge receipt.', 'error');
+                    setButtonLoading(btn, false);
                 }
             })
-            .catch(error => showToast('Error: ' + error.message, 'error'));
+            .catch(error => {
+                showToast('Error: ' + error.message, 'error');
+                setButtonLoading(btn, false);
+            });
         }
 
+        document.getElementById('acknowledgeModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('acknowledgeBtn'), false);
+        });
+
         // ============================================
-        // Resend Signing Link (Reminder) - via confirm dialog
+        // Resend Signing Link - With toast
         // ============================================
         function confirmResendLink(id) {
             document.getElementById('resendLinkId').value = id;
@@ -1461,12 +1680,17 @@
         }
 
         function submitResendLink() {
+            const btn = document.getElementById('resendLinkBtn');
+            if (btn.disabled) return;
+            setButtonLoading(btn, true, 'Sending...');
+
             const id = document.getElementById('resendLinkId').value;
             fetch('/assetIQ-pro/resources/' + id + '/resend-link', {
                 method: 'POST'
             })
             .then(response => {
                 bootstrap.Modal.getInstance(document.getElementById('resendLinkConfirmModal')).hide();
+                setButtonLoading(btn, false);
                 if (response.ok) {
                     showToast('Signing link resent successfully!', 'success');
                 } else {
@@ -1475,9 +1699,14 @@
             })
             .catch(error => {
                 bootstrap.Modal.getInstance(document.getElementById('resendLinkConfirmModal')).hide();
+                setButtonLoading(btn, false);
                 showToast('Error: ' + error.message, 'error');
             });
         }
+
+        document.getElementById('resendLinkConfirmModal').addEventListener('hidden.bs.modal', function() {
+            setButtonLoading(document.getElementById('resendLinkBtn'), false);
+        });
 
         // ============================================
         // Generate PDF
