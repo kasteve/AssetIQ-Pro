@@ -83,6 +83,7 @@ public class LoginController {
             session.setAttribute("isFirstLogin", user.isFirstLogin());
             session.setAttribute("mustChangePassword", user.isMustChangePassword());
             session.setAttribute("sessionCreatedAt", System.currentTimeMillis());
+            session.setAttribute("sessionLastResetAt", System.currentTimeMillis());
 
             if (user.getPermissions() != null) {
                 session.setAttribute("permissionNames", user.getPermissions());
@@ -230,8 +231,53 @@ public class LoginController {
     }
 
     /**
-     * Extend current session - called when user clicks "Extend Session"
-     * This is the ONLY endpoint that should touch/modify the session
+     * REFRESH SESSION - Called on user activity to reset the session timer
+     * This is the primary endpoint for resetting the session on user interaction
+     */
+    @PostMapping(value = "/api/session/refresh", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> refreshSession(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        Map<String, Object> response = new HashMap<>();
+
+        if (session != null) {
+            try {
+                // Reset the session creation time to now - this effectively resets the timer
+                long currentTime = System.currentTimeMillis();
+                session.setAttribute("sessionCreationTime", currentTime);
+                session.setAttribute("sessionLastResetAt", currentTime);
+                session.setAttribute("sessionRefreshCount",
+                        ((Integer) session.getAttribute("sessionRefreshCount") != null ?
+                                (Integer) session.getAttribute("sessionRefreshCount") + 1 : 1));
+
+                int maxInactiveInterval = session.getMaxInactiveInterval();
+
+                response.put("success", true);
+                response.put("remainingSeconds", maxInactiveInterval);
+                response.put("message", "Session refreshed successfully");
+                response.put("refreshedAt", Instant.now().toString());
+
+                String username = (String) session.getAttribute("username");
+                int refreshCount = (Integer) session.getAttribute("sessionRefreshCount");
+                log.info("🔄 Session REFRESHED for user: {} (refresh #{}, reset to {} seconds)",
+                        username, refreshCount, maxInactiveInterval);
+
+            } catch (Exception e) {
+                log.error("Error refreshing session: {}", e.getMessage());
+                response.put("success", false);
+                response.put("message", "Failed to refresh session: " + e.getMessage());
+            }
+        } else {
+            response.put("success", false);
+            response.put("message", "No active session found");
+        }
+
+        return response;
+    }
+
+    /**
+     * Extend current session - called when user clicks "Extend Session" in the modal
+     * This is similar to refresh but with an explicit user action
      */
     @PostMapping(value = "/api/session/extend", produces = "application/json")
     @ResponseBody
@@ -241,11 +287,14 @@ public class LoginController {
 
         if (session != null) {
             try {
-                // ONLY extend the session when user explicitly requests it
                 // Reset the session creation time to now
-                session.setAttribute("sessionCreationTime", System.currentTimeMillis());
-                session.setAttribute("lastActivity", System.currentTimeMillis());
-                session.setAttribute("sessionExtendedAt", System.currentTimeMillis());
+                long currentTime = System.currentTimeMillis();
+                session.setAttribute("sessionCreationTime", currentTime);
+                session.setAttribute("sessionLastResetAt", currentTime);
+                session.setAttribute("sessionExtendedAt", currentTime);
+                session.setAttribute("sessionExtendCount",
+                        ((Integer) session.getAttribute("sessionExtendCount") != null ?
+                                (Integer) session.getAttribute("sessionExtendCount") + 1 : 1));
 
                 int maxInactiveInterval = session.getMaxInactiveInterval();
 
@@ -255,8 +304,9 @@ public class LoginController {
                 response.put("extendedAt", Instant.now().toString());
 
                 String username = (String) session.getAttribute("username");
-                log.info("✅ Session EXTENDED for user: {} (reset to {} seconds)",
-                        username, maxInactiveInterval);
+                int extendCount = (Integer) session.getAttribute("sessionExtendCount");
+                log.info("✅ Session EXTENDED for user: {} (extend #{}, reset to {} seconds)",
+                        username, extendCount, maxInactiveInterval);
 
             } catch (Exception e) {
                 log.error("Error extending session: {}", e.getMessage());

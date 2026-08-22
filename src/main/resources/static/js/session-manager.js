@@ -13,11 +13,13 @@ class SessionManager {
             warningThreshold: options.warningThreshold || 60,
             // Show critical at 15 seconds remaining
             criticalThreshold: options.criticalThreshold || 15,
-            // REMOVED: No auto-extend - user must click the button
+            // Debounce time for activity detection (500ms)
+            activityDebounce: options.activityDebounce || 500,
             logoutEndpoint: options.logoutEndpoint || `${contextPath}/logout`,
             statusEndpoint: options.statusEndpoint || `${contextPath}/api/session/status`,
             extendEndpoint: options.extendEndpoint || `${contextPath}/api/session/extend`,
-            pingEndpoint: options.pingEndpoint || `${contextPath}/api/session/ping`
+            pingEndpoint: options.pingEndpoint || `${contextPath}/api/session/ping`,
+            refreshEndpoint: options.refreshEndpoint || `${contextPath}/api/session/refresh`
         };
 
         this.sessionData = {
@@ -37,21 +39,29 @@ class SessionManager {
         this.consecutiveFailures = 0;
         this.localCountdown = 0;
         this.localTimer = null;
+        this.activityTimer = null;
+        this.isRefreshing = false;
+        this.isInitialized = false;
 
         this.init();
     }
 
     init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+
         console.log('🕐 Session Manager initialized (5-minute timeout)');
         console.log(`📍 API endpoint: ${this.config.statusEndpoint}`);
         console.log(`⚠️ Warning at ${this.config.warningThreshold}s remaining`);
         console.log(`🔴 Critical at ${this.config.criticalThreshold}s remaining`);
-        console.log(`ℹ️ Auto-extend DISABLED - User must click "Extend Session"`);
+        console.log(`🔄 Session resets on user activity (clicks, typing, scrolling, etc.)`);
+
         this.createModal();
         this.startMonitoring();
         this.addActivityListeners();
         this.startPing();
 
+        // Check session when tab becomes visible again
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
                 console.log('👁️ Tab visible, checking session...');
@@ -59,11 +69,15 @@ class SessionManager {
             }
         });
 
+        // Initial session check
         setTimeout(() => {
             this.checkSession();
         }, 1000);
     }
 
+    // ============================================
+    // PING - Keep session alive with lightweight pings
+    // ============================================
     startPing() {
         this.pingTimer = setInterval(() => {
             this.pingSession();
@@ -72,13 +86,81 @@ class SessionManager {
 
     async pingSession() {
         try {
-            await fetch(this.config.pingEndpoint);
+            await fetch(this.config.pingEndpoint, {
+                method: 'POST',
+                credentials: 'include'
+            });
             this.consecutiveFailures = 0;
         } catch (error) {
-            // Silently fail
+            // Silently fail - network errors are expected if user is offline
         }
     }
 
+    // ============================================
+    // REFRESH SESSION ON ACTIVITY - Resets the session timer
+    // ============================================
+    async refreshSessionOnActivity() {
+        // Don't refresh if warning is shown - user must click extend
+        if (this.warningShown || this.isModalOpen) {
+            console.log('⏳ Warning shown - waiting for user to extend session');
+            return false;
+        }
+
+        if (this.isRefreshing) return false;
+        this.isRefreshing = true;
+
+        try {
+            console.log('🔄 Refreshing session due to user activity...');
+            const response = await fetch(this.config.refreshEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    // Update session data with new remaining time
+                    this.sessionData.remainingSeconds = data.remainingSeconds || 300;
+                    this.localCountdown = this.sessionData.remainingSeconds;
+
+                    // Reset warning flags since session was refreshed
+                    this.warningShown = false;
+                    this.criticalShown = false;
+
+                    // Close modal if open
+                    if (this.isModalOpen) {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('sessionWarningModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        this.isModalOpen = false;
+                        if (this.countdownTimer) {
+                            clearInterval(this.countdownTimer);
+                            this.countdownTimer = null;
+                        }
+                    }
+
+                    this.updateSessionTimerDisplay();
+                    this.startLocalCountdown();
+                    console.log(`✅ Session refreshed! ${this.sessionData.remainingSeconds}s remaining`);
+                    return true;
+                }
+            }
+            return false;
+        } catch (error) {
+            // Don't log errors for refresh - it's a background operation
+            return false;
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    // ============================================
+    // START MONITORING - Periodic session checks
+    // ============================================
     startMonitoring() {
         this.checkSession();
         this.timer = setInterval(() => {
@@ -86,9 +168,14 @@ class SessionManager {
         }, this.config.checkInterval);
     }
 
+    // ============================================
+    // CHECK SESSION - Get current session status from server
+    // ============================================
     async checkSession() {
         try {
-            const response = await fetch(this.config.statusEndpoint);
+            const response = await fetch(this.config.statusEndpoint, {
+                credentials: 'include'
+            });
 
             if (response.status === 401 || response.status === 403) {
                 console.log('🔴 Session expired (HTTP 401/403)');
@@ -121,13 +208,11 @@ class SessionManager {
 
             const remaining = this.sessionData.remainingSeconds;
 
-            // Detect session reset
+            // Detect session reset (server-side reset)
             if (previousRemaining > 0 && remaining > previousRemaining + 10) {
                 console.log(`🔄 Session reset detected! Previous: ${previousRemaining}s, New: ${remaining}s`);
-                // Reset warning flags on session reset
                 this.warningShown = false;
                 this.criticalShown = false;
-                // Close modal if open
                 if (this.isModalOpen) {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('sessionWarningModal'));
                     if (modal) {
@@ -137,10 +222,12 @@ class SessionManager {
                 }
             }
 
-            // Log remaining time
-            const mins = Math.floor(remaining / 60);
-            const secs = remaining % 60;
-            console.log(`⏱️ Session: ${mins}m ${secs}s remaining (${remaining}s)`);
+            // Log remaining time (only if significant change)
+            if (Math.abs(remaining - previousRemaining) > 5 || remaining % 30 === 0) {
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                console.log(`⏱️ Session: ${mins}m ${secs}s remaining (${remaining}s)`);
+            }
 
             this.updateSessionTimerDisplay();
 
@@ -156,8 +243,8 @@ class SessionManager {
                     console.log(`⚠️⚠️⚠️ WARNING: ${remaining}s remaining - SHOWING MODAL`);
                     this.showWarning();
                 }
-                // REMOVED: Auto-extend logic - user must click the button
             } else {
+                // Reset warning flags if session has been refreshed
                 if (remaining > this.config.warningThreshold + 10) {
                     this.warningShown = false;
                     this.criticalShown = false;
@@ -173,15 +260,18 @@ class SessionManager {
 
         } catch (error) {
             this.consecutiveFailures++;
-            console.error('❌ Session check failed:', error);
-
+            // Don't log every failure, only when threshold reached
             if (this.consecutiveFailures >= 3) {
+                console.error('❌ Multiple session check failures:', error);
                 console.log('🔴 Multiple consecutive failures, session likely expired');
                 this.handleSessionExpired();
             }
         }
     }
 
+    // ============================================
+    // LOCAL COUNTDOWN - Smooth timer display
+    // ============================================
     startLocalCountdown() {
         if (this.localTimer) {
             clearInterval(this.localTimer);
@@ -201,6 +291,9 @@ class SessionManager {
         }
     }
 
+    // ============================================
+    // CREATE MODAL - Session warning popup
+    // ============================================
     createModal() {
         const existingModal = document.getElementById('sessionWarningModal');
         if (existingModal) {
@@ -211,13 +304,13 @@ class SessionManager {
         <div class="modal fade" id="sessionWarningModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                        <h5 class="modal-title" style="color: var(--ink);">
+                    <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                        <h5 class="modal-title" style="color: var(--ink, #1a1a2e);">
                             <i class="fas fa-clock text-warning me-2"></i>
                             Session Expiring Soon
                         </h5>
                     </div>
-                    <div class="modal-body" style="color: var(--ink);">
+                    <div class="modal-body" style="color: var(--ink, #1a1a2e);">
                         <div id="sessionWarningContent">
                             <div class="text-center mb-3">
                                 <i class="fas fa-hourglass-half" style="font-size: 48px; color: #ffc107;"></i>
@@ -237,7 +330,7 @@ class SessionManager {
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                    <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
                         <button type="button" class="btn btn-primary btn-lg" onclick="window.sessionManager.extendAndDismiss()" style="padding: 12px 40px;">
                             <i class="fas fa-sync-alt me-2"></i>
                             Extend Session
@@ -256,6 +349,9 @@ class SessionManager {
         console.log('✅ Session warning modal created');
     }
 
+    // ============================================
+    // SHOW WARNING - Display the session expiry modal
+    // ============================================
     showWarning() {
         if (this.isModalOpen) return;
 
@@ -311,6 +407,9 @@ class SessionManager {
         }
     }
 
+    // ============================================
+    // UPDATE MODAL COUNTDOWN - Update the timer in the modal
+    // ============================================
     updateModalCountdown() {
         const countdownEl = document.getElementById('countdownDisplay');
         if (!countdownEl) return;
@@ -344,6 +443,9 @@ class SessionManager {
         }
     }
 
+    // ============================================
+    // UPDATE SESSION TIMER DISPLAY - Update the header timer
+    // ============================================
     updateSessionTimerDisplay() {
         const display = document.getElementById('sessionTimeDisplay');
         if (!display) return;
@@ -365,6 +467,9 @@ class SessionManager {
         }
     }
 
+    // ============================================
+    // EXTEND SESSION - Manually extend the session
+    // ============================================
     async extendSession() {
         try {
             console.log('🔄 Extending session...');
@@ -372,7 +477,8 @@ class SessionManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                credentials: 'include'
             });
 
             const data = await response.json();
@@ -417,6 +523,9 @@ class SessionManager {
         }
     }
 
+    // ============================================
+    // LOGOUT - User-initiated logout
+    // ============================================
     logout() {
         console.log('🚪 User initiated logout');
         const modal = bootstrap.Modal.getInstance(document.getElementById('sessionWarningModal'));
@@ -439,16 +548,21 @@ class SessionManager {
             this.localTimer = null;
         }
 
-        fetch(this.config.logoutEndpoint, { method: 'POST' })
+        fetch(this.config.logoutEndpoint, {
+            method: 'POST',
+            credentials: 'include'
+        })
             .finally(() => {
                 window.location.href = this.config.logoutEndpoint;
             });
     }
 
+    // ============================================
+    // HANDLE SESSION EXPIRED - Automatic logout
+    // ============================================
     handleSessionExpired() {
         console.log('🔴 Session expired - logging out');
 
-        // Close modal if open
         if (this.isModalOpen) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('sessionWarningModal'));
             if (modal) {
@@ -478,25 +592,42 @@ class SessionManager {
         }, 2000);
     }
 
+    // ============================================
+    // ADD ACTIVITY LISTENERS - Detect user interaction
+    // ============================================
     addActivityListeners() {
-        const activityEvents = ['click', 'keypress', 'mousemove', 'scroll', 'touchstart'];
-        let activityTimer;
+        // Events that indicate user activity
+        const activityEvents = [
+            'click', 'dblclick', 'mousedown', 'mouseup',
+            'keydown', 'keypress', 'keyup',
+            'scroll', 'wheel',
+            'touchstart', 'touchmove', 'touchend',
+            'focus', 'blur',
+            'input', 'change', 'submit'
+        ];
 
+        // Debounced refresh function
+        const debouncedRefresh = () => {
+            clearTimeout(this.activityTimer);
+            this.activityTimer = setTimeout(() => {
+                // Only refresh if not already in warning state
+                if (!this.warningShown && !this.isModalOpen) {
+                    this.refreshSessionOnActivity();
+                }
+            }, this.config.activityDebounce);
+        };
+
+        // Add event listeners using capture phase to ensure we catch all events
         activityEvents.forEach(event => {
-            document.addEventListener(event, () => {
-                clearTimeout(activityTimer);
-                activityTimer = setTimeout(() => {
-                    this.pingSession();
-                    // Only check if warning isn't already shown
-                    if (!this.warningShown) {
-                        this.checkSession();
-                    }
-                }, 1000);
-            });
+            document.addEventListener(event, debouncedRefresh, { passive: true, capture: true });
         });
+
         console.log('✅ Activity listeners added');
     }
 
+    // ============================================
+    // TOAST NOTIFICATIONS
+    // ============================================
     showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
 
@@ -538,9 +669,39 @@ class SessionManager {
         document.body.appendChild(container);
         return container;
     }
+
+    // ============================================
+    // DESTROY - Clean up when page unloads
+    // ============================================
+    destroy() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+        if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = null;
+        }
+        if (this.pingTimer) {
+            clearInterval(this.pingTimer);
+            this.pingTimer = null;
+        }
+        if (this.localTimer) {
+            clearInterval(this.localTimer);
+            this.localTimer = null;
+        }
+        if (this.activityTimer) {
+            clearTimeout(this.activityTimer);
+            this.activityTimer = null;
+        }
+        this.isInitialized = false;
+        console.log('🕐 Session Manager destroyed');
+    }
 }
 
-// Initialize session manager when page loads
+// ============================================
+// INITIALIZE SESSION MANAGER
+// ============================================
 let sessionManager;
 
 window.CONTEXT_PATH = '/assetIQ-pro';
@@ -555,14 +716,21 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`📍 Context path: ${window.CONTEXT_PATH}`);
         sessionManager = new SessionManager({
             contextPath: window.CONTEXT_PATH,
-            checkInterval: 10000,      // Check every 10 seconds
-            warningThreshold: 60,       // Show warning at 60 seconds remaining
-            criticalThreshold: 15,      // Show critical at 15 seconds remaining
-            // No extendBuffer - user must click the button
+            checkInterval: 10000,       // Check every 10 seconds
+            warningThreshold: 60,        // Show warning at 60 seconds remaining
+            criticalThreshold: 15,       // Show critical at 15 seconds remaining
+            activityDebounce: 500        // Wait 500ms after activity before refreshing
         });
         window.sessionManager = sessionManager;
     } else {
         console.log('📄 On login/logout page, session manager not initialized');
+    }
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    if (window.sessionManager && typeof window.sessionManager.destroy === 'function') {
+        window.sessionManager.destroy();
     }
 });
 
