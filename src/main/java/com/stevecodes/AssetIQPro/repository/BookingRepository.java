@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -89,4 +90,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("SELECT b FROM Booking b WHERE b.userId = :userId ORDER BY b.startTime DESC")
     List<Booking> findTop5BookingsByUserId(@Param("userId") Long userId);
+
+    Collection<Object> findByStatusIn(List<BookingStatus> booked);
 }

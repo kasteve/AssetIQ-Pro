@@ -17,6 +17,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -64,6 +65,14 @@ public class EmailService {
     private JavaMailSender buildMailSender() {
         SystemSettingService.EmailConfig cfg = settingService.getEmailConfig();
 
+        log.info("🔧 Building mail sender with config:");
+        log.info("   Host: {}", cfg.getHost());
+        log.info("   Port: {}", cfg.getPort());
+        log.info("   Username: {}", cfg.getUsername());
+        log.info("   From: {}", cfg.getFrom());
+        log.info("   TLS: {}, SSL: {}", cfg.isTlsEnabled(), cfg.isSslEnabled());
+        log.info("   Password set: {}", cfg.getPassword() != null && !cfg.getPassword().isEmpty());
+
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(cfg.getHost());
         sender.setPort(cfg.getPort());
@@ -76,14 +85,23 @@ public class EmailService {
         props.put("mail.smtp.starttls.enable", String.valueOf(cfg.isTlsEnabled()));
         props.put("mail.smtp.starttls.required", String.valueOf(cfg.isTlsEnabled()));
         props.put("mail.smtp.ssl.enable", String.valueOf(cfg.isSslEnabled()));
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.connectiontimeout", "10000");
+        props.put("mail.smtp.timeout", "10000");
+        props.put("mail.smtp.writetimeout", "10000");
+
+        // Enable debug logging for SMTP - REMOVE IN PRODUCTION
+        props.put("mail.debug", "true");
 
         return sender;
     }
 
     private String getFromAddress() {
-        return settingService.getString(SystemSettingService.KEY_EMAIL_FROM);
+        String from = settingService.getString(SystemSettingService.KEY_EMAIL_FROM);
+        if (from == null || from.isEmpty()) {
+            log.warn("⚠️ EMAIL_FROM not configured, using default");
+            from = "noreply@asset-iq-pro.com";
+        }
+        return from;
     }
 
     // ============================================
@@ -226,7 +244,7 @@ public class EmailService {
 
     public void sendSimpleEmail(String toEmail, String subject, String body) {
         try {
-            log.info("📧 Sending email to: {} - Subject: {}", toEmail, subject);
+            log.info("📧 Sending simple email to: {} - Subject: {}", toEmail, subject);
             JavaMailSender mailSender = buildMailSender();
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(toEmail);
@@ -234,9 +252,9 @@ public class EmailService {
             message.setText(body);
             message.setFrom(getFromAddress());
             mailSender.send(message);
-            log.info("✅ Email sent to: {}", toEmail);
+            log.info("✅ Simple email sent to: {}", toEmail);
         } catch (Exception e) {
-            log.error("❌ Failed to send email to {}: {}", toEmail, e.getMessage(), e);
+            log.error("❌ Failed to send simple email to {}: {}", toEmail, e.getMessage(), e);
         }
     }
 
@@ -256,34 +274,47 @@ public class EmailService {
             log.error("❌ Failed to send HTML email to {}: {}", toEmail, e.getMessage(), e);
             sendSimpleEmail(toEmail, subject, "Please view this email in HTML format.");
         } catch (Exception e) {
-            // Logging the full exception (not just e.getMessage()) is what actually lets you
-            // diagnose failures like NPEs from missing SMTP config, bad "from" addresses, etc.
             log.error("❌ Unexpected error sending HTML email to {}: {}", toEmail, e.getMessage(), e);
             sendSimpleEmail(toEmail, subject, "Failed to send HTML email.");
         }
     }
 
+    // ============================================
+    // Email with Attachment - PRIMARY METHOD FOR REPORTS
+    // ============================================
+
+    /**
+     * Send an email with a PDF attachment - PRIMARY METHOD for report emails
+     * This is what ReportApiController.emailReport() calls
+     */
     public void sendEmailWithAttachment(String toEmail, String subject, String body, byte[] attachment, String fileName) {
         try {
             log.info("📧 Sending email with attachment to: {} - Subject: {}", toEmail, subject);
+            log.info("📎 Attachment: {} ({} bytes)", fileName, attachment != null ? attachment.length : 0);
+
+            if (attachment == null || attachment.length == 0) {
+                log.warn("⚠️ Attachment is empty, sending without attachment");
+                sendSimpleEmail(toEmail, subject, body);
+                return;
+            }
+
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
             helper.setTo(toEmail);
             helper.setSubject(subject);
-            helper.setText(body);
+            helper.setText(body, false);  // Plain text for report emails
             helper.setFrom(getFromAddress());
 
-            if (attachment != null && attachment.length > 0) {
-                ByteArrayResource resource = new ByteArrayResource(attachment);
-                helper.addAttachment(fileName, resource);
-                log.info("📎 Attachment added: {}", fileName);
-            }
+            ByteArrayResource resource = new ByteArrayResource(attachment);
+            helper.addAttachment(fileName, resource);
+            log.info("📎 Attachment added: {}", fileName);
 
             mailSender.send(message);
             log.info("✅ Email with attachment sent to: {}", toEmail);
         } catch (MessagingException e) {
-            log.error("❌ Failed to send email with attachment to {}: {}", toEmail, e.getMessage(), e);
+            log.error("❌ MessagingException sending email with attachment to {}: {}", toEmail, e.getMessage(), e);
             sendSimpleEmail(toEmail, subject, body + "\n\n(Attachment could not be sent.)");
         } catch (Exception e) {
             log.error("❌ Unexpected error sending email with attachment to {}: {}", toEmail, e.getMessage(), e);
@@ -291,6 +322,9 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send an email with attachment from file path
+     */
     public void sendEmailWithAttachment(String toEmail, String subject, String body, String attachmentPath) {
         try {
             if (attachmentPath == null || attachmentPath.isEmpty()) {
@@ -315,6 +349,9 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send an email with attachment from File object
+     */
     public void sendEmailWithAttachment(String toEmail, String subject, String body, File attachment) {
         try {
             if (attachment == null || !attachment.exists()) {
@@ -330,8 +367,41 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send an HTML email with attachment
+     */
+    public void sendHtmlEmailWithAttachment(String toEmail, String subject, String htmlContent, byte[] attachment, String fileName) {
+        try {
+            log.info("📧 Sending HTML email with attachment to: {} - Subject: {}", toEmail, subject);
+
+            JavaMailSender mailSender = buildMailSender();
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            helper.setFrom(getFromAddress());
+
+            if (attachment != null && attachment.length > 0) {
+                ByteArrayResource resource = new ByteArrayResource(attachment);
+                helper.addAttachment(fileName, resource);
+                log.info("📎 Attachment added: {}", fileName);
+            }
+
+            mailSender.send(message);
+            log.info("✅ HTML email with attachment sent to: {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("❌ Failed to send HTML email with attachment to {}: {}", toEmail, e.getMessage(), e);
+            sendSimpleEmail(toEmail, subject, "Please view this email in HTML format.");
+        } catch (Exception e) {
+            log.error("❌ Unexpected error sending HTML email with attachment to {}: {}", toEmail, e.getMessage(), e);
+            sendSimpleEmail(toEmail, subject, "Failed to send email.");
+        }
+    }
+
     // ============================================
-    // Email Templates
+    // Email Templates - Wrapper
     // ============================================
 
     private String buildEmailWrapper(String content, String title) {
@@ -355,7 +425,7 @@ public class EmailService {
     }
 
     // ============================================
-    // Email Content Builders
+    // Email Content Builders - COMPLETE
     // ============================================
 
     private String buildWelcomeContent(String fullName, String username, String tempPassword, String loginUrl) {
@@ -751,7 +821,7 @@ public class EmailService {
         try {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(toEmails.toArray(new String[0]));
             helper.setSubject(subject);
@@ -781,7 +851,7 @@ public class EmailService {
         try {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(signerEmails.toArray(new String[0]));
             helper.setSubject(subject);
@@ -801,10 +871,6 @@ public class EmailService {
         }
     }
 
-    /**
-     * Sends the infra-request completion report (with the generated PDF attached) to every
-     * involved party — e.g. requester, line manager, infra reviewer, finance approver.
-     */
     @Async
     public void sendInfraRequestCompletionReport(List<String> recipientEmails, String resourceType,
                                                  String requestId, byte[] pdfBytes) {
@@ -815,7 +881,7 @@ public class EmailService {
         try {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(recipientEmails.toArray(new String[0]));
             helper.setSubject(subject);
@@ -858,10 +924,6 @@ public class EmailService {
         String content = buildBookingConfirmationContent(fullName, resourceType, bookingDetails);
         sendHtmlEmail(toEmail, subject, buildEmailWrapper(content, "Booking Confirmed"));
     }
-
-    // ============================================
-    // Room Booking Emails (Async)
-    // ============================================
 
     @Async
     public void sendRoomSlotRequest(String toEmail, String requesterName,
@@ -907,7 +969,7 @@ public class EmailService {
         try {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(toEmail);
             helper.setSubject(subject);
@@ -958,7 +1020,28 @@ public class EmailService {
     }
 
     public void processPendingEmails() {
-        // Delegated to EmailRetryService
         log.debug("EmailService.processPendingEmails() - Delegated to EmailRetryService");
+    }
+
+    /**
+     * Diagnostic method to test email configuration
+     */
+    public void testEmailConfig() {
+        try {
+            SystemSettingService.EmailConfig cfg = settingService.getEmailConfig();
+            log.info("=== EMAIL CONFIG TEST ===");
+            log.info("Host: {}", cfg.getHost());
+            log.info("Port: {}", cfg.getPort());
+            log.info("Username: {}", cfg.getUsername());
+            log.info("From: {}", getFromAddress());
+            log.info("Password present: {}", cfg.getPassword() != null && !cfg.getPassword().isEmpty());
+            log.info("Password length: {}", cfg.getPassword() != null ? cfg.getPassword().length() : 0);
+            log.info("TLS: {}, SSL: {}", cfg.isTlsEnabled(), cfg.isSslEnabled());
+
+            JavaMailSender sender = buildMailSender();
+            log.info("✅ Mail sender built successfully");
+        } catch (Exception e) {
+            log.error("❌ Email config test failed: {}", e.getMessage(), e);
+        }
     }
 }

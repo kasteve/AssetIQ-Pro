@@ -95,6 +95,7 @@ public class SystemSettingService {
         createOrUpdateSetting(KEY_EMAIL_FROM, "noreply@asset-iq-pro.com", CATEGORY_EMAIL, "From email address");
         createOrUpdateSetting(KEY_EMAIL_SSL, "false", CATEGORY_EMAIL, "Enable SSL");
         createOrUpdateSetting(KEY_EMAIL_TLS, "true", CATEGORY_EMAIL, "Enable TLS");
+        createOrUpdateSetting(KEY_REPORT_RECIPIENTS, "admin@company.com", CATEGORY_REPORTS, "Default report recipients");
 
         createOrUpdateSetting(KEY_REPORT_AUTO_GENERATE, "true", CATEGORY_REPORTS, "Auto-generate scheduled reports");
         createOrUpdateSetting(KEY_REPORT_SCHEDULE, "0 0 6 * * *", CATEGORY_REPORTS, "Cron schedule for reports (daily at 6 AM)");

@@ -10,6 +10,227 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+    <style>
+        /* Report Generation Card Styles */
+        .report-generation-card {
+            background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
+            border: 1px solid #eef0f3;
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .report-generation-card .card-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--ink);
+            margin-bottom: 12px;
+        }
+        .report-generation-card .card-title i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+        .report-gen-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .report-gen-row .field-group {
+            flex: 1 1 160px;
+            min-width: 140px;
+        }
+        .report-gen-row .field-group .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-muted);
+        }
+        .report-gen-row .field-group .form-control,
+        .report-gen-row .field-group .form-select {
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            font-size: 13px !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        .report-gen-row .field-group .form-control:focus,
+        .report-gen-row .field-group .form-select:focus {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 3px rgba(13,110,253,0.08) !important;
+        }
+        .report-gen-row .action-group {
+            display: flex;
+            gap: 8px;
+            flex: 0 0 auto;
+            align-items: flex-end;
+        }
+        .report-gen-row .action-group .btn {
+            padding: 8px 18px !important;
+            font-size: 13px !important;
+            border-radius: 8px !important;
+        }
+
+        /* Quick Stats Cards */
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .quick-stat {
+            background: white;
+            border-radius: 12px;
+            padding: 14px 16px;
+            border: 1px solid #eef0f3;
+            text-align: center;
+        }
+        .quick-stat .stat-number {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--ink);
+            line-height: 1.2;
+        }
+        .quick-stat .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .quick-stat .stat-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .quick-stat.green .stat-number { color: #198754; }
+        .quick-stat.orange .stat-number { color: #fd7e14; }
+        .quick-stat.red .stat-number { color: #dc3545; }
+        .quick-stat.blue .stat-number { color: #0d6efd; }
+        .quick-stat.purple .stat-number { color: #6610f2; }
+
+        /* Report Tabs */
+        .report-tabs {
+            border-bottom: 2px solid #eef0f3;
+            gap: 4px;
+            margin-bottom: 22px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+        .report-tabs .nav-link {
+            border: none !important;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 12px 18px !important;
+            font-weight: 600;
+            font-size: 13px;
+            color: #6c757d;
+            background: transparent;
+            white-space: nowrap;
+        }
+        .report-tabs .nav-link i { margin-right: 8px; }
+        .report-tabs .nav-link:hover { background: #f8f9fb; color: var(--ink); }
+        .report-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: white;
+            border-bottom: 2px solid var(--primary-color) !important;
+        }
+
+        .report-panel {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid #eef0f3;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        }
+
+        .report-filters {
+            background: #f8f9fc;
+            border-left: 4px solid var(--primary-color);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+        }
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .filter-field {
+            flex: 1 1 150px;
+            min-width: 140px;
+        }
+        .filter-field .form-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .filter-field .form-control, .filter-field .form-select {
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            font-size: 13px !important;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .filter-info {
+            flex: 1 1 220px;
+            font-size: 13px;
+            color: #0d6efd;
+            display: flex;
+            align-items: center;
+        }
+
+        .report-table { width: 100% !important; }
+        .report-table thead th {
+            background: #f8f9fb;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #6c757d;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eef0f3;
+        }
+        .report-table tbody td {
+            padding: 10px 12px;
+            font-size: 13px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f5f6f8;
+        }
+        .report-table tbody tr:hover { background: #f8f9fc; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10.5px;
+            font-weight: 700;
+        }
+        .status-badge.active { background: #e6f7ec; color: #198754; }
+        .status-badge.eol { background: #fdeeee; color: #dc3545; }
+        .status-badge.eos { background: #fff4e0; color: #fd7e14; }
+        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
+        .status-badge.approved { background: #e6f7ec; color: #198754; }
+        .status-badge.completed { background: #eef0fd; color: #6610f2; }
+        .status-badge.rejected { background: #fdeeee; color: #dc3545; }
+        .status-badge.cancelled { background: #e9ecef; color: #6c757d; }
+        .status-badge.booked { background: #e6f7ec; color: #198754; }
+        .status-badge.accepted { background: #e6f7ec; color: #198754; }
+        .status-badge.declined { background: #fdeeee; color: #dc3545; }
+        .status-badge.expired { background: #fdeeee; color: #dc3545; }
+        .status-badge.warning { background: #fff4e0; color: #fd7e14; }
+        .status-badge.recalled { background: #e9ecef; color: #6c757d; }
+
+        @media (max-width: 768px) {
+            .report-tabs { flex-wrap: nowrap; }
+            .report-tabs .nav-link { font-size: 12px; padding: 10px 14px !important; }
+            .report-filters { padding: 14px; }
+            .filter-field { flex: 1 1 100%; }
+            .filter-actions { flex: 1 1 100%; }
+            .filter-info { flex: 1 1 100%; }
+            .report-gen-row .field-group { flex: 1 1 100%; }
+            .report-gen-row .action-group { flex: 1 1 100%; }
+            .quick-stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
 </head>
 
 <body>
@@ -20,6 +241,54 @@
             <button class="btn btn-success" onclick="exportCurrentReport()">
                 <i class="fas fa-file-excel me-2"></i>Export
             </button>
+            <button class="btn btn-primary" onclick="generateExecutiveReport()">
+                <i class="fas fa-file-pdf me-2"></i>Executive Report
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- EXECUTIVE REPORT GENERATION CARD -->
+    <!-- ============================================ -->
+    <div class="report-generation-card">
+        <div class="card-title">
+            <i class="fas fa-file-pdf"></i> Generate Executive Report
+            <span class="badge bg-primary ms-2" style="font-size: 10px;">NEW</span>
+        </div>
+        <div class="report-gen-row">
+            <div class="field-group">
+                <label class="form-label">Report Type</label>
+                <select id="execReportType" class="form-select">
+                    <option value="ASSETS">Assets Report</option>
+                    <option value="TRANSFERS">Transfers Report</option>
+                    <option value="BOOKINGS">Bookings Report</option>
+                    <option value="RESOURCES">Resource Requests Report</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" id="execStartDate" class="form-control" th:value="${#temporals.format(defaultStartDate, 'yyyy-MM-dd')}">
+            </div>
+            <div class="field-group">
+                <label class="form-label">End Date</label>
+                <input type="date" id="execEndDate" class="form-control" th:value="${#temporals.format(defaultEndDate, 'yyyy-MM-dd')}">
+            </div>
+            <div class="field-group" style="min-width: 200px;">
+                <label class="form-label">Send to Email</label>
+                <input type="text" id="execEmail" class="form-control" placeholder="email@example.com" th:value="${reportRecipients}">
+            </div>
+            <div class="action-group">
+                <button class="btn btn-primary" onclick="generateAndDownloadReport()">
+                    <i class="fas fa-download me-1"></i> Download PDF
+                </button>
+                <button class="btn btn-success" onclick="generateAndEmailReport()">
+                    <i class="fas fa-envelope me-1"></i> Email Report
+                </button>
+            </div>
+        </div>
+        <div class="mt-2 text-muted small">
+            <i class="fas fa-info-circle me-1"></i>
+            Executive reports include a professional cover page, executive summary, key metrics, detailed analysis, trends, and actionable conclusions.
         </div>
     </div>
 
@@ -66,6 +335,30 @@
         <!-- ============================================ -->
         <div class="tab-pane fade show active" id="assets-pane" role="tabpanel" aria-labelledby="assets-tab">
             <div class="report-panel">
+                <!-- Quick Stats -->
+                <div class="quick-stats" id="assetQuickStats">
+                    <div class="quick-stat blue">
+                        <span class="stat-icon">📊</span>
+                        <div class="stat-number" id="assetTotal">0</div>
+                        <div class="stat-label">Total Assets</div>
+                    </div>
+                    <div class="quick-stat green">
+                        <span class="stat-icon">✅</span>
+                        <div class="stat-number" id="assetActive">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="quick-stat orange">
+                        <span class="stat-icon">⚠️</span>
+                        <div class="stat-number" id="assetWarning">0</div>
+                        <div class="stat-label">Warning</div>
+                    </div>
+                    <div class="quick-stat red">
+                        <span class="stat-icon">🚨</span>
+                        <div class="stat-number" id="assetCritical">0</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                </div>
+
                 <!-- Single-line filter bar -->
                 <div class="report-filters primary-filters">
                     <div class="filter-row">
@@ -147,6 +440,30 @@
         <!-- ============================================ -->
         <div class="tab-pane fade" id="transfers-pane" role="tabpanel" aria-labelledby="transfers-tab">
             <div class="report-panel">
+                <!-- Quick Stats -->
+                <div class="quick-stats" id="transferQuickStats">
+                    <div class="quick-stat blue">
+                        <span class="stat-icon">📦</span>
+                        <div class="stat-number" id="transferTotal">0</div>
+                        <div class="stat-label">Total Transfers</div>
+                    </div>
+                    <div class="quick-stat green">
+                        <span class="stat-icon">✅</span>
+                        <div class="stat-number" id="transferCompleted">0</div>
+                        <div class="stat-label">Completed</div>
+                    </div>
+                    <div class="quick-stat orange">
+                        <span class="stat-icon">⏳</span>
+                        <div class="stat-number" id="transferPending">0</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="quick-stat purple">
+                        <span class="stat-icon">📈</span>
+                        <div class="stat-number" id="transferRate">0%</div>
+                        <div class="stat-label">Completion Rate</div>
+                    </div>
+                </div>
+
                 <!-- Single-line filter bar -->
                 <div class="report-filters primary-filters">
                     <div class="filter-row">
@@ -228,6 +545,30 @@
         <!-- ============================================ -->
         <div class="tab-pane fade" id="bookings-pane" role="tabpanel" aria-labelledby="bookings-tab">
             <div class="report-panel">
+                <!-- Quick Stats -->
+                <div class="quick-stats" id="bookingQuickStats">
+                    <div class="quick-stat blue">
+                        <span class="stat-icon">📅</span>
+                        <div class="stat-number" id="bookingTotal">0</div>
+                        <div class="stat-label">Total Bookings</div>
+                    </div>
+                    <div class="quick-stat green">
+                        <span class="stat-icon">✅</span>
+                        <div class="stat-number" id="bookingActive">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="quick-stat orange">
+                        <span class="stat-icon">⏳</span>
+                        <div class="stat-number" id="bookingPending">0</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="quick-stat purple">
+                        <span class="stat-icon">✔️</span>
+                        <div class="stat-number" id="bookingCompleted">0</div>
+                        <div class="stat-label">Completed</div>
+                    </div>
+                </div>
+
                 <!-- Single-line filter bar -->
                 <div class="report-filters primary-filters">
                     <div class="filter-row">
@@ -251,7 +592,6 @@
                             <label class="form-label" id="bookingSpecificLabel">Driver</label>
                             <select id="bookingSpecificValue" class="form-select">
                                 <option value="">All</option>
-                                <!-- Dynamically populated by JavaScript -->
                             </select>
                         </div>
                         <div class="filter-field" id="bookingStatusWrap" style="display:none;">
@@ -418,124 +758,6 @@
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; }
         .page-header-row h4 i { color: var(--primary-color); }
         .header-actions { display: flex; gap: 10px; }
-
-        .report-tabs {
-            border-bottom: 2px solid #eef0f3;
-            gap: 4px;
-            margin-bottom: 22px;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-        }
-        .report-tabs .nav-link {
-            border: none !important;
-            border-radius: 10px 10px 0 0 !important;
-            padding: 12px 18px !important;
-            font-weight: 600;
-            font-size: 13px;
-            color: #6c757d;
-            background: transparent;
-            white-space: nowrap;
-        }
-        .report-tabs .nav-link i { margin-right: 8px; }
-        .report-tabs .nav-link:hover { background: #f8f9fb; color: var(--ink); }
-        .report-tabs .nav-link.active {
-            color: var(--primary-color);
-            background: white;
-            border-bottom: 2px solid var(--primary-color) !important;
-        }
-
-        .report-panel {
-            background: white;
-            border-radius: 14px;
-            border: 1px solid #eef0f3;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-        }
-
-        .report-filters {
-            background: #eef2f7;
-            border-left: 4px solid var(--primary-color);
-            border-radius: 12px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
-        }
-        .filter-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-end;
-        }
-        .filter-field {
-            flex: 1 1 150px;
-            min-width: 140px;
-        }
-        .filter-field .form-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
-        .filter-field .form-control, .filter-field .form-select {
-            border-radius: 8px !important;
-            padding: 8px 12px !important;
-            font-size: 13px !important;
-        }
-        .filter-actions {
-            display: flex;
-            gap: 8px;
-            flex: 0 0 auto;
-        }
-        .filter-info {
-            flex: 1 1 220px;
-            font-size: 13px;
-            color: #0d6efd;
-            display: flex;
-            align-items: center;
-        }
-
-        .report-table { width: 100% !important; }
-        .report-table thead th {
-            background: #f8f9fb;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: #6c757d;
-            padding: 10px 12px;
-            border-bottom: 1px solid #eef0f3;
-        }
-        .report-table tbody td {
-            padding: 10px 12px;
-            font-size: 13px;
-            vertical-align: middle;
-            border-bottom: 1px solid #f5f6f8;
-        }
-        .report-table tbody tr:hover { background: #f8f9fc; }
-
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 10.5px;
-            font-weight: 700;
-        }
-        .status-badge.active { background: #e6f7ec; color: #198754; }
-        .status-badge.eol { background: #fdeeee; color: #dc3545; }
-        .status-badge.eos { background: #fff4e0; color: #fd7e14; }
-        .status-badge.pending { background: #fff4e0; color: #fd7e14; }
-        .status-badge.approved { background: #e6f7ec; color: #198754; }
-        .status-badge.completed { background: #eef0fd; color: #6610f2; }
-        .status-badge.rejected { background: #fdeeee; color: #dc3545; }
-        .status-badge.cancelled { background: #e9ecef; color: #6c757d; }
-        .status-badge.booked { background: #e6f7ec; color: #198754; }
-        .status-badge.accepted { background: #e6f7ec; color: #198754; }
-        .status-badge.declined { background: #fdeeee; color: #dc3545; }
-        .status-badge.expired { background: #fdeeee; color: #dc3545; }
-        .status-badge.warning { background: #fff4e0; color: #fd7e14; }
-
-        @media (max-width: 768px) {
-            .report-tabs { flex-wrap: nowrap; }
-            .report-tabs .nav-link { font-size: 12px; padding: 10px 14px !important; }
-            .report-filters { padding: 14px; }
-            .filter-field { flex: 1 1 100%; }
-            .filter-actions { flex: 1 1 100%; }
-            .filter-info { flex: 1 1 100%; }
-        }
     </style>
 </div>
 
@@ -554,6 +776,18 @@
 
     <script th:inline="none">
         // ============================================
+        // CSRF Token Helper - Get from meta tags
+        // ============================================
+        function getCsrfToken() {
+            const token = document.querySelector('meta[name="_csrf"]');
+            const header = document.querySelector('meta[name="_csrf_header"]');
+            return {
+                token: token ? token.content : '',
+                header: header ? header.content : 'X-CSRF-TOKEN'
+            };
+        }
+
+        // ============================================
         // GLOBAL VARIABLES
         // ============================================
         let assetsDataTable = null;
@@ -562,13 +796,117 @@
         let auditDataTable = null;
 
         // ============================================
+        // EXECUTIVE REPORT FUNCTIONS
+        // ============================================
+
+        function generateAndDownloadReport() {
+            const reportType = document.getElementById('execReportType').value;
+            const startDate = document.getElementById('execStartDate').value;
+            const endDate = document.getElementById('execEndDate').value;
+
+            if (!startDate || !endDate) {
+                showToast('Please select both start and end dates.', 'warning');
+                return;
+            }
+
+            // For download, we can use a GET request (no CSRF needed)
+            const url = `/assetIQ-pro/api/reports/download/${reportType}?startDate=${startDate}&endDate=${endDate}`;
+            window.open(url, '_blank');
+        }
+
+        function generateAndEmailReport() {
+            const reportType = document.getElementById('execReportType').value;
+            const startDate = document.getElementById('execStartDate').value;
+            const endDate = document.getElementById('execEndDate').value;
+            let email = document.getElementById('execEmail').value;
+
+            if (!startDate || !endDate) {
+                showToast('Please select both start and end dates.', 'warning');
+                return;
+            }
+
+            if (!email) {
+                email = prompt('Enter email address to send the report to:');
+                if (!email) return;
+                document.getElementById('execEmail').value = email;
+            }
+
+            const btn = event.target;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+            // Get CSRF token from meta tags
+            const csrf = getCsrfToken();
+
+            fetch(`/assetIQ-pro/api/reports/email/${reportType}?startDate=${startDate}&endDate=${endDate}&email=${encodeURIComponent(email)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Add CSRF token to headers
+                    [csrf.header]: csrf.token
+                },
+                credentials: 'include'  // Include cookies
+            })
+            .then(async response => {
+                const text = await response.text();
+                if (!response.ok) {
+                    throw new Error(text || 'Failed to send report');
+                }
+                return text;
+            })
+            .then(message => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                showToast(message || 'Report sent successfully!', 'success');
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                showToast('Error sending report: ' + error.message, 'error');
+            });
+        }
+
+        // ============================================
+        // TOAST NOTIFICATION
+        // ============================================
+        function showToast(message, type) {
+            type = type || 'success';
+            const isSuccess = type === 'success' || type === 'info';
+            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
+            const color = type === 'warning' ? 'warning' : (isSuccess ? 'success' : 'danger');
+
+            const toastHtml = `
+                <div class="toast align-items-center text-white bg-${color} border-0" role="alert" aria-live="assertive" aria-atomic="true" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas ${icon} me-2"></i> ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            const container = document.createElement('div');
+            container.innerHTML = toastHtml;
+            document.body.appendChild(container.firstElementChild);
+
+            const toastEl = document.querySelector('.toast');
+            const bsToast = new bootstrap.Toast(toastEl, { delay: 5000 });
+            bsToast.show();
+
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                toastEl.remove();
+            });
+        }
+
+        // ============================================
         // TOGGLE FUNCTIONS WITH DYNAMIC LABELS
         // ============================================
         function toggleAssetFilters() {
             const type = document.getElementById('assetReportType').value;
             const show = type ? 'flex' : 'none';
 
-            // Show/hide filter fields
             document.getElementById('assetDateFromWrap').style.display = type ? 'block' : 'none';
             document.getElementById('assetDateToWrap').style.display = type ? 'block' : 'none';
             document.getElementById('assetCategoryWrap').style.display = type ? 'block' : 'none';
@@ -576,10 +914,7 @@
             document.getElementById('assetFilterActions').style.display = show;
             document.getElementById('assetFilterInfo').style.display = type ? 'none' : 'flex';
 
-            // Update labels based on report type
             updateAssetLabels(type);
-
-            // Update table headers
             updateAssetTableHeaders(type);
 
             if (type) loadAssetReport();
@@ -649,7 +984,6 @@
             document.getElementById('transferFilterActions').style.display = show;
             document.getElementById('transferFilterInfo').style.display = category ? 'none' : 'flex';
 
-            // Update transfer date labels
             updateTransferLabels(category);
 
             if (category) loadTransfersReport();
@@ -758,6 +1092,37 @@
         }
 
         // ============================================
+        // UPDATE QUICK STATS
+        // ============================================
+        function updateAssetQuickStats(data) {
+            if (data) {
+                document.getElementById('assetTotal').textContent = data.total || 0;
+                document.getElementById('assetActive').textContent = data.activeCount || 0;
+                document.getElementById('assetWarning').textContent = data.warningCount || 0;
+                document.getElementById('assetCritical').textContent = data.criticalCount || 0;
+            }
+        }
+
+        function updateTransferQuickStats(data) {
+            if (data) {
+                document.getElementById('transferTotal').textContent = data.total || 0;
+                document.getElementById('transferCompleted').textContent = data.completedCount || 0;
+                document.getElementById('transferPending').textContent = data.pendingCount || 0;
+                const rate = data.total > 0 ? Math.round((data.completedCount || 0) / data.total * 100) : 0;
+                document.getElementById('transferRate').textContent = rate + '%';
+            }
+        }
+
+        function updateBookingQuickStats(data) {
+            if (data) {
+                document.getElementById('bookingTotal').textContent = data.total || 0;
+                document.getElementById('bookingActive').textContent = data.activeCount || 0;
+                document.getElementById('bookingPending').textContent = data.pendingCount || 0;
+                document.getElementById('bookingCompleted').textContent = data.completedCount || 0;
+            }
+        }
+
+        // ============================================
         // 1. ASSETS REPORT
         // ============================================
         function loadAssetReport() {
@@ -771,8 +1136,6 @@
 
             const params = new URLSearchParams();
             params.append('type', type);
-
-            // Only add filters if they have values
             if (dateFrom) params.append('dateFrom', dateFrom);
             if (dateTo) params.append('dateTo', dateTo);
             if (category) params.append('category', category);
@@ -781,6 +1144,7 @@
             fetch('/assetIQ-pro/api/reports/assets?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
+                    updateAssetQuickStats(data);
                     renderAssetsTable(data.assets || []);
                 })
                 .catch(err => console.error('Error loading asset report:', err));
@@ -832,6 +1196,10 @@
             document.getElementById('assetStatus').value = '';
             toggleAssetFilters();
             document.getElementById('assetsTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Select a report type and click "Generate"</td></tr>';
+            document.getElementById('assetTotal').textContent = '0';
+            document.getElementById('assetActive').textContent = '0';
+            document.getElementById('assetWarning').textContent = '0';
+            document.getElementById('assetCritical').textContent = '0';
         }
 
         // ============================================
@@ -856,6 +1224,7 @@
             fetch('/assetIQ-pro/api/reports/transfers?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
+                    updateTransferQuickStats(data);
                     renderTransfersTable(data.transfers || []);
                 })
                 .catch(err => console.error('Error loading transfers report:', err));
@@ -909,6 +1278,10 @@
             document.getElementById('transferDepartment').value = '';
             toggleTransferFilters();
             document.getElementById('transfersTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted">Select a category and click "Generate"</td></tr>';
+            document.getElementById('transferTotal').textContent = '0';
+            document.getElementById('transferCompleted').textContent = '0';
+            document.getElementById('transferPending').textContent = '0';
+            document.getElementById('transferRate').textContent = '0%';
         }
 
         // ============================================
@@ -933,6 +1306,7 @@
             fetch('/assetIQ-pro/api/reports/bookings?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
+                    updateBookingQuickStats(data);
                     renderBookingsTable(data.bookings || [], type);
                 })
                 .catch(err => console.error('Error loading bookings report:', err));
@@ -991,6 +1365,10 @@
             document.getElementById('bookingStatus').value = '';
             toggleBookingFilters();
             document.getElementById('bookingsTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Select a booking type and click "Generate"</td></tr>';
+            document.getElementById('bookingTotal').textContent = '0';
+            document.getElementById('bookingActive').textContent = '0';
+            document.getElementById('bookingPending').textContent = '0';
+            document.getElementById('bookingCompleted').textContent = '0';
         }
 
         // ============================================
@@ -1088,18 +1466,32 @@
         // AUTO-LOAD REPORTS ON TAB ACTIVATION
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
+            // Set default dates
+            const today = new Date();
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 7);
+
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const startInput = document.getElementById('execStartDate');
+            const endInput = document.getElementById('execEndDate');
+            if (startInput && !startInput.value) startInput.value = formatDate(sevenDaysAgo);
+            if (endInput && !endInput.value) endInput.value = formatDate(today);
+
             document.querySelectorAll('.report-tabs .nav-link').forEach(tab => {
                 tab.addEventListener('shown.bs.tab', function(e) {
                     const id = this.id;
                     switch(id) {
                         case 'assets-tab':
-                            // Don't auto-load, wait for user to select report type
                             break;
                         case 'transfers-tab':
-                            // Don't auto-load, wait for user to select category
                             break;
                         case 'bookings-tab':
-                            // Don't auto-load, wait for user to select booking type
                             break;
                         case 'audit-tab':
                             loadAuditReport();

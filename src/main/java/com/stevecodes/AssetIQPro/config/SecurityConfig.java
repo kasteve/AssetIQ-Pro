@@ -274,6 +274,7 @@ public class SecurityConfig implements WebMvcConfigurer {
                                 "/bookings/server-room/error",
                                 "/transfers/thankyou",
                                 "/transfers/error",
+                                "/api/reports/email/**",
                                 "/swagger-ui/**",
                                 "/bookings/driver-rating/**",
                                 "/admin/disposal/**",

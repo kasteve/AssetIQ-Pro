@@ -2,14 +2,20 @@ package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.*;
 import com.stevecodes.AssetIQPro.repository.*;
+import com.stevecodes.AssetIQPro.service.EmailService;
+import com.stevecodes.AssetIQPro.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,6 +36,8 @@ public class ReportApiController {
     private final AppUserRepository userRepository;
     private final RoomRepository roomRepository;
     private final DepartmentRepository departmentRepository;
+    private final ReportService reportService;
+    private final EmailService emailService;
 
     // ============================================
     // 1. ASSETS REPORT (Unified)
@@ -225,8 +233,8 @@ public class ReportApiController {
     }
 
     // ============================================
-// 2. TRANSFERS REPORT - FIXED
-// ============================================
+    // 2. TRANSFERS REPORT - FIXED
+    // ============================================
     @GetMapping("/transfers")
     public Map<String, Object> getTransfersReport(
             @RequestParam String category,
@@ -245,7 +253,7 @@ public class ReportApiController {
         log.info("Department filter: {}", department);
         log.info("Total transfers before filtering: {}", transfers.size());
 
-        // Filter by category - FIXED: Use getCategory() method
+        // Filter by category
         if (category != null && !category.isEmpty() && !"ALL".equalsIgnoreCase(category)) {
             transfers = transfers.stream()
                     .filter(t -> {
@@ -270,7 +278,7 @@ public class ReportApiController {
         }
         log.info("After date filter: {} transfers", transfers.size());
 
-        // Apply status filter - FIXED: Use getStatus() method
+        // Apply status filter
         if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
             transfers = transfers.stream()
                     .filter(t -> {
@@ -291,7 +299,7 @@ public class ReportApiController {
             log.info("After department filter: {} transfers", transfers.size());
         }
 
-        // Calculate statistics using getStatus()
+        // Calculate statistics
         long total = transfers.size();
         long pendingCount = transfers.stream()
                 .filter(t -> "PENDING".equalsIgnoreCase(t.getStatus()))
@@ -356,8 +364,8 @@ public class ReportApiController {
     }
 
     // ============================================
-// 4. DRIVER BOOKINGS REPORT - FIXED
-// ============================================
+    // 4. DRIVER BOOKINGS REPORT - FIXED
+    // ============================================
     public Map<String, Object> getDriverBookingsReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -392,7 +400,6 @@ public class ReportApiController {
             log.info("After driver filter: {} requests", requests.size());
         }
 
-        // FIXED: Status filter using equalsIgnoreCase
         if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
             requests = requests.stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().equalsIgnoreCase(status))
@@ -434,8 +441,8 @@ public class ReportApiController {
     }
 
     // ============================================
-// 5. ROOM BOOKINGS REPORT - FIXED
-// ============================================
+    // 5. ROOM BOOKINGS REPORT - FIXED
+    // ============================================
     public Map<String, Object> getRoomBookingsReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -470,7 +477,6 @@ public class ReportApiController {
             log.info("After room filter: {} bookings", bookings.size());
         }
 
-        // FIXED: Status filter using enum name comparison
         if (status != null && !status.isEmpty() && !"ALL".equalsIgnoreCase(status)) {
             try {
                 Booking.BookingStatus statusEnum = Booking.BookingStatus.valueOf(status.toUpperCase());
@@ -707,5 +713,167 @@ public class ReportApiController {
         return departmentRepository.findById(departmentId)
                 .map(Department::getName)
                 .orElse("Dept #" + departmentId);
+    }
+
+    // ============================================
+    // 9. REPORT GENERATION ENDPOINTS - FIXED
+    // ============================================
+
+    /**
+     * Generate and download a report as PDF
+     */
+    @GetMapping("/download/{reportType}")
+    @PreAuthorize("hasAnyAuthority('VIEW_REPORTS', 'ADMIN')")
+    public ResponseEntity<byte[]> downloadReport(
+            @PathVariable String reportType,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        try {
+            log.info("📊 Generating report: {} from {} to {}", reportType, startDate, endDate);
+            byte[] pdfBytes = reportService.generateExecutiveReport(reportType, startDate, endDate);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+
+            String filename = reportType.toLowerCase() + "_report_" +
+                    LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+            headers.setContentDispositionFormData("attachment", filename);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+
+        } catch (Exception e) {
+            log.error("❌ Error generating report: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Generate and email a report - FIXED
+     */
+    @PostMapping("/email/{reportType}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<String> emailReport(
+            @PathVariable String reportType,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam String email) {
+
+        try {
+            log.info("📧 Emailing report: {} to {}", reportType, email);
+            log.info("📊 Report period: {} to {}", startDate, endDate);
+
+            // Generate the report
+            byte[] pdfBytes = reportService.generateExecutiveReport(reportType, startDate, endDate);
+            log.info("✅ Report generated successfully. Size: {} bytes", pdfBytes.length);
+
+            // Build email content
+            String subject = reportType + " Report - " + startDate + " to " + endDate;
+            String body = String.format("""
+                    Dear User,
+
+                    Please find attached the %s report for the period %s to %s.
+
+                    Report Details:
+                    - Type: %s
+                    - Period: %s to %s
+                    - Generated: %s
+
+                    If you have any questions, please contact the IT Asset Management team.
+
+                    Best regards,
+                    AssetIQ-Pro Team
+                    """,
+                    reportType,
+                    startDate,
+                    endDate,
+                    reportType,
+                    startDate,
+                    endDate,
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"))
+            );
+
+            String fileName = reportType.toLowerCase() + "_report_" +
+                    LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+
+            // Send the email with attachment
+            emailService.sendEmailWithAttachment(email, subject, body, pdfBytes, fileName);
+            log.info("✅ Report email sent successfully to: {}", email);
+
+            return ResponseEntity.ok("Report sent successfully to " + email);
+
+        } catch (Exception e) {
+            log.error("❌ Error emailing report: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body("Failed to send report: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test email configuration
+     */
+    @PostMapping("/test-email")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<String> testEmail(@RequestParam String email) {
+        try {
+            log.info("📧 Testing email configuration to: {}", email);
+
+            String subject = "AssetIQ-Pro Test Email";
+            String body = """
+                    Dear User,
+
+                    This is a test email from AssetIQ-Pro.
+
+                    Your email configuration is working correctly.
+
+                    If you received this email, your SMTP settings are properly configured.
+
+                    Best regards,
+                    AssetIQ-Pro Team
+                    """;
+
+            emailService.sendSimpleEmail(email, subject, body);
+            log.info("✅ Test email sent successfully to: {}", email);
+
+            return ResponseEntity.ok("✅ Test email sent successfully to " + email);
+
+        } catch (Exception e) {
+            log.error("❌ Failed to send test email: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body("❌ Failed to send test email: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Generate report on demand (for scheduled jobs)
+     */
+    @PostMapping("/generate/{reportType}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<String> generateReportOnDemand(
+            @PathVariable String reportType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        try {
+            LocalDate now = LocalDate.now();
+            if (startDate == null) startDate = now.minusDays(7);
+            if (endDate == null) endDate = now;
+
+            byte[] pdfBytes = reportService.generateExecutiveReport(reportType, startDate, endDate);
+
+            // Get recipients from settings
+            // List<String> recipients = settingService.getStringList(SystemSettingService.KEY_REPORT_RECIPIENTS);
+            // Send email to each recipient
+
+            log.info("✅ Report generated successfully: {} ({} bytes)", reportType, pdfBytes.length);
+
+            return ResponseEntity.ok("Report generated successfully");
+
+        } catch (Exception e) {
+            log.error("❌ Error generating report on demand: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body("Failed to generate report: " + e.getMessage());
+        }
     }
 }
