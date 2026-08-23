@@ -91,6 +91,10 @@ public class InfraRequest {
     @Column(name = "delivered_by")
     private Long deliveredBy;
 
+    // ✅ FIX: Add delivery notes field
+    @Column(name = "delivery_notes", columnDefinition = "NVARCHAR(MAX)")
+    private String deliveryNotes;
+
     @Column(name = "acknowledged_at")
     private LocalDateTime acknowledgedAt;
 
@@ -111,7 +115,7 @@ public class InfraRequest {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // New: Requester Signature fields
+    // Requester Signature fields
     @Column(name = "requester_signature", columnDefinition = "NVARCHAR(MAX)")
     private String requesterSignature;
 
@@ -123,6 +127,8 @@ public class InfraRequest {
 
     @Column(name = "signing_token_expiry")
     private LocalDateTime signingTokenExpiry;
+
+    // ✅ FIX: Remove empty setter method - Lombok @Data generates it automatically
 
     public enum RequestStatus {
         DRAFT,

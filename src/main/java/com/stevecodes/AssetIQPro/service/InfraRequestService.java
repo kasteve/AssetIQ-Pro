@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -192,7 +193,6 @@ public class InfraRequestService {
         // ✅ FIX: Capture final variables for lambdas
         final InfraRequest finalSaved = saved;
         final Long finalRequesterId = requesterId;
-        final Long finalLineManagerId = lineManagerId;
 
         // ✅ ASYNC: Start SLA tracking
         CompletableFuture.runAsync(() -> {
@@ -204,7 +204,7 @@ public class InfraRequestService {
             }
         });
 
-        // ✅ ASYNC: Notify line manager
+        // ✅ ASYNC: Notify line manager (in-app)
         CompletableFuture.runAsync(() -> {
             try {
                 notifyLineManager(finalSaved);
@@ -213,12 +213,10 @@ public class InfraRequestService {
             }
         });
 
-        // ✅ ASYNC: Send email
+        // ✅ ASYNC: Send approval-request email (styled HTML template)
         CompletableFuture.runAsync(() -> {
             try {
-                sendEmailNotification(finalLineManagerId,
-                        "Infrastructure Request Pending Approval",
-                        "Request #" + finalSaved.getRequestId() + " for " + finalSaved.getResourceType() + " requires your approval.");
+                sendApprovalRequestEmail(finalSaved);
             } catch (Exception e) {
                 log.error("Failed to send email: {}", e.getMessage());
             }
@@ -265,12 +263,13 @@ public class InfraRequestService {
                 "/infra-requests/" + finalRequestId
         );
 
-        // ✅ ASYNC: Send email
+        // ✅ ASYNC: Send status-update email (styled HTML template)
         CompletableFuture.runAsync(() -> {
             try {
-                sendEmailNotification(finalRequesterId,
-                        "Infrastructure Request Approved by Line Manager",
-                        "Your request #" + finalRequestId + " has been approved by your line manager and is now pending infrastructure review.");
+                sendStatusUpdateEmail(saved, "APPROVED",
+                        (finalComment != null && !finalComment.isBlank())
+                                ? finalComment
+                                : "Approved by your line manager. Now pending infrastructure review.");
             } catch (Exception e) {
                 log.error("Failed to send email: {}", e.getMessage());
             }
@@ -316,17 +315,6 @@ public class InfraRequestService {
                 "Your request #" + finalRequestId + " has been rejected by your line manager. Reason: " + finalReason,
                 "/infra-requests/" + finalRequestId
         );
-
-        // ✅ ASYNC: Send email
-        CompletableFuture.runAsync(() -> {
-            try {
-                sendEmailNotification(finalRequesterId,
-                        "Infrastructure Request Rejected by Line Manager",
-                        "Your request #" + finalRequestId + " has been rejected by your line manager. Reason: " + finalReason);
-            } catch (Exception e) {
-                log.error("Failed to send email: {}", e.getMessage());
-            }
-        });
 
         // ✅ ASYNC: Audit log
         asyncAuditService.logActionAsync(
@@ -432,12 +420,13 @@ public class InfraRequestService {
                 "/infra-requests/" + finalRequestId
         );
 
-        // ✅ ASYNC: Send email
+        // ✅ ASYNC: Send status-update email (styled HTML template)
         CompletableFuture.runAsync(() -> {
             try {
-                sendEmailNotification(finalRequesterId,
-                        "Infrastructure Request Approved by Finance",
-                        "Your request #" + finalRequestId + " has been approved by Finance and is now in procurement.");
+                sendStatusUpdateEmail(saved, "APPROVED",
+                        (finalComment != null && !finalComment.isBlank())
+                                ? finalComment
+                                : "Approved by Finance. Your request is now in procurement.");
             } catch (Exception e) {
                 log.error("Failed to send email: {}", e.getMessage());
             }
@@ -543,6 +532,10 @@ public class InfraRequestService {
         return result;
     }
 
+    // ============================================
+    // MARK DELIVERED - sends signing link email via styled EmailService template
+    // ============================================
+
     @Transactional
     public InfraRequestDTO markDelivered(Long requestId, Long deliveredBy, String deliveryNotes) {
         log.info("Marking request {} as delivered by: {}", requestId, deliveredBy);
@@ -553,34 +546,49 @@ public class InfraRequestService {
             throw new IllegalStateException("Request must be in PROCUREMENT status. Current: " + request.getStatus());
         }
 
-        // ✅ IMMEDIATE: Update request
+        // ✅ IMMEDIATE: Update request status to DELIVERED
         request.setStatus(RequestStatus.DELIVERED);
         request.setDeliveredAt(LocalDateTime.now());
         request.setDeliveredBy(deliveredBy);
-        requestRepository.save(request);
+        request.setDeliveryNotes(deliveryNotes);
+
+        // ✅ IMMEDIATE: Generate signing token
+        String token = UUID.randomUUID().toString();
+        request.setSigningToken(token);
+        request.setSigningTokenExpiry(LocalDateTime.now().plusHours(48));
+
+        InfraRequest saved = requestRepository.save(request);
+        log.info("✅ Request {} marked as DELIVERED with signing token", requestId);
 
         // ✅ FIX: Capture final variables for lambdas
         final Long finalRequestId = requestId;
         final Long finalDeliveredBy = deliveredBy;
         final Long finalRequesterId = request.getRequesterId();
+        final String finalSigningLink = baseUrlService.buildUrl("/infra-requests/sign?token=%s", token);
+        final String finalExpiryDate = LocalDateTime.now().plusHours(48)
+                .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"));
 
-        // ✅ ASYNC: Generate signing link
+        // ✅ ASYNC: Send signing link email to requester (styled HTML template)
         CompletableFuture.runAsync(() -> {
             try {
-                String signingLink = generateSigningLink(finalRequestId);
-                log.info("Signing link generated for request {}: {}", finalRequestId, signingLink);
+                userRepository.findById(finalRequesterId).ifPresent(user -> {
+                    String requesterName = user.getFullName() != null ? user.getFullName() : user.getUsername();
+                    emailService.sendInfraRequestSigningLink(
+                            user.getEmail(), requesterName, finalRequestId, finalSigningLink, finalExpiryDate);
+                    log.info("📧 Signing link email sent to requester: {} for request {}", user.getEmail(), finalRequestId);
+                });
             } catch (Exception e) {
-                log.error("Failed to generate signing link: {}", e.getMessage());
+                log.error("❌ Failed to send signing link email for request {}: {}", finalRequestId, e.getMessage(), e);
             }
         });
 
-        // ✅ ASYNC: Notify requester
+        // ✅ ASYNC: Create notification for requester
         asyncNotificationService.createNotificationAsync(
                 finalRequesterId,
-                "REQUEST_STATUS",
+                "REQUEST_DELIVERED",
                 "Infrastructure Request Delivered",
-                "Your request #" + finalRequestId + " has been delivered. Please sign to complete.",
-                "/infra-requests/" + finalRequestId
+                "Your request #" + finalRequestId + " has been delivered. Please sign to complete using the link sent to your email.",
+                finalSigningLink
         );
 
         // ✅ ASYNC: Audit log
@@ -590,7 +598,7 @@ public class InfraRequestService {
                 finalDeliveredBy
         );
 
-        return convertToDTO(request);
+        return convertToDTO(saved);
     }
 
     @Transactional
@@ -608,14 +616,14 @@ public class InfraRequestService {
         requestRepository.save(request);
 
         String signingLink = baseUrlService.buildUrl("/infra-requests/sign?token=%s", token);
+        String expiryDate = request.getSigningTokenExpiry()
+                .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"));
 
-        // ✅ ASYNC: Send email
+        // ✅ ASYNC: Send signing link email (styled HTML template)
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
-            emailService.sendSimpleEmail(
-                    user.getEmail(),
-                    "Infrastructure Request - Sign to Complete",
-                    "Please sign to acknowledge receipt of your request #" + requestId + ":\n\n" + signingLink
-            );
+            String requesterName = user.getFullName() != null ? user.getFullName() : user.getUsername();
+            emailService.sendInfraRequestSigningLink(
+                    user.getEmail(), requesterName, requestId, signingLink, expiryDate);
         });
 
         return signingLink;
@@ -754,7 +762,6 @@ public class InfraRequestService {
 
         // ✅ FIX: Capture final variables for lambdas
         final Long finalRequestId = requestId;
-        final Long finalRequesterId = saved.getRequesterId();
 
         // ✅ ASYNC: Send completion report
         CompletableFuture.runAsync(() -> {
@@ -765,12 +772,10 @@ public class InfraRequestService {
             }
         });
 
-        // ✅ ASYNC: Send email notification
+        // ✅ ASYNC: Send status-update email (styled HTML template)
         CompletableFuture.runAsync(() -> {
             try {
-                sendEmailNotification(finalRequesterId,
-                        "Infrastructure Request Completed",
-                        "Your request #" + finalRequestId + " has been completed. Thank you for using AssetIQ-Pro.");
+                sendStatusUpdateEmail(saved, "COMPLETED", "Thank you for using AssetIQ-Pro!");
             } catch (Exception e) {
                 log.error("Failed to send email: {}", e.getMessage());
             }
@@ -853,9 +858,46 @@ public class InfraRequestService {
         }
     }
 
-    private void sendEmailNotification(Long userId, String subject, String body) {
-        userRepository.findById(userId).ifPresent(user -> {
-            emailService.sendSimpleEmail(user.getEmail(), subject, body);
+    /**
+     * Sends the styled "Action Required" approval-request email (EmailService.sendInfraRequestApproval)
+     * to the line manager assigned to this request.
+     */
+    private void sendApprovalRequestEmail(InfraRequest request) {
+        userRepository.findById(request.getLineManagerId()).ifPresent(manager -> {
+            String approverName = manager.getFullName() != null ? manager.getFullName() : manager.getUsername();
+            String requesterName = userRepository.findById(request.getRequesterId())
+                    .map(u -> u.getFullName() != null ? u.getFullName() : u.getUsername())
+                    .orElse("Employee");
+            String approvalLink = baseUrlService.buildUrl("/infra-requests/%s", request.getRequestId());
+
+            emailService.sendInfraRequestApproval(
+                    manager.getEmail(),
+                    approverName,
+                    String.valueOf(request.getRequestId()),
+                    requesterName,
+                    request.getResourceType(),
+                    approvalLink
+            );
+        });
+    }
+
+    /**
+     * Sends the styled status-update email (EmailService.sendInfraRequestStatusUpdate) to the
+     * requester. `status` should be one of APPROVED / REJECTED / PENDING / any other free-form
+     * status label — EmailService colors the badge accordingly.
+     */
+    private void sendStatusUpdateEmail(InfraRequest request, String status, String comment) {
+        userRepository.findById(request.getRequesterId()).ifPresent(user -> {
+            String requesterName = user.getFullName() != null ? user.getFullName() : user.getUsername();
+
+            emailService.sendInfraRequestStatusUpdate(
+                    user.getEmail(),
+                    requesterName,
+                    String.valueOf(request.getRequestId()),
+                    status,
+                    comment,
+                    request.getResourceType()
+            );
         });
     }
 
@@ -929,6 +971,9 @@ public class InfraRequestService {
         dto.setRequesterSignedAt(request.getRequesterSignedAt());
         dto.setSigningToken(request.getSigningToken());
         dto.setSigningTokenExpiry(request.getSigningTokenExpiry());
+
+        // ✅ Add delivery notes to DTO
+        dto.setDeliveryNotes(request.getDeliveryNotes());
 
         userRepository.findById(request.getRequesterId()).ifPresent(user -> {
             dto.setRequesterName(user.getFullName());

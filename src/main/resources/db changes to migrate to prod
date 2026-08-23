@@ -1,0 +1,1 @@
+ALTER TABLE infra_requests ADD delivery_notes NVARCHAR(MAX) NULL;
