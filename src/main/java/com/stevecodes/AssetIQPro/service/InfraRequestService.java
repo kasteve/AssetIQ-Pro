@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -670,6 +671,15 @@ public class InfraRequestService {
         // ✅ ASYNC: Generate PDF with signature
         asyncPdfService.generateInfraRequestPdfAsync(finalRequestId);
 
+        // ✅ ASYNC: Send completion report (PDF attached) to requester + involved approvers
+        CompletableFuture.runAsync(() -> {
+            try {
+                sendCompletionReport(request);
+            } catch (Exception e) {
+                log.error("Failed to send completion report: {}", e.getMessage(), e);
+            }
+        });
+
         // ✅ ASYNC: Audit log
         asyncAuditService.logActionAsync(
                 "INFRA_REQUEST_SIGNED",
@@ -901,9 +911,56 @@ public class InfraRequestService {
         });
     }
 
+    /**
+     * Emails the completion PDF report to every involved party: requester, line manager, and
+     * whichever infra reviewer / finance approver actually acted on the request (skipped if null).
+     *
+     * NOTE: PDF generation happens asynchronously in some call paths (asyncPdfService), so this
+     * re-fetches the request fresh to pick up a pdfReportPath written after the caller's snapshot
+     * was taken. If the PDF genuinely isn't ready yet, this logs a warning and skips rather than
+     * sending a broken email — if you need guaranteed delivery, the PDF generation for that path
+     * needs to complete (or be awaited) before this is called.
+     */
     private void sendCompletionReport(InfraRequest request) {
         log.info("Sending completion report for request: {}", request.getRequestId());
-        // Implementation for sending completion report
+
+        InfraRequest current = requestRepository.findById(request.getRequestId()).orElse(request);
+
+        if (current.getPdfReportPath() == null) {
+            log.warn("No PDF report available yet for request {} - skipping completion report email",
+                    current.getRequestId());
+            return;
+        }
+
+        byte[] pdfBytes;
+        try {
+            pdfBytes = Files.readAllBytes(Paths.get(current.getPdfReportPath()));
+        } catch (IOException e) {
+            log.error("Failed to read PDF report for request {}: {}", current.getRequestId(), e.getMessage(), e);
+            return;
+        }
+
+        List<String> recipients = new ArrayList<>();
+        userRepository.findById(current.getRequesterId()).map(AppUser::getEmail).ifPresent(recipients::add);
+        if (current.getLineManagerId() != null) {
+            userRepository.findById(current.getLineManagerId()).map(AppUser::getEmail).ifPresent(recipients::add);
+        }
+        if (current.getInfraReviewedBy() != null) {
+            userRepository.findById(current.getInfraReviewedBy()).map(AppUser::getEmail).ifPresent(recipients::add);
+        }
+        if (current.getFinanceApprovedBy() != null) {
+            userRepository.findById(current.getFinanceApprovedBy()).map(AppUser::getEmail).ifPresent(recipients::add);
+        }
+
+        List<String> uniqueRecipients = recipients.stream().distinct().collect(Collectors.toList());
+
+        if (uniqueRecipients.isEmpty()) {
+            log.warn("No recipient emails found for request {} completion report", current.getRequestId());
+            return;
+        }
+
+        emailService.sendInfraRequestCompletionReport(
+                uniqueRecipients, current.getResourceType(), String.valueOf(current.getRequestId()), pdfBytes);
     }
 
     private InfraRequest validateRequest(Long requestId) {

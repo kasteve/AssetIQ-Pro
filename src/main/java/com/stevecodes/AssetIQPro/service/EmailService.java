@@ -606,6 +606,22 @@ public class EmailService {
         return heading + panel + detailCard + note;
     }
 
+    private String buildInfraCompletionContent(String resourceType, String requestId) {
+        String heading = buildHeading("✅", "Request Completed", "Infrastructure request has been completed successfully");
+
+        String panelBody = "<p style=\"margin:0 0 8px 0; color:" + TEXT_COLOR + "; font-weight:600; font-size:14px; font-family:" + FONT_STACK + ";\">Dear Team,</p>"
+                + "<p style=\"margin:0; color:" + TEXT_BODY + "; font-size:14px; line-height:1.6; font-family:" + FONT_STACK + ";\">"
+                + "Infrastructure request <strong>#" + requestId + "</strong> for <strong>" + resourceType + "</strong> has been completed and signed off.</p>";
+        String panel = buildPanel(SUCCESS_COLOR, panelBody);
+
+        String rows = buildInfoRow("Request #", requestId) + buildInfoRow("Resource Type", resourceType);
+        String detailCard = buildDetailCard("Request Details", rows);
+
+        String note = buildCallout("📎 The completion report is attached to this email as a PDF.", TEXT_MUTED);
+
+        return heading + panel + detailCard + note;
+    }
+
     private String buildRoomSlotRequestContent(String requesterName, String roomName, String timeSlot) {
         String heading = buildHeading("🔄", "Slot Request Received", "Someone wants to use your booked slot");
 
@@ -782,6 +798,41 @@ public class EmailService {
         } catch (MessagingException e) {
             log.error("❌ Failed to send completed transfer report: {}", e.getMessage(), e);
             sendSimpleEmail(signerEmails.get(0), subject, "Transfer complete. Please check the portal for details.");
+        }
+    }
+
+    /**
+     * Sends the infra-request completion report (with the generated PDF attached) to every
+     * involved party — e.g. requester, line manager, infra reviewer, finance approver.
+     */
+    @Async
+    public void sendInfraRequestCompletionReport(List<String> recipientEmails, String resourceType,
+                                                 String requestId, byte[] pdfBytes) {
+        String subject = "Infrastructure Request Completed - #" + requestId;
+        String content = buildInfraCompletionContent(resourceType, requestId);
+        String htmlContent = buildEmailWrapper(content, "Request Completed");
+
+        try {
+            JavaMailSender mailSender = buildMailSender();
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(recipientEmails.toArray(new String[0]));
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            helper.setFrom(getFromAddress());
+
+            if (pdfBytes != null && pdfBytes.length > 0) {
+                helper.addAttachment("InfraRequest_" + requestId + ".pdf", new ByteArrayResource(pdfBytes));
+            }
+
+            mailSender.send(message);
+            log.info("✅ Infra request completion report sent to {} recipients", recipientEmails.size());
+        } catch (MessagingException e) {
+            log.error("❌ Failed to send infra request completion report: {}", e.getMessage(), e);
+            if (!recipientEmails.isEmpty()) {
+                sendSimpleEmail(recipientEmails.get(0), subject, "Request complete. Please check the portal for details.");
+            }
         }
     }
 
