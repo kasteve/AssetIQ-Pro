@@ -89,6 +89,9 @@ public class AppUser {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
+    private Set<UserGroup> groups = new HashSet<>();
+
     // ✅ FIXED: Use Set instead of List to prevent duplicates
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

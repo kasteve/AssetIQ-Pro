@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>User Groups - AssetIQ-Pro</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-users me-2"></i>User Groups</h4>
+        <button type="button" class="btn btn-primary ms-auto" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+            <i class="fas fa-plus me-2"></i>Create Group
+        </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #0d6efd;">
+                <div class="stat-number" th:text="${totalGroups}">0</div>
+                <div class="stat-label">Total Groups</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #28a745;">
+                <div class="stat-number" th:text="${activeGroups}">0</div>
+                <div class="stat-label">Active Groups</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #6f42c1;">
+                <div class="stat-number" th:text="${systemGroups}">0</div>
+                <div class="stat-label">System Groups</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color: #fd7e14;">
+                <div class="stat-number" th:text="${customGroups}">0</div>
+                <div class="stat-label">Custom Groups</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Groups Table -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table id="groupsTable" class="table table-hover dataTable">
+                <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Description</th>
+                    <th>Members</th>
+                    <th>Permissions</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="group : ${groups}">
+                    <td>
+                        <span class="group-name" th:text="${group.groupName}">Group Name</span>
+                        <span th:if="${group.systemGroup}" class="system-badge">System</span>
+                    </td>
+                    <td th:text="${group.description}">Description</td>
+                    <td>
+                        <span class="member-count" th:text="${#lists.size(group.members)}">0</span>
+                        <button class="btn btn-sm btn-outline-primary view-members-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#viewMembersModal"
+                                th:data-groupid="${group.groupId}"
+                                th:data-groupname="${group.groupName}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <span class="permission-count" th:text="${#lists.size(group.permissions)}">0</span>
+                        <button class="btn btn-sm btn-outline-secondary view-perms-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#viewPermissionsModal"
+                                th:data-groupid="${group.groupId}"
+                                th:data-groupname="${group.groupName}">
+                            <i class="fas fa-lock"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <span th:if="${group.systemGroup}" class="badge bg-info">System</span>
+                        <span th:unless="${group.systemGroup}" class="badge bg-secondary">Custom</span>
+                    </td>
+                    <td>
+                        <span class="status-badge" th:classappend="${group.active} ? 'active' : 'inactive'"
+                              th:text="${group.active} ? 'Active' : 'Inactive'">Active</span>
+                    </td>
+                    <td>
+                        <div class="dropdown">
+                            <button type="button" class="btn btn-sm action-dots-btn" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#editGroupModal"
+                                       th:data-groupid="${group.groupId}"
+                                       th:data-groupname="${group.groupName}"
+                                       th:data-description="${group.description}"
+                                       th:data-system="${group.systemGroup}"
+                                       th:data-active="${group.active}">
+                                        <i class="fas fa-edit me-2 text-primary"></i>Edit Group
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#manageMembersModal"
+                                       th:data-groupid="${group.groupId}"
+                                       th:data-groupname="${group.groupName}">
+                                        <i class="fas fa-user-plus me-2 text-success"></i>Manage Members
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#managePermissionsModal"
+                                       th:data-groupid="${group.groupId}"
+                                       th:data-groupname="${group.groupName}">
+                                        <i class="fas fa-key me-2 text-warning"></i>Manage Permissions
+                                    </a>
+                                </li>
+                                <li th:unless="${group.systemGroup}">
+                                    <a class="dropdown-item" href="#"
+                                       th:attr="data-groupid=${group.groupId}"
+                                       onclick="toggleGroup(this.getAttribute('data-groupid')); return false;">
+                                        <i class="fas fa-power-off me-2 text-danger"></i>
+                                        <span th:text="${group.active} ? 'Deactivate' : 'Activate'">Deactivate</span>
+                                    </a>
+                                </li>
+                                <li th:unless="${group.systemGroup}"><hr class="dropdown-divider"></li>
+                                <li th:unless="${group.systemGroup}">
+                                    <a class="dropdown-item text-danger" href="#"
+                                       th:attr="data-groupid=${group.groupId}"
+                                       onclick="deleteGroup(this.getAttribute('data-groupid')); return false;">
+                                        <i class="fas fa-trash me-2"></i>Delete Group
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="empty-state" th:if="${groups == null or groups.isEmpty()}">
+                <i class="fas fa-users"></i>
+                <h5>No groups created yet</h5>
+                <p class="text-muted small">Click "Create Group" to get started</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- CREATE GROUP MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus-circle me-2" style="color: #0d6efd;"></i>Create New Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/groups/create}" method="post">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Group Name *</label>
+                            <input type="text" name="groupName" class="form-control" required
+                                   placeholder="e.g., IT Support, Finance Team">
+                            <small class="text-muted">Unique name for the group</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2"
+                                      placeholder="Describe the purpose of this group"></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Initial Permissions</label>
+                            <small class="text-muted d-block mb-2">Select permissions to assign to this group</small>
+                            <div class="perm-picker">
+                                <div class="perm-picker-item" th:each="perm : ${allPermissions}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               th:value="${perm.permissionName}"
+                                               th:id="'create-perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'create-perm-' + ${perm.permissionName}">
+                                            <span class="perm-name" th:text="${perm.permissionName}">PERM_NAME</span>
+                                            <span class="perm-desc" th:text="${perm.description}">Description</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Group</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- EDIT GROUP MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="editGroupModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2" style="color: #0d6efd;"></i>Edit Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/groups/update}" method="post">
+                    <input type="hidden" name="groupId" id="editGroupId">
+                    <div class="modal-body">
+                        <div class="alert alert-warning" id="editSystemWarning" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>System Group:</strong> Some fields are read-only for system groups.
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Group Name *</label>
+                            <input type="text" name="groupName" id="editGroupName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" id="editDescription" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Permissions</label>
+                            <div class="perm-picker">
+                                <div class="perm-picker-item" th:each="perm : ${allPermissions}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               th:value="${perm.permissionName}"
+                                               th:id="'edit-perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'edit-perm-' + ${perm.permissionName}">
+                                            <span class="perm-name" th:text="${perm.permissionName}">PERM_NAME</span>
+                                            <span class="perm-desc" th:text="${perm.description}">Description</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Group</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- VIEW MEMBERS MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="viewMembersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-users me-2" style="color: #0d6efd;"></i>Group Members</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Group:</strong> <span id="viewMembersGroupName"></span></p>
+                    <div id="membersList" class="members-list">
+                        <p class="text-muted">Loading members...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- VIEW PERMISSIONS MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="viewPermissionsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-lock me-2" style="color: #0d6efd;"></i>Group Permissions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Group:</strong> <span id="viewPermsGroupName"></span></p>
+                    <div id="permissionsList" class="permissions-list">
+                        <p class="text-muted">Loading permissions...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- MANAGE MEMBERS MODAL - FIXED -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="manageMembersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus me-2" style="color: #0d6efd;"></i>Manage Members</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Group:</strong> <span id="manageMembersGroupName"></span></p>
+                    <form th:action="@{/admin/groups/add-member}" method="post" id="addMemberForm">
+                        <!-- Hidden input for groupId - THIS IS THE FIX -->
+                        <input type="hidden" name="groupId" id="manageMembersGroupIdInput">
+                        <div class="mb-3">
+                            <label class="form-label">Add Member</label>
+                            <select name="userId" class="form-select" required>
+                                <option value="">Select User</option>
+                                <option th:each="user : ${users}"
+                                        th:value="${user.userId}"
+                                        th:text="${user.fullName} + ' (' + ${user.username} + ')'"></option>
+                            </select>
+                        </div>
+                        <hr>
+                        <div class="current-members">
+                            <label class="form-label">Current Members</label>
+                            <div id="currentMembersList" class="current-members-list">
+                                <p class="text-muted">Loading members...</p>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2" style="padding-top: 16px; border-top: 1px solid var(--border-color);">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Add Member</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- MANAGE PERMISSIONS MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="managePermissionsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-key me-2" style="color: #0d6efd;"></i>Manage Group Permissions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/groups/update}" method="post">
+                    <input type="hidden" name="groupId" id="managePermsGroupId">
+                    <input type="hidden" name="groupName" id="managePermsGroupName">
+                    <div class="modal-body">
+                        <p><strong>Group:</strong> <span id="managePermsGroupNameDisplay"></span></p>
+                        <div class="mb-2">
+                            <label class="form-label">Permissions</label>
+                            <div class="perm-picker">
+                                <div class="perm-picker-item" th:each="perm : ${allPermissions}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               th:value="${perm.permissionName}"
+                                               th:id="'manage-perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'manage-perm-' + ${perm.permissionName}">
+                                            <span class="perm-name" th:text="${perm.permissionName}">PERM_NAME</span>
+                                            <span class="perm-desc" th:text="${perm.description}">Description</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Update Permissions</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TOAST CONTAINER -->
+    <!-- ============================================ -->
+    <div class="toast-container position-fixed top-50 start-50 translate-middle" style="z-index: 9999; pointer-events: none;" id="toastContainer"></div>
+
+    <!-- ============================================ -->
+    <!-- CONFIRM MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmActionTitle"><i class="fas fa-question-circle me-2 text-warning"></i>Please Confirm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmActionMessage" class="mb-0">Are you sure?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionYesBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .page-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            border-left: 4px solid #0d6efd;
+            height: 100%;
+            transition: background 0.3s ease;
+        }
+        .stat-number { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+        .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 600; margin-top: 4px; }
+        .table-card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border-color); box-shadow: 0 2px 10px var(--shadow-color); overflow: hidden; padding: 16px; transition: background 0.3s ease, border-color 0.3s ease; }
+        .group-name { font-weight: 700; }
+        .system-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 9px; font-weight: 700; background: #e8eefc; color: #0d6efd; margin-left: 6px; text-transform: uppercase; }
+        .member-count, .permission-count { font-weight: 700; color: var(--ink); margin-right: 6px; }
+        .view-members-btn, .view-perms-btn { padding: 2px 8px; font-size: 12px; border-radius: 6px; }
+        .action-dots-btn { width: 30px; height: 30px; padding: 0; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; }
+        .action-dots-btn:hover { background: var(--hover-bg); color: var(--ink); }
+        .action-dropdown-menu { border-radius: 12px; border: 1px solid var(--border-color); padding: 6px; box-shadow: 0 12px 32px var(--shadow-color); min-width: 180px; background: var(--dropdown-bg); }
+        .action-dropdown-menu .dropdown-item { border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 500; color: var(--ink); }
+        .action-dropdown-menu .dropdown-item:hover { background: var(--hover-bg); }
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 10.5px; font-weight: 700; }
+        .status-badge.active { background: #e6f7ec; color: #198754; }
+        .status-badge.inactive { background: #fdeeee; color: #dc3545; }
+        .modal-content { border-radius: 16px; border: none !important; box-shadow: 0 24px 70px rgba(15,23,42,0.28); background: var(--modal-bg); }
+        .modal-header { border-bottom: 1px solid var(--border-color); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid var(--border-color); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+        .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid var(--border-color); padding: 10px 14px; font-size: 14px; background: var(--input-bg); color: var(--ink); }
+        .perm-picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; background: var(--bg-color); }
+        .perm-picker-item .form-check { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px 8px 2.2rem; margin: 0; transition: border-color 0.15s ease; }
+        .perm-picker-item .form-check:hover { border-color: var(--primary-color); }
+        .perm-picker-item .form-check-input { margin-left: -1.7rem; margin-top: 3px; cursor: pointer; }
+        .perm-picker-item .form-check-label { cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
+        .perm-picker-item .perm-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+        .perm-picker-item .perm-desc { font-size: 11px; color: var(--text-muted); line-height: 1.3; }
+        .members-list, .permissions-list { max-height: 300px; overflow-y: auto; }
+        .members-list .member-item, .permissions-list .perm-item { padding: 8px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .members-list .member-item:last-child, .permissions-list .perm-item:last-child { border-bottom: none; }
+        .current-members-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; background: var(--card-bg); }
+        .current-members-list .member-item { padding: 6px 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .current-members-list .member-item:last-child { border-bottom: none; }
+        .remove-member-btn { padding: 2px 8px; font-size: 11px; border-radius: 6px; }
+        .empty-state { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
+        .empty-state h5 { color: var(--ink); }
+        @media (max-width: 576px) { .perm-picker { grid-template-columns: 1fr; } }
+        .dataTables_wrapper .dataTables_filter input { border-radius: 10px; border: 1px solid var(--border-color); padding: 8px 14px; font-size: 14px; margin-left: 8px; background: var(--input-bg); color: var(--ink); }
+        .dataTables_wrapper .dataTables_length select { border-radius: 10px; border: 1px solid var(--border-color); padding: 8px 14px; font-size: 14px; background: var(--input-bg); color: var(--ink); }
+        .dt-buttons .btn { border-radius: 10px; padding: 6px 14px; font-size: 13px; margin-right: 4px; }
+
+        /* Toast styles */
+        .toast-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 500px; padding: 20px; }
+        .app-toast { pointer-events: auto; min-width: 320px; max-width: 500px; border-radius: 16px; border: none; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; margin-bottom: 0; animation: slideInCenter 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; transform-origin: center; width: 100%; }
+        .app-toast .toast-header { border-bottom: none; font-weight: 700; font-size: 15px; padding: 14px 20px; background: white; }
+        .app-toast .toast-body { font-size: 14.5px; padding: 14px 20px 20px 20px; background: white; color: #1a1a2e; line-height: 1.5; }
+        .app-toast.toast-success .toast-header { background: #e6f7ec; color: #0d7a3e; border-bottom: 2px solid #28a745; }
+        .app-toast.toast-error .toast-header { background: #fdeeee; color: #b02a37; border-bottom: 2px solid #dc3545; }
+        .app-toast.toast-warning .toast-header { background: #fff4e0; color: #b35d0a; border-bottom: 2px solid #fd7e14; }
+        .app-toast.toast-info .toast-header { background: #e8eefc; color: #0a58ca; border-bottom: 2px solid #0d6efd; }
+        @keyframes slideInCenter { 0% { opacity: 0; transform: scale(0.7) translateY(-30px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes slideOutCenter { 0% { opacity: 1; transform: scale(1) translateY(0); } 100% { opacity: 0; transform: scale(0.7) translateY(-30px); } }
+        .app-toast.hiding { animation: slideOutCenter 0.4s ease-in forwards; }
+        .toast-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.35); z-index: 9998; backdrop-filter: blur(4px); animation: fadeInBackdrop 0.3s ease forwards; }
+        @keyframes fadeInBackdrop { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes fadeOutBackdrop { 0% { opacity: 1; } 100% { opacity: 0; } }
+        .toast-backdrop.hiding { animation: fadeOutBackdrop 0.3s ease forwards; }
+        @media (max-width: 576px) { .toast-container { max-width: 100%; padding: 16px; } .app-toast { min-width: auto; max-width: 100%; border-radius: 12px; } }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+
+    <script>
+        // ============================================
+        // Toast Helper
+        // ============================================
+        const TOAST_ICONS = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+        const TOAST_TITLES = { success: '✅ Success', error: '❌ Error', warning: '⚠️ Warning', info: 'ℹ️ Notice' };
+        let backdropElement = null;
+        let activeToasts = 0;
+
+        function showToast(message, type = 'info', delay = 5000) {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
+            const title = TOAST_TITLES[type] || TOAST_TITLES.info;
+            if (activeToasts === 0) {
+                backdropElement = document.createElement('div');
+                backdropElement.className = 'toast-backdrop';
+                document.body.appendChild(backdropElement);
+            }
+            activeToasts++;
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast app-toast toast-' + type;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.innerHTML = '<div class="toast-header"><i class="fas ' + icon + ' me-2"></i><strong class="me-auto">' + title + '</strong><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body">' + message + '</div>';
+            container.appendChild(toastEl);
+            const bsToast = new bootstrap.Toast(toastEl, { delay: delay, autohide: true });
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.classList.add('hiding');
+                setTimeout(function() {
+                    toastEl.remove();
+                    activeToasts--;
+                    if (activeToasts === 0 && backdropElement) {
+                        backdropElement.classList.add('hiding');
+                        setTimeout(function() { if (backdropElement) { backdropElement.remove(); backdropElement = null; } }, 300);
+                    }
+                }, 400);
+            });
+            bsToast.show();
+            setTimeout(function() {
+                if (toastEl && toastEl.parentNode) {
+                    const bsInstance = bootstrap.Toast.getInstance(toastEl);
+                    if (bsInstance) bsInstance.hide();
+                }
+            }, delay + 500);
+        }
+
+        // ============================================
+        // Confirm Helper
+        // ============================================
+        function showConfirm(message, onConfirm, options = {}) {
+            const modalEl = document.getElementById('confirmActionModal');
+            if (!modalEl) return;
+
+            const messageEl = document.getElementById('confirmActionMessage');
+            const titleEl = document.getElementById('confirmActionTitle');
+            const yesBtn = document.getElementById('confirmActionYesBtn');
+            messageEl.textContent = message;
+            titleEl.innerHTML = '<i class="fas fa-question-circle me-2 text-warning"></i>' + (options.title || 'Please Confirm');
+            yesBtn.textContent = options.confirmLabel || 'Confirm';
+            yesBtn.className = 'btn ' + (options.confirmClass || 'btn-danger');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const newYesBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+            newYesBtn.addEventListener('click', function() { modal.hide(); onConfirm(); }, { once: true });
+            modal.show();
+        }
+
+        // ============================================
+        // DataTables Initialization
+        // ============================================
+        $(document).ready(function() {
+            if ($.fn.DataTable.isDataTable('#groupsTable')) {
+                $('#groupsTable').DataTable().destroy();
+            }
+            $('#groupsTable').DataTable({
+                destroy: true,
+                pageLength: 10,
+                lengthMenu: [ [10, 25, 50, 100, -1], [10, 25, 50, 100, 'All'] ],
+                order: [ [0, 'asc'] ],
+                columnDefs: [{ orderable: false, targets: 6 }],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'excel', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-outline-secondary btn-sm' },
+                    { extend: 'print', className: 'btn btn-outline-secondary btn-sm' }
+                ],
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Show _MENU_ entries',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ groups',
+                    infoEmpty: 'No groups found',
+                    infoFiltered: '(filtered from _MAX_ total groups)'
+                }
+            });
+        });
+
+        // ============================================
+        // Modal Event Handlers - FIXED
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // ============================================
+            // EDIT GROUP MODAL
+            // ============================================
+            const editModal = document.getElementById('editGroupModal');
+            if (editModal) {
+                editModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const groupId = button.getAttribute('data-groupid');
+                    const isSystem = button.getAttribute('data-system') === 'true';
+
+                    document.getElementById('editGroupId').value = groupId;
+                    document.getElementById('editGroupName').value = button.getAttribute('data-groupname') || '';
+                    document.getElementById('editDescription').value = button.getAttribute('data-description') || '';
+
+                    document.getElementById('editSystemWarning').style.display = isSystem ? 'block' : 'none';
+                    document.getElementById('editGroupName').readOnly = isSystem;
+
+                    document.querySelectorAll('#editGroupModal input[name="permissions"]').forEach(function(cb) { cb.checked = false; });
+
+                    fetch('/assetIQ-pro/api/admin/groups/' + groupId + '/permissions', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+                    .then(function(permissions) {
+                        if (permissions && permissions.length > 0) {
+                            document.querySelectorAll('#editGroupModal input[name="permissions"]').forEach(function(cb) {
+                                if (permissions.includes(cb.value)) { cb.checked = true; }
+                            });
+                        }
+                    })
+                    .catch(function(error) { console.error('Error loading permissions:', error); });
+                });
+            }
+
+            // ============================================
+            // MANAGE MEMBERS MODAL - FIXED
+            // ============================================
+            const membersModal = document.getElementById('manageMembersModal');
+            if (membersModal) {
+                membersModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const groupId = button.getAttribute('data-groupid');
+
+                    console.log('🔍 Manage Members - Group ID:', groupId);
+
+                    if (!groupId) {
+                        console.error('❌ No group ID found!');
+                        document.getElementById('currentMembersList').innerHTML = '<p class="text-danger">Error: No group ID found</p>';
+                        return;
+                    }
+
+                    // Set the hidden input value - FIXED: using the correct input ID
+                    document.getElementById('manageMembersGroupIdInput').value = groupId;
+                    document.getElementById('manageMembersGroupName').textContent = button.getAttribute('data-groupname') || 'Group';
+
+                    // Load current members
+                    const apiUrl = '/assetIQ-pro/api/admin/groups/' + groupId + '/members';
+                    console.log('📡 Fetching members from:', apiUrl);
+
+                    fetch(apiUrl, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(function(members) {
+                        console.log('✅ Members loaded:', members);
+                        var list = document.getElementById('currentMembersList');
+                        if (!members || members.length === 0) {
+                            list.innerHTML = '<p class="text-muted">No members in this group.</p>';
+                            return;
+                        }
+                        var html = '';
+                        members.forEach(function(member) {
+                            html += '<div class="member-item">' +
+                                '<span>' + (member.fullName || member.username) + ' (' + member.username + ')</span>' +
+                                '<a href="#" class="btn btn-sm btn-danger remove-member-btn" onclick="removeMember(' + groupId + ', ' + member.userId + '); return false;">Remove</a>' +
+                                '</div>';
+                        });
+                        list.innerHTML = html;
+                    })
+                    .catch(function(error) {
+                        console.error('❌ Error loading members:', error);
+                        document.getElementById('currentMembersList').innerHTML = '<p class="text-danger">Error loading members: ' + error.message + '</p>';
+                        showToast('Failed to load members', 'error');
+                    });
+                });
+            }
+
+            // ============================================
+            // VIEW MEMBERS MODAL
+            // ============================================
+            const viewMembersModal = document.getElementById('viewMembersModal');
+            if (viewMembersModal) {
+                viewMembersModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const groupId = button.getAttribute('data-groupid');
+                    document.getElementById('viewMembersGroupName').textContent = button.getAttribute('data-groupname') || '';
+
+                    fetch('/assetIQ-pro/api/admin/groups/' + groupId + '/members', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+                    .then(function(members) {
+                        var list = document.getElementById('membersList');
+                        if (!members || members.length === 0) {
+                            list.innerHTML = '<p class="text-muted">No members in this group.</p>';
+                            return;
+                        }
+                        var html = '';
+                        members.forEach(function(member) {
+                            html += '<div class="member-item">' +
+                                '<span><strong>' + (member.fullName || member.username) + '</strong> (' + member.username + ')</span>' +
+                                '<span class="text-muted small">' + member.email + '</span>' +
+                                '</div>';
+                        });
+                        list.innerHTML = html;
+                    })
+                    .catch(function(error) { console.error('Error loading members:', error); });
+                });
+            }
+
+            // ============================================
+            // VIEW PERMISSIONS MODAL
+            // ============================================
+            const viewPermsModal = document.getElementById('viewPermissionsModal');
+            if (viewPermsModal) {
+                viewPermsModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const groupId = button.getAttribute('data-groupid');
+                    document.getElementById('viewPermsGroupName').textContent = button.getAttribute('data-groupname') || '';
+
+                    fetch('/assetIQ-pro/api/admin/groups/' + groupId + '/permissions', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+                    .then(function(permissions) {
+                        var list = document.getElementById('permissionsList');
+                        if (!permissions || permissions.length === 0) {
+                            list.innerHTML = '<p class="text-muted">No permissions assigned to this group.</p>';
+                            return;
+                        }
+                        var html = '';
+                        permissions.forEach(function(perm) {
+                            html += '<div class="perm-item"><span>' + perm + '</span></div>';
+                        });
+                        list.innerHTML = html;
+                    })
+                    .catch(function(error) { console.error('Error loading permissions:', error); });
+                });
+            }
+
+            // ============================================
+            // MANAGE PERMISSIONS MODAL
+            // ============================================
+            const managePermsModal = document.getElementById('managePermissionsModal');
+            if (managePermsModal) {
+                managePermsModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const groupId = button.getAttribute('data-groupid');
+                    const groupName = button.getAttribute('data-groupname');
+                    document.getElementById('managePermsGroupId').value = groupId;
+                    document.getElementById('managePermsGroupName').value = groupName;
+                    document.getElementById('managePermsGroupNameDisplay').textContent = groupName;
+
+                    document.querySelectorAll('#managePermissionsModal input[name="permissions"]').forEach(function(cb) { cb.checked = false; });
+
+                    fetch('/assetIQ-pro/api/admin/groups/' + groupId + '/permissions', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin'
+                    })
+                    .then(function(response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+                    .then(function(permissions) {
+                        if (permissions && permissions.length > 0) {
+                            document.querySelectorAll('#managePermissionsModal input[name="permissions"]').forEach(function(cb) {
+                                if (permissions.includes(cb.value)) { cb.checked = true; }
+                            });
+                        }
+                    })
+                    .catch(function(error) { console.error('Error loading permissions:', error); });
+                });
+            }
+        });
+
+        // ============================================
+        // Action Functions
+        // ============================================
+        function toggleGroup(id) {
+            showConfirm('Are you sure you want to toggle this group\'s status?', function() {
+                fetch('/assetIQ-pro/admin/groups/' + id + '/toggle', { method: 'POST' })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Request failed');
+                        showToast('Group status updated successfully.', 'success');
+                        setTimeout(function() { window.location.reload(); }, 1200);
+                    })
+                    .catch(function(err) { showToast('Failed to toggle group status: ' + err.message, 'error'); });
+            }, { title: 'Toggle Group Status', confirmLabel: 'Toggle', confirmClass: 'btn-primary' });
+        }
+
+        function deleteGroup(id) {
+            showConfirm('This will permanently delete the group. This action cannot be undone.', function() {
+                fetch('/assetIQ-pro/admin/groups/' + id + '/delete', { method: 'POST' })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Request failed');
+                        showToast('Group deleted successfully.', 'success');
+                        setTimeout(function() { window.location.reload(); }, 1200);
+                    })
+                    .catch(function(err) { showToast('Failed to delete group: ' + err.message, 'error'); });
+            }, { title: 'Delete Group', confirmLabel: 'Delete', confirmClass: 'btn-danger' });
+        }
+
+        function removeMember(groupId, userId) {
+            showConfirm('Remove this member from the group?', function() {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/assetIQ-pro/admin/groups/' + groupId + '/remove-member';
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'userId';
+                input.value = userId;
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }, { title: 'Remove Member', confirmLabel: 'Remove', confirmClass: 'btn-danger' });
+        }
+
+        // ============================================
+        // Flash Messages
+        // ============================================
+        <th:block th:if="${param.success != null}">
+        showToast('[[${param.success}]]', 'success');
+        </th:block>
+        <th:block th:if="${param.error != null}">
+        showToast('[[${param.error}]]', 'error');
+        </th:block>
+    </script>
+</div>
+</body>
+</html>

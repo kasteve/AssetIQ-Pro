@@ -1,1 +1,224 @@
 ALTER TABLE infra_requests ADD delivery_notes NVARCHAR(MAX) NULL;
+
+
+-- ============================================================
+-- USER GROUPS TABLES - SQL SERVER VERSION (CORRECT ORDER)
+-- ============================================================
+
+-- ============================================================
+-- STEP 1: Create Tables
+-- ============================================================
+
+-- User Groups Table
+CREATE TABLE user_groups (
+    group_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    group_name VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(255) NULL,
+    is_active BIT DEFAULT 1,
+    is_system_group BIT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    updated_at DATETIME DEFAULT GETDATE(),
+    created_by BIGINT NULL,
+    updated_by BIGINT NULL
+);
+GO
+
+-- User Group Members (Many-to-Many)
+CREATE TABLE user_group_members (
+    group_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    PRIMARY KEY (group_id, user_id),
+    FOREIGN KEY (group_id) REFERENCES user_groups(group_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES app_users(user_id) ON DELETE CASCADE
+);
+GO
+
+-- User Group Permissions (Many-to-Many)
+CREATE TABLE user_group_permissions (
+    group_id BIGINT NOT NULL,
+    permission_id INT NOT NULL,
+    PRIMARY KEY (group_id, permission_id),
+    FOREIGN KEY (group_id) REFERENCES user_groups(group_id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
+);
+GO
+
+-- Role Permissions Table
+CREATE TABLE role_permissions (
+    role_permission_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    role_name VARCHAR(50) NOT NULL,
+    permission_name VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT GETDATE(),
+    created_by BIGINT NULL,
+    CONSTRAINT uk_role_permission UNIQUE (role_name, permission_name)
+);
+GO
+
+-- ============================================================
+-- STEP 2: Create Indexes (AFTER all tables exist)
+-- ============================================================
+CREATE INDEX idx_user_group_members_user_id ON user_group_members(user_id);
+GO
+
+CREATE INDEX idx_user_group_permissions_permission_id ON user_group_permissions(permission_id);
+GO
+
+CREATE INDEX idx_role_permissions_role_name ON role_permissions(role_name);
+GO
+
+-- ============================================================
+-- STEP 3: Insert Default Data
+-- ============================================================
+
+-- Add default system groups
+INSERT INTO user_groups (group_name, description, is_system_group, is_active)
+VALUES
+    ('ADMINS', 'System administrators with full access', 1, 1),
+    ('MANAGERS', 'Line managers with approval authority', 1, 1),
+    ('INFRASTRUCTURE', 'Infrastructure team members', 1, 1),
+    ('FINANCE', 'Finance team members', 1, 1),
+    ('DRIVERS', 'Driver team members', 1, 1);
+GO
+
+-- Add group management permissions (if not exists)
+INSERT INTO permissions (permission_name, description)
+SELECT 'MANAGE_GROUPS', 'Create, edit, and delete user groups'
+WHERE NOT EXISTS (
+    SELECT 1 FROM permissions WHERE permission_name = 'MANAGE_GROUPS'
+);
+GO
+
+INSERT INTO permissions (permission_name, description)
+SELECT 'VIEW_GROUPS', 'View user groups and their members'
+WHERE NOT EXISTS (
+    SELECT 1 FROM permissions WHERE permission_name = 'VIEW_GROUPS'
+);
+GO
+
+-- ============================================================
+-- STEP 4: Assign Default Permissions to System Groups
+-- ============================================================
+
+-- ADMINS get all admin permissions
+INSERT INTO user_group_permissions (group_id, permission_id)
+SELECT
+    (SELECT group_id FROM user_groups WHERE group_name = 'ADMINS'),
+    p.permission_id
+FROM permissions p
+WHERE p.permission_name IN (
+    'ADMIN', 'MANAGE_ROLES', 'CREATE_USERS', 'RESET_PASSWORDS',
+    'MANAGE_CONFIG', 'VIEW_AUDIT', 'VIEW_ALL_TRANSACTIONS',
+    'MANAGE_GROUPS', 'VIEW_GROUPS'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM user_group_permissions ugp
+    WHERE ugp.group_id = (SELECT group_id FROM user_groups WHERE group_name = 'ADMINS')
+    AND ugp.permission_id = p.permission_id
+);
+GO
+
+-- MANAGERS get line manager permissions
+INSERT INTO user_group_permissions (group_id, permission_id)
+SELECT
+    (SELECT group_id FROM user_groups WHERE group_name = 'MANAGERS'),
+    p.permission_id
+FROM permissions p
+WHERE p.permission_name IN (
+    'APPROVE_LM', 'VIEW_REPORTS', 'EMPLOYEE_VIEW'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM user_group_permissions ugp
+    WHERE ugp.group_id = (SELECT group_id FROM user_groups WHERE group_name = 'MANAGERS')
+    AND ugp.permission_id = p.permission_id
+);
+GO
+
+-- INFRASTRUCTURE get infra permissions
+INSERT INTO user_group_permissions (group_id, permission_id)
+SELECT
+    (SELECT group_id FROM user_groups WHERE group_name = 'INFRASTRUCTURE'),
+    p.permission_id
+FROM permissions p
+WHERE p.permission_name IN (
+    'APPROVE_INFRA', 'REVIEW_INFRA', 'INFRA_REQUEST_VIEW', 'INFRA_REQUEST_APPROVE'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM user_group_permissions ugp
+    WHERE ugp.group_id = (SELECT group_id FROM user_groups WHERE group_name = 'INFRASTRUCTURE')
+    AND ugp.permission_id = p.permission_id
+);
+GO
+
+-- FINANCE get finance permissions
+INSERT INTO user_group_permissions (group_id, permission_id)
+SELECT
+    (SELECT group_id FROM user_groups WHERE group_name = 'FINANCE'),
+    p.permission_id
+FROM permissions p
+WHERE p.permission_name IN (
+    'APPROVE_FINANCE', 'VIEW_REPORTS', 'DOWNLOAD_REPORTS'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM user_group_permissions ugp
+    WHERE ugp.group_id = (SELECT group_id FROM user_groups WHERE group_name = 'FINANCE')
+    AND ugp.permission_id = p.permission_id
+);
+GO
+
+-- DRIVERS get driver permissions
+INSERT INTO user_group_permissions (group_id, permission_id)
+SELECT
+    (SELECT group_id FROM user_groups WHERE group_name = 'DRIVERS'),
+    p.permission_id
+FROM permissions p
+WHERE p.permission_name IN (
+    'DRIVER_VIEW', 'DRIVER_REQUEST', 'VIEW_OWN_TRANSACTIONS'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM user_group_permissions ugp
+    WHERE ugp.group_id = (SELECT group_id FROM user_groups WHERE group_name = 'DRIVERS')
+    AND ugp.permission_id = p.permission_id
+);
+GO
+
+-- ============================================================
+-- STEP 5: Optional - Create Trigger for updated_at
+-- ============================================================
+CREATE TRIGGER trg_user_groups_update
+ON user_groups
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE user_groups
+    SET updated_at = GETDATE()
+    FROM user_groups ug
+    INNER JOIN inserted i ON ug.group_id = i.group_id;
+END;
+GO
+
+-- ============================================================
+-- STEP 6: Verify Everything
+-- ============================================================
+-- Check tables exist
+SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME IN ('user_groups', 'user_group_members', 'user_group_permissions', 'role_permissions');
+GO
+
+-- Check system groups were inserted
+SELECT * FROM user_groups;
+GO
+
+-- Check permissions were added
+SELECT * FROM permissions WHERE permission_name IN ('MANAGE_GROUPS', 'VIEW_GROUPS');
+GO
+
+-- Check group permissions were assigned
+SELECT
+    ug.group_name,
+    p.permission_name
+FROM user_groups ug
+JOIN user_group_permissions ugp ON ug.group_id = ugp.group_id
+JOIN permissions p ON ugp.permission_id = p.permission_id
+ORDER BY ug.group_name, p.permission_name;
+GO

@@ -828,7 +828,14 @@
                             <a class="collapse-item" href="/assetIQ-pro/admin/audit"><i class="fas fa-history"></i> Audit Logs</a>
                         </li>
                         <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
-                            <a class="collapse-item" href="/assetIQ-pro/admin/permissions"><i class="fas fa-lock"></i> Permissions</a>
+                            <a class="collapse-item" th:classappend="${currentPage == 'groups'} ? 'active' : ''" href="/assetIQ-pro/admin/groups">
+                                <i class="fas fa-users"></i> User Groups
+                            </a>
+                        </li>
+                        <li sec:authorize="hasAnyAuthority('MANAGE_ROLES', 'ADMIN')">
+                            <a class="collapse-item" th:classappend="${currentPage == 'role-permissions'} ? 'active' : ''" href="/assetIQ-pro/admin/role-permissions">
+                                <i class="fas fa-lock"></i> Role Permissions
+                            </a>
                         </li>
                     </ul>
                 </div>

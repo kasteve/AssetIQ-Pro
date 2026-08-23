@@ -21,8 +21,19 @@ public class Permission {
     @Column(length = 255)
     private String description;
 
+    // ============================================
+    // Group Management Permission Constants
+    // ============================================
+    public static final String MANAGE_GROUPS = "MANAGE_GROUPS";
+    public static final String VIEW_GROUPS = "VIEW_GROUPS";
+
     public Permission(String permissionName, String description) {
         this.permissionName = permissionName;
         this.description = description;
+    }
+
+    @Override
+    public String toString() {
+        return permissionName;
     }
 }

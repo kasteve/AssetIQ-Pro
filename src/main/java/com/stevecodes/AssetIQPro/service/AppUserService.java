@@ -64,6 +64,12 @@ public class AppUserService {
     @Autowired
     private SystemSettingService settingService;
 
+    @Autowired
+    private UserGroupService userGroupService;
+
+    @Autowired
+    private RolePermissionService rolePermissionService;
+
     // ============================================
     // Default Permissions for ALL New Users
     // ============================================
@@ -493,6 +499,42 @@ public class AppUserService {
         auditService.logAction("PASSWORD_CHANGED",
                 "Password changed for user: " + user.getUsername(),
                 user.getUserId());
+    }
+
+    /**
+     * Get all effective permissions for a user
+     * Priority: Direct > Group > Role
+     */
+    public Set<String> getEffectivePermissions(Long userId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        Set<String> allPermissions = new HashSet<>();
+
+        // 1. Add role-based permissions
+        if (user.getRole() != null) {
+            allPermissions.addAll(rolePermissionService.getPermissionsForRole(user.getRole()));
+        }
+
+        // 2. Add group-based permissions
+        Set<String> groupPermissions = userGroupService.getGroupPermissionsForUser(userId);
+        allPermissions.addAll(groupPermissions);
+
+        // 3. Add direct permissions (highest priority - can override)
+        if (user.getPermissions() != null) {
+            user.getPermissions().stream()
+                    .map(Permission::getPermissionName)
+                    .forEach(allPermissions::add);
+        }
+
+        return allPermissions;
+    }
+
+    /**
+     * Check if a user has a permission (considering role, groups, and direct)
+     */
+    public boolean userHasPermission(Long userId, String permissionName) {
+        return getEffectivePermissions(userId).contains(permissionName);
     }
 
     @Transactional

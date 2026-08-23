@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/default}">
+
+<head>
+    <title>Role Permissions - AssetIQ-Pro</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+</head>
+
+<body>
+<div layout:fragment="content">
+    <div class="page-header-row">
+        <h4><i class="fas fa-lock me-2"></i>Role Permissions</h4>
+        <div>
+            <button class="btn btn-warning" onclick="initializeDefaults()">
+                <i class="fas fa-sync me-2"></i>Reset to Defaults
+            </button>
+            <a href="/assetIQ-pro/admin/groups" class="btn btn-secondary">
+                <i class="fas fa-users me-2"></i>Manage Groups
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>How it works:</strong> Permissions are automatically assigned based on a user's role.
+        Users also inherit permissions from groups they belong to, and can have custom permissions directly assigned.
+        <span class="badge bg-primary ms-2">Priority: Direct > Group > Role</span>
+    </div>
+
+    <!-- Role Permissions Cards -->
+    <div class="row g-4" id="rolePermissionsContainer">
+        <div class="col-md-6 col-xl-4" th:each="role : ${roles}">
+            <div class="role-permission-card">
+                <div class="role-header">
+                    <div>
+                        <span class="role-name" th:text="${role}">ROLE</span>
+                        <span class="role-badge" th:classappend="${role == 'ADMIN' || role == 'SUPERADMIN' ? 'admin' :
+                                                                   role == 'MANAGER' ? 'manager' :
+                                                                   role == 'INFRA' ? 'infra' :
+                                                                   role == 'FINANCE' ? 'finance' :
+                                                                   role == 'DRIVER' ? 'driver' : 'employee'}">
+                            <span th:text="${role}">EMPLOYEE</span>
+                        </span>
+                    </div>
+                    <span class="perm-count" th:text="${rolePermissions[role] != null ? #lists.size(rolePermissions[role]) : 0}">0</span>
+                </div>
+                <div class="role-body">
+                    <div class="permission-tags" id="perms-[[${role}]]">
+                        <th:block th:if="${rolePermissions[role] != null and !#lists.isEmpty(rolePermissions[role])}">
+                            <span th:each="perm : ${rolePermissions[role]}"
+                                  class="permission-tag">
+                                <span th:text="${perm}">PERMISSION</span>
+                            </span>
+                        </th:block>
+                        <span th:if="${rolePermissions[role] == null or #lists.isEmpty(rolePermissions[role])}" class="text-muted small">
+                            No permissions assigned
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary edit-perms-btn mt-3"
+                            data-bs-toggle="modal"
+                            data-bs-target="#editRolePermissionsModal"
+                            th:data-rolename="${role}"
+                            th:data-permissions="${rolePermissions[role] != null ? #strings.join(rolePermissions[role], ',') : ''}">
+                        <i class="fas fa-edit me-1"></i> Edit Permissions
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- EDIT ROLE PERMISSIONS MODAL -->
+    <!-- ============================================ -->
+    <div class="modal fade" id="editRolePermissionsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2" style="color: #0d6efd;"></i>Edit Role Permissions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form th:action="@{/admin/role-permissions/sync}" method="post">
+                    <input type="hidden" name="roleName" id="editRoleName">
+                    <div class="modal-body">
+                        <p><strong>Role:</strong> <span id="editRoleNameDisplay"></span></p>
+                        <div class="mb-2">
+                            <label class="form-label">Permissions</label>
+                            <small class="text-muted d-block mb-2">Select all permissions that should be assigned to this role</small>
+                            <div class="perm-picker">
+                                <div class="perm-picker-item" th:each="perm : ${allPermissions}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               th:value="${perm.permissionName}"
+                                               th:id="'role-perm-' + ${perm.permissionName}">
+                                        <label class="form-check-label" th:for="'role-perm-' + ${perm.permissionName}">
+                                            <span class="perm-name" th:text="${perm.permissionName}">PERM_NAME</span>
+                                            <span class="perm-desc" th:text="${perm.description}">Description</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Permissions</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TOAST CONTAINER -->
+    <!-- ============================================ -->
+    <div class="toast-container position-fixed top-50 start-50 translate-middle" style="z-index: 9999; pointer-events: none;" id="toastContainer"></div>
+</div>
+
+<div layout:fragment="styles">
+    <style>
+        .page-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+        .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; }
+        .page-header-row h4 i { color: var(--primary-color); }
+        .page-header-row .btn { border-radius: 10px !important; }
+
+        .role-permission-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            overflow: hidden;
+            height: 100%;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+        }
+        .role-permission-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px var(--shadow-color);
+        }
+        .role-header {
+            padding: 16px 20px;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .role-name { font-weight: 700; font-size: 15px; color: var(--ink); }
+        .role-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 8px;
+            text-transform: uppercase;
+        }
+        .role-badge.admin { background: #fdeeee; color: #dc3545; }
+        .role-badge.manager { background: #eef0fd; color: #6610f2; }
+        .role-badge.infra { background: #e8eefc; color: #0d6efd; }
+        .role-badge.finance { background: #e6f7ec; color: #198754; }
+        .role-badge.driver { background: #fff4e0; color: #fd7e14; }
+        .role-badge.employee { background: #eef0f3; color: #6c757d; }
+        .perm-count {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 20px;
+            padding: 2px 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .role-body { padding: 16px 20px 20px; }
+        .permission-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-height: 40px;
+        }
+        .permission-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #e8eefc;
+            color: #0d6efd;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid #d0ddf5;
+        }
+        .edit-perms-btn { border-radius: 8px; font-size: 12px; padding: 5px 14px; }
+
+        .modal-content { border-radius: 16px; border: none !important; box-shadow: 0 24px 70px rgba(15,23,42,0.28); background: var(--modal-bg); }
+        .modal-header { border-bottom: 1px solid var(--border-color); padding: 20px 24px; }
+        .modal-footer { border-top: 1px solid var(--border-color); padding: 16px 24px; }
+        .modal-title { font-weight: 700; font-size: 18px; }
+        .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+
+        .perm-picker {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px;
+            background: var(--bg-color);
+        }
+        .perm-picker-item .form-check {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px 8px 2.2rem;
+            margin: 0;
+            transition: border-color 0.15s ease;
+        }
+        .perm-picker-item .form-check:hover { border-color: var(--primary-color); }
+        .perm-picker-item .form-check-input { margin-left: -1.7rem; margin-top: 3px; cursor: pointer; }
+        .perm-picker-item .form-check-label { cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
+        .perm-picker-item .perm-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+        .perm-picker-item .perm-desc { font-size: 11px; color: var(--text-muted); line-height: 1.3; }
+
+        .toast-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+        .app-toast {
+            pointer-events: auto;
+            min-width: 320px;
+            max-width: 500px;
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: slideInCenter 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+            width: 100%;
+        }
+        .app-toast .toast-header { border-bottom: none; font-weight: 700; font-size: 15px; padding: 14px 20px; background: white; }
+        .app-toast .toast-body { font-size: 14.5px; padding: 14px 20px 20px 20px; background: white; color: #1a1a2e; line-height: 1.5; }
+        .app-toast.toast-success .toast-header { background: #e6f7ec; color: #0d7a3e; border-bottom: 2px solid #28a745; }
+        .app-toast.toast-error .toast-header { background: #fdeeee; color: #b02a37; border-bottom: 2px solid #dc3545; }
+        .app-toast.toast-warning .toast-header { background: #fff4e0; color: #b35d0a; border-bottom: 2px solid #fd7e14; }
+        .app-toast.toast-info .toast-header { background: #e8eefc; color: #0a58ca; border-bottom: 2px solid #0d6efd; }
+        @keyframes slideInCenter { 0% { opacity: 0; transform: scale(0.7) translateY(-30px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes slideOutCenter { 0% { opacity: 1; transform: scale(1) translateY(0); } 100% { opacity: 0; transform: scale(0.7) translateY(-30px); } }
+        .app-toast.hiding { animation: slideOutCenter 0.4s ease-in forwards; }
+        .toast-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.35); z-index: 9998; backdrop-filter: blur(4px); animation: fadeInBackdrop 0.3s ease forwards; }
+        @keyframes fadeInBackdrop { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes fadeOutBackdrop { 0% { opacity: 1; } 100% { opacity: 0; } }
+        .toast-backdrop.hiding { animation: fadeOutBackdrop 0.3s ease forwards; }
+
+        @media (max-width: 768px) { .perm-picker { grid-template-columns: 1fr; } }
+        @media (max-width: 576px) { .toast-container { max-width: 100%; padding: 16px; } .app-toast { min-width: auto; max-width: 100%; border-radius: 12px; } }
+    </style>
+</div>
+
+<div layout:fragment="scripts">
+    <script>
+        // ============================================
+        // Toast Helper
+        // ============================================
+        const TOAST_ICONS = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+        const TOAST_TITLES = { success: '✅ Success', error: '❌ Error', warning: '⚠️ Warning', info: 'ℹ️ Notice' };
+        let backdropElement = null, activeToasts = 0;
+
+        function showToast(message, type, delay) {
+            type = type || 'info';
+            delay = delay || 5000;
+            var container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            var icon = TOAST_ICONS[type] || TOAST_ICONS.info;
+            var title = TOAST_TITLES[type] || TOAST_TITLES.info;
+            if (activeToasts === 0) {
+                backdropElement = document.createElement('div');
+                backdropElement.className = 'toast-backdrop';
+                document.body.appendChild(backdropElement);
+            }
+            activeToasts++;
+            var toastEl = document.createElement('div');
+            toastEl.className = 'toast app-toast toast-' + type;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.innerHTML = '<div class="toast-header"><i class="fas ' + icon + ' me-2"></i><strong class="me-auto">' + title + '</strong><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div><div class="toast-body">' + message + '</div>';
+            container.appendChild(toastEl);
+            var bsToast = new bootstrap.Toast(toastEl, { delay: delay, autohide: true });
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.classList.add('hiding');
+                setTimeout(function() {
+                    toastEl.remove();
+                    activeToasts--;
+                    if (activeToasts === 0 && backdropElement) {
+                        backdropElement.classList.add('hiding');
+                        setTimeout(function() { if (backdropElement) { backdropElement.remove(); backdropElement = null; } }, 300);
+                    }
+                }, 400);
+            });
+            bsToast.show();
+            setTimeout(function() {
+                if (toastEl && toastEl.parentNode) {
+                    var bsInstance = bootstrap.Toast.getInstance(toastEl);
+                    if (bsInstance) bsInstance.hide();
+                }
+            }, delay + 500);
+        }
+
+        // ============================================
+        // Edit Role Permissions Modal
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            var editModal = document.getElementById('editRolePermissionsModal');
+            if (editModal) {
+                editModal.addEventListener('show.bs.modal', function(event) {
+                    var button = event.relatedTarget;
+                    var roleName = button.getAttribute('data-rolename');
+                    var permissionsStr = button.getAttribute('data-permissions') || '';
+
+                    document.getElementById('editRoleName').value = roleName;
+                    document.getElementById('editRoleNameDisplay').textContent = roleName;
+
+                    // Uncheck all
+                    document.querySelectorAll('#editRolePermissionsModal input[name="permissions"]').forEach(function(cb) {
+                        cb.checked = false;
+                    });
+
+                    // Check current permissions
+                    if (permissionsStr) {
+                        var perms = permissionsStr.split(',');
+                        document.querySelectorAll('#editRolePermissionsModal input[name="permissions"]').forEach(function(cb) {
+                            if (perms.indexOf(cb.value) !== -1) {
+                                cb.checked = true;
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // ============================================
+        // Initialize Defaults
+        // ============================================
+        function initializeDefaults() {
+            if (!confirm('This will reset all role permissions to their default values. Continue?')) {
+                return;
+            }
+
+            fetch('/assetIQ-pro/admin/role-permissions/initialize-defaults', { method: 'POST' })
+                .then(function(response) {
+                    if (response.ok) {
+                        showToast('Default permissions initialized successfully.', 'success');
+                        setTimeout(function() { window.location.reload(); }, 1200);
+                    } else {
+                        throw new Error('Failed to initialize defaults');
+                    }
+                })
+                .catch(function(error) {
+                    showToast('Failed to initialize defaults: ' + error.message, 'error');
+                });
+        }
+
+        // ============================================
+        // Flash Messages - FIXED
+        // ============================================
+        (function() {
+            var urlParams = new URLSearchParams(window.location.search);
+
+            // Check for success message
+            var successMsg = urlParams.get('success');
+            if (successMsg && successMsg.trim()) {
+                // Decode the message - it might be URL encoded
+                try {
+                    var decoded = decodeURIComponent(successMsg);
+                    // Remove any HTML tags that might have been injected
+                    var cleanMsg = decoded.replace(/<[^>]*>/g, '');
+                    showToast(cleanMsg, 'success');
+                } catch(e) {
+                    showToast('Operation completed successfully.', 'success');
+                }
+            }
+
+            // Check for error message
+            var errorMsg = urlParams.get('error');
+            if (errorMsg && errorMsg.trim()) {
+                try {
+                    var decoded = decodeURIComponent(errorMsg);
+                    var cleanMsg = decoded.replace(/<[^>]*>/g, '');
+                    showToast(cleanMsg, 'error');
+                } catch(e) {
+                    showToast('An error occurred.', 'error');
+                }
+            }
+        })();
+    </script>
+</div>
+</body>
+</html>
