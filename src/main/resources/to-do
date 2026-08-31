@@ -23,17 +23,9 @@ asset status changes to disposed, those options should become inactive so that o
 
 
 
--- Update existing session timeout to 10 minutes
-UPDATE [AssetIQ_Pro_db].[dbo].[system_settings]
-SET [setting_value] = '10',
-    [updated_at] = GETDATE()
-WHERE [setting_key] = 'SESSION_TIMEOUT';
+Allow the transfers to be moved to the next receiver without necessarily creating a new one. The existing parameters
+and details for the asset should not be changed apart from the new receiving person. Here the person currently having the asset
+should be the old asset giver and the only the new one should be added and all should sign, the asset configurator, finance rep and
+Infra representatives should also sign. The transactions history should be captured detailing the movement of the
+asset from the previous ones to the current transfer.
 
--- If the record doesn't exist, insert it
-IF NOT EXISTS (SELECT 1 FROM [AssetIQ_Pro_db].[dbo].[system_settings] WHERE [setting_key] = 'SESSION_TIMEOUT')
-BEGIN
-    INSERT INTO [AssetIQ_Pro_db].[dbo].[system_settings]
-        ([is_active], [category], [created_at], [description], [is_encrypted], [setting_key], [setting_value], [updated_at], [updated_by])
-    VALUES
-        (1, 'Security', GETDATE(), 'Session timeout in minutes', 0, 'SESSION_TIMEOUT', '10', GETDATE(), 1);
-END
