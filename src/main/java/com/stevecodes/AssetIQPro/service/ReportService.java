@@ -42,7 +42,7 @@ public class ReportService {
     private final AppUserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final CategoryRepository categoryRepository;
-    private final RoomRepository roomRepository;  // ADDED THIS
+    private final RoomRepository roomRepository;
 
     // Colors matching the email design - using RGB values
     private static final DeviceRgb PRIMARY_COLOR = new DeviceRgb(79, 70, 229);
@@ -61,9 +61,8 @@ public class ReportService {
     // Helper to convert hex to DeviceRgb
     private DeviceRgb hexToRgb(String hex) {
         if (hex == null || hex.isEmpty()) {
-            return new DeviceRgb(100, 116, 139); // Default muted
+            return new DeviceRgb(100, 116, 139);
         }
-        // Remove # if present
         String clean = hex.startsWith("#") ? hex.substring(1) : hex;
         try {
             int r = Integer.parseInt(clean.substring(0, 2), 16);
@@ -88,20 +87,13 @@ public class ReportService {
             Document document = new Document(pdfDoc, PageSize.A4);
             document.setMargins(40, 40, 40, 40);
 
-            // Load fonts
             PdfFont regularFont = PdfFontFactory.createFont("Helvetica");
             PdfFont boldFont = PdfFontFactory.createFont("Helvetica-Bold");
 
-            // Add cover page
             addCoverPage(document, reportType, startDate, endDate, boldFont, regularFont);
-
-            // Add table of contents
             addTableOfContents(document, boldFont, regularFont);
-
-            // Add executive summary
             addExecutiveSummary(document, reportType, startDate, endDate, boldFont, regularFont);
 
-            // Add the main data based on report type
             switch (reportType.toUpperCase()) {
                 case "ASSETS":
                     addAssetReport(document, startDate, endDate, boldFont, regularFont);
@@ -134,10 +126,8 @@ public class ReportService {
 
     private void addCoverPage(Document document, String reportType, LocalDate startDate, LocalDate endDate,
                               PdfFont boldFont, PdfFont regularFont) {
-        // Company Logo / Header
         document.add(new Paragraph("\n\n\n\n\n\n\n\n\n\n\n\n"));
 
-        // Report Title
         Paragraph title = new Paragraph("ASSETIQ-PRO")
                 .setFont(boldFont)
                 .setFontSize(28)
@@ -154,7 +144,6 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Report Type
         Paragraph type = new Paragraph(reportType.toUpperCase() + " REPORT")
                 .setFont(boldFont)
                 .setFontSize(16)
@@ -164,7 +153,6 @@ public class ReportService {
 
         document.add(new Paragraph("\n\n"));
 
-        // Date Range
         String dateRange = startDate + " to " + endDate;
         Paragraph dates = new Paragraph("Reporting Period: " + dateRange)
                 .setFont(regularFont)
@@ -173,7 +161,6 @@ public class ReportService {
                 .setTextAlignment(TextAlignment.CENTER);
         document.add(dates);
 
-        // Generated Date
         String generated = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy, HH:mm"));
         Paragraph generatedDate = new Paragraph("Generated: " + generated)
                 .setFont(regularFont)
@@ -184,7 +171,6 @@ public class ReportService {
 
         document.add(new Paragraph("\n\n\n\n\n\n\n\n\n\n\n\n"));
 
-        // Footer
         Paragraph footer = new Paragraph("Confidential - For Internal Use Only")
                 .setFont(regularFont)
                 .setFontSize(10)
@@ -200,14 +186,12 @@ public class ReportService {
                 .setTextAlignment(TextAlignment.CENTER));
 
         document.add(new Paragraph("\n\n\n\n"));
-        // Add a separator line
         document.add(new Paragraph("─".repeat(80))
                 .setFont(regularFont)
                 .setFontSize(8)
                 .setFontColor(TEXT_MUTED)
                 .setTextAlignment(TextAlignment.CENTER));
 
-        // Start a new page
         document.add(new Paragraph("\n\n"));
         document.add(new Paragraph(" ").setFontSize(1));
         document.add(new Paragraph("\n\n"));
@@ -285,7 +269,6 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Key highlights based on report type
         switch (reportType.toUpperCase()) {
             case "ASSETS":
                 addAssetHighlights(document, startDate, endDate, boldFont, regularFont);
@@ -324,11 +307,9 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Get data
         List<Asset> assets = assetRepository.findAll();
         LocalDate now = LocalDate.now();
 
-        // Filter by date range
         if (startDate != null) {
             assets = assets.stream()
                     .filter(a -> a.getPurchaseDate() != null && !a.getPurchaseDate().isBefore(startDate))
@@ -340,7 +321,6 @@ public class ReportService {
                     .collect(Collectors.toList());
         }
 
-        // Calculate statistics
         long totalAssets = assets.size();
         long activeAssets = assets.stream()
                 .filter(a -> a.getStatus() == Asset.AssetStatus.AVAILABLE || a.getStatus() == Asset.AssetStatus.ASSIGNED)
@@ -352,7 +332,6 @@ public class ReportService {
                 .filter(a -> a.getEolDate() != null && a.getEolDate().isBefore(now))
                 .count();
 
-        // Add summary section
         document.add(new Paragraph("Key Metrics")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -360,13 +339,11 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Create summary table
         float[] summaryWidths = {200, 200};
         Table summaryTable = new Table(summaryWidths);
         summaryTable.setHorizontalAlignment(HorizontalAlignment.CENTER);
         summaryTable.setWidth(UnitValue.createPercentValue(80));
 
-        // Add rows
         addSummaryRow(summaryTable, "Total Assets", String.valueOf(totalAssets), boldFont, regularFont);
         addSummaryRow(summaryTable, "Active Assets", String.valueOf(activeAssets), boldFont, regularFont);
         addSummaryRow(summaryTable, "Expired Warranty", String.valueOf(expiredWarranty), boldFont, regularFont);
@@ -375,7 +352,6 @@ public class ReportService {
         document.add(summaryTable);
         document.add(new Paragraph("\n\n"));
 
-        // Asset Details Table
         document.add(new Paragraph("Asset Details")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -383,15 +359,12 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Create asset data table
         float[] assetWidths = {30, 100, 80, 100, 80, 80, 80};
         Table assetTable = new Table(assetWidths);
         assetTable.setWidth(UnitValue.createPercentValue(100));
 
-        // Add header
         addTableHeader(assetTable, new String[]{"#", "Name", "Tag", "Category", "Purchase Date", "Status", "Warranty"}, boldFont);
 
-        // Add data rows (limit to 20 rows to keep PDF manageable)
         int count = 0;
         for (Asset asset : assets.stream().limit(20).collect(Collectors.toList())) {
             count++;
@@ -408,7 +381,6 @@ public class ReportService {
                     .setTextAlignment(TextAlignment.CENTER));
         }
 
-        // Category breakdown
         document.add(new Paragraph("\n\n"));
         document.add(new Paragraph("Category Breakdown")
                 .setFont(boldFont)
@@ -434,10 +406,8 @@ public class ReportService {
         categoryCount.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .forEach(entry -> {
-                    Cell catCell = new Cell().add(new Paragraph(entry.getKey()).setFont(regularFont).setFontSize(10));
-                    Cell countCell = new Cell().add(new Paragraph(String.valueOf(entry.getValue())).setFont(regularFont).setFontSize(10));
-                    catTable.addCell(catCell);
-                    catTable.addCell(countCell);
+                    catTable.addCell(new Cell().add(new Paragraph(entry.getKey()).setFont(regularFont).setFontSize(10)));
+                    catTable.addCell(new Cell().add(new Paragraph(String.valueOf(entry.getValue())).setFont(regularFont).setFontSize(10)));
                 });
 
         document.add(catTable);
@@ -465,10 +435,8 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Get data
         List<Transfer> transfers = transferRepository.findAll();
 
-        // Filter by date range
         if (startDate != null) {
             transfers = transfers.stream()
                     .filter(t -> t.getTransferDate() != null && !t.getTransferDate().isBefore(startDate))
@@ -480,7 +448,6 @@ public class ReportService {
                     .collect(Collectors.toList());
         }
 
-        // Calculate statistics
         long totalTransfers = transfers.size();
         long pendingTransfers = transfers.stream()
                 .filter(t -> "PENDING".equalsIgnoreCase(t.getStatus()))
@@ -492,7 +459,6 @@ public class ReportService {
                 .filter(t -> "REJECTED".equalsIgnoreCase(t.getStatus()))
                 .count();
 
-        // Add summary section
         document.add(new Paragraph("Key Metrics")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -513,7 +479,6 @@ public class ReportService {
         document.add(summaryTable);
         document.add(new Paragraph("\n\n"));
 
-        // Transfer Details Table
         document.add(new Paragraph("Transfer Details")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -543,7 +508,6 @@ public class ReportService {
                     .setTextAlignment(TextAlignment.CENTER));
         }
 
-        // Category breakdown
         document.add(new Paragraph("\n\n"));
         document.add(new Paragraph("Transfer Category Breakdown")
                 .setFont(boldFont)
@@ -552,10 +516,11 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
+        // ✅ FIX: Use getCategoryType() instead of getCategory()
         Map<String, Long> categoryCount = transfers.stream()
-                .filter(t -> t.getCategory() != null)
+                .filter(t -> t.getCategoryType() != null)
                 .collect(Collectors.groupingBy(
-                        Transfer::getCategory,
+                        Transfer::getCategoryType,
                         Collectors.counting()
                 ));
 
@@ -598,11 +563,9 @@ public class ReportService {
 
         document.add(new Paragraph("\n"));
 
-        // Get data
         List<Booking> bookings = bookingRepository.findAll();
         List<DriverRequest> driverRequests = driverRequestRepository.findAll();
 
-        // Filter bookings by date range
         if (startDate != null) {
             bookings = bookings.stream()
                     .filter(b -> b.getStartTime() != null && !b.getStartTime().toLocalDate().isBefore(startDate))
@@ -614,7 +577,6 @@ public class ReportService {
                     .collect(Collectors.toList());
         }
 
-        // Filter driver requests by date range
         if (startDate != null) {
             driverRequests = driverRequests.stream()
                     .filter(r -> r.getRequestTime() != null && !r.getRequestTime().toLocalDate().isBefore(startDate))
@@ -626,7 +588,6 @@ public class ReportService {
                     .collect(Collectors.toList());
         }
 
-        // Calculate statistics
         long totalBookings = bookings.size();
         long totalDriverRequests = driverRequests.size();
         long pendingBookings = bookings.stream()
@@ -639,7 +600,6 @@ public class ReportService {
                 .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()) || "PENDING_ADMIN".equalsIgnoreCase(r.getStatus()))
                 .count();
 
-        // Add summary section
         document.add(new Paragraph("Key Metrics")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -660,7 +620,6 @@ public class ReportService {
         document.add(summaryTable);
         document.add(new Paragraph("\n\n"));
 
-        // Room Bookings Table
         document.add(new Paragraph("Room Bookings")
                 .setFont(boldFont)
                 .setFontSize(14)
@@ -690,7 +649,6 @@ public class ReportService {
                     .setTextAlignment(TextAlignment.CENTER));
         }
 
-        // Driver Requests Table
         document.add(new Paragraph("\n\n"));
         document.add(new Paragraph("Driver Requests")
                 .setFont(boldFont)
@@ -747,7 +705,6 @@ public class ReportService {
         List<Transfer> transfers = transferRepository.findAll();
         List<Booking> bookings = bookingRepository.findAll();
 
-        // Calculate some combined metrics
         long totalTransfers = transfers.size();
         long pendingTransfers = transfers.stream()
                 .filter(t -> "PENDING".equalsIgnoreCase(t.getStatus()))
@@ -997,12 +954,13 @@ public class ReportService {
                 .setPadding(4));
     }
 
+    // ✅ FIXED: Use getCategoryType() instead of getCategory()
     private void addTransferRow(Table table, int count, Transfer transfer, PdfFont regularFont) {
         DeviceRgb statusColor = hexToRgb(getTransferStatusColor(transfer.getStatus()));
 
         table.addCell(new Cell().add(new Paragraph(String.valueOf(count)).setFont(regularFont).setFontSize(9))
                 .setPadding(4));
-        table.addCell(new Cell().add(new Paragraph(transfer.getCategory() != null ? transfer.getCategory() : "N/A").setFont(regularFont).setFontSize(9))
+        table.addCell(new Cell().add(new Paragraph(transfer.getCategoryType() != null ? transfer.getCategoryType() : "N/A").setFont(regularFont).setFontSize(9))
                 .setPadding(4));
         table.addCell(new Cell().add(new Paragraph(getDepartmentName(transfer.getOldDepartmentId())).setFont(regularFont).setFontSize(9))
                 .setPadding(4));

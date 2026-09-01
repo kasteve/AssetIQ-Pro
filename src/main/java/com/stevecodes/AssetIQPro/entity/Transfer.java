@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,22 @@ public class Transfer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "transferId")
     private Long transferId;
+
+    // ============================================
+    // HISTORY LINKING FIELDS
+    // ============================================
+
+    @Column(name = "originalTransferId")
+    private Long originalTransferId;
+
+    @Column(name = "previousTransferId")
+    private Long previousTransferId;
+
+    @Column(name = "transferSequence")
+    private Integer transferSequence = 1;
+
+    @Column(name = "isInitialTransfer")
+    private Boolean isInitialTransfer = false;
 
     // ============================================
     // Asset Information
@@ -37,10 +54,11 @@ public class Transfer {
     private LocalDate transferDate;
 
     // ============================================
-    // Category - FIXED: Proper mapping to Category entity
+    // Category - Add @JsonIgnore to prevent circular reference
     // ============================================
     @ManyToOne
     @JoinColumn(name = "CategoryId", referencedColumnName = "CategoryId")
+    @JsonIgnore
     private Category category;
 
     // ============================================
@@ -91,6 +109,9 @@ public class Transfer {
     @Column(name = "FinanceRepresentativeId")
     private Long financeRepresentativeId;
 
+    // ============================================
+    // Staff IDs
+    // ============================================
     @Column(name = "oldEmployeeStaffId")
     private String oldEmployeeStaffId;
 
@@ -278,37 +299,66 @@ public class Transfer {
         return Boolean.TRUE.equals(isFullySigned);
     }
 
-    // ============================================
-    // FIXED: These methods now return proper values
-    // ============================================
-
-    /**
-     * Returns the transfer status based on signature completion
-     */
     public String getStatus() {
+        // ✅ First check if fully signed flag is true
         if (Boolean.TRUE.equals(isFullySigned)) {
             return "COMPLETED";
         }
-        // Check if any signatures are present
+
+        // ✅ Check if all required signatures are present
+        boolean allRequiredSignersSigned = true;
+        boolean hasAnySigner = false;
+
+        if (oldHandoverById != null) {
+            hasAnySigner = true;
+            if (oldHandoverBySignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (oldReceivedById != null) {
+            hasAnySigner = true;
+            if (oldReceivedBySignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (newHandoverById != null) {
+            hasAnySigner = true;
+            if (newHandoverBySignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (newReceivedById != null) {
+            hasAnySigner = true;
+            if (newReceivedBySignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (configuredById != null) {
+            hasAnySigner = true;
+            if (configuredBySignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (infraRepresentativeId != null) {
+            hasAnySigner = true;
+            if (infraRepSignedAt == null) allRequiredSignersSigned = false;
+        }
+        if (financeRepresentativeId != null) {
+            hasAnySigner = true;
+            if (financeRepSignedAt == null) allRequiredSignersSigned = false;
+        }
+
+        // If all required signers have signed, mark as completed
+        if (allRequiredSignersSigned && hasAnySigner) {
+            isFullySigned = true;
+            return "COMPLETED";
+        }
+
+        // Check if any signatures are present (in progress)
         if (oldHandoverBySignedAt != null || oldReceivedBySignedAt != null ||
                 newHandoverBySignedAt != null || newReceivedBySignedAt != null ||
                 configuredBySignedAt != null || infraRepSignedAt != null || financeRepSignedAt != null) {
             return "IN_PROGRESS";
         }
+
         return "PENDING";
     }
 
-    /**
-     * Returns the transfer type based on category
-     * FIXED: Handles null category properly
-     */
-    public String getCategory() {
-        // First try to get from category entity
+    public String getCategoryType() {
         if (category != null) {
             String categoryName = category.getName();
             if (categoryName != null) {
                 String cat = categoryName.toUpperCase();
-                // Map based on your actual category names
                 if (cat.equals("LAPTOP") || cat.equals("HARDWARE2") ||
                         cat.equals("SERVER") || cat.equals("NETWORK") ||
                         cat.equals("HARDWARE12")) {
@@ -318,69 +368,43 @@ public class Transfer {
                 } else if (cat.equals("ANOTHER ONE") || cat.equals("TP")) {
                     return "OTHER";
                 }
-                // Default for unknown categories
                 return "ASSET";
             }
         }
-        // Default based on asset tag presence
         if (assetTag != null && !assetTag.isEmpty()) {
             return "ASSET";
         }
         return "OTHER";
     }
 
-    /**
-     * Returns the transfer type (for backward compatibility)
-     */
     public String getTransferType() {
-        return getCategory();
+        return getCategoryType();
     }
 
-    /**
-     * Returns the asset name or tag
-     */
     public String getAsset() {
         return assetTag != null ? assetTag : "N/A";
     }
 
-    /**
-     * Returns amount (not applicable for asset transfers)
-     */
     public String getAmount() {
         return "N/A";
     }
 
-    /**
-     * Returns from location (department name)
-     */
     public String getFromLocation() {
         return oldDepartmentName != null ? oldDepartmentName : "N/A";
     }
 
-    /**
-     * Returns to location (department name)
-     */
     public String getToLocation() {
         return newDepartmentName != null ? newDepartmentName : "N/A";
     }
 
-    /**
-     * Returns the created date (use transfer date)
-     */
     public LocalDate getCreatedAt() {
         return transferDate;
     }
 
-    /**
-     * Returns the category name
-     */
     public String getCategoryName() {
         return category != null ? category.getName() : "N/A";
     }
 
-    /**
-     * Returns the category ID
-     */
     public Integer getCategoryId() {
         return category != null ? category.getCategoryId() : null;
     }
@@ -455,5 +479,57 @@ public class Transfer {
 
     public String getFullySignedPDF() {
         return fullySignedPdf;
+    }
+
+    // ============================================
+    // GETTERS AND SETTERS FOR HISTORY LINKING FIELDS
+    // ============================================
+
+    public Long getOriginalTransferId() {
+        return originalTransferId;
+    }
+
+    public void setOriginalTransferId(Long originalTransferId) {
+        this.originalTransferId = originalTransferId;
+    }
+
+    public Long getPreviousTransferId() {
+        return previousTransferId;
+    }
+
+    public void setPreviousTransferId(Long previousTransferId) {
+        this.previousTransferId = previousTransferId;
+    }
+
+    public Integer getTransferSequence() {
+        return transferSequence != null ? transferSequence : 1;
+    }
+
+    public void setTransferSequence(Integer transferSequence) {
+        this.transferSequence = transferSequence;
+    }
+
+    public Boolean getIsInitialTransfer() {
+        return isInitialTransfer != null ? isInitialTransfer : false;
+    }
+
+    public void setIsInitialTransfer(Boolean isInitialTransfer) {
+        this.isInitialTransfer = isInitialTransfer;
+    }
+
+    public boolean isInitialTransfer() {
+        return Boolean.TRUE.equals(isInitialTransfer);
+    }
+
+    // ============================================
+    // Category getter/setter (for the ENTITY)
+    // ============================================
+
+    public Category getCategory() {
+        return category;
+    }
+
+    public void setCategory(Category category) {
+        this.category = category;
     }
 }

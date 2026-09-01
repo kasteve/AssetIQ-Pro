@@ -105,7 +105,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- VIEW TRANSFER MODAL -->
+    <!-- VIEW TRANSFER MODAL WITH RE-TRANSFER OPTION -->
     <!-- ============================================================ -->
     <div class="modal fade" id="viewTransferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -123,6 +123,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" id="retransferFromViewBtn" onclick="openRetransferModal()">
+                        <i class="fas fa-exchange-alt me-2"></i>Re-Transfer
+                    </button>
                     <button type="button" class="btn btn-danger" id="pdfFromViewBtn" onclick="downloadPDFFromView()">
                         <i class="fas fa-file-pdf me-2"></i>Download PDF
                     </button>
@@ -132,7 +135,197 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- CREATE TRANSFER MODAL -->
+    <!-- RE-TRANSFER MODAL -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="retransferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-exchange-alt me-2" style="color: #fd7e14;"></i>Re-Transfer Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="retransferForm" th:action="@{/transfers/retransfer}" method="post">
+                    <div class="modal-body">
+                        <!-- Hidden fields -->
+                        <input type="hidden" name="sourceTransferId" id="retransferSourceId">
+                        <input type="hidden" name="assetTag" id="retransferAssetTag">
+
+                        <!-- Asset Info -->
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Re-Transfer Asset:</strong> This will create a new transfer record for the same asset. All existing signers (Configurator, Infrastructure Rep, Finance Rep) will be notified and must sign. The current holder will become the "From" employee.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Current Asset Details -->
+                        <div class="panel-card mb-3">
+                            <div class="panel-header">
+                                <h6><i class="fas fa-laptop me-2" style="color: #0d6efd;"></i>Asset Details</h6>
+                            </div>
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="detail-item">
+                                            <span class="label">Asset Tag</span>
+                                            <span class="value fw-bold" id="retransferAssetTagDisplay">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="detail-item">
+                                            <span class="label">Serial Number</span>
+                                            <span class="value" id="retransferSerialNumber">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="detail-item">
+                                            <span class="label">Version/Make</span>
+                                            <span class="value" id="retransferVersionMake">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="detail-item">
+                                            <span class="label">Model/Build</span>
+                                            <span class="value" id="retransferModelBuild">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Current Holder & New Recipient -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="panel-card mb-3">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-user me-2" style="color: #dc3545;"></i>Current Holder (From)</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="detail-item">
+                                            <span class="label">Name</span>
+                                            <span class="value fw-bold" id="retransferCurrentHolder">-</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Staff ID</span>
+                                            <span class="value" id="retransferCurrentHolderStaffId">-</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="label">Department</span>
+                                            <span class="value" id="retransferCurrentDepartment">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="panel-card mb-3">
+                                    <div class="panel-header">
+                                        <h6><i class="fas fa-user-plus me-2" style="color: #28a745;"></i>New Recipient (To) *</h6>
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Select New Employee</label>
+                                            <select name="newEmployeeId" class="form-select" required>
+                                                <option value="">Select Employee...</option>
+                                                <option th:each="e : ${employees}"
+                                                        th:value="${e.employeeId}"
+                                                        th:text="${e.fullName} + ' (' + ${e.staffId} + ')'">
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold">New Department</label>
+                                            <select name="newDepartmentId" class="form-select">
+                                                <option value="">Same as current</option>
+                                                <option th:each="d : ${departments}"
+                                                        th:value="${d.departmentId}"
+                                                        th:text="${d.name}">
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Signers -->
+                        <div class="panel-card mb-3">
+                            <div class="panel-header">
+                                <h6><i class="fas fa-signature me-2" style="color: #6f42c1;"></i>Signers (Will be notified)</h6>
+                            </div>
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="detail-item">
+                                            <span class="label">Configurator</span>
+                                            <span class="value" id="retransferConfigurator">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="detail-item">
+                                            <span class="label">Infrastructure Rep</span>
+                                            <span class="value" id="retransferInfraRep">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="detail-item">
+                                            <span class="label">Finance Rep</span>
+                                            <span class="value" id="retransferFinanceRep">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Editable Fields -->
+                        <div class="panel-card mb-3">
+                            <div class="panel-header">
+                                <h6><i class="fas fa-edit me-2" style="color: #fd7e14;"></i>Editable Details</h6>
+                            </div>
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Previous Condition</label>
+                                        <textarea name="conditionOld" id="retransferConditionOld" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Current Condition</label>
+                                        <textarea name="conditionNew" id="retransferConditionNew" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Previous Accessories</label>
+                                        <textarea name="accessoriesOld" id="retransferAccessoriesOld" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Current Accessories</label>
+                                        <textarea name="accessoriesNew" id="retransferAccessoriesNew" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label fw-semibold">Software Installed</label>
+                                        <textarea name="softwareInstalled" id="retransferSoftwareInstalled" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-12 mb-2">
+                                        <label class="form-label fw-semibold">Transfer Comments</label>
+                                        <textarea name="comments" id="retransferComments" class="form-control" rows="2" placeholder="Any additional notes about this re-transfer..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-exchange-alt me-2"></i>Create Re-Transfer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CREATE TRANSFER MODAL (Existing) -->
     <!-- ============================================================ -->
     <div class="modal fade" id="createTransferModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -223,28 +416,28 @@
                                     <label class="form-label fw-semibold">From Employee</label>
                                     <select name="oldEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">To Employee</label>
                                     <select name="newEmployeeId" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Infrastructure Representative</label>
                                     <select name="infraRepresentativeId" class="form-select">
                                         <option value="">Select Infrastructure Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Finance Representative</label>
                                     <select name="financeRepresentativeId" class="form-select">
                                         <option value="">Select Finance Rep</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                             </div>
@@ -284,35 +477,35 @@
                                     <label class="form-label fw-semibold">Old Handover By</label>
                                     <select name="oldHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Old Received By</label>
                                     <select name="oldReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Handover By</label>
                                     <select name="newHandoverById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">New Received By</label>
                                     <select name="newReceivedById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Configured By</label>
                                     <select name="configuredById" class="form-select">
                                         <option value="">Select Employee</option>
-                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.firstName} + ' ' + ${e.surName}"></option>
+                                        <option th:each="e : ${employees}" th:value="${e.employeeId}" th:text="${e.fullName}"></option>
                                     </select>
                                 </div>
                             </div>
@@ -351,6 +544,49 @@
         .btn-primary:hover { background: var(--primary-dark) !important; }
         .btn-secondary { background: #eef0f3 !important; border: none !important; color: var(--ink) !important; }
         .btn-secondary:hover { background: #e2e5ea !important; color: var(--ink) !important; }
+        .btn-success { background: #198754 !important; border: none !important; color: white !important; }
+        .btn-success:hover { background: #157347 !important; }
+
+        .panel-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            overflow: hidden;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-color);
+        }
+        .panel-header h6 {
+            font-weight: 700;
+            font-size: 14px;
+            margin: 0;
+            color: var(--ink);
+        }
+        .panel-body {
+            padding: 20px;
+        }
+        .detail-item {
+            margin-bottom: 8px;
+        }
+        .detail-item .label {
+            font-size: 10.5px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-muted);
+            display: block;
+        }
+        .detail-item .value {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--ink);
+        }
 
         .table-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden; padding: 16px; }
         .transfers-table { margin-bottom: 0; width: 100% !important; }
@@ -368,9 +604,9 @@
 
         .action-btn-group .btn { border-radius: 8px !important; padding: 6px 10px !important; font-size: 12.5px !important; margin-right: 4px; border: 1px solid #e9ecef; }
         .action-btn-group .btn:last-child { margin-right: 0; }
-        .action-btn-group .btn-outline-info:hover { background: #17a2b8; border-color: #17a2b8; }
-        .action-btn-group .btn-outline-secondary:hover { background: #6c757d; border-color: #6c757d; }
-        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; }
+        .action-btn-group .btn-outline-info:hover { background: #17a2b8; border-color: #17a2b8; color: white; }
+        .action-btn-group .btn-outline-secondary:hover { background: #6c757d; border-color: #6c757d; color: white; }
+        .action-btn-group .btn-outline-primary:hover { background: #0d6efd; border-color: #0d6efd; color: white; }
 
         .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
         .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
@@ -383,10 +619,6 @@
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
         .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
-
-        .detail-item { margin-bottom: 12px; }
-        .detail-item .label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa0a6; display: block; }
-        .detail-item .value { font-size: 14px; color: var(--ink); font-weight: 500; }
 
         .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-badge.completed { background: #d4edda; color: #157a34; }
@@ -498,6 +730,7 @@
 
     <script th:inline="none">
         let currentTransferId = null;
+        let currentTransferData = null;
 
         $(document).ready(function() {
             if ($.fn.DataTable.isDataTable('#transfersTable')) {
@@ -530,7 +763,7 @@
         });
 
         // ============================================
-        // Center Alert (success/error) - square box, center screen
+        // Center Alert (success/error)
         // ============================================
         let centerAlertTimeout = null;
         function showToast(message, type) {
@@ -568,6 +801,10 @@
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewTransferModal'));
             const body = document.getElementById('transferDetailBody');
             const pdfBtn = document.getElementById('pdfFromViewBtn');
+            const retransferBtn = document.getElementById('retransferFromViewBtn');
+
+            // Show retransfer button only if transfer is completed
+            retransferBtn.style.display = 'inline-block';
 
             body.innerHTML = `
                 <div class="text-center py-4">
@@ -585,6 +822,7 @@
                     return response.json();
                 })
                 .then(transfer => {
+                    currentTransferData = transfer;
                     document.getElementById('viewTransferId').textContent = transfer.transferId;
 
                     const isFullySigned = transfer.fullySigned || false;
@@ -803,8 +1041,8 @@
                                                 <td>${transfer.configuredByName || 'N/A'}</td>
                                                 <td>${transfer.configuredByStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.configuredBySignature ? 'signed' : 'pending'}">
-                                                        ${transfer.configuredBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.configuredBySignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.configuredBySignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.configuredBySignedAt || '-'}</td>
@@ -814,8 +1052,8 @@
                                                 <td>${transfer.oldHandoverByName || 'N/A'}</td>
                                                 <td>${transfer.oldHandoverByStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.oldHandoverBySignature ? 'signed' : 'pending'}">
-                                                        ${transfer.oldHandoverBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.oldHandoverBySignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.oldHandoverBySignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.oldHandoverBySignedAt || '-'}</td>
@@ -825,8 +1063,8 @@
                                                 <td>${transfer.oldReceivedByName || 'N/A'}</td>
                                                 <td>${transfer.oldReceivedByStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.oldReceivedBySignature ? 'signed' : 'pending'}">
-                                                        ${transfer.oldReceivedBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.oldReceivedBySignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.oldReceivedBySignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.oldReceivedBySignedAt || '-'}</td>
@@ -836,8 +1074,8 @@
                                                 <td>${transfer.newHandoverByName || 'N/A'}</td>
                                                 <td>${transfer.newHandoverByStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.newHandoverBySignature ? 'signed' : 'pending'}">
-                                                        ${transfer.newHandoverBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.newHandoverBySignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.newHandoverBySignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.newHandoverBySignedAt || '-'}</td>
@@ -847,8 +1085,8 @@
                                                 <td>${transfer.newReceivedByName || 'N/A'}</td>
                                                 <td>${transfer.newReceivedByStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.newReceivedBySignature ? 'signed' : 'pending'}">
-                                                        ${transfer.newReceivedBySignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.newReceivedBySignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.newReceivedBySignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.newReceivedBySignedAt || '-'}</td>
@@ -858,8 +1096,8 @@
                                                 <td>${transfer.infraRepresentativeName || 'N/A'}</td>
                                                 <td>${transfer.infraRepresentativeStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.infraRepSignature ? 'signed' : 'pending'}">
-                                                        ${transfer.infraRepSignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.infraRepSignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.infraRepSignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.infraRepSignedAt || '-'}</td>
@@ -869,8 +1107,8 @@
                                                 <td>${transfer.financeRepresentativeName || 'N/A'}</td>
                                                 <td>${transfer.financeRepresentativeStaffId || 'N/A'}</td>
                                                 <td>
-                                                    <span class="status-badge ${transfer.financeRepSignature ? 'signed' : 'pending'}">
-                                                        ${transfer.financeRepSignature ? '✅ Signed' : '⏳ Pending'}
+                                                    <span class="status-badge ${transfer.financeRepSignedAt ? 'signed' : 'pending'}">
+                                                        ${transfer.financeRepSignedAt ? '✅ Signed' : '⏳ Pending'}
                                                     </span>
                                                 </td>
                                                 <td>${transfer.financeRepSignedAt || '-'}</td>
@@ -888,6 +1126,9 @@
                     } else {
                         pdfBtn.style.display = 'none';
                     }
+
+                    // Show retransfer button for all transfers (even pending ones)
+                    retransferBtn.style.display = 'inline-block';
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -901,6 +1142,73 @@
         }
 
         // ============================================
+        // Open Re-Transfer Modal
+        // ============================================
+        function openRetransferModal() {
+            if (!currentTransferData) {
+                showToast('No transfer data loaded. Please view a transfer first.', 'error');
+                return;
+            }
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('retransferModal'));
+
+            // Populate asset details
+            document.getElementById('retransferSourceId').value = currentTransferData.transferId;
+            document.getElementById('retransferAssetTag').value = currentTransferData.assetTag || '';
+            document.getElementById('retransferAssetTagDisplay').textContent = currentTransferData.assetTag || '-';
+            document.getElementById('retransferSerialNumber').textContent = currentTransferData.serialNumber || '-';
+            document.getElementById('retransferVersionMake').textContent = currentTransferData.versionMake || '-';
+            document.getElementById('retransferModelBuild').textContent = currentTransferData.modelBuild || '-';
+
+            // Current holder (From employee - the current recipient)
+            const currentHolderName = currentTransferData.newEmployeeName || 'Unknown';
+            const currentHolderStaffId = currentTransferData.newEmployeeStaffId || '';
+            const currentDepartment = currentTransferData.newDepartmentName || 'Unknown';
+
+            document.getElementById('retransferCurrentHolder').textContent = currentHolderName;
+            document.getElementById('retransferCurrentHolderStaffId').textContent = currentHolderStaffId;
+            document.getElementById('retransferCurrentDepartment').textContent = currentDepartment;
+
+            // Signers
+            document.getElementById('retransferConfigurator').textContent = currentTransferData.configuredByName || 'Not assigned';
+            document.getElementById('retransferInfraRep').textContent = currentTransferData.infraRepresentativeName || 'Not assigned';
+            document.getElementById('retransferFinanceRep').textContent = currentTransferData.financeRepresentativeName || 'Not assigned';
+
+            // Populate editable fields
+            document.getElementById('retransferConditionOld').value = currentTransferData.conditionOld || '';
+            document.getElementById('retransferConditionNew').value = currentTransferData.conditionNew || '';
+            document.getElementById('retransferAccessoriesOld').value = currentTransferData.accessoriesOld || '';
+            document.getElementById('retransferAccessoriesNew').value = currentTransferData.accessoriesNew || '';
+            document.getElementById('retransferSoftwareInstalled').value = currentTransferData.softwareInstalled || '';
+            document.getElementById('retransferComments').value = 'Re-transfer from ' + currentHolderName + ' to new recipient';
+
+            // Pre-populate employee dropdown with current holder excluded
+            const employeeSelect = document.querySelector('#retransferForm select[name="newEmployeeId"]');
+            if (employeeSelect) {
+                // Get current holder ID from transfer data
+                const currentHolderId = currentTransferData.newEmployeeId;
+                // Remove the current holder from options
+                for (let option of employeeSelect.options) {
+                    if (option.value && parseInt(option.value) === currentHolderId) {
+                        option.disabled = true;
+                        option.text += ' (Current Holder)';
+                    }
+                }
+            }
+
+            // Close the view modal first, then open retransfer modal
+            const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewTransferModal'));
+            if (viewModal) {
+                viewModal.hide();
+            }
+
+            // Show retransfer modal after a short delay
+            setTimeout(() => {
+                modal.show();
+            }, 300);
+        }
+
+        // ============================================
         // Download PDF from View Modal
         // ============================================
         function downloadPDFFromView() {
@@ -908,6 +1216,32 @@
                 window.open('/assetIQ-pro/transfers/' + currentTransferId + '/pdf', '_blank');
             }
         }
+
+        // ============================================
+        // Handle Re-Transfer Form Submission
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            const retransferForm = document.getElementById('retransferForm');
+            if (retransferForm) {
+                retransferForm.addEventListener('submit', function(e) {
+                    // Validate that a new employee is selected
+                    const newEmployeeSelect = this.querySelector('select[name="newEmployeeId"]');
+                    if (!newEmployeeSelect.value) {
+                        e.preventDefault();
+                        showToast('Please select a new employee to receive the asset.', 'error');
+                        return false;
+                    }
+
+                    // Show loading state
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+
+                    // Allow form to submit normally
+                    return true;
+                });
+            }
+        });
 
         // ============================================
         // Wizard Functions
@@ -961,13 +1295,23 @@
                     showTransferWizardStep(1);
                 });
             }
+
+            // Reset retransfer form when modal closes
+            const retransferModalEl = document.getElementById('retransferModal');
+            if (retransferModalEl) {
+                retransferModalEl.addEventListener('hidden.bs.modal', function () {
+                    const submitBtn = document.querySelector('#retransferForm button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Create Re-Transfer';
+                    }
+                });
+            }
         });
     </script>
 
     <!-- ============================================================ -->
-    <!-- Flash-message toasts: separate th:inline="javascript" block   -->
-    <!-- so Thymeleaf inlining doesn't clash with the DataTables       -->
-    <!-- th:inline="none" script above.                                -->
+    <!-- Flash-message toasts -->
     <!-- ============================================================ -->
     <script th:if="${success != null}" th:inline="javascript">
         document.addEventListener('DOMContentLoaded', function () {

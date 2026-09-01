@@ -1,5 +1,6 @@
 package com.stevecodes.AssetIQPro.service;
 
+import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.entity.TransferToken;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
@@ -9,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import com.stevecodes.AssetIQPro.entity.Employee;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,7 +29,6 @@ public class TransferSigningService {
     private final EmployeeRepository employeeRepository;
     private final BaseUrlService baseUrlService;
 
-    // FIXED: Changed Integer to Long
     public void initiateTransferSigning(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -54,7 +53,6 @@ public class TransferSigningService {
         log.info("=========================================");
     }
 
-    // FIXED: Changed Integer to Long
     public void signTransferWithSignature(Long transferId, String tokenValue, String base64Signature) {
         TransferToken token = tokenRepository.findByToken(tokenValue)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
@@ -76,7 +74,6 @@ public class TransferSigningService {
         }
     }
 
-    // FIXED: Changed Integer to Long
     public String determineSignerRole(Long transferId, Long employeeId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -121,13 +118,16 @@ public class TransferSigningService {
         return token;
     }
 
-    // FIXED: Changed Integer to Long
     public boolean isTransferFullySigned(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
+        log.info("🔍 Checking if transfer {} is fully signed", transferId);
+        log.info("   isFullySigned flag: {}", transfer.getIsFullySigned());
+
         // First check: If isFullySigned flag is true
         if (Boolean.TRUE.equals(transfer.getIsFullySigned())) {
+            log.info("✅ Transfer {} already marked as fully signed", transferId);
             return true;
         }
 
@@ -136,7 +136,7 @@ public class TransferSigningService {
         if (!allTokens.isEmpty() && allTokens.size() == countRequiredSigners(transfer)) {
             boolean allTokensUsed = allTokens.stream().allMatch(TransferToken::getIsUsed);
             if (allTokensUsed) {
-                log.info("Transfer {} fully signed via tokens - all {} tokens used", transferId, allTokens.size());
+                log.info("✅ Transfer {} fully signed via tokens - all {} tokens used", transferId, allTokens.size());
                 completeTransferSigning(transfer);
                 return true;
             }
@@ -145,22 +145,38 @@ public class TransferSigningService {
         // Third check: All timestamps are present
         boolean timestampsSigned = isTransferFullySignedByTimestamps(transfer);
         if (timestampsSigned) {
-            log.info("Transfer {} fully signed via timestamps", transferId);
+            log.info("✅ Transfer {} fully signed via timestamps", transferId);
             completeTransferSigning(transfer);
             return true;
         }
 
-        // Fourth check: Hybrid approach (some tokens, some timestamps)
+        // Fourth check: Hybrid approach
         if (!allTokens.isEmpty() && countRequiredSigners(transfer) > 0) {
             boolean hybridComplete = isTransferCompleteByHybridApproach(transfer, allTokens);
             if (hybridComplete) {
-                log.info("Transfer {} fully signed via hybrid approach", transferId);
+                log.info("✅ Transfer {} fully signed via hybrid approach", transferId);
                 completeTransferSigning(transfer);
                 return true;
             }
         }
 
-        log.info("Transfer {} is NOT fully signed", transferId);
+        // Fifth check: Manual signature verification
+        boolean allSignaturesPresent = true;
+        if (transfer.getOldHandoverById() != null && transfer.getOldHandoverBySignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getOldReceivedById() != null && transfer.getOldReceivedBySignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getNewHandoverById() != null && transfer.getNewHandoverBySignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getNewReceivedById() != null && transfer.getNewReceivedBySignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getConfiguredById() != null && transfer.getConfiguredBySignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getInfraRepresentativeId() != null && transfer.getInfraRepSignedAt() == null) allSignaturesPresent = false;
+        if (transfer.getFinanceRepresentativeId() != null && transfer.getFinanceRepSignedAt() == null) allSignaturesPresent = false;
+
+        if (allSignaturesPresent && countRequiredSigners(transfer) > 0) {
+            log.info("✅ Transfer {} fully signed via manual signature check", transferId);
+            completeTransferSigning(transfer);
+            return true;
+        }
+
+        log.info("❌ Transfer {} is NOT fully signed", transferId);
         return false;
     }
 
@@ -252,12 +268,25 @@ public class TransferSigningService {
         return (tokenUsed || timestampExists);
     }
 
+    // ✅ FIXED: Ensure completeTransferSigning properly sets and saves
     private void completeTransferSigning(Transfer transfer) {
+        log.info("=========================================");
+        log.info("✅ COMPLETING TRANSFER SIGNING FOR: {}", transfer.getTransferId());
+        log.info("=========================================");
+
         transfer.setIsFullySigned(true);
-        transferRepository.save(transfer);
+
+        // Save immediately
+        Transfer saved = transferRepository.save(transfer);
+        log.info("✅ Transfer {} marked as fully signed (isFullySigned = {})",
+                saved.getTransferId(), saved.getIsFullySigned());
+
         generateFullySignedPdf(transfer.getTransferId());
         sendCompletedTransferNotification(transfer.getTransferId());
-        log.info("Transfer {} marked as fully signed", transfer.getTransferId());
+
+        log.info("=========================================");
+        log.info("✅ TRANSFER {} FULLY COMPLETED", transfer.getTransferId());
+        log.info("=========================================");
     }
 
     private boolean isTransferFullySignedByTimestamps(Transfer transfer) {
@@ -278,7 +307,6 @@ public class TransferSigningService {
         return allTokens.stream().allMatch(TransferToken::getIsUsed);
     }
 
-    // FIXED: Changed Integer to Long
     public boolean isTransferFullySignedByTimestamps(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -305,7 +333,6 @@ public class TransferSigningService {
         }
     }
 
-    // FIXED: Changed Integer to Long
     public void saveSignature(Long transferId, String role, String base64Signature) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -353,7 +380,6 @@ public class TransferSigningService {
         log.info("Saved signature for role {} on transfer {}", role, transferId);
     }
 
-    // FIXED: Changed Integer to Long
     public void generateFullySignedPdf(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -373,7 +399,6 @@ public class TransferSigningService {
         }
     }
 
-    // FIXED: Changed Integer to Long
     private void sendCompletedTransferNotification(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -436,13 +461,11 @@ public class TransferSigningService {
         }
     }
 
-    // FIXED: Changed Integer to Long
     public boolean manuallyCheckTransferCompletion(Long transferId) {
         log.info("Manual completion check triggered for transfer {}", transferId);
         return isTransferFullySigned(transferId);
     }
 
-    // FIXED: Changed Integer to Long
     public byte[] getFullySignedPdf(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));

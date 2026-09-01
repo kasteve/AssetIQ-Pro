@@ -23,9 +23,201 @@ asset status changes to disposed, those options should become inactive so that o
 
 
 
-Allow the transfers to be moved to the next receiver without necessarily creating a new one. The existing parameters
-and details for the asset should not be changed apart from the new receiving person. Here the person currently having the asset
+Allow the already existing transfers to be transferred to the next recipient without necessarily creating a new one from scratch for the same asset. The existing parameters
+and details for that asset should be maintained apart from the details of the new receiving person. Here the person currently having the asset
 should be the old asset giver and the only the new one should be added and all should sign, the asset configurator, finance rep and
 Infra representatives should also sign. The transactions history should be captured detailing the movement of the
-asset from the previous ones to the current transfer.
+asset from the previous ones to the current transfer. This flow should create a new record in the database but on the form, all details regarding that particular asset tag
+or serial number should be retrieved as part of the transaction history for that asset. This is to help the admins and other users
+track how the asset has moved from the time of deployment to its decommissioning or disposal.
 
+
+
+
+-- Add history linking columns to Transfers table
+ALTER TABLE Transfers ADD originalTransferId BIGINT NULL;
+ALTER TABLE Transfers ADD previousTransferId BIGINT NULL;
+ALTER TABLE Transfers ADD transferSequence INT DEFAULT 1;
+ALTER TABLE Transfers ADD isInitialTransfer BIT DEFAULT 0;
+
+-- Add indexes for performance
+CREATE INDEX idx_transfers_originalTransferId ON Transfers(originalTransferId);
+CREATE INDEX idx_transfers_previousTransferId ON Transfers(previousTransferId);
+CREATE INDEX idx_transfers_transferSequence ON Transfers(transferSequence);
+CREATE INDEX idx_transfers_assetTag_sequence ON Transfers(assetTag, transferSequence);
+
+-- Update existing transfers to set isInitialTransfer = true for each asset's first transfer
+-- This assumes the first transfer is the one with the lowest transferId for each asset
+WITH FirstTransfers AS (
+    SELECT assetTag, MIN(transferId) as minTransferId
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+    GROUP BY assetTag
+)
+UPDATE Transfers
+SET isInitialTransfer = 1, transferSequence = 1
+WHERE transferId IN (SELECT minTransferId FROM FirstTransfers);
+
+-- Update sequence numbers for existing transfers
+-- This is a simplified version - you may need to adjust based on your data
+WITH NumberedTransfers AS (
+    SELECT
+        transferId,
+        assetTag,
+        ROW_NUMBER() OVER (PARTITION BY assetTag ORDER BY transferDate ASC, transferId ASC) as seq
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+)
+UPDATE Transfers
+SET transferSequence = nt.seq
+FROM Transfers t
+INNER JOIN NumberedTransfers nt ON t.transferId = nt.transferId;
+
+-- Set previousTransferId and originalTransferId for existing transfers
+WITH TransferChains AS (
+    SELECT
+        transferId,
+        assetTag,
+        transferSequence,
+        LAG(transferId, 1, NULL) OVER (PARTITION BY assetTag ORDER BY transferSequence) as prevId,
+        FIRST_VALUE(transferId) OVER (PARTITION BY assetTag ORDER BY transferSequence) as firstId
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+)
+UPDATE Transfers
+SET
+    previousTransferId = tc.prevId,
+    originalTransferId = CASE WHEN tc.transferSequence = 1 THEN NULL ELSE tc.firstId END
+FROM Transfers t
+INNER JOIN TransferChains tc ON t.transferId = tc.transferId;
+
+
+
+
+
+
+
+
+
+
+-- ============================================================
+-- ADD HISTORY LINKING COLUMNS TO TRANSFERS TABLE
+-- ============================================================
+
+-- Add columns if they don't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Transfers') AND name = 'originalTransferId')
+BEGIN
+    ALTER TABLE Transfers ADD originalTransferId BIGINT NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Transfers') AND name = 'previousTransferId')
+BEGIN
+    ALTER TABLE Transfers ADD previousTransferId BIGINT NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Transfers') AND name = 'transferSequence')
+BEGIN
+    ALTER TABLE Transfers ADD transferSequence INT DEFAULT 1;
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Transfers') AND name = 'isInitialTransfer')
+BEGIN
+    ALTER TABLE Transfers ADD isInitialTransfer BIT DEFAULT 0;
+END
+GO
+
+-- Add indexes for performance
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_transfers_originalTransferId' AND object_id = OBJECT_ID('dbo.Transfers'))
+BEGIN
+    CREATE INDEX idx_transfers_originalTransferId ON Transfers(originalTransferId);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_transfers_previousTransferId' AND object_id = OBJECT_ID('dbo.Transfers'))
+BEGIN
+    CREATE INDEX idx_transfers_previousTransferId ON Transfers(previousTransferId);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_transfers_transferSequence' AND object_id = OBJECT_ID('dbo.Transfers'))
+BEGIN
+    CREATE INDEX idx_transfers_transferSequence ON Transfers(transferSequence);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_transfers_assetTag_sequence' AND object_id = OBJECT_ID('dbo.Transfers'))
+BEGIN
+    CREATE INDEX idx_transfers_assetTag_sequence ON Transfers(assetTag, transferSequence);
+END
+GO
+
+-- ============================================================
+-- UPDATE EXISTING TRANSFERS WITH HISTORY LINKING
+-- ============================================================
+
+-- Step 1: Set isInitialTransfer = true for the first transfer of each asset
+WITH FirstTransfers AS (
+    SELECT assetTag, MIN(transferId) as minTransferId
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+    GROUP BY assetTag
+)
+UPDATE Transfers
+SET isInitialTransfer = 1, transferSequence = 1
+WHERE transferId IN (SELECT minTransferId FROM FirstTransfers);
+GO
+
+-- Step 2: Set sequence numbers for existing transfers
+WITH NumberedTransfers AS (
+    SELECT
+        transferId,
+        assetTag,
+        ROW_NUMBER() OVER (PARTITION BY assetTag ORDER BY transferDate ASC, transferId ASC) as seq
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+)
+UPDATE Transfers
+SET transferSequence = nt.seq
+FROM Transfers t
+INNER JOIN NumberedTransfers nt ON t.transferId = nt.transferId;
+GO
+
+-- Step 3: Set previousTransferId and originalTransferId for existing transfers
+WITH TransferChains AS (
+    SELECT
+        transferId,
+        assetTag,
+        transferSequence,
+        LAG(transferId, 1, NULL) OVER (PARTITION BY assetTag ORDER BY transferSequence) as prevId,
+        FIRST_VALUE(transferId) OVER (PARTITION BY assetTag ORDER BY transferSequence) as firstId
+    FROM Transfers
+    WHERE assetTag IS NOT NULL AND assetTag != ''
+)
+UPDATE Transfers
+SET
+    previousTransferId = tc.prevId,
+    originalTransferId = CASE WHEN tc.transferSequence = 1 THEN NULL ELSE tc.firstId END
+FROM Transfers t
+INNER JOIN TransferChains tc ON t.transferId = tc.transferId;
+GO
+
+-- ============================================================
+-- VERIFY THE UPDATES
+-- ============================================================
+
+-- Check the history linking fields
+SELECT
+    transferId,
+    assetTag,
+    transferSequence,
+    isInitialTransfer,
+    originalTransferId,
+    previousTransferId,
+    transferDate
+FROM Transfers
+WHERE assetTag IS NOT NULL AND assetTag != ''
+ORDER BY assetTag, transferSequence;
+GO

@@ -253,11 +253,11 @@ public class ReportApiController {
         log.info("Department filter: {}", department);
         log.info("Total transfers before filtering: {}", transfers.size());
 
-        // Filter by category
+        // Filter by category - ✅ FIXED: Use getCategoryType() instead of getCategory()
         if (category != null && !category.isEmpty() && !"ALL".equalsIgnoreCase(category)) {
             transfers = transfers.stream()
                     .filter(t -> {
-                        String transferCategory = t.getCategory();
+                        String transferCategory = t.getCategoryType();
                         log.debug("Transfer {} category: {}", t.getTransferId(), transferCategory);
                         return transferCategory != null && transferCategory.equalsIgnoreCase(category);
                     })
@@ -315,7 +315,8 @@ public class ReportApiController {
                 .map(t -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", t.getTransferId());
-                    item.put("category", t.getCategory() != null ? t.getCategory() : "ASSET");
+                    // ✅ FIXED: Use getCategoryType() instead of getCategory()
+                    item.put("category", t.getCategoryType() != null ? t.getCategoryType() : "ASSET");
                     item.put("from", getDepartmentName(t.getOldDepartmentId()));
                     item.put("to", getDepartmentName(t.getNewDepartmentId()));
                     item.put("item", t.getAssetTag() != null ? t.getAssetTag() : "N/A");

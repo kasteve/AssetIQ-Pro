@@ -72,6 +72,97 @@ public class TransferViewController {
         return "transfers/list";
     }
 
+    // ============================================
+    // PROCESS RE-TRANSFER - FIXED
+    // ============================================
+
+    @PostMapping("/retransfer")
+    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
+    public String processRetransfer(
+            @RequestParam Long sourceTransferId,
+            @RequestParam Long newEmployeeId,
+            @RequestParam(required = false) Integer newDepartmentId,
+            @RequestParam(required = false) String conditionOld,
+            @RequestParam(required = false) String conditionNew,
+            @RequestParam(required = false) String accessoriesOld,
+            @RequestParam(required = false) String accessoriesNew,
+            @RequestParam(required = false) String softwareInstalled,
+            @RequestParam(required = false) String comments,
+            RedirectAttributes redirectAttributes) {
+
+        log.info("=========================================");
+        log.info("📝 Processing re-transfer for source transfer: {}", sourceTransferId);
+        log.info("   New Employee ID: {}", newEmployeeId);
+        log.info("   New Department ID: {}", newDepartmentId);
+        log.info("=========================================");
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            redirectAttributes.addFlashAttribute("error", "You must be logged in.");
+            return "redirect:/login";
+        }
+
+        try {
+            // Get the source transfer (this has the Category object)
+            Transfer sourceTransfer = transferService.getTransferById(sourceTransferId);
+
+            // Create a new Transfer object with the re-transfer data
+            Transfer retransferData = new Transfer();
+
+            // Asset info - copy from source
+            retransferData.setAssetTag(sourceTransfer.getAssetTag());
+            retransferData.setSerialNumber(sourceTransfer.getSerialNumber());
+            retransferData.setVersionMake(sourceTransfer.getVersionMake());
+            retransferData.setModelBuild(sourceTransfer.getModelBuild());
+
+            // ✅ FIX: Copy the Category object from source (NOT a String)
+            // This is the correct way - getCategory() returns a Category object
+            if (sourceTransfer.getCategory() != null) {
+                retransferData.setCategory(sourceTransfer.getCategory());
+            }
+
+            // Company
+            retransferData.setCompanyId(sourceTransfer.getCompanyId());
+
+            // Previous transfer ID (for history linking)
+            retransferData.setPreviousTransferId(sourceTransferId);
+
+            // New employee
+            retransferData.setNewEmployeeId(newEmployeeId);
+
+            // New department (optional)
+            if (newDepartmentId != null) {
+                retransferData.setNewDepartmentId(newDepartmentId);
+            }
+
+            // Editable fields
+            retransferData.setConditionOld(conditionOld);
+            retransferData.setConditionNew(conditionNew);
+            retransferData.setAccessoriesOld(accessoriesOld);
+            retransferData.setAccessoriesNew(accessoriesNew);
+            retransferData.setSoftwareInstalled(softwareInstalled);
+            retransferData.setComments(comments);
+
+            // Process the re-transfer
+            Transfer newTransfer = transferService.retransferAsset(retransferData);
+
+            redirectAttributes.addFlashAttribute("success",
+                    "✅ Asset re-transferred successfully! Transfer #" + newTransfer.getTransferId() +
+                            " (Sequence: " + newTransfer.getTransferSequence() + ") created. Signing emails sent to all parties.");
+
+            return "redirect:/transfers";
+
+        } catch (Exception e) {
+            log.error("❌ Error processing re-transfer: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error", "Failed to re-transfer asset: " + e.getMessage());
+            return "redirect:/transfers";
+        }
+    }
+
+    // ============================================
+    // OTHER EXISTING METHODS (unchanged)
+    // ============================================
+
     private void populateEmployeeDetails(Transfer transfer) {
         if (transfer.getOldEmployeeId() != null) {
             employeeService.getEmployeeById(transfer.getOldEmployeeId())
@@ -246,7 +337,6 @@ public class TransferViewController {
         }
     }
 
-    // FIXED: Changed Integer to Long
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Long transferId,
                                   @RequestParam String token,
@@ -323,7 +413,6 @@ public class TransferViewController {
         }
     }
 
-    // FIXED: Changed Integer to Long
     @PostMapping("/{transferId}/initiate-signing")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String initiateSigning(@PathVariable Long transferId, RedirectAttributes redirectAttributes) {
@@ -346,7 +435,6 @@ public class TransferViewController {
         return "redirect:/transfers";
     }
 
-    // FIXED: Changed Integer to Long
     @GetMapping("/{transferId}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable Long transferId) {
         try {

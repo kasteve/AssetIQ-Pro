@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface TransferRepository extends JpaRepository<Transfer, Long> {  // FIXED: Changed Integer to Long
+public interface TransferRepository extends JpaRepository<Transfer, Long> {
 
     List<Transfer> findByAssetTag(String assetTag);
 
@@ -32,7 +32,6 @@ public interface TransferRepository extends JpaRepository<Transfer, Long> {  // 
     @Query("SELECT t.transferDate, COUNT(t) FROM Transfer t GROUP BY t.transferDate ORDER BY t.transferDate DESC")
     List<Object[]> countTransfersByDate();
 
-    // FIXED: Changed excludeId from Integer to Long
     @Query("SELECT t FROM Transfer t WHERE t.transferId <> :excludeId AND (" +
             "  (:assetTag IS NOT NULL AND TRIM(t.assetTag) <> '' " +
             "     AND LOWER(TRIM(t.assetTag)) = LOWER(TRIM(:assetTag))) " +
@@ -42,10 +41,50 @@ public interface TransferRepository extends JpaRepository<Transfer, Long> {  // 
             ") ORDER BY t.transferDate ASC, t.transferId ASC")
     List<Transfer> findRelatedTransfers(@Param("assetTag") String assetTag,
                                         @Param("serialNumber") String serialNumber,
-                                        @Param("excludeId") Long excludeId);  // FIXED: Changed to Long
+                                        @Param("excludeId") Long excludeId);
 
     List<Transfer> findTop5ByOrderByTransferDateDesc();
 
     @Query("SELECT t FROM Transfer t WHERE t.oldEmployeeId = :userId OR t.newEmployeeId = :userId ORDER BY t.transferDate DESC")
     List<Transfer> findTop5ByUserId(@Param("userId") Long userId);
+
+    // ============================================
+    // NEW: History Linking Queries
+    // ============================================
+
+    /**
+     * Find all transfers in the history chain for an asset
+     */
+    @Query("SELECT t FROM Transfer t WHERE t.assetTag = :assetTag ORDER BY t.transferSequence ASC")
+    List<Transfer> findTransferHistoryByAssetTag(@Param("assetTag") String assetTag);
+
+    /**
+     * Find the initial transfer for an asset
+     */
+    @Query("SELECT t FROM Transfer t WHERE t.assetTag = :assetTag AND t.isInitialTransfer = true")
+    Transfer findInitialTransferByAssetTag(@Param("assetTag") String assetTag);
+
+    /**
+     * Find the latest transfer for an asset
+     */
+    @Query("SELECT t FROM Transfer t WHERE t.assetTag = :assetTag ORDER BY t.transferSequence DESC")
+    List<Transfer> findLatestTransferByAssetTag(@Param("assetTag") String assetTag);
+
+    /**
+     * Find all transfers linked to an original transfer
+     */
+    @Query("SELECT t FROM Transfer t WHERE t.originalTransferId = :originalId ORDER BY t.transferSequence ASC")
+    List<Transfer> findTransfersByOriginalId(@Param("originalId") Long originalId);
+
+    /**
+     * Find the next transfer in the chain
+     */
+    @Query("SELECT t FROM Transfer t WHERE t.previousTransferId = :previousId")
+    Transfer findNextTransferByPreviousId(@Param("previousId") Long previousId);
+
+    /**
+     * Count transfers in the history chain
+     */
+    @Query("SELECT COUNT(t) FROM Transfer t WHERE t.originalTransferId = :originalId")
+    long countTransfersInChain(@Param("originalId") Long originalId);
 }
