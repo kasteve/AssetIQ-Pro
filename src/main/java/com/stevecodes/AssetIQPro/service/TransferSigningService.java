@@ -6,6 +6,7 @@ import com.stevecodes.AssetIQPro.entity.TransferToken;
 import com.stevecodes.AssetIQPro.repository.EmployeeRepository;
 import com.stevecodes.AssetIQPro.repository.TransferRepository;
 import com.stevecodes.AssetIQPro.repository.TransferTokenRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -475,5 +476,51 @@ public class TransferSigningService {
         }
 
         return Base64.getDecoder().decode(transfer.getFullySignedPDF());
+    }
+
+    // Add this method to TransferSigningService.java
+
+    /**
+     * Process a signature for a specific role within a transfer
+     * When a signer has multiple roles, they need to sign each one
+     */
+    @Transactional
+    public void processSignatureForRole(Long transferId, String tokenValue, String role, String base64Signature) {
+        TransferToken token = tokenRepository.findByToken(tokenValue)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
+
+        if (token.getIsUsed()) {
+            throw new IllegalStateException("Token has already been used");
+        }
+
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Token has expired");
+        }
+
+        // Verify the role is part of this token's roles
+        List<String> allowedRoles = tokenService.getRolesFromToken(token);
+        if (!allowedRoles.contains(role)) {
+            throw new IllegalArgumentException("Role " + role + " is not assigned to this signer");
+        }
+
+        // Save the signature for this specific role
+        saveSignature(transferId, role, base64Signature);
+
+        // Check if all roles for this signer are now signed
+        Transfer transfer = transferRepository.findById(transferId)
+                .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
+
+        boolean allSlotsSigned = tokenService.areAllSlotsSigned(transfer, token);
+        if (allSlotsSigned) {
+            // All roles for this signer are done
+            token.setIsUsed(true);
+            tokenRepository.save(token);
+            log.info("✅ Signer {} has completed all their roles for transfer {}", token.getSignerEmail(), transferId);
+        }
+
+        // Check if the entire transfer is fully signed
+        if (isTransferFullySigned(transferId)) {
+            log.info("🎉 Transfer {} is now fully signed!", transferId);
+        }
     }
 }

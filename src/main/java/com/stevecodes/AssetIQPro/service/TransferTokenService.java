@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -85,6 +86,10 @@ public class TransferTokenService {
         return result;
     }
 
+    // ============================================
+    // UPDATED: Group tokens by signer email
+    // ============================================
+
     public void createTokensAndSendEmails(Transfer transfer) {
         log.info("=========================================");
         log.info("🚀 STARTING TOKEN CREATION FOR TRANSFER: {}", transfer.getTransferId());
@@ -108,25 +113,39 @@ public class TransferTokenService {
             return;
         }
 
-        log.info("📋 Found {} signers for transfer: {}", signers.size(), transfer.getTransferId());
+        log.info("📋 Found {} signer slots for transfer: {}", signers.size(), transfer.getTransferId());
+
+        // ✅ GROUP BY EMAIL - Same email = same person, send one link with all roles
+        Map<String, List<SignerInfo>> signersByEmail = signers.stream()
+                .collect(Collectors.groupingBy(SignerInfo::getEmail));
+
+        log.info("👥 Grouped into {} unique signers", signersByEmail.size());
+
         List<TransferToken> createdTokens = new ArrayList<>();
 
-        for (SignerInfo signer : signers) {
-            try {
-                if (signer.getEmail() == null || signer.getEmail().trim().isEmpty()) {
-                    log.warn("⚠️ Skipping token creation for employee ID {} - no email address found", signer.getEmployeeId());
-                    continue;
-                }
+        for (Map.Entry<String, List<SignerInfo>> entry : signersByEmail.entrySet()) {
+            String email = entry.getKey();
+            List<SignerInfo> signerSlots = entry.getValue();
 
+            // Get the employee ID from the first signer slot (all slots for same email should have same employee ID)
+            Long employeeId = signerSlots.get(0).getEmployeeId();
+
+            try {
+                // Create ONE token for this signer with multiple roles
                 TransferToken token = new TransferToken();
                 token.setTransferId(transfer.getTransferId());
-                token.setSignerEmployeeId(signer.getEmployeeId());
-                token.setSignerEmail(signer.getEmail());
+                token.setSignerEmployeeId(employeeId);
+                token.setSignerEmail(email);
                 token.setToken(generateUniqueToken());
                 token.setIsUsed(false);
                 token.setExpiresAt(LocalDateTime.now().plusDays(7));
                 token.setCreatedAt(LocalDateTime.now());
-                token.setSignerRole(signer.getRole());
+
+                // Store all roles as comma-separated in the signerRole field
+                String allRoles = signerSlots.stream()
+                        .map(SignerInfo::getRole)
+                        .collect(Collectors.joining(","));
+                token.setSignerRole(allRoles);
 
                 TransferToken savedToken = transferTokenRepository.save(token);
                 createdTokens.add(savedToken);
@@ -135,35 +154,41 @@ public class TransferTokenService {
 
                 log.info("=========================================");
                 log.info("🔐 SIGNING LINK GENERATED FOR TRANSFER: {}", transfer.getTransferId());
-                log.info("👤 Signer: {} ({})", signer.getEmail(), signer.getRole());
+                log.info("👤 Signer: {} ({} roles: {})", email, signerSlots.size(), allRoles);
                 log.info("🔗 LINK: {}", signingLink);
                 log.info("⏰ Expires: {}", savedToken.getExpiresAt());
                 log.info("📝 Token: {}", savedToken.getToken());
                 log.info("=========================================");
 
             } catch (Exception e) {
-                log.error("❌ Failed to create token for signer: {} (Transfer: {})", signer.getEmail(), transfer.getTransferId(), e);
+                log.error("❌ Failed to create token for signer: {} (Transfer: {})", email, transfer.getTransferId(), e);
             }
         }
 
         if (!createdTokens.isEmpty()) {
-            log.info("📧 Sending emails for {} tokens on transfer {}...", createdTokens.size(), transfer.getTransferId());
-            CompletableFuture.runAsync(() -> sendEmailsInBackground(transfer, createdTokens));
-            log.info("✅ Background email sending initiated for {} tokens on transfer {} - returning control immediately",
+            log.info("📧 Sending emails for {} unique signers on transfer {}...", createdTokens.size(), transfer.getTransferId());
+            CompletableFuture.runAsync(() -> sendEmailsInBackground(transfer, createdTokens, signersByEmail));
+            log.info("✅ Background email sending initiated for {} signers on transfer {} - returning control immediately",
                     createdTokens.size(), transfer.getTransferId());
         } else {
             log.warn("⚠️ No tokens were created for transfer {}", transfer.getTransferId());
         }
     }
 
-    private void sendEmailsInBackground(Transfer transfer, List<TransferToken> tokens) {
-        log.info("🔄 Starting background email sending for {} tokens on transfer {} [Thread: {}]",
+    private void sendEmailsInBackground(Transfer transfer, List<TransferToken> tokens, Map<String, List<SignerInfo>> signersByEmail) {
+        log.info("🔄 Starting background email sending for {} signers on transfer {} [Thread: {}]",
                 tokens.size(), transfer.getTransferId(), Thread.currentThread().getName());
 
         for (TransferToken token : tokens) {
             try {
-                SignerInfo signerInfo = new SignerInfo(token.getSignerEmployeeId(), token.getSignerEmail(), token.getSignerRole());
-                sendSigningEmail(transfer, signerInfo, token);
+                // Get all roles for this signer
+                List<SignerInfo> signerSlots = signersByEmail.get(token.getSignerEmail());
+                if (signerSlots == null || signerSlots.isEmpty()) {
+                    log.warn("⚠️ No signer slots found for email: {}", token.getSignerEmail());
+                    continue;
+                }
+
+                sendSigningEmail(transfer, token, signerSlots);
                 log.info("✅ Email sent successfully to: {} [Thread: {}]", token.getSignerEmail(), Thread.currentThread().getName());
             } catch (Exception e) {
                 log.error("❌ Failed to send email to {} [Thread: {}]: {}",
@@ -177,8 +202,8 @@ public class TransferTokenService {
     }
 
     @Async("emailTaskExecutor")
-    public CompletableFuture<Void> sendSigningEmailsAsyncNonBlocking(Transfer transfer, List<TransferToken> tokens) {
-        log.info("🚀 Starting async email sending for {} tokens on transfer {} [Thread: {}]",
+    public CompletableFuture<Void> sendSigningEmailsAsyncNonBlocking(Transfer transfer, List<TransferToken> tokens, Map<String, List<SignerInfo>> signersByEmail) {
+        log.info("🚀 Starting async email sending for {} signers on transfer {} [Thread: {}]",
                 tokens.size(), transfer.getTransferId(), Thread.currentThread().getName());
 
         int successCount = 0;
@@ -186,11 +211,16 @@ public class TransferTokenService {
 
         for (TransferToken token : tokens) {
             try {
-                SignerInfo signerInfo = new SignerInfo(token.getSignerEmployeeId(), token.getSignerEmail(), token.getSignerRole());
-                sendSigningEmail(transfer, signerInfo, token);
+                List<SignerInfo> signerSlots = signersByEmail.get(token.getSignerEmail());
+                if (signerSlots == null || signerSlots.isEmpty()) {
+                    log.warn("⚠️ No signer slots found for email: {}", token.getSignerEmail());
+                    continue;
+                }
+
+                sendSigningEmail(transfer, token, signerSlots);
                 successCount++;
-                log.info("✅ Email sent successfully to: {} (Role: {}) with token: {} [Thread: {}]",
-                        token.getSignerEmail(), token.getSignerRole(), token.getToken(), Thread.currentThread().getName());
+                log.info("✅ Email sent successfully to: {} ({} roles) [Thread: {}]",
+                        token.getSignerEmail(), signerSlots.size(), Thread.currentThread().getName());
             } catch (Exception e) {
                 failureCount++;
                 log.error("❌ Failed to send email to {} for transfer {} [Thread: {}]: {}",
@@ -278,7 +308,7 @@ public class TransferTokenService {
             log.warn("⚠️ No Finance Representative assigned to transfer: {}", transfer.getTransferId());
         }
 
-        log.info("📋 Total signers found for transfer {}: {}", transfer.getTransferId(), signers.size());
+        log.info("📋 Total signer slots found for transfer {}: {}", transfer.getTransferId(), signers.size());
         for (SignerInfo signer : signers) {
             log.info("   👤 Signer: {} (ID: {}, Role: {})", signer.getEmail(), signer.getEmployeeId(), signer.getRole());
         }
@@ -310,25 +340,34 @@ public class TransferTokenService {
         }
     }
 
-    private void sendSigningEmail(Transfer transfer, SignerInfo signer, TransferToken token) {
-        try {
-            log.debug("📧 Sending email to {} on thread: {}", signer.getEmail(), Thread.currentThread().getName());
+    // ============================================
+    // UPDATED: Send email with all roles for the signer
+    // ============================================
 
-            String employeeName = getEmployeeName(signer.getEmployeeId());
-            String greeting = (employeeName != null) ? employeeName : getRoleDisplayName(signer.getRole());
+    private void sendSigningEmail(Transfer transfer, TransferToken token, List<SignerInfo> signerSlots) {
+        try {
+            log.debug("📧 Sending email to {} on thread: {}", token.getSignerEmail(), Thread.currentThread().getName());
+
+            String employeeName = getEmployeeName(token.getSignerEmployeeId());
+            String greeting = (employeeName != null) ? employeeName : "Signer";
             String signingLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
+
+            // Build roles list
+            String rolesDisplay = signerSlots.stream()
+                    .map(s -> getRoleDisplayName(s.getRole()))
+                    .collect(Collectors.joining(", "));
 
             log.info("=========================================");
             log.info("🔗 SIGNING LINK GENERATED");
             log.info("   Transfer ID: {}", transfer.getTransferId());
-            log.info("   Role: {}", signer.getRole());
-            log.info("   Signer: {}", signer.getEmail());
+            log.info("   Roles: {}", rolesDisplay);
+            log.info("   Signer: {}", token.getSignerEmail());
             log.info("   LINK: {}", signingLink);
             log.info("   Token: {}", token.getToken());
             log.info("   Expires: {}", token.getExpiresAt());
             log.info("=========================================");
 
-            String subject = "Transfer Signature Required - Asset: " + transfer.getAssetTag() + " (Role: " + getRoleDisplayName(signer.getRole()) + ")";
+            String subject = "Transfer Signature Required - Asset: " + transfer.getAssetTag() + " (" + rolesDisplay + ")";
             String body = String.format("""
                     Dear %s,
                     
@@ -337,11 +376,10 @@ public class TransferTokenService {
                     Transfer Details:
                     - Transfer ID: %s
                     - Asset Tag: %s
-                    - Your Role: %s
+                    - Your Roles: %s
                     - Transfer Date: %s
                     
-                    IMPORTANT: This signature is required to complete the asset transfer process.
-                    Your digital signature confirms your approval of this transfer in your capacity as %s.
+                    IMPORTANT: Your digital signature confirms your approval of this transfer in your capacity as %s.
                     
                     Please click the link below to review details and sign:
                     %s
@@ -359,23 +397,23 @@ public class TransferTokenService {
                     AssetIQ-Pro
                     """,
                     greeting, transfer.getAssetTag(), transfer.getTransferId(), transfer.getAssetTag(),
-                    getRoleDisplayName(signer.getRole()),
+                    rolesDisplay,
                     (transfer.getTransferDate() != null) ? transfer.getTransferDate().toString() : "N/A",
-                    getRoleDisplayName(signer.getRole()), signingLink, token.getToken(), token.getExpiresAt());
+                    rolesDisplay, signingLink, token.getToken(), token.getExpiresAt());
 
-            log.info("📧 SENDING EMAIL TO: {}", signer.getEmail());
+            log.info("📧 SENDING EMAIL TO: {}", token.getSignerEmail());
             log.info("🔗 LINK IN EMAIL: {}", signingLink);
 
-            emailService.sendSimpleEmail(signer.getEmail(), subject, body);
+            emailService.sendSimpleEmail(token.getSignerEmail(), subject, body);
 
-            log.info("✅ Email sent successfully to: {} (Link: {})", signer.getEmail(), signingLink);
+            log.info("✅ Email sent successfully to: {} (Link: {})", token.getSignerEmail(), signingLink);
 
         } catch (Exception e) {
-            log.error("❌ Failed to send email to: {} (Role: {}) on thread: {}",
-                    signer.getEmail(), signer.getRole(), Thread.currentThread().getName(), e);
+            log.error("❌ Failed to send email to: {} on thread: {}",
+                    token.getSignerEmail(), Thread.currentThread().getName(), e);
 
             String manualLink = baseUrlService.buildUrl("/transfers/sign?token=%s", token.getToken());
-            log.info("🔗 MANUAL LINK FOR {}: {}", signer.getEmail(), manualLink);
+            log.info("🔗 MANUAL LINK FOR {}: {}", token.getSignerEmail(), manualLink);
 
             throw new RuntimeException("Email sending failed", e);
         }
@@ -422,12 +460,10 @@ public class TransferTokenService {
         return transferTokenRepository.findByToken(token);
     }
 
-    // FIXED: Changed Integer to Long
     public List<TransferToken> findTokensByTransferId(Long transferId) {
         return transferTokenRepository.findByTransferId(transferId);
     }
 
-    // FIXED: Changed Integer to Long
     public boolean hasValidToken(Long transferId, Long signerEmployeeId) {
         return transferTokenRepository.hasValidTokenForSigner(transferId, signerEmployeeId, LocalDateTime.now());
     }
@@ -446,12 +482,10 @@ public class TransferTokenService {
         return transferTokenRepository.findTokensExpiringSoon(now, futureDate);
     }
 
-    // FIXED: Changed Integer to Long
     public long countUnusedTokensForTransfer(Long transferId) {
         return transferTokenRepository.countByTransferIdAndIsUsedFalse(transferId);
     }
 
-    // FIXED: Changed Integer to Long
     public long countUsedTokensForTransfer(Long transferId) {
         return transferTokenRepository.countByTransferIdAndIsUsedTrue(transferId);
     }
@@ -460,7 +494,6 @@ public class TransferTokenService {
         return transferTokenRepository.findBySignerEmail(signerEmail);
     }
 
-    // FIXED: Changed Integer to Long
     public Optional<TransferToken> getMostRecentTokenForSigner(Long transferId, Long signerEmployeeId) {
         return transferTokenRepository.findTopByTransferIdAndSignerEmployeeIdOrderByCreatedAtDesc(transferId, signerEmployeeId);
     }
@@ -526,5 +559,43 @@ public class TransferTokenService {
 
     public void sendReminderEmails(int reminderDaysBefore) {
         sendReminderEmailsAsync(reminderDaysBefore);
+    }
+
+    /**
+     * Get all roles for a signer from a token
+     */
+    public List<String> getRolesFromToken(TransferToken token) {
+        if (token.getSignerRole() == null || token.getSignerRole().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.asList(token.getSignerRole().split(","));
+    }
+
+    /**
+     * Get all signing slots for a signer based on their token
+     */
+    public List<String> getSigningSlotsForSigner(Transfer transfer, TransferToken token) {
+        List<String> roles = getRolesFromToken(token);
+        List<String> signedSlots = new ArrayList<>();
+
+        for (String role : roles) {
+            if (transfer.isSignedForRole(role)) {
+                signedSlots.add(role);
+            }
+        }
+        return signedSlots;
+    }
+
+    /**
+     * Check if all slots for a signer have been signed
+     */
+    public boolean areAllSlotsSigned(Transfer transfer, TransferToken token) {
+        List<String> roles = getRolesFromToken(token);
+        for (String role : roles) {
+            if (!transfer.isSignedForRole(role)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

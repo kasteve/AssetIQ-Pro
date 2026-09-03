@@ -17,12 +17,9 @@ Add default permissions per role so that these permissions are assigned at creat
 During signing, send a single link if a signer has more than one slot to sign for that given transfer. Disable the sumbit button
 until their slots have been signed by that signer.
 
-3. Improve the email body design from the default plain text.
-
 8. Review and define default permissions for every user role so that they are assigned everytime a user is assigned that role
-
-11. Make users get instant responses on UI not waiting for the backend activity like emails to be sent out to give the user a response.
 
 19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.
 
-
+20. Allow for batch upload of assets in form of csv so that all assets are captured at a go
+Here, there should be validation of the submitted data so that any errors like null values for mandatory fields are flagged or even indicate records with errors before actual submission

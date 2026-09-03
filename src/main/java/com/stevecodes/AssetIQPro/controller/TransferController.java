@@ -4,6 +4,7 @@ import com.stevecodes.AssetIQPro.dto.TransferDTO;
 import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import com.stevecodes.AssetIQPro.entity.TransferToken;
+import com.stevecodes.AssetIQPro.service.TransferTokenService;
 import com.stevecodes.AssetIQPro.repository.TransferRepository;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.TransferService;
@@ -34,6 +35,7 @@ public class TransferController {
     private final TransferService transferService;
     private final TransferSigningService signingService;
     private final TransferRepository transferRepository;
+    private final TransferTokenService tokenService;
 
     @PostMapping
     @Operation(summary = "Create a new asset transfer")
@@ -108,13 +110,37 @@ public class TransferController {
         }
     }
 
+    // Add to TransferController.java for the signing endpoint
+
     @PostMapping("/sign")
     @Operation(summary = "Sign a transfer using token")
-    public ResponseEntity<?> signTransfer(@RequestParam String token, @RequestParam String signature) {
+    public ResponseEntity<?> signTransfer(@RequestParam String token,
+                                          @RequestParam String signature,
+                                          @RequestParam(required = false) String role) {
         try {
             TransferToken tokenObj = signingService.validateToken(token);
-            signingService.signTransferWithSignature(tokenObj.getTransferId(), token, signature);
-            return ResponseEntity.ok(Map.of("message", "Signature submitted successfully"));
+
+            // If role is not specified, use the first role from the token
+            if (role == null || role.isEmpty()) {
+                List<String> roles = tokenService.getRolesFromToken(tokenObj);
+                if (roles.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "No roles found for this token"));
+                }
+                role = roles.get(0);
+            }
+
+            // Process the signature for the specific role
+            signingService.processSignatureForRole(tokenObj.getTransferId(), token, role, signature);
+
+            // Check if all slots for this signer are done
+            Transfer transfer = transferService.getTransferById(tokenObj.getTransferId());
+            boolean allSlotsSigned = tokenService.areAllSlotsSigned(transfer, tokenObj);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Signature submitted successfully for role: " + role,
+                    "role", role,
+                    "allSlotsSigned", allSlotsSigned
+            ));
         } catch (Exception e) {
             log.error("Error signing transfer: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
