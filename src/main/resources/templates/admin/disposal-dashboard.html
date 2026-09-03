@@ -186,7 +186,7 @@
                                 <th>Requested By</th>
                                 <th>Requested</th>
                                 <th>Priority</th>
-                                <th>Finance Approved By</th>
+                                <th>Finance Approver</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -204,8 +204,8 @@
                                           th:text="${req.priority}">Normal</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-success">✅</span>
-                                    <span th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</span>
+                                    <div class="fw-bold" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</div>
+                                    <small class="text-muted" th:text="${req.financeApprover != null ? req.financeApprover.department : 'Department'}">Dept</small>
                                 </td>
                                 <td><span class="status-badge pending">PENDING</span></td>
                                 <td>
@@ -223,7 +223,7 @@
         </div>
 
         <!-- ============================================================ -->
-        <!-- TAB 3: RISK & COMPLIANCE APPROVAL - FIXED LINKS -->
+        <!-- TAB 3: RISK & COMPLIANCE APPROVAL -->
         <!-- ============================================================ -->
         <div class="tab-pane fade" id="tab-compliance" role="tabpanel">
             <div class="booking-panel">
@@ -243,7 +243,8 @@
                                 <th>Asset</th>
                                 <th>Requested By</th>
                                 <th>Priority</th>
-                                <th>Approvals</th>
+                                <th>Finance Approver</th>
+                                <th>Infra Approver</th>
                                 <th>Policy</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -261,11 +262,14 @@
                                           th:text="${req.priority}">Normal</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-success me-1">✅ Finance</span>
-                                    <span class="badge bg-success">✅ Infra</span>
+                                    <div class="fw-bold" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</div>
+                                    <small class="text-muted" th:text="${req.financeApprover != null ? req.financeApprover.department : 'Dept'}">Dept</small>
                                 </td>
                                 <td>
-                                    <!-- ✅ FIXED: Correct link with context path -->
+                                    <div class="fw-bold" th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'N/A'}">N/A</div>
+                                    <small class="text-muted" th:text="${req.infraApprover != null ? req.infraApprover.department : 'Dept'}">Dept</small>
+                                </td>
+                                <td>
                                     <a th:if="${req.disposalPolicyPath}"
                                        th:href="@{${'/' + req.disposalPolicyPath}}"
                                        target="_blank"
@@ -311,7 +315,7 @@
                                 <th>Requested By</th>
                                 <th>Requested</th>
                                 <th>Priority</th>
-                                <th>Approvals</th>
+                                <th>Approvers</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -328,7 +332,20 @@
                                     <span class="badge" th:class="${req.priority == 'URGENT' ? 'bg-danger' : req.priority == 'HIGH' ? 'bg-warning' : 'bg-secondary'}"
                                           th:text="${req.priority}">Normal</span>
                                 </td>
-                                <td><span class="badge bg-success">✅ All Approved</span></td>
+                                <td>
+                                    <div class="mb-1">
+                                        <span class="badge bg-success">✅ Finance</span>
+                                        <span class="ms-1" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                    <div class="mb-1">
+                                        <span class="badge bg-success">✅ Infrastructure</span>
+                                        <span class="ms-1" th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-success">✅ Compliance</span>
+                                        <span class="ms-1" th:text="${req.complianceApprover != null ? req.complianceApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                </td>
                                 <td><span class="status-badge inprogress">READY</span></td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-primary view-detail-btn"
@@ -366,6 +383,7 @@
                                 <th>Rejected At</th>
                                 <th>Time</th>
                                 <th>Reason</th>
+                                <th>Rejected By</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -379,6 +397,17 @@
                                 <td th:text="${req.currentApprovalStep}">Step</td>
                                 <td th:text="${#temporals.format(req.updatedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
                                 <td class="text-truncate" style="max-width: 220px;" th:text="${req.rejectionReason}">Reason</td>
+                                <td>
+                                    <div th:if="${req.financeApprovedBy != null && req.financeStatus == 'REJECTED'}">
+                                        <span th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'Finance'}">Finance</span>
+                                    </div>
+                                    <div th:if="${req.infraApprovedBy != null && req.infraStatus == 'REJECTED'}">
+                                        <span th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'Infrastructure'}">Infrastructure</span>
+                                    </div>
+                                    <div th:if="${req.complianceApprovedBy != null && req.complianceStatus == 'REJECTED'}">
+                                        <span th:text="${req.complianceApprover != null ? req.complianceApprover.fullName : 'Compliance'}">Compliance</span>
+                                    </div>
+                                </td>
                                 <td><span class="status-badge rejected">REJECTED</span></td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-outline-secondary view-detail-btn"
@@ -415,6 +444,7 @@
                                 <th>Asset</th>
                                 <th>Completed</th>
                                 <th>Executed By</th>
+                                <th>Approvers</th>
                                 <th>Notes</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -426,8 +456,25 @@
                                     <div class="fw-bold" th:text="${req.asset != null ? req.asset.name : 'Asset #' + req.assetId}">Asset</div>
                                     <small class="text-muted" th:text="${req.asset != null ? req.asset.tag : 'N/A'}">Tag</small>
                                 </td>
-                                <td th:text="${#temporals.format(req.completedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
-                                <td th:text="${req.executor != null ? req.executor.fullName : 'N/A'}">User</td>
+                                <td th:text="${#temporals.format(req.executedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
+                                <td>
+                                    <div class="fw-bold" th:text="${req.executor != null ? req.executor.fullName : 'N/A'}">User</div>
+                                    <small class="text-muted" th:text="${req.executor != null ? req.executor.department : 'Dept'}">Dept</small>
+                                </td>
+                                <td>
+                                    <div class="mb-1">
+                                        <span class="badge bg-success">Finance</span>
+                                        <span class="ms-1" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                    <div class="mb-1">
+                                        <span class="badge bg-success">Infrastructure</span>
+                                        <span class="ms-1" th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-success">Compliance</span>
+                                        <span class="ms-1" th:text="${req.complianceApprover != null ? req.complianceApprover.fullName : 'N/A'}">N/A</span>
+                                    </div>
+                                </td>
                                 <td class="text-truncate" style="max-width: 220px;" th:text="${req.completionNotes != null ? req.completionNotes : '-'}">Notes</td>
                                 <td><span class="status-badge completed">COMPLETED</span></td>
                                 <td>
@@ -466,6 +513,7 @@
                                 <th>Requested</th>
                                 <th>Reason</th>
                                 <th>Current Step</th>
+                                <th>Approvers</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -479,6 +527,23 @@
                                 <td th:text="${#temporals.format(req.requestedAt, 'dd/MM/yyyy HH:mm')}">Time</td>
                                 <td class="text-truncate" style="max-width: 200px;" th:text="${req.disposalReason}">Reason</td>
                                 <td th:text="${req.currentApprovalStep}">Step</td>
+                                <td>
+                                    <div th:if="${req.financeStatus == 'APPROVED'}" class="mb-1">
+                                        <span class="badge bg-success">Finance</span>
+                                        <span class="ms-1" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'Approved'}">N/A</span>
+                                    </div>
+                                    <div th:if="${req.infraStatus == 'APPROVED'}" class="mb-1">
+                                        <span class="badge bg-success">Infrastructure</span>
+                                        <span class="ms-1" th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'Approved'}">N/A</span>
+                                    </div>
+                                    <div th:if="${req.complianceStatus == 'APPROVED'}">
+                                        <span class="badge bg-success">Compliance</span>
+                                        <span class="ms-1" th:text="${req.complianceApprover != null ? req.complianceApprover.fullName : 'Approved'}">N/A</span>
+                                    </div>
+                                    <div th:if="${req.status == 'PENDING_FINANCE_APPROVAL' or req.status == 'PENDING_INFRA_APPROVAL' or req.status == 'PENDING_COMPLIANCE_APPROVAL'}" class="text-muted small">
+                                        <i class="fas fa-clock me-1"></i>Awaiting approval
+                                    </div>
+                                </td>
                                 <td>
                                     <span class="status-badge" th:class="${req.status == 'PENDING_FINANCE_APPROVAL' ? 'pending' :
                                                                               req.status == 'PENDING_INFRA_APPROVAL' ? 'pending' :
@@ -657,6 +722,10 @@
                                         <span class="label">Approved By</span>
                                         <span class="value" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">User</span>
                                     </div>
+                                    <div class="detail-item">
+                                        <span class="label">Department</span>
+                                        <span class="value" th:text="${req.financeApprover != null ? req.financeApprover.department : 'N/A'}">Dept</span>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="detail-item">
@@ -742,7 +811,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- COMPLIANCE APPROVAL MODALS - FIXED LINKS -->
+    <!-- COMPLIANCE APPROVAL MODALS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${pendingCompliance}">
         <div class="modal fade disposal-modal" th:id="'modal-compliance-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -768,7 +837,7 @@
                             </div>
                         </div>
 
-                        <!-- Finance Approval Info -->
+                        <!-- Approvals Summary -->
                         <div class="detail-block">
                             <h6 class="fw-bold mb-3"><i class="fas fa-check-circle text-success me-2"></i>Approvals Summary</h6>
                             <div class="row">
@@ -776,6 +845,10 @@
                                     <div class="detail-item">
                                         <span class="label">Finance Approved By</span>
                                         <span class="value" th:text="${req.financeApprover != null ? req.financeApprover.fullName : 'N/A'}">User</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="label">Finance Department</span>
+                                        <span class="value" th:text="${req.financeApprover != null ? req.financeApprover.department : 'N/A'}">Dept</span>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -791,6 +864,10 @@
                                         <span class="label">Infrastructure Approved By</span>
                                         <span class="value" th:text="${req.infraApprover != null ? req.infraApprover.fullName : 'N/A'}">User</span>
                                     </div>
+                                    <div class="detail-item">
+                                        <span class="label">Infrastructure Department</span>
+                                        <span class="value" th:text="${req.infraApprover != null ? req.infraApprover.department : 'N/A'}">Dept</span>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="detail-item">
@@ -805,7 +882,6 @@
                                     <span class="value" th:text="${req.infraComment}">Comment</span>
                                 </div>
                             </div>
-                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.disposalPolicyPath}" class="mt-2">
                                 <a th:href="@{${'/' + req.disposalPolicyPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file-pdf me-1"></i>View Disposal Policy
@@ -874,7 +950,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- EXECUTION MODALS - FIXED LINKS -->
+    <!-- EXECUTION MODALS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${pendingExecution}">
         <div class="modal fade disposal-modal" th:id="'modal-execution-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -889,7 +965,6 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <!-- Status Alert -->
                         <div class="alert alert-success">
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-check-circle me-2"></i>
@@ -920,7 +995,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.disposalPolicyPath}" class="mt-2">
                                 <a th:href="@{${'/' + req.disposalPolicyPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file-pdf me-1"></i>View Disposal Policy
@@ -981,7 +1055,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- REJECTED REQUESTS MODALS (Simplified) -->
+    <!-- REJECTED REQUESTS MODALS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${rejectedRequests}">
         <div class="modal fade disposal-modal" th:id="'modal-rejected-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -998,12 +1072,19 @@
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-circle me-2"></i>
                             This request was rejected at: <strong th:text="${req.currentApprovalStep}">Step</strong>
+                            <span th:if="${req.rejectedBy != null}">
+                                by <strong th:text="${req.rejectedBy.fullName}">User</strong>
+                            </span>
                         </div>
                         <div class="detail-block">
                             <h6 class="fw-bold mb-3">Rejection Details</h6>
                             <div class="detail-item">
                                 <span class="label">Reason</span>
                                 <span class="value" th:text="${req.rejectionReason}">Reason</span>
+                            </div>
+                            <div class="detail-item mt-2">
+                                <span class="label">Rejected By</span>
+                                <span class="value" th:text="${req.rejectedBy != null ? req.rejectedBy.fullName + ' (' + req.rejectedBy.department + ')' : 'Unknown'}">User</span>
                             </div>
                             <div class="detail-item mt-2">
                                 <span class="label">Rejected At</span>
@@ -1034,7 +1115,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- COMPLETED REQUESTS MODALS - FIXED LINKS -->
+    <!-- COMPLETED REQUESTS MODALS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${completedRequests}">
         <div class="modal fade disposal-modal" th:id="'modal-completed-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -1074,6 +1155,10 @@
                                         <span class="label">Executed By</span>
                                         <span class="value" th:text="${req.executor != null ? req.executor.fullName : 'N/A'}">User</span>
                                     </div>
+                                    <div class="detail-item">
+                                        <span class="label">Department</span>
+                                        <span class="value" th:text="${req.executor != null ? req.executor.department : 'N/A'}">Dept</span>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="detail-item">
@@ -1088,7 +1173,6 @@
                                     <span class="value" th:text="${req.completionNotes}">Notes</span>
                                 </div>
                             </div>
-                            <!-- ✅ FIXED: Correct link with context path -->
                             <div th:if="${req.proofDocumentPath}" class="mt-2">
                                 <a th:href="@{${'/' + req.proofDocumentPath}}" target="_blank" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-file me-1"></i>View Proof
@@ -1097,9 +1181,18 @@
                         </div>
                         <div class="detail-block">
                             <h6 class="fw-bold mb-3">Approval Summary</h6>
-                            <div class="mb-1"><span class="badge bg-success">Finance</span> <span class="ms-2">Approved</span></div>
-                            <div class="mb-1"><span class="badge bg-success">Infrastructure</span> <span class="ms-2">Approved</span></div>
-                            <div class="mb-1"><span class="badge bg-success">Compliance</span> <span class="ms-2">Approved</span></div>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Finance</span>
+                                <span class="ms-2" th:text="${req.financeApprover != null ? req.financeApprover.fullName + ' (' + req.financeApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Infrastructure</span>
+                                <span class="ms-2" th:text="${req.infraApprover != null ? req.infraApprover.fullName + ' (' + req.infraApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Compliance</span>
+                                <span class="ms-2" th:text="${req.complianceApprover != null ? req.complianceApprover.fullName + ' (' + req.complianceApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1114,7 +1207,7 @@
     </th:block>
 
     <!-- ============================================================ -->
-    <!-- MY REQUESTS MODALS (Simplified - reusing pending structure) -->
+    <!-- MY REQUESTS MODALS -->
     <!-- ============================================================ -->
     <th:block th:each="req : ${myRequests}">
         <div class="modal fade disposal-modal" th:id="'modal-my-' + ${req.disposalRequestId}" tabindex="-1" aria-hidden="true">
@@ -1159,21 +1252,57 @@
                                     <span class="label text-danger">Rejection Reason</span>
                                     <span class="value text-danger" th:text="${req.rejectionReason}">Reason</span>
                                 </div>
+                                <div class="detail-item mt-1" th:if="${req.rejectedBy != null}">
+                                    <span class="label text-danger">Rejected By</span>
+                                    <span class="value text-danger" th:text="${req.rejectedBy.fullName + ' (' + req.rejectedBy.department + ')'}">User</span>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- Approval Status with Names -->
                         <div th:if="${req.status != 'REJECTED' and req.status != 'COMPLETED'}" class="detail-block">
                             <h6 class="fw-bold mb-3">Approval Status</h6>
-                            <div class="mb-1">
+                            <div class="mb-2">
                                 <span class="badge" th:class="${req.financeStatus == 'APPROVED' ? 'bg-success' : 'bg-warning'}">Finance</span>
                                 <span class="ms-2" th:text="${req.financeStatus != null ? req.financeStatus : 'PENDING'}">PENDING</span>
+                                <span th:if="${req.financeApprover != null and req.financeStatus == 'APPROVED'}" class="ms-2 text-muted small">
+                                    by <span th:text="${req.financeApprover.fullName}">User</span>
+                                </span>
                             </div>
-                            <div class="mb-1">
+                            <div class="mb-2">
                                 <span class="badge" th:class="${req.infraStatus == 'APPROVED' ? 'bg-success' : 'bg-warning'}">Infrastructure</span>
                                 <span class="ms-2" th:text="${req.infraStatus != null ? req.infraStatus : 'PENDING'}">PENDING</span>
+                                <span th:if="${req.infraApprover != null and req.infraStatus == 'APPROVED'}" class="ms-2 text-muted small">
+                                    by <span th:text="${req.infraApprover.fullName}">User</span>
+                                </span>
                             </div>
-                            <div class="mb-1">
+                            <div class="mb-2">
                                 <span class="badge" th:class="${req.complianceStatus == 'APPROVED' ? 'bg-success' : 'bg-warning'}">Compliance</span>
                                 <span class="ms-2" th:text="${req.complianceStatus != null ? req.complianceStatus : 'PENDING'}">PENDING</span>
+                                <span th:if="${req.complianceApprover != null and req.complianceStatus == 'APPROVED'}" class="ms-2 text-muted small">
+                                    by <span th:text="${req.complianceApprover.fullName}">User</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Completed Approval Summary -->
+                        <div th:if="${req.status == 'COMPLETED'}" class="detail-block">
+                            <h6 class="fw-bold mb-3">Approval Summary</h6>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Finance</span>
+                                <span class="ms-2" th:text="${req.financeApprover != null ? req.financeApprover.fullName + ' (' + req.financeApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Infrastructure</span>
+                                <span class="ms-2" th:text="${req.infraApprover != null ? req.infraApprover.fullName + ' (' + req.infraApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge bg-success">Compliance</span>
+                                <span class="ms-2" th:text="${req.complianceApprover != null ? req.complianceApprover.fullName + ' (' + req.complianceApprover.department + ')' : 'N/A'}">N/A</span>
+                            </div>
+                            <div class="mt-2">
+                                <span class="badge bg-success">Executed By</span>
+                                <span class="ms-2" th:text="${req.executor != null ? req.executor.fullName + ' (' + req.executor.department + ')' : 'N/A'}">N/A</span>
                             </div>
                         </div>
                     </div>
@@ -1230,6 +1359,7 @@
             font-size: 13px;
             padding: 10px 16px;
             background: transparent;
+            cursor: pointer;
         }
         .disposal-tabs .nav-link .badge { font-size: 10px; vertical-align: middle; }
         .disposal-tabs .nav-link.active {
@@ -1356,35 +1486,105 @@
 <div layout:fragment="scripts">
     <script>
         (function () {
-            function initDisposalDashboard() {
+            // ============================================
+            // TAB SWITCHING - pure vanilla JS, no dependency
+            // on bootstrap.Tab (works even if that component
+            // isn't part of the loaded Bootstrap bundle).
+            // ============================================
+            function initDisposalTabs() {
+                var tabList = document.getElementById('disposalTabs');
+                if (!tabList) return;
 
-                document.querySelectorAll('#disposalTabs button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
-                    tabBtn.addEventListener('click', function (e) {
+                var tabButtons = tabList.querySelectorAll('.nav-link[data-bs-target]');
+                var panes = document.querySelectorAll('.disposal-tab-content > .tab-pane');
+
+                function activateTab(btn) {
+                    var targetSelector = btn.getAttribute('data-bs-target');
+                    if (!targetSelector) return;
+                    var targetPane = document.querySelector(targetSelector);
+                    if (!targetPane) return;
+
+                    tabButtons.forEach(function (b) {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-selected', 'false');
+                    });
+                    panes.forEach(function (p) {
+                        p.classList.remove('show', 'active');
+                    });
+
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-selected', 'true');
+                    targetPane.classList.add('show', 'active');
+                }
+
+                tabButtons.forEach(function (btn) {
+                    btn.addEventListener('click', function (e) {
                         e.preventDefault();
-                        if (typeof bootstrap === 'undefined' || !bootstrap.Tab) {
-                            console.error('Bootstrap JS not loaded - tabs cannot switch.');
-                            return;
-                        }
-                        bootstrap.Tab.getOrCreateInstance(this).show();
+                        activateTab(btn);
                     });
                 });
 
+                // Make sure exactly one tab/pane is active on load
+                var activeBtn = tabList.querySelector('.nav-link.active');
+                if (!activeBtn && tabButtons.length > 0) {
+                    activeBtn = tabButtons[0];
+                }
+                if (activeBtn) {
+                    activateTab(activeBtn);
+                }
+            }
+
+            // ============================================
+            // View Detail Button Handler (opens modals)
+            // ============================================
+            function initViewDetailButtons() {
                 document.addEventListener('click', function (e) {
                     var btn = e.target.closest('.view-detail-btn');
                     if (!btn) return;
+
                     var targetId = btn.getAttribute('data-target');
+                    if (!targetId) return;
+
                     var modal = document.getElementById(targetId);
                     if (!modal) {
                         console.error('Modal not found: ' + targetId);
                         return;
                     }
-                    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-                        console.error('Bootstrap JS not loaded - modal cannot open.');
-                        return;
-                    }
-                    bootstrap.Modal.getOrCreateInstance(modal).show();
-                });
 
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modal).show();
+                    } else {
+                        // Fallback if Bootstrap's Modal component isn't available
+                        modal.style.display = 'block';
+                        modal.classList.add('show');
+                        modal.removeAttribute('aria-hidden');
+                        document.body.classList.add('modal-open');
+
+                        var backdrop = document.createElement('div');
+                        backdrop.className = 'modal-backdrop fade show';
+                        backdrop.setAttribute('data-manual-backdrop', targetId);
+                        document.body.appendChild(backdrop);
+
+                        var closeManual = function () {
+                            modal.style.display = 'none';
+                            modal.classList.remove('show');
+                            modal.setAttribute('aria-hidden', 'true');
+                            document.body.classList.remove('modal-open');
+                            var bd = document.querySelector('[data-manual-backdrop="' + targetId + '"]');
+                            if (bd) bd.remove();
+                        };
+                        modal.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function (closeBtn) {
+                            closeBtn.addEventListener('click', closeManual, { once: true });
+                        });
+                        backdrop.addEventListener('click', closeManual, { once: true });
+                    }
+                });
+            }
+
+            // ============================================
+            // Form Submit Handler (disable + spinner)
+            // ============================================
+            function initFormSubmitHandlers() {
                 document.querySelectorAll('.disposal-modal form[method="post"]').forEach(function (form) {
                     form.addEventListener('submit', function () {
                         var btn = this.querySelector('button[type="submit"]');
@@ -1396,15 +1596,34 @@
                 });
             }
 
+            function init() {
+                initDisposalTabs();
+                initViewDetailButtons();
+                initFormSubmitHandlers();
+            }
+
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initDisposalDashboard);
+                document.addEventListener('DOMContentLoaded', init);
             } else {
-                initDisposalDashboard();
+                init();
             }
         })();
 
+        // ============================================
+        // Open Disposal From Asset
+        // ============================================
         function openDisposalFromAsset(assetId) {
             window.location.href = '/assetIQ-pro/assets?disposal=' + assetId;
+        }
+
+        // ============================================
+        // Manual Tab Switch (Fallback)
+        // ============================================
+        function switchTab(tabId) {
+            var tab = document.getElementById(tabId);
+            if (tab) {
+                tab.click();
+            }
         }
     </script>
 </div>

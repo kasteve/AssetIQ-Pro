@@ -329,4 +329,23 @@ public class AssetDisposalRequest {
     public boolean isApprovalFlowComplete() {
         return "COMPLETED".equals(approvalFlowStatus);
     }
+
+    // ============================================
+    // REJECTION HELPERS
+    // ============================================
+    // The template (disposal-dashboard.html) reads req.rejectedBy.fullName /
+    // req.rejectedBy.department. Rejection isn't stored against a single
+    // dedicated column - it happens at whichever stage rejected the request,
+    // so this derives the right AppUser from the stage-specific approver
+    // fields that already exist. No new DB column needed.
+    public AppUser getRejectedBy() {
+        if ("REJECTED".equals(financeStatus)) {
+            return financeApprover;
+        } else if ("REJECTED".equals(infraStatus)) {
+            return infraApprover;
+        } else if ("REJECTED".equals(complianceStatus)) {
+            return complianceApprover;
+        }
+        return null;
+    }
 }
