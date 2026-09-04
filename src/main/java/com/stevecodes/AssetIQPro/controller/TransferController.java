@@ -110,8 +110,6 @@ public class TransferController {
         }
     }
 
-    // Add to TransferController.java for the signing endpoint
-
     @PostMapping("/sign")
     @Operation(summary = "Sign a transfer using token")
     public ResponseEntity<?> signTransfer(@RequestParam String token,
@@ -126,7 +124,17 @@ public class TransferController {
                 if (roles.isEmpty()) {
                     return ResponseEntity.badRequest().body(Map.of("error", "No roles found for this token"));
                 }
-                role = roles.get(0);
+                // Find the first unsigned role
+                Transfer transfer = transferService.getTransferById(tokenObj.getTransferId());
+                for (String r : roles) {
+                    if (!transfer.isSignedForRole(r)) {
+                        role = r;
+                        break;
+                    }
+                }
+                if (role == null || role.isEmpty()) {
+                    role = roles.get(0);
+                }
             }
 
             // Process the signature for the specific role
@@ -142,7 +150,7 @@ public class TransferController {
                     "allSlotsSigned", allSlotsSigned
             ));
         } catch (Exception e) {
-            log.error("Error signing transfer: {}", e.getMessage());
+            log.error("Error signing transfer: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to sign transfer: " + e.getMessage()));
         }

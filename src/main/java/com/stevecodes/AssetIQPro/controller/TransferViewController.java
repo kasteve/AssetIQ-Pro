@@ -18,7 +18,11 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Controller
@@ -29,11 +33,16 @@ public class TransferViewController {
     private final TransferService transferService;
     private final TransferSigningService transferSigningService;
     private final TransferTokenRepository transferTokenRepository;
+    private final TransferTokenService transferTokenService;
     private final CompanyService companyService;
     private final CategoryService categoryService;
     private final DepartmentService departmentService;
     private final EmployeeService employeeService;
     private final AssetService assetService;
+
+    // ============================================
+    // TRANSFERS LIST PAGE
+    // ============================================
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('TRANSFER_VIEW', 'VIEW_ALL_TRANSACTIONS', 'ADMIN', 'SUPER_ADMIN')")
@@ -73,94 +82,7 @@ public class TransferViewController {
     }
 
     // ============================================
-    // PROCESS RE-TRANSFER - FIXED
-    // ============================================
-
-    @PostMapping("/retransfer")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
-    public String processRetransfer(
-            @RequestParam Long sourceTransferId,
-            @RequestParam Long newEmployeeId,
-            @RequestParam(required = false) Integer newDepartmentId,
-            @RequestParam(required = false) String conditionOld,
-            @RequestParam(required = false) String conditionNew,
-            @RequestParam(required = false) String accessoriesOld,
-            @RequestParam(required = false) String accessoriesNew,
-            @RequestParam(required = false) String softwareInstalled,
-            @RequestParam(required = false) String comments,
-            RedirectAttributes redirectAttributes) {
-
-        log.info("=========================================");
-        log.info("📝 Processing re-transfer for source transfer: {}", sourceTransferId);
-        log.info("   New Employee ID: {}", newEmployeeId);
-        log.info("   New Department ID: {}", newDepartmentId);
-        log.info("=========================================");
-
-        AppUser currentUser = SecurityUtils.getCurrentUser();
-        if (currentUser == null) {
-            redirectAttributes.addFlashAttribute("error", "You must be logged in.");
-            return "redirect:/login";
-        }
-
-        try {
-            // Get the source transfer (this has the Category object)
-            Transfer sourceTransfer = transferService.getTransferById(sourceTransferId);
-
-            // Create a new Transfer object with the re-transfer data
-            Transfer retransferData = new Transfer();
-
-            // Asset info - copy from source
-            retransferData.setAssetTag(sourceTransfer.getAssetTag());
-            retransferData.setSerialNumber(sourceTransfer.getSerialNumber());
-            retransferData.setVersionMake(sourceTransfer.getVersionMake());
-            retransferData.setModelBuild(sourceTransfer.getModelBuild());
-
-            // ✅ FIX: Copy the Category object from source (NOT a String)
-            // This is the correct way - getCategory() returns a Category object
-            if (sourceTransfer.getCategory() != null) {
-                retransferData.setCategory(sourceTransfer.getCategory());
-            }
-
-            // Company
-            retransferData.setCompanyId(sourceTransfer.getCompanyId());
-
-            // Previous transfer ID (for history linking)
-            retransferData.setPreviousTransferId(sourceTransferId);
-
-            // New employee
-            retransferData.setNewEmployeeId(newEmployeeId);
-
-            // New department (optional)
-            if (newDepartmentId != null) {
-                retransferData.setNewDepartmentId(newDepartmentId);
-            }
-
-            // Editable fields
-            retransferData.setConditionOld(conditionOld);
-            retransferData.setConditionNew(conditionNew);
-            retransferData.setAccessoriesOld(accessoriesOld);
-            retransferData.setAccessoriesNew(accessoriesNew);
-            retransferData.setSoftwareInstalled(softwareInstalled);
-            retransferData.setComments(comments);
-
-            // Process the re-transfer
-            Transfer newTransfer = transferService.retransferAsset(retransferData);
-
-            redirectAttributes.addFlashAttribute("success",
-                    "✅ Asset re-transferred successfully! Transfer #" + newTransfer.getTransferId() +
-                            " (Sequence: " + newTransfer.getTransferSequence() + ") created. Signing emails sent to all parties.");
-
-            return "redirect:/transfers";
-
-        } catch (Exception e) {
-            log.error("❌ Error processing re-transfer: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to re-transfer asset: " + e.getMessage());
-            return "redirect:/transfers";
-        }
-    }
-
-    // ============================================
-    // OTHER EXISTING METHODS (unchanged)
+    // POPULATE EMPLOYEE DETAILS
     // ============================================
 
     private void populateEmployeeDetails(Transfer transfer) {
@@ -255,6 +177,28 @@ public class TransferViewController {
         }
     }
 
+    // ============================================
+    // GET ROLE DISPLAY NAME
+    // ============================================
+
+    private String getRoleDisplayName(String role) {
+        if (role == null) return "Unknown";
+        switch (role) {
+            case "OLD_HANDOVER": return "Old Handover By";
+            case "OLD_RECEIVED": return "Old Received By";
+            case "NEW_HANDOVER": return "New Handover By";
+            case "NEW_RECEIVED": return "New Received By";
+            case "CONFIGURED_BY": return "Configured By";
+            case "INFRA_REP": return "Infrastructure Representative";
+            case "FINANCE_REP": return "Finance Representative";
+            default: return role;
+        }
+    }
+
+    // ============================================
+    // CREATE TRANSFER PAGE
+    // ============================================
+
     @GetMapping("/create")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String createTransfer(@RequestParam(required = false) String assetTag, Model model) {
@@ -283,6 +227,10 @@ public class TransferViewController {
         return "transfers/create";
     }
 
+    // ============================================
+    // SIGN PAGE - MULTI-ROLE SUPPORT
+    // ============================================
+
     @GetMapping("/sign")
     public String showSignPage(@RequestParam String token, Model model) {
         log.info("Sign page accessed with token: {}", token);
@@ -302,20 +250,76 @@ public class TransferViewController {
                         .ifPresent(dept -> transfer.setNewDepartmentName(dept.getName()));
             }
 
-            String roleDisplay = getRoleDisplayName(transferToken.getSignerRole());
+            // ============================================
+            // MULTI-ROLE SIGNING - Get all roles for this signer
+            // ============================================
+            List<String> signerRoles = transferTokenService.getRolesFromToken(transferToken);
+            log.info("Signer roles: {}", signerRoles);
 
+            // Get current role (first unsigned role, or first role if all signed)
+            String currentRole = null;
+            Map<String, Boolean> roleSignedStatus = new LinkedHashMap<>();
+            int signedCount = 0;
+
+            for (String role : signerRoles) {
+                boolean isSigned = transfer.isSignedForRole(role);
+                roleSignedStatus.put(role, isSigned);
+                if (isSigned) {
+                    signedCount++;
+                } else if (currentRole == null) {
+                    currentRole = role;
+                }
+            }
+
+            // If all roles are signed, set currentRole to the last role
+            if (currentRole == null && !signerRoles.isEmpty()) {
+                currentRole = signerRoles.get(signerRoles.size() - 1);
+            }
+
+            boolean allSlotsSigned = signedCount == signerRoles.size() && !signerRoles.isEmpty();
+
+            String roleDisplay = currentRole != null ? getRoleDisplayName(currentRole) : "No roles assigned";
+
+            AtomicReference<String> signerName = new AtomicReference<>(transferToken.getSignerEmail());
+            // Try to get the employee name
+            if (transferToken.getSignerEmployeeId() != null) {
+                Long employeeId = transferToken.getSignerEmployeeId();
+                employeeService.getEmployeeById(employeeId)
+                        .ifPresent(emp -> signerName.set(emp.getFullName()));
+            }
+
+            // ============================================
+            // ADD ALL ATTRIBUTES TO MODEL
+            // ============================================
             model.addAttribute("transfer", transfer);
             model.addAttribute("token", token);
             model.addAttribute("signerRole", transferToken.getSignerRole());
             model.addAttribute("signerRoleDisplay", roleDisplay);
-            model.addAttribute("signerName", transferToken.getSignerEmail());
+            model.addAttribute("signerName", signerName);
             model.addAttribute("alreadySigned", transferToken.getIsUsed());
 
+            // Multi-role attributes
+            model.addAttribute("signerRoles", signerRoles);
+            model.addAttribute("currentRole", currentRole);
+            model.addAttribute("currentRoleDisplay", roleDisplay);
+            model.addAttribute("roleSignedStatus", roleSignedStatus);
+            model.addAttribute("totalSlots", signerRoles.size());
+            model.addAttribute("signedSlotsCount", signedCount);
+            model.addAttribute("allSlotsSigned", allSlotsSigned);
+
+            // Transfer date formatting
+            if (transfer.getTransferDate() != null) {
+                model.addAttribute("transferDateFormatted",
+                        transfer.getTransferDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            }
+
+            // Related transfers
             List<Transfer> relatedTransfers = transferService.getRelatedTransfers(
                     transfer.getTransferId(), transfer.getAssetTag(), transfer.getSerialNumber());
             model.addAttribute("relatedTransfers", relatedTransfers);
 
             return "transfers/sign";
+
         } catch (Exception e) {
             log.error("Error validating token: {}", e.getMessage(), e);
             model.addAttribute("error", "Invalid or expired signing link: " + e.getMessage());
@@ -323,33 +327,37 @@ public class TransferViewController {
         }
     }
 
-    private String getRoleDisplayName(String role) {
-        if (role == null) return "Unknown";
-        switch (role) {
-            case "OLD_HANDOVER": return "Old Handover By";
-            case "OLD_RECEIVED": return "Old Received By";
-            case "NEW_HANDOVER": return "New Handover By";
-            case "NEW_RECEIVED": return "New Received By";
-            case "CONFIGURED_BY": return "Configured By";
-            case "INFRA_REP": return "Infrastructure Representative";
-            case "FINANCE_REP": return "Finance Representative";
-            default: return role;
-        }
-    }
+    // ============================================
+    // SUBMIT SIGNATURE - FIXED
+    // ============================================
 
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Long transferId,
                                   @RequestParam String token,
                                   @RequestParam String signature,
+                                  @RequestParam(required = false) String role,
                                   RedirectAttributes redirectAttributes) {
         try {
-            log.info("Submitting signature for transfer: {}, token: {}", transferId, token);
+            log.info("Submitting signature for transfer: {}, token: {}, role: {}", transferId, token, role);
 
             TransferToken transferToken = transferSigningService.validateToken(token);
-            transferSigningService.saveSignature(transferId, transferToken.getSignerRole(), signature);
 
-            transferToken.setIsUsed(true);
-            transferTokenRepository.save(transferToken);
+            // Determine which role to sign (using helper method to avoid lambda issues)
+            String signerRole = determineSignerRole(transferId, transferToken, role);
+            log.info("Signing role: {}", signerRole);
+
+            // Save the signature for the specific role
+            transferSigningService.saveSignature(transferId, signerRole, signature);
+
+            // Check if all roles for this signer are now signed
+            Transfer transfer = transferService.getTransferById(transferId);
+            boolean allSlotsSigned = transferTokenService.areAllSlotsSigned(transfer, transferToken);
+
+            if (allSlotsSigned) {
+                transferToken.setIsUsed(true);
+                transferTokenRepository.save(transferToken);
+                log.info("✅ Signer {} has completed all roles for transfer {}", transferToken.getSignerEmail(), transferId);
+            }
 
             boolean fullySigned = transferSigningService.isTransferFullySigned(transferId);
 
@@ -358,27 +366,79 @@ public class TransferViewController {
                 redirectAttributes.addFlashAttribute("message", "Transfer fully signed! PDF certificate emailed to all parties.");
                 redirectAttributes.addFlashAttribute("fullySigned", true);
             } else {
-                redirectAttributes.addFlashAttribute("message", "Your signature has been submitted successfully.");
+                redirectAttributes.addFlashAttribute("message",
+                        "Your signature for " + getRoleDisplayName(signerRole) + " has been submitted successfully." +
+                                (allSlotsSigned ? " All your roles are now signed!" :
+                                        " Please sign your remaining roles if any."));
                 redirectAttributes.addFlashAttribute("fullySigned", false);
             }
 
-            return "redirect:/transfers/thankyou";
+            if (allSlotsSigned) {
+                return "redirect:/transfers/thankyou";
+            } else {
+                // Redirect back to signing page with same token to sign remaining roles
+                return "redirect:/transfers/sign?token=" + token;
+            }
+
         } catch (Exception e) {
-            log.error("Error submitting signature: {}", e.getMessage());
+            log.error("Error submitting signature: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to submit signature: " + e.getMessage());
             return "redirect:/transfers/sign-error";
         }
     }
+
+    // ============================================
+    // DETERMINE SIGNER ROLE - HELPER METHOD
+    // ============================================
+
+    private String determineSignerRole(Long transferId, TransferToken transferToken, String requestedRole) {
+        // If a specific role was requested, use it
+        if (requestedRole != null && !requestedRole.isEmpty()) {
+            return requestedRole;
+        }
+
+        String signerRole = transferToken.getSignerRole();
+
+        // Single role - use it directly
+        if (signerRole == null || !signerRole.contains(",")) {
+            return signerRole != null ? signerRole : "UNKNOWN";
+        }
+
+        // Multiple roles - find the first unsigned one
+        List<String> roles = transferTokenService.getRolesFromToken(transferToken);
+        Transfer transfer = transferService.getTransferById(transferId);
+
+        for (String r : roles) {
+            if (!transfer.isSignedForRole(r)) {
+                return r;
+            }
+        }
+
+        // All roles are signed, return the first one
+        return roles.isEmpty() ? "UNKNOWN" : roles.get(0);
+    }
+
+    // ============================================
+    // THANK YOU PAGE
+    // ============================================
 
     @GetMapping("/thankyou")
     public String thankyou() {
         return "transfers/thankyou";
     }
 
+    // ============================================
+    // SIGN ERROR PAGE
+    // ============================================
+
     @GetMapping("/sign-error")
     public String signError() {
         return "transfers/sign-error";
     }
+
+    // ============================================
+    // CREATE TRANSFER
+    // ============================================
 
     @PostMapping("/create")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
@@ -413,6 +473,84 @@ public class TransferViewController {
         }
     }
 
+    // ============================================
+    // PROCESS RE-TRANSFER
+    // ============================================
+
+    @PostMapping("/retransfer")
+    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
+    public String processRetransfer(
+            @RequestParam Long sourceTransferId,
+            @RequestParam Long newEmployeeId,
+            @RequestParam(required = false) Integer newDepartmentId,
+            @RequestParam(required = false) String conditionOld,
+            @RequestParam(required = false) String conditionNew,
+            @RequestParam(required = false) String accessoriesOld,
+            @RequestParam(required = false) String accessoriesNew,
+            @RequestParam(required = false) String softwareInstalled,
+            @RequestParam(required = false) String comments,
+            RedirectAttributes redirectAttributes) {
+
+        log.info("=========================================");
+        log.info("📝 Processing re-transfer for source transfer: {}", sourceTransferId);
+        log.info("   New Employee ID: {}", newEmployeeId);
+        log.info("   New Department ID: {}", newDepartmentId);
+        log.info("=========================================");
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            redirectAttributes.addFlashAttribute("error", "You must be logged in.");
+            return "redirect:/login";
+        }
+
+        try {
+            Transfer sourceTransfer = transferService.getTransferById(sourceTransferId);
+
+            Transfer retransferData = new Transfer();
+
+            retransferData.setAssetTag(sourceTransfer.getAssetTag());
+            retransferData.setSerialNumber(sourceTransfer.getSerialNumber());
+            retransferData.setVersionMake(sourceTransfer.getVersionMake());
+            retransferData.setModelBuild(sourceTransfer.getModelBuild());
+
+            if (sourceTransfer.getCategory() != null) {
+                retransferData.setCategory(sourceTransfer.getCategory());
+            }
+
+            retransferData.setCompanyId(sourceTransfer.getCompanyId());
+            retransferData.setPreviousTransferId(sourceTransferId);
+            retransferData.setNewEmployeeId(newEmployeeId);
+
+            if (newDepartmentId != null) {
+                retransferData.setNewDepartmentId(newDepartmentId);
+            }
+
+            retransferData.setConditionOld(conditionOld);
+            retransferData.setConditionNew(conditionNew);
+            retransferData.setAccessoriesOld(accessoriesOld);
+            retransferData.setAccessoriesNew(accessoriesNew);
+            retransferData.setSoftwareInstalled(softwareInstalled);
+            retransferData.setComments(comments);
+
+            Transfer newTransfer = transferService.retransferAsset(retransferData);
+
+            redirectAttributes.addFlashAttribute("success",
+                    "✅ Asset re-transferred successfully! Transfer #" + newTransfer.getTransferId() +
+                            " (Sequence: " + newTransfer.getTransferSequence() + ") created. Signing emails sent to all parties.");
+
+            return "redirect:/transfers";
+
+        } catch (Exception e) {
+            log.error("❌ Error processing re-transfer: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error", "Failed to re-transfer asset: " + e.getMessage());
+            return "redirect:/transfers";
+        }
+    }
+
+    // ============================================
+    // INITIATE SIGNING
+    // ============================================
+
     @PostMapping("/{transferId}/initiate-signing")
     @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
     public String initiateSigning(@PathVariable Long transferId, RedirectAttributes redirectAttributes) {
@@ -434,6 +572,10 @@ public class TransferViewController {
         }
         return "redirect:/transfers";
     }
+
+    // ============================================
+    // DOWNLOAD PDF
+    // ============================================
 
     @GetMapping("/{transferId}/pdf")
     public ResponseEntity<byte[]> downloadPdf(@PathVariable Long transferId) {
