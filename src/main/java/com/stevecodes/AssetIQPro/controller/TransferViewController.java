@@ -8,6 +8,8 @@ import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,11 +20,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Controller
@@ -196,6 +199,24 @@ public class TransferViewController {
     }
 
     // ============================================
+    // HELPER METHOD: Get signed at timestamp for a role
+    // ============================================
+
+    private LocalDateTime getSignedAtForRole(Transfer transfer, String role) {
+        if (role == null) return null;
+        switch (role) {
+            case "OLD_HANDOVER": return transfer.getOldHandoverBySignedAt();
+            case "OLD_RECEIVED": return transfer.getOldReceivedBySignedAt();
+            case "NEW_HANDOVER": return transfer.getNewHandoverBySignedAt();
+            case "NEW_RECEIVED": return transfer.getNewReceivedBySignedAt();
+            case "CONFIGURED_BY": return transfer.getConfiguredBySignedAt();
+            case "INFRA_REP": return transfer.getInfraRepSignedAt();
+            case "FINANCE_REP": return transfer.getFinanceRepSignedAt();
+            default: return null;
+        }
+    }
+
+    // ============================================
     // CREATE TRANSFER PAGE
     // ============================================
 
@@ -256,9 +277,8 @@ public class TransferViewController {
             List<String> signerRoles = transferTokenService.getRolesFromToken(transferToken);
             log.info("Signer roles: {}", signerRoles);
 
-            // Get current role (first unsigned role, or first role if all signed)
-            String currentRole = null;
             Map<String, Boolean> roleSignedStatus = new LinkedHashMap<>();
+            Map<String, String> roleSignedAt = new LinkedHashMap<>();
             int signedCount = 0;
 
             for (String role : signerRoles) {
@@ -266,31 +286,37 @@ public class TransferViewController {
                 roleSignedStatus.put(role, isSigned);
                 if (isSigned) {
                     signedCount++;
-                } else if (currentRole == null) {
-                    currentRole = role;
+                    LocalDateTime signedAt = getSignedAtForRole(transfer, role);
+                    if (signedAt != null) {
+                        roleSignedAt.put(role, signedAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                    }
                 }
             }
 
-            // If all roles are signed, set currentRole to the last role
+            // Find first unsigned role for currentRole
+            String currentRole = null;
+            for (String role : signerRoles) {
+                if (!roleSignedStatus.getOrDefault(role, false)) {
+                    currentRole = role;
+                    break;
+                }
+            }
+
             if (currentRole == null && !signerRoles.isEmpty()) {
-                currentRole = signerRoles.get(signerRoles.size() - 1);
+                currentRole = signerRoles.get(0);
             }
 
             boolean allSlotsSigned = signedCount == signerRoles.size() && !signerRoles.isEmpty();
-
             String roleDisplay = currentRole != null ? getRoleDisplayName(currentRole) : "No roles assigned";
 
-            AtomicReference<String> signerName = new AtomicReference<>(transferToken.getSignerEmail());
-            // Try to get the employee name
+            String signerName = transferToken.getSignerEmail();
             if (transferToken.getSignerEmployeeId() != null) {
                 Long employeeId = transferToken.getSignerEmployeeId();
-                employeeService.getEmployeeById(employeeId)
-                        .ifPresent(emp -> signerName.set(emp.getFullName()));
+                signerName = employeeService.getEmployeeById(employeeId)
+                        .map(emp -> emp.getFullName())
+                        .orElse(signerName);
             }
 
-            // ============================================
-            // ADD ALL ATTRIBUTES TO MODEL
-            // ============================================
             model.addAttribute("transfer", transfer);
             model.addAttribute("token", token);
             model.addAttribute("signerRole", transferToken.getSignerRole());
@@ -298,22 +324,21 @@ public class TransferViewController {
             model.addAttribute("signerName", signerName);
             model.addAttribute("alreadySigned", transferToken.getIsUsed());
 
-            // Multi-role attributes
             model.addAttribute("signerRoles", signerRoles);
-            model.addAttribute("currentRole", currentRole);
+            model.addAttribute("currentRole", currentRole != null ? currentRole : (signerRoles.isEmpty() ? "" : signerRoles.get(0)));
             model.addAttribute("currentRoleDisplay", roleDisplay);
             model.addAttribute("roleSignedStatus", roleSignedStatus);
+            model.addAttribute("roleSignedAt", roleSignedAt);
             model.addAttribute("totalSlots", signerRoles.size());
             model.addAttribute("signedSlotsCount", signedCount);
             model.addAttribute("allSlotsSigned", allSlotsSigned);
+            model.addAttribute("remainingSlots", signerRoles.size() - signedCount);
 
-            // Transfer date formatting
             if (transfer.getTransferDate() != null) {
                 model.addAttribute("transferDateFormatted",
                         transfer.getTransferDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
             }
 
-            // Related transfers
             List<Transfer> relatedTransfers = transferService.getRelatedTransfers(
                     transfer.getTransferId(), transfer.getAssetTag(), transfer.getSerialNumber());
             model.addAttribute("relatedTransfers", relatedTransfers);
@@ -328,7 +353,7 @@ public class TransferViewController {
     }
 
     // ============================================
-    // SUBMIT SIGNATURE - FIXED
+    // SUBMIT SIGNATURE (non-JS fallback path)
     // ============================================
 
     @PostMapping("/sign")
@@ -342,31 +367,34 @@ public class TransferViewController {
 
             TransferToken transferToken = transferSigningService.validateToken(token);
 
-            // Determine which role to sign (using helper method to avoid lambda issues)
             String signerRole = determineSignerRole(transferId, transferToken, role);
             log.info("Signing role: {}", signerRole);
 
-            // Save the signature for the specific role
             transferSigningService.saveSignature(transferId, signerRole, signature);
 
-            // Check if all roles for this signer are now signed
             Transfer transfer = transferService.getTransferById(transferId);
             boolean allSlotsSigned = transferTokenService.areAllSlotsSigned(transfer, transferToken);
 
             if (allSlotsSigned) {
                 transferToken.setIsUsed(true);
                 transferTokenRepository.save(transferToken);
-                log.info("✅ Signer {} has completed all roles for transfer {}", transferToken.getSignerEmail(), transferId);
+                log.info("Signer {} has completed all roles for transfer {}", transferToken.getSignerEmail(), transferId);
             }
 
             boolean fullySigned = transferSigningService.isTransferFullySigned(transferId);
 
+            // NOTE: these flash attribute names ("successMessage" / "signedRole")
+            // must match what transfers/sign.html reads - a previous mismatch
+            // ("message" here vs. "successMessage" in the template) meant the
+            // post-redirect success banner/modal never fired on this fallback path.
+            redirectAttributes.addFlashAttribute("signedRole", signerRole);
+
             if (fullySigned) {
                 transferSigningService.generateFullySignedPdf(transferId);
-                redirectAttributes.addFlashAttribute("message", "Transfer fully signed! PDF certificate emailed to all parties.");
+                redirectAttributes.addFlashAttribute("successMessage", "Transfer fully signed! PDF certificate emailed to all parties.");
                 redirectAttributes.addFlashAttribute("fullySigned", true);
             } else {
-                redirectAttributes.addFlashAttribute("message",
+                redirectAttributes.addFlashAttribute("successMessage",
                         "Your signature for " + getRoleDisplayName(signerRole) + " has been submitted successfully." +
                                 (allSlotsSigned ? " All your roles are now signed!" :
                                         " Please sign your remaining roles if any."));
@@ -376,7 +404,6 @@ public class TransferViewController {
             if (allSlotsSigned) {
                 return "redirect:/transfers/thankyou";
             } else {
-                // Redirect back to signing page with same token to sign remaining roles
                 return "redirect:/transfers/sign?token=" + token;
             }
 
@@ -388,23 +415,80 @@ public class TransferViewController {
     }
 
     // ============================================
+    // SUBMIT SIGNATURE (AJAX/JSON path)
+    // ============================================
+    // Lives under /transfers/sign so it shares whatever security rule already
+    // permits anonymous, token-based access to GET/POST /transfers/sign -
+    // unlike /api/transfers/sign, which sits under a prefix that apparently
+    // requires auth and was silently redirecting to an HTML login page
+    // instead of returning JSON (hence the "Unexpected token '<'" error).
+    @PostMapping(value = "/sign/api", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> submitSignatureJson(@RequestParam Long transferId,
+                                                                   @RequestParam String token,
+                                                                   @RequestParam String signature,
+                                                                   @RequestParam(required = false) String role) {
+        try {
+            log.info("Submitting signature (ajax) for transfer: {}, role: {}", transferId, role);
+
+            TransferToken transferToken = transferSigningService.validateToken(token);
+            String signerRole = determineSignerRole(transferId, transferToken, role);
+
+            transferSigningService.saveSignature(transferId, signerRole, signature);
+
+            Transfer transfer = transferService.getTransferById(transferId);
+            boolean allSlotsSigned = transferTokenService.areAllSlotsSigned(transfer, transferToken);
+
+            if (allSlotsSigned) {
+                transferToken.setIsUsed(true);
+                transferTokenRepository.save(transferToken);
+            }
+
+            boolean fullySigned = transferSigningService.isTransferFullySigned(transferId);
+            if (fullySigned) {
+                transferSigningService.generateFullySignedPdf(transferId);
+            }
+
+            List<String> roles = transferTokenService.getRolesFromToken(transferToken);
+            List<String> remainingRoles = new ArrayList<>();
+            for (String r : roles) {
+                if (!transfer.isSignedForRole(r)) {
+                    remainingRoles.add(r);
+                }
+            }
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("message", "Signature submitted successfully for role: " + signerRole);
+            body.put("role", signerRole);
+            body.put("allSlotsSigned", allSlotsSigned);
+            body.put("fullySigned", fullySigned);
+            body.put("remainingRoles", remainingRoles);
+
+            return ResponseEntity.ok(body);
+
+        } catch (Exception e) {
+            log.error("Error submitting signature (ajax): {}", e.getMessage(), e);
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "Failed to submit signature: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
+    }
+
+    // ============================================
     // DETERMINE SIGNER ROLE - HELPER METHOD
     // ============================================
 
     private String determineSignerRole(Long transferId, TransferToken transferToken, String requestedRole) {
-        // If a specific role was requested, use it
         if (requestedRole != null && !requestedRole.isEmpty()) {
             return requestedRole;
         }
 
         String signerRole = transferToken.getSignerRole();
 
-        // Single role - use it directly
         if (signerRole == null || !signerRole.contains(",")) {
             return signerRole != null ? signerRole : "UNKNOWN";
         }
 
-        // Multiple roles - find the first unsigned one
         List<String> roles = transferTokenService.getRolesFromToken(transferToken);
         Transfer transfer = transferService.getTransferById(transferId);
 
@@ -414,7 +498,6 @@ public class TransferViewController {
             }
         }
 
-        // All roles are signed, return the first one
         return roles.isEmpty() ? "UNKNOWN" : roles.get(0);
     }
 
@@ -491,11 +574,7 @@ public class TransferViewController {
             @RequestParam(required = false) String comments,
             RedirectAttributes redirectAttributes) {
 
-        log.info("=========================================");
-        log.info("📝 Processing re-transfer for source transfer: {}", sourceTransferId);
-        log.info("   New Employee ID: {}", newEmployeeId);
-        log.info("   New Department ID: {}", newDepartmentId);
-        log.info("=========================================");
+        log.info("Processing re-transfer for source transfer: {}", sourceTransferId);
 
         AppUser currentUser = SecurityUtils.getCurrentUser();
         if (currentUser == null) {
@@ -535,13 +614,13 @@ public class TransferViewController {
             Transfer newTransfer = transferService.retransferAsset(retransferData);
 
             redirectAttributes.addFlashAttribute("success",
-                    "✅ Asset re-transferred successfully! Transfer #" + newTransfer.getTransferId() +
+                    "Asset re-transferred successfully! Transfer #" + newTransfer.getTransferId() +
                             " (Sequence: " + newTransfer.getTransferSequence() + ") created. Signing emails sent to all parties.");
 
             return "redirect:/transfers";
 
         } catch (Exception e) {
-            log.error("❌ Error processing re-transfer: {}", e.getMessage(), e);
+            log.error("Error processing re-transfer: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to re-transfer asset: " + e.getMessage());
             return "redirect:/transfers";
         }

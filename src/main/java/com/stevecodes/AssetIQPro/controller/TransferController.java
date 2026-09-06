@@ -118,7 +118,7 @@ public class TransferController {
         try {
             TransferToken tokenObj = signingService.validateToken(token);
 
-            // If role is not specified, use the first role from the token
+            // If role is not specified, find the first unsigned role
             if (role == null || role.isEmpty()) {
                 List<String> roles = tokenService.getRolesFromToken(tokenObj);
                 if (roles.isEmpty()) {
@@ -132,6 +132,7 @@ public class TransferController {
                         break;
                     }
                 }
+                // If all roles are signed, use the first one (shouldn't happen)
                 if (role == null || role.isEmpty()) {
                     role = roles.get(0);
                 }
@@ -144,10 +145,17 @@ public class TransferController {
             Transfer transfer = transferService.getTransferById(tokenObj.getTransferId());
             boolean allSlotsSigned = tokenService.areAllSlotsSigned(transfer, tokenObj);
 
+            // Check if transfer is fully signed
+            boolean fullySigned = signingService.isTransferFullySigned(tokenObj.getTransferId());
+
             return ResponseEntity.ok(Map.of(
                     "message", "Signature submitted successfully for role: " + role,
                     "role", role,
-                    "allSlotsSigned", allSlotsSigned
+                    "allSlotsSigned", allSlotsSigned,
+                    "fullySigned", fullySigned,
+                    "remainingRoles", tokenService.getRolesFromToken(tokenObj).stream()
+                            .filter(r -> !transfer.isSignedForRole(r))
+                            .collect(Collectors.toList())
             ));
         } catch (Exception e) {
             log.error("Error signing transfer: {}", e.getMessage(), e);

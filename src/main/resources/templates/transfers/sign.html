@@ -67,6 +67,7 @@
         }
         .header-status-badge.pending { background: #fef3c7; color: #92400e; }
         .header-status-badge.completed { background: #d1fae5; color: #065f46; }
+        .header-status-badge.in-progress { background: #dbeafe; color: #1e40af; }
         .body-content { padding: 1.5rem 2rem; }
         .alert-modern {
             border: none;
@@ -80,6 +81,7 @@
         }
         .alert-modern.alert-success { background: #d1fae5; border-left-color: var(--success-color); color: #065f46; }
         .alert-modern.alert-danger { background: #fee2e2; border-left-color: var(--danger-color); color: #991b1b; }
+        .alert-modern.alert-info { background: #dbeafe; border-left-color: var(--accent-color); color: #1e40af; }
         .card-modern {
             background: #fff;
             border-radius: 12px;
@@ -94,9 +96,12 @@
             font-size: 0.9rem;
             color: var(--primary-color);
             background: #fafbfc;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .card-header-modern i { color: var(--accent-color); margin-right: 0.5rem; }
-        .card-header-modern .badge { margin-left: auto; font-size: 0.7rem; padding: 0.2rem 0.8rem; border-radius: 20px; }
+        .card-header-modern .badge { font-size: 0.7rem; padding: 0.2rem 0.8rem; border-radius: 20px; }
         .card-body-modern { padding: 1.25rem 1.5rem; }
         .details-grid {
             display: grid;
@@ -179,35 +184,54 @@
         .btn-primary-modern { background: var(--accent-color); color: white; }
         .btn-primary-modern:hover:not(:disabled) { background: #2563eb; }
         .btn-secondary-modern { background: #6b7280; color: white; }
+        .btn-success-modern { background: var(--success-color); color: white; }
+        .btn-success-modern:hover:not(:disabled) { background: #059669; }
         .btn-group-modern { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem; }
         .signed-indicator { text-align: center; padding: 2rem; background: #d1fae5; border-radius: 12px; }
         .signed-indicator .icon { font-size: 3rem; color: var(--success-color); margin-bottom: 0.5rem; }
-        .role-badge { padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .role-badge {
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+            margin: 0.15rem;
+        }
         .role-badge.default { background: #3b82f6; color: white; }
         .role-badge.infra-rep { background: #10b981; color: white; }
         .role-badge.finance-rep { background: #f59e0b; color: white; }
-        .signature-detail { padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; display: inline-block; }
-        .signature-detail.signed { background: #d1fae5; color: #065f46; }
-        .signature-detail.unsigned { background: #fef3c7; color: #92400e; }
         .spinner-modern { width: 3rem; height: 3rem; border: 4px solid #f3f3f3; border-top: 4px solid var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        .slot-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
         .slot-item {
             border: 2px solid #eef2f6;
             border-radius: 12px;
             padding: 16px 20px;
-            margin-bottom: 12px;
             transition: all 0.3s ease;
-            cursor: pointer;
+            background: white;
         }
-        .slot-item:hover { border-color: #d1d5db; }
-        .slot-item.active { border-color: var(--accent-color); background: #eff6ff; }
-        .slot-item.signed { border-color: var(--success-color); background: #d1fae5; }
-        .slot-item .slot-status { font-size: 0.8rem; font-weight: 600; }
+        .slot-item.completed {
+            border-color: var(--success-color);
+            background: #f0fdf4;
+        }
+        .slot-item.active {
+            border-color: var(--accent-color);
+            background: #eff6ff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .slot-item.pending {
+            border-color: #eef2f6;
+            background: white;
+        }
         .slot-item .slot-status .badge { font-size: 0.7rem; padding: 0.2rem 0.8rem; }
         .slot-indicator {
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -227,7 +251,6 @@
             padding: 0.15rem 0.6rem;
             border-radius: 12px;
         }
-        .signature-count { font-size: 0.8rem; color: var(--text-muted); }
         .progress-container {
             background: #eef2f6;
             border-radius: 20px;
@@ -241,6 +264,27 @@
             border-radius: 20px;
             transition: width 0.5s ease;
         }
+        .progress-container .progress-bar.complete {
+            background: var(--success-color);
+        }
+        .checkmark {
+            display: inline-block;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--success-color);
+            color: white;
+            line-height: 60px;
+            font-size: 30px;
+            animation: popIn 0.5s ease;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .hidden { display: none !important; }
+        .fade-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
     </style>
 </head>
 <body>
@@ -250,22 +294,21 @@
     <div class="page-header">
         <div>
             <h1><i class="fas fa-file-signature"></i> Asset Transfer Signing</h1>
-            <p class="subtitle"><i class="fas fa-info-circle me-1"></i>Review the transfer details below and sign each role to complete your approval</p>
+            <p class="subtitle"><i class="fas fa-info-circle me-1"></i>Review the transfer details below and sign each required role</p>
         </div>
         <div>
-            <span class="header-status-badge" th:classappend="${allSlotsSigned != null and allSlotsSigned ? 'completed' : 'pending'}">
-                <i th:class="${allSlotsSigned != null and allSlotsSigned} ? 'fas fa-check-circle' : 'fas fa-clock'"></i>
-                <span th:text="${allSlotsSigned != null and allSlotsSigned} ? 'All Roles Signed' : 'Pending Signatures'">Pending Signatures</span>
+            <span id="headerStatusBadge" class="header-status-badge"
+                  th:classappend="${allSlotsSigned != null and allSlotsSigned ? 'completed' : (signedSlotsCount > 0 ? 'in-progress' : 'pending')}">
+                <i id="headerStatusIcon" th:class="${allSlotsSigned != null and allSlotsSigned} ? 'fas fa-check-circle' : (${signedSlotsCount > 0} ? 'fas fa-spinner fa-pulse' : 'fas fa-clock')"></i>
+                <span id="headerStatusText" th:text="${allSlotsSigned != null and allSlotsSigned} ? 'All Roles Signed' : (${signedSlotsCount > 0} ? 'Signing in Progress' : 'Pending Signatures')">
+                    Pending Signatures
+                </span>
             </span>
         </div>
     </div>
 
     <div class="body-content">
 
-        <div th:if="${successMessage}" class="alert-modern alert-success">
-            <div><i class="fas fa-check-circle"></i></div>
-            <div><strong>Success!</strong> <span th:text="${successMessage}"></span></div>
-        </div>
         <div th:if="${error}" class="alert-modern alert-danger">
             <div><i class="fas fa-exclamation-triangle"></i></div>
             <div><strong>Error!</strong> <span th:text="${error}"></span></div>
@@ -274,7 +317,7 @@
         <!-- Signer Information -->
         <div class="card-modern">
             <div class="card-header-modern">
-                <i class="fas fa-user-check"></i> Signer Information
+                <div><i class="fas fa-user-check"></i> Signer Information</div>
                 <span class="badge bg-primary" th:text="${signerRoleDisplay}">Finance Representative</span>
             </div>
             <div class="card-body-modern">
@@ -293,20 +336,21 @@
                             </span>
                         </span>
                     </div>
-                    <div class="detail-item" th:if="${allSlotsSigned != null and allSlotsSigned}">
-                        <span class="label">Signed At</span>
-                        <span class="value" th:text="${signedAtFormatted}">Unknown</span>
+                    <div id="signedAtDetailItem" class="detail-item" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? '' : 'hidden'">
+                        <span class="label">Status</span>
+                        <span class="value">All your roles are signed</span>
                     </div>
-                    <div class="detail-item" th:unless="${allSlotsSigned != null and allSlotsSigned}">
+                    <div id="progressDetailItem" class="detail-item" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? 'hidden' : ''">
                         <span class="label">Progress</span>
                         <span class="value">
-                            <span th:text="${signedSlotsCount} + ' of ' + ${totalSlots} + ' roles signed'">0 of 0</span>
+                            <span id="progressText" th:text="${signedSlotsCount} + ' of ' + ${totalSlots} + ' roles signed'">0 of 0</span>
                         </span>
                     </div>
                 </div>
-                <div class="mt-2" th:unless="${allSlotsSigned != null and allSlotsSigned}">
+                <div id="progressBarWrap" class="mt-2" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? 'hidden' : ''">
                     <div class="progress-container">
-                        <div class="progress-bar"
+                        <div id="progressBarEl" class="progress-bar"
+                             th:classappend="${signedSlotsCount == totalSlots and totalSlots > 0} ? 'complete' : ''"
                              th:style="'width: ' + ${totalSlots != null and totalSlots > 0 ? (signedSlotsCount / totalSlots) * 100 : 0} + '%;'"></div>
                     </div>
                 </div>
@@ -314,49 +358,53 @@
         </div>
 
         <!-- Signing Slots -->
-        <div class="card-modern" th:unless="${allSlotsSigned != null and allSlotsSigned}">
+        <div id="slotsCard" class="card-modern" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? 'hidden' : ''">
             <div class="card-header-modern">
-                <i class="fas fa-tasks"></i> Your Signing Slots
-                <span class="badge bg-info" th:text="${signedSlotsCount} + '/' + ${totalSlots}">0/0</span>
+                <div><i class="fas fa-tasks"></i> Signing Order</div>
+                <span id="slotsCountBadge" class="badge bg-info" th:text="${signedSlotsCount} + '/' + ${totalSlots}">0/0</span>
             </div>
             <div class="card-body-modern">
-                <p class="text-muted small">Click on a slot below to sign it. You must sign all slots to complete your approval.</p>
+                <p class="text-muted small">You have <strong th:text="${totalSlots}">0</strong> role(s) to sign. Each signature is applied automatically to the next role — you don't need to select anything.</p>
 
-                <div th:each="role, stat : ${signerRoles}">
-                    <!-- ✅ FIXED: Combined th:classappend -->
-                    <div class="slot-item"
-                         th:classappend="${#strings.equals(role, currentRole)} ? 'active' : (${roleSignedStatus[role] != null and roleSignedStatus[role]} ? 'signed' : '')"
-                         th:data-role="${role}"
-                         onclick="selectSlot(this)">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="slot-indicator"
-                                     th:classappend="${roleSignedStatus[role] != null and roleSignedStatus[role]} ? 'signed' : (${#strings.equals(role, currentRole)} ? 'active-slot' : 'pending')">
-                                    <i th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}" class="fas fa-check"></i>
-                                    <span th:unless="${roleSignedStatus[role] != null and roleSignedStatus[role]}" th:text="${stat.index + 1}">1</span>
-                                </div>
-                                <div>
-                                    <strong th:text="${#strings.replace(#strings.replace(#strings.replace(role, 'OLD_HANDOVER', 'Old Handover'), 'OLD_RECEIVED', 'Old Received'), 'NEW_HANDOVER', 'New Handover')}"></strong>
-                                    <div class="slot-status">
-                                        <span th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
-                                            <span class="badge bg-success">✅ Signed</span>
-                                        </span>
-                                        <span th:unless="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
-                                            <span th:if="${#strings.equals(role, currentRole)}">
-                                                <span class="badge bg-primary">⏳ Sign Now</span>
+                <div id="slotList" class="slot-list">
+                    <div th:each="role, stat : ${signerRoles}">
+                        <div class="slot-item"
+                             th:classappend="${allSlotsSigned != null and allSlotsSigned} ? 'completed' : (${roleSignedStatus[role] != null and roleSignedStatus[role]} ? 'completed' : (${#strings.equals(role, currentRole)} ? 'active' : 'pending'))">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="slot-indicator"
+                                         th:classappend="${roleSignedStatus[role] != null and roleSignedStatus[role]} ? 'signed' : (${#strings.equals(role, currentRole)} ? 'active-slot' : 'pending')">
+                                        <i th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}" class="fas fa-check"></i>
+                                        <span th:unless="${roleSignedStatus[role] != null and roleSignedStatus[role]}" th:text="${stat.index + 1}">1</span>
+                                    </div>
+                                    <div>
+                                        <strong th:text="${#strings.replace(#strings.replace(#strings.replace(role, 'OLD_HANDOVER', 'Old Handover'), 'OLD_RECEIVED', 'Old Received'), 'NEW_HANDOVER', 'New Handover')}"></strong>
+                                        <div class="slot-status">
+                                            <span th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
+                                                <span class="badge bg-success"><i class="fas fa-check"></i> Signed</span>
                                             </span>
-                                            <span th:unless="${#strings.equals(role, currentRole)}">
-                                                <span class="badge bg-secondary">⏳ Pending</span>
+                                            <span th:unless="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
+                                                <span th:if="${#strings.equals(role, currentRole)}">
+                                                    <span class="badge bg-primary"><i class="fas fa-pen"></i> Ready to Sign</span>
+                                                </span>
+                                                <span th:unless="${#strings.equals(role, currentRole)}">
+                                                    <span class="badge bg-secondary"><i class="fas fa-hourglass-half"></i> Waiting</span>
+                                                </span>
                                             </span>
-                                        </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
-                                <span class="text-success small"><i class="fas fa-check-circle"></i> Signed</span>
-                            </div>
-                            <div th:unless="${roleSignedStatus[role] != null and roleSignedStatus[role]}">
-                                <span th:if="${#strings.equals(role, currentRole)}" class="current-slot-label">Current Slot</span>
+                                <div>
+                                    <span th:if="${roleSignedStatus[role] != null and roleSignedStatus[role]}" class="text-success small"><i class="fas fa-check-circle"></i> Done</span>
+                                    <span th:if="${roleSignedStatus[role] == null or !roleSignedStatus[role]}">
+                                        <span th:if="${#strings.equals(role, currentRole)}" class="current-slot-label">
+                                            <i class="fas fa-arrow-right me-1"></i>Current
+                                        </span>
+                                        <span th:unless="${#strings.equals(role, currentRole)}" class="text-muted small">
+                                            <i class="fas fa-arrow-right me-1"></i>Next
+                                        </span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -364,17 +412,16 @@
             </div>
         </div>
 
-        <!-- Transfer Details (collapsed) -->
+        <!-- Transfer Details -->
         <div class="card-modern">
             <div class="card-header-modern" role="button" data-bs-toggle="collapse" data-bs-target="#transferDetails" aria-expanded="false">
-                <i class="fas fa-exchange-alt"></i> Transfer Details
+                <div><i class="fas fa-exchange-alt"></i> Transfer Details</div>
                 <span class="badge" th:classappend="${transfer?.isFullySigned ? 'bg-success' : 'bg-warning'}"
                       th:text="${transfer?.isFullySigned ? 'COMPLETED' : 'PENDING'}">PENDING</span>
                 <i class="fas fa-chevron-down ms-2"></i>
             </div>
             <div class="collapse" id="transferDetails">
                 <div class="card-body-modern">
-                    <!-- Asset Information -->
                     <div class="section-title"><i class="fas fa-laptop"></i> Asset Information</div>
                     <div class="details-grid">
                         <div class="detail-item">
@@ -398,9 +445,7 @@
                             <span class="value" th:text="${transferDateFormatted}">N/A</span>
                         </div>
                     </div>
-
                     <hr class="section-divider">
-
                     <div class="section-title"><i class="fas fa-building"></i> Department Transfer</div>
                     <div class="details-grid">
                         <div class="detail-item">
@@ -420,9 +465,7 @@
                             <span class="value" th:text="${transfer?.newEmployeeName}">N/A</span>
                         </div>
                     </div>
-
                     <hr class="section-divider">
-
                     <div class="section-title"><i class="fas fa-clipboard-check"></i> Condition & Accessories</div>
                     <div class="details-grid">
                         <div class="detail-item">
@@ -455,21 +498,21 @@
         </div>
 
         <!-- Signature Pad -->
-        <div class="card-modern" th:unless="${allSlotsSigned != null and allSlotsSigned}">
+        <div id="signatureCard" class="card-modern" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? 'hidden' : ''">
             <div class="card-header-modern">
-                <i class="fas fa-pen-fancy"></i> Sign for: <span id="currentRoleDisplay" th:text="${currentRoleDisplay}">Role</span>
-                <span class="badge bg-danger">Required</span>
+                <div><i class="fas fa-pen-fancy"></i> Sign Here - <span id="currentRoleDisplay" th:text="${currentRoleDisplay}">Role</span></div>
+                <span class="badge bg-primary">Step <span id="stepCurrent" th:text="${signedSlotsCount + 1}">1</span> of <span th:text="${totalSlots}">0</span></span>
             </div>
             <div class="card-body-modern">
                 <div class="signature-instructions" id="signatureInstructions">
                     <i class="fas fa-info-circle"></i>
-                    By signing below, you confirm that you have reviewed the transfer details above and agree to the transfer as
-                    <strong th:text="${currentRoleDisplay}">Finance Representative</strong>.
+                    By signing below, you confirm that you have reviewed the transfer details above and agree to the transfer in your capacity as
+                    <strong id="instructionRole" th:text="${currentRoleDisplay}">Finance Representative</strong>.
                 </div>
 
-                <form id="signForm" th:action="@{/transfers/sign}" method="post" novalidate>
-                    <input type="hidden" name="transferId" th:value="${transfer?.transferId}"/>
-                    <input type="hidden" name="token" th:value="${token}"/>
+                <form id="signForm" novalidate>
+                    <input type="hidden" name="transferId" id="transferIdInput" th:value="${transfer?.transferId}"/>
+                    <input type="hidden" name="token" id="tokenInput" th:value="${token}"/>
                     <input type="hidden" name="role" id="roleInput" th:value="${currentRole}"/>
                     <input type="hidden" name="signature" id="signatureInput"/>
 
@@ -481,21 +524,23 @@
                         <div class="btn-group-modern">
                             <button type="button" id="clear-signature" class="btn-modern btn-secondary-modern"><i class="fas fa-eraser"></i> Clear</button>
                             <button type="button" id="preview-signature" class="btn-modern btn-secondary-modern"><i class="fas fa-eye"></i> Preview</button>
-                            <button type="submit" id="submit-signature" class="btn-modern btn-primary-modern" disabled><i class="fas fa-check"></i> Sign Current Role</button>
+                            <button type="submit" id="submit-signature" class="btn-modern btn-success-modern" disabled><i class="fas fa-check"></i> Sign & Continue</button>
                         </div>
+                        <p class="fade-note">The next role in your list will be selected automatically after each signature.</p>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- All Signed -->
-        <div class="card-modern" th:if="${allSlotsSigned != null and allSlotsSigned}">
+        <div id="allSignedCard" class="card-modern" th:classappend="${allSlotsSigned != null and allSlotsSigned} ? '' : 'hidden'">
             <div class="card-body-modern">
                 <div class="signed-indicator">
                     <div class="icon"><i class="fas fa-check-circle"></i></div>
                     <h2>All Roles Signed!</h2>
                     <p>You have successfully signed all your roles for this transfer</p>
-                    <p>You will receive the fully signed document via email once all parties have signed.</p>
+                    <p class="mt-3 text-muted small">The fully signed document will be sent via email once all parties have signed.</p>
+                    <a href="/transfers" class="btn btn-primary mt-3"><i class="fas fa-arrow-left me-1"></i> Return to Transfers</a>
                 </div>
             </div>
         </div>
@@ -511,6 +556,31 @@
                 <div class="spinner-modern mx-auto mb-4"></div>
                 <h2 class="h5 mb-2">Processing Your Signature</h2>
                 <p class="text-muted mb-0">Please wait while we save your digital signature for <span id="loadingRoleDisplay">Role</span>...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <div class="checkmark"><i class="fas fa-check"></i></div>
+                <h2 class="h4 mt-3">Role Signed!</h2>
+                <p class="text-muted" id="successMessageText">You have successfully signed.</p>
+                <div id="remainingWrap" class="hidden">
+                    <p class="text-muted small">You have <span id="remainingCountEl">0</span> more role(s) to sign.</p>
+                    <button type="button" class="btn btn-primary mt-2" onclick="continueSigning()">
+                        <i class="fas fa-arrow-right me-1"></i> Continue to Next Role
+                    </button>
+                </div>
+                <div id="doneWrap" class="hidden">
+                    <p class="text-success fw-bold">🎉 All roles signed! You're done.</p>
+                    <button type="button" class="btn btn-success mt-2" onclick="reloadPage()">
+                        <i class="fas fa-check me-1"></i> View Completion
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -536,29 +606,37 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Data passed from server
+
+<!--
+  th:inline="javascript" is REQUIRED here — it's what makes Thymeleaf actually
+  process the /*[[...]]*/ comments below and inject real server data (a role
+  string, an array, a map) instead of leaving the JS defaults ('', [], {}) in
+  place. That missing attribute was the root cause of "No role selected to sign."
+-->
+<script th:inline="javascript">
+    // Data from server - populated by Thymeleaf via inline JS
     var currentRole = /*[[${currentRole}]]*/ '';
     var signerRoles = /*[[${signerRoles}]]*/ [];
     var roleSignedStatus = /*[[${roleSignedStatus}]]*/ {};
     var totalSlots = /*[[${totalSlots}]]*/ 0;
     var signedSlotsCount = /*[[${signedSlotsCount}]]*/ 0;
-
-    console.log('Signer Roles:', signerRoles);
-    console.log('Role Signed Status:', roleSignedStatus);
-    console.log('Total Slots:', totalSlots);
-    console.log('Signed Slots Count:', signedSlotsCount);
-    console.log('Current Role:', currentRole);
+    var allSlotsSigned = /*[[${allSlotsSigned}]]*/ false;
 
     (function() {
         'use strict';
-        var signaturePad, loadingModal, previewModal;
+        var signaturePad;
+        var loadingModal, previewModal, successModal;
 
         function initializeApp() {
             var canvas = document.getElementById('signature-pad');
-            if (!canvas) { console.error('Canvas not found!'); return; }
-            canvas.width = 500; canvas.height = 180;
-            canvas.style.width = '100%'; canvas.style.maxWidth = '500px';
+            if (!canvas) {
+                console.error('Canvas not found!');
+                return;
+            }
+            canvas.width = 500;
+            canvas.height = 180;
+            canvas.style.width = '100%';
+            canvas.style.maxWidth = '500px';
             canvas.style.height = '180px';
             canvas.style.border = '2px solid #dee2e6';
             canvas.style.borderRadius = '12px';
@@ -569,75 +647,90 @@
                 signaturePad = new SignaturePad(canvas, {
                     backgroundColor: 'rgba(255,255,255,1)',
                     penColor: '#1a2332',
-                    minWidth: 1, maxWidth: 2.5
+                    minWidth: 1,
+                    maxWidth: 2.5
                 });
-            } catch(e) { console.error('Error:', e); return; }
+            } catch (e) {
+                console.error('Error initializing signature pad:', e);
+                return;
+            }
 
             try {
                 loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
                 previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
-            } catch(e) {}
+                successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            } catch (e) {
+                console.error('Error initializing modals:', e);
+            }
+
+            // Defensive fallback: if the server didn't hand us a currentRole
+            // (shouldn't happen now that th:inline is fixed) pick the first
+            // unsigned role ourselves so the signer is never stuck.
+            if (!currentRole) {
+                currentRole = firstUnsignedRole();
+            }
 
             setupEventListeners();
             toggleSubmitButton();
-            updateUI();
+            renderSlotList();
+            updateHeaderAndProgress();
+        }
+
+        function firstUnsignedRole() {
+            for (var i = 0; i < signerRoles.length; i++) {
+                if (!roleSignedStatus[signerRoles[i]]) return signerRoles[i];
+            }
+            return null;
         }
 
         function setupEventListeners() {
-            document.getElementById('clear-signature').addEventListener('click', function(e) {
-                e.preventDefault(); signaturePad.clear(); toggleSubmitButton();
-            });
-            document.getElementById('preview-signature').addEventListener('click', function(e) {
+            document.getElementById('clear-signature').addEventListener('click', function (e) {
                 e.preventDefault();
-                if (signaturePad.isEmpty()) { alert('Please provide a signature before previewing.'); return; }
+                signaturePad.clear();
+                toggleSubmitButton();
+            });
+            document.getElementById('preview-signature').addEventListener('click', function (e) {
+                e.preventDefault();
+                if (signaturePad.isEmpty()) {
+                    alert('Please provide a signature before previewing.');
+                    return;
+                }
                 showPreview();
             });
-            document.getElementById('signForm').addEventListener('submit', function(e) { e.preventDefault(); submitSignature(); });
-            signaturePad.addEventListener('endStroke', function() { toggleSubmitButton(); });
+            document.getElementById('signForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                submitSignature();
+            });
+            signaturePad.addEventListener('endStroke', function () {
+                toggleSubmitButton();
+            });
         }
 
         function toggleSubmitButton() {
             var submitBtn = document.getElementById('submit-signature');
-            if (submitBtn) { submitBtn.disabled = signaturePad.isEmpty(); }
+            if (submitBtn) {
+                submitBtn.disabled = !signaturePad || signaturePad.isEmpty();
+            }
         }
 
         function showPreview() {
             var previewCanvas = document.getElementById('preview-canvas');
             if (previewCanvas) {
                 try {
-                    var ps = new SignaturePad(previewCanvas, { backgroundColor: 'rgba(255,255,255,1)', penColor: '#1a2332' });
+                    var ps = new SignaturePad(previewCanvas, {
+                        backgroundColor: 'rgba(255,255,255,1)',
+                        penColor: '#1a2332'
+                    });
                     ps.fromData(signaturePad.toData());
                     previewModal.show();
-                } catch(e) { alert('Unable to show preview.'); }
+                } catch (e) {
+                    alert('Unable to show preview.');
+                }
             }
         }
-
-        function selectSlot(element) {
-            var role = element.getAttribute('data-role');
-            console.log('Selected slot:', role);
-
-            // Check if already signed
-            if (roleSignedStatus[role]) {
-                alert('This role has already been signed.');
-                return;
-            }
-            // Update current role
-            currentRole = role;
-            document.getElementById('roleInput').value = role;
-            document.getElementById('currentRoleDisplay').textContent = getRoleDisplayName(role);
-            document.getElementById('signatureInstructions').innerHTML =
-                '<i class="fas fa-info-circle"></i> By signing below, you confirm that you have reviewed the transfer details above and agree to the transfer as <strong>' + getRoleDisplayName(role) + '</strong>.';
-
-            // Clear signature pad for new role
-            signaturePad.clear();
-            toggleSubmitButton();
-
-            // Update UI
-            updateUI();
-        }
-        window.selectSlot = selectSlot;
 
         function getRoleDisplayName(role) {
+            if (!role) return 'Role';
             var names = {
                 'OLD_HANDOVER': 'Old Handover',
                 'OLD_RECEIVED': 'Old Received',
@@ -650,62 +743,110 @@
             return names[role] || role;
         }
 
-        function updateUI() {
-            // Update slot items
-            document.querySelectorAll('.slot-item').forEach(function(item) {
-                var role = item.getAttribute('data-role');
-                item.classList.remove('active', 'signed');
-                if (roleSignedStatus[role]) {
-                    item.classList.add('signed');
-                } else if (role === currentRole) {
-                    item.classList.add('active');
-                }
-                // Update indicator
-                var indicator = item.querySelector('.slot-indicator');
-                if (indicator) {
-                    indicator.className = 'slot-indicator';
-                    if (roleSignedStatus[role]) {
-                        indicator.classList.add('signed');
-                        indicator.innerHTML = '<i class="fas fa-check"></i>';
-                    } else if (role === currentRole) {
-                        indicator.classList.add('active-slot');
-                        var index = signerRoles.indexOf(role) + 1;
-                        indicator.textContent = index;
-                    } else {
-                        indicator.classList.add('pending');
-                        var idx = signerRoles.indexOf(role) + 1;
-                        indicator.textContent = idx;
-                    }
-                }
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str == null ? '' : str;
+            return div.innerHTML;
+        }
+
+        // Rebuilds the slot-list UI from current in-memory state.
+        // Called on load and after every successful signature - no reload needed.
+        function renderSlotList() {
+            var container = document.getElementById('slotList');
+            if (!container) return;
+            var html = '';
+            signerRoles.forEach(function (role, idx) {
+                var isSigned = !!roleSignedStatus[role];
+                var isActive = (role === currentRole);
+                var itemClass = isSigned ? 'completed' : (isActive ? 'active' : 'pending');
+                var indicatorClass = isSigned ? 'signed' : (isActive ? 'active-slot' : 'pending');
+                var indicatorContent = isSigned ? '<i class="fas fa-check"></i>' : (idx + 1);
+                var statusBadge = isSigned
+                    ? '<span class="badge bg-success"><i class="fas fa-check"></i> Signed</span>'
+                    : (isActive
+                        ? '<span class="badge bg-primary"><i class="fas fa-pen"></i> Ready to Sign</span>'
+                        : '<span class="badge bg-secondary"><i class="fas fa-hourglass-half"></i> Waiting</span>');
+                var rightSide = isSigned
+                    ? '<span class="text-success small"><i class="fas fa-check-circle"></i> Done</span>'
+                    : (isActive
+                        ? '<span class="current-slot-label"><i class="fas fa-arrow-right me-1"></i>Current</span>'
+                        : '<span class="text-muted small"><i class="fas fa-arrow-right me-1"></i>Next</span>');
+
+                html += '<div class="slot-item ' + itemClass + '">' +
+                    '<div class="d-flex align-items-center justify-content-between">' +
+                    '<div class="d-flex align-items-center gap-3">' +
+                    '<div class="slot-indicator ' + indicatorClass + '">' + indicatorContent + '</div>' +
+                    '<div>' +
+                    '<strong>' + escapeHtml(getRoleDisplayName(role)) + '</strong>' +
+                    '<div class="slot-status">' + statusBadge + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div>' + rightSide + '</div>' +
+                    '</div>' +
+                    '</div>';
             });
+            container.innerHTML = html;
+        }
 
-            // Update progress
-            var progressBar = document.querySelector('.progress-bar');
+        // Refreshes every piece of chrome that depends on progress/currentRole.
+        function updateHeaderAndProgress() {
+            var allSigned = totalSlots > 0 && signedSlotsCount === totalSlots;
+            allSlotsSigned = allSigned;
+
+            var badge = document.getElementById('headerStatusBadge');
+            var icon = document.getElementById('headerStatusIcon');
+            var text = document.getElementById('headerStatusText');
+            if (badge) badge.className = 'header-status-badge ' + (allSigned ? 'completed' : (signedSlotsCount > 0 ? 'in-progress' : 'pending'));
+            if (icon) icon.className = allSigned ? 'fas fa-check-circle' : (signedSlotsCount > 0 ? 'fas fa-spinner fa-pulse' : 'fas fa-clock');
+            if (text) text.textContent = allSigned ? 'All Roles Signed' : (signedSlotsCount > 0 ? 'Signing in Progress' : 'Pending Signatures');
+
+            var progressText = document.getElementById('progressText');
+            if (progressText) progressText.textContent = signedSlotsCount + ' of ' + totalSlots + ' roles signed';
+
+            var progressBar = document.getElementById('progressBarEl');
             if (progressBar && totalSlots > 0) {
-                var percent = (signedSlotsCount / totalSlots) * 100;
-                progressBar.style.width = percent + '%';
+                var pct = (signedSlotsCount / totalSlots) * 100;
+                progressBar.style.width = pct + '%';
+                progressBar.classList.toggle('complete', allSigned);
             }
 
-            // Update submit button text
+            document.getElementById('progressDetailItem').classList.toggle('hidden', allSigned);
+            document.getElementById('signedAtDetailItem').classList.toggle('hidden', !allSigned);
+            document.getElementById('progressBarWrap').classList.toggle('hidden', allSigned);
+
+            var slotsCountBadge = document.getElementById('slotsCountBadge');
+            if (slotsCountBadge) slotsCountBadge.textContent = signedSlotsCount + '/' + totalSlots;
+
+            document.getElementById('slotsCard').classList.toggle('hidden', allSigned);
+            document.getElementById('signatureCard').classList.toggle('hidden', allSigned);
+            document.getElementById('allSignedCard').classList.toggle('hidden', !allSigned);
+
+            var stepCurrent = document.getElementById('stepCurrent');
+            if (stepCurrent) stepCurrent.textContent = Math.min(signedSlotsCount + 1, totalSlots);
+
+            var displayName = currentRole ? getRoleDisplayName(currentRole) : '';
+            var roleDisplay = document.getElementById('currentRoleDisplay');
+            var instructionRole = document.getElementById('instructionRole');
+            if (roleDisplay) roleDisplay.textContent = displayName;
+            if (instructionRole) instructionRole.textContent = displayName;
+
+            var roleInput = document.getElementById('roleInput');
+            if (roleInput) roleInput.value = currentRole || '';
+
             var submitBtn = document.getElementById('submit-signature');
-            if (submitBtn) {
-                submitBtn.textContent = 'Sign ' + getRoleDisplayName(currentRole);
-            }
+            if (submitBtn && currentRole) submitBtn.textContent = 'Sign ' + getRoleDisplayName(currentRole);
 
-            // Update loading modal text
             var loadingText = document.getElementById('loadingRoleDisplay');
-            if (loadingText) {
-                loadingText.textContent = getRoleDisplayName(currentRole);
-            }
+            if (loadingText && currentRole) loadingText.textContent = getRoleDisplayName(currentRole);
         }
 
         function submitSignature() {
-            if (signaturePad.isEmpty()) {
+            if (!signaturePad || signaturePad.isEmpty()) {
                 alert('Please provide your signature before submitting.');
                 return;
             }
             if (!currentRole) {
-                alert('Please select a role to sign.');
+                alert('There is no unsigned role left for you on this transfer.');
                 return;
             }
             if (roleSignedStatus[currentRole]) {
@@ -713,25 +854,119 @@
                 return;
             }
 
-            var signatureInput = document.getElementById('signatureInput');
-            var roleInput = document.getElementById('roleInput');
-            var signForm = document.getElementById('signForm');
+            var tokenValue = document.getElementById('tokenInput').value;
+            var transferIdValue = document.getElementById('transferIdInput').value;
+            var signatureData = signaturePad.toDataURL('image/png');
+            var roleToSign = currentRole;
 
-            if (signatureInput && signForm) {
-                try {
-                    signatureInput.value = signaturePad.toDataURL('image/png');
-                    roleInput.value = currentRole;
-                    loadingModal.show();
-                    signForm.submit();
-                } catch(e) {
-                    alert('Error processing signature.');
-                    loadingModal.hide();
-                }
+            if (!transferIdValue) {
+                alert('Missing transfer ID - cannot submit signature. Please reload the signing link.');
+                return;
             }
+
+            try {
+                if (previewModal) previewModal.hide();
+            } catch (e) { /* no-op */ }
+            loadingModal.show();
+
+            var params = new URLSearchParams();
+            params.append('transferId', transferIdValue);
+            params.append('token', tokenValue);
+            params.append('signature', signatureData);
+            params.append('role', roleToSign);
+
+            fetch('sign/api', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
+                },
+                body: params.toString()
+            })
+                .then(function (res) {
+                    var contentType = res.headers.get('content-type') || '';
+                    if (contentType.indexOf('application/json') === -1) {
+                        // Got HTML back (login page, error page, etc.) instead of JSON -
+                        // surface a clear message rather than a raw parse error.
+                        throw new Error('Server did not return JSON (got a ' + res.status + ' response). You may have been signed out, or the link may have expired.');
+                    }
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    loadingModal.hide();
+                    if (!result.ok) {
+                        alert('Error: ' + (result.data && result.data.error ? result.data.error : 'Failed to submit signature.'));
+                        return;
+                    }
+                    handleSignSuccess(roleToSign, result.data);
+                })
+                .catch(function (err) {
+                    loadingModal.hide();
+                    alert('Network error while submitting your signature: ' + err.message);
+                });
         }
+
         window.submitSignature = submitSignature;
 
-        initializeApp();
+        function handleSignSuccess(justSignedRole, apiData) {
+            roleSignedStatus[justSignedRole] = true;
+            signedSlotsCount = Math.min(signedSlotsCount + 1, totalSlots);
+
+            currentRole = firstUnsignedRole();
+
+            signaturePad.clear();
+            toggleSubmitButton();
+            renderSlotList();
+            updateHeaderAndProgress();
+
+            showSuccessModal(justSignedRole, apiData);
+        }
+
+        function showSuccessModal(signedRole, apiData) {
+            var msgEl = document.getElementById('successMessageText');
+            if (msgEl) {
+                var msg = 'You have successfully signed as ' + getRoleDisplayName(signedRole) + '.';
+                if (apiData && apiData.fullySigned) {
+                    msg += ' The transfer is now fully signed by all parties.';
+                }
+                msgEl.textContent = msg;
+            }
+
+            var remaining = totalSlots - signedSlotsCount;
+            var remainingWrap = document.getElementById('remainingWrap');
+            var doneWrap = document.getElementById('doneWrap');
+            var remainingCountEl = document.getElementById('remainingCountEl');
+
+            if (remaining > 0) {
+                if (remainingCountEl) remainingCountEl.textContent = remaining;
+                remainingWrap.classList.remove('hidden');
+                doneWrap.classList.add('hidden');
+            } else {
+                remainingWrap.classList.add('hidden');
+                doneWrap.classList.remove('hidden');
+            }
+
+            successModal.show();
+        }
+
+        function continueSigning() {
+            successModal.hide();
+            // No reload - the UI is already showing the next role.
+        }
+        window.continueSigning = continueSigning;
+
+        function reloadPage() {
+            location.reload();
+        }
+        window.reloadPage = reloadPage;
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
     })();
 </script>
 </body>
