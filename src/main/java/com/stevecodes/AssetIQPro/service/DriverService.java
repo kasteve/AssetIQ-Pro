@@ -88,7 +88,7 @@ public class DriverService {
     @Transactional
     public DriverRequest createDriverRequest(Long userId, String destination, Long driverId,
                                              String reason, String requestedBy, LocalDateTime requestTime,
-                                             String tripType) {  // ✅ NEW PARAMETER
+                                             String tripType) {
         log.info("=== CREATE DRIVER REQUEST START ===");
         log.info("📝 Creating driver request for user: {}, request time: {}", userId, requestTime);
         log.info("📝 Destination: {}, Driver: {}, Reason: {}, Trip Type: {}", destination, driverId, reason, tripType);
@@ -131,7 +131,7 @@ public class DriverService {
             request.setPickupDatetime(requestTime);
             request.setStatus("PENDING");
             request.setRequestedBy(requestedBy);
-            request.setTripType(tripType);  // ✅ SET TRIP TYPE
+            request.setTripType(tripType);
 
             // Set category based on trip type
             if (tripType != null) {
@@ -178,6 +178,9 @@ public class DriverService {
                 notifyAvailableDrivers(saved);
             }
 
+            // Send acknowledgment to requester using modern HTML email
+            sendDriverRequestAcknowledgment(saved);
+
             // Log audit
             try {
                 auditService.logAction("DRIVER_REQUEST_CREATED",
@@ -209,7 +212,7 @@ public class DriverService {
             request.setDriverId(-1L);
             request.setReason(reason);
             request.setRequestTime(requestTime != null ? requestTime : LocalDateTime.now());
-            request.setStatus("PENDING_ADMIN");  // ✅ This is correct
+            request.setStatus("PENDING_ADMIN");
             request.setRequestedBy(requestedBy);
 
             log.info("💾 Saving CAB request");
@@ -219,6 +222,9 @@ public class DriverService {
             // Notify admins
             log.info("📧 Notifying admins about CAB request");
             notifyAdminOfCabRequest(saved);
+
+            // Send acknowledgment to requester using modern HTML email
+            sendDriverRequestAcknowledgment(saved);
 
             // Log audit
             try {
@@ -267,18 +273,20 @@ public class DriverService {
             DriverRequest saved = driverRequestRepository.save(request);
             log.info("✅ Cab request approved");
 
-            // Send email to requester
+            // ✅ Send MODERN HTML email to requester
             try {
                 String requesterEmail = getUserEmail(request.getUserId());
-                emailService.sendSimpleEmail(
+                String requesterName = getRequesterName(request.getUserId());
+
+                emailService.sendDriverRequestStatusUpdate(
                         requesterEmail,
-                        "Cab Request Approved",
-                        "Your cab request has been approved.\n\n" +
-                                "Destination: " + request.getDestination() + "\n" +
-                                "Your external cab has been arranged and will arrive shortly.\n\n" +
-                                "Thank you for using AssetIQ-Pro."
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        "APPROVED",
+                        null, null, null,
+                        "Your cab request has been approved. An external cab has been arranged."
                 );
-                log.info("✅ Email sent to requester");
+                log.info("✅ Modern HTML email sent to requester");
             } catch (Exception e) {
                 log.error("❌ Failed to send email: {}", e.getMessage(), e);
             }
@@ -336,17 +344,22 @@ public class DriverService {
             DriverRequest saved = driverRequestRepository.save(request);
             log.info("✅ Cab request assigned");
 
-            // Send email
+            // ✅ Send MODERN HTML email to requester
             try {
-                emailService.sendSimpleEmail(
-                        getUserEmail(request.getUserId()),
-                        "Cab Request Processed",
-                        "Your cab request to " + request.getDestination() + " has been processed.\n\n" +
-                                "Your cab has been arranged and will arrive shortly.\n" +
-                                "Admin Notes: " + (notes != null ? notes : "N/A") + "\n\n" +
-                                "Thank you for using AssetIQ-Pro."
+                String requesterEmail = getUserEmail(request.getUserId());
+                String requesterName = getRequesterName(request.getUserId());
+
+                emailService.sendDriverRequestStatusUpdate(
+                        requesterEmail,
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        "ASSIGNED",
+                        "External Cab",
+                        null,
+                        null,
+                        "Your cab request has been processed. Admin Notes: " + (notes != null ? notes : "N/A")
                 );
-                log.info("✅ Email sent to requester");
+                log.info("✅ Modern HTML email sent to requester");
             } catch (Exception e) {
                 log.error("❌ Failed to send email: {}", e.getMessage(), e);
             }
@@ -387,7 +400,6 @@ public class DriverService {
                     });
             log.info("✅ Found request with status: {}", request.getStatus());
 
-            // ✅ FIX: Allow both PENDING and PENDING_ADMIN
             if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
                 log.error("❌ Invalid status: {}", request.getStatus());
                 throw new IllegalStateException("Request is no longer pending");
@@ -447,19 +459,35 @@ public class DriverService {
 
             String driverName = driverId != null && driverId != -1L ? getDriverName(driverId) : "Cab (External)";
 
-            // Send email
+            // ✅ Send MODERN HTML emails to requester
             try {
-                emailService.sendSimpleEmail(
-                        getUserEmail(request.getUserId()),
-                        "Driver Request Accepted",
-                        "Your driver request has been accepted by " + driverName + ".\n\n" +
-                                "Destination: " + request.getDestination() + "\n" +
-                                "Driver: " + driverName + "\n" +
-                                "Date: " + requestDate + "\n" +
-                                "Time: " + requestTime + "\n\n" +
-                                "Please be ready at the pickup location."
+                String requesterEmail = getUserEmail(request.getUserId());
+                String requesterName = getRequesterName(request.getUserId());
+                String formattedDateTime = requestDate + " at " + requestTime;
+
+                // Send the driver assigned notification
+                emailService.sendDriverAssignedNotification(
+                        requesterEmail,
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        driverName,
+                        null,  // phone - not tracked
+                        null,  // vehicle type - not tracked
+                        formattedDateTime
                 );
-                log.info("✅ Email sent to requester");
+
+                // Also send a status update
+                emailService.sendDriverRequestStatusUpdate(
+                        requesterEmail,
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        "ASSIGNED",
+                        driverName,
+                        null,  // phone - not tracked
+                        formattedDateTime,
+                        "Your driver has been assigned. Please be ready at the pickup location."
+                );
+                log.info("✅ Modern HTML emails sent to requester");
             } catch (Exception e) {
                 log.error("❌ Failed to send email: {}", e.getMessage(), e);
             }
@@ -510,7 +538,6 @@ public class DriverService {
                     });
             log.info("✅ Found request with status: {}", request.getStatus());
 
-            // ✅ FIX: Allow both PENDING and PENDING_ADMIN
             if (!"PENDING".equals(request.getStatus()) && !"PENDING_ADMIN".equals(request.getStatus())) {
                 log.error("❌ Invalid status: {}", request.getStatus());
                 throw new IllegalStateException("Request is no longer pending");
@@ -525,17 +552,23 @@ public class DriverService {
             DriverRequest saved = driverRequestRepository.save(request);
             log.info("✅ Request declined");
 
-            // Send email
+            // ✅ Send MODERN HTML email to requester
             try {
-                emailService.sendSimpleEmail(
-                        getUserEmail(request.getUserId()),
-                        "Driver Request Declined",
-                        "Your driver request has been declined.\n\n" +
-                                "Driver: " + (driverId != null && driverId != -1L ? getDriverName(driverId) : "Cab (External)") + "\n" +
-                                "Reason: " + reason + "\n\n" +
-                                "Please try requesting another driver or select Cab."
+                String requesterEmail = getUserEmail(request.getUserId());
+                String requesterName = getRequesterName(request.getUserId());
+                String driverName = driverId != null && driverId != -1L ? getDriverName(driverId) : "Cab (External)";
+
+                emailService.sendDriverRequestStatusUpdate(
+                        requesterEmail,
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        "REJECTED",
+                        driverName,
+                        null,
+                        null,
+                        "Reason: " + reason + ". Please try requesting another driver or select Cab."
                 );
-                log.info("✅ Email sent to requester");
+                log.info("✅ Modern HTML email sent to requester");
             } catch (Exception e) {
                 log.error("❌ Failed to send email: {}", e.getMessage(), e);
             }
@@ -617,20 +650,21 @@ public class DriverService {
             driverRequestRepository.save(request);
 
             String requesterEmail = getUserEmail(request.getUserId());
+            String requesterName = getRequesterName(request.getUserId());
+            String driverName = getDriverName(driverId);
             String ratingLink = baseUrlService.buildUrl("/bookings/driver-rating/%s?token=%s", requestId, ratingToken);
 
-            // Send rating email
+            // ✅ Send MODERN HTML email with rating link
             try {
                 log.info("📧 Sending rating email to: {}", requesterEmail);
-                emailService.sendSimpleEmail(
+                emailService.sendDriverRatingEmail(
                         requesterEmail,
-                        "Trip Completed - Please Rate Your Driver",
-                        "Your trip to " + request.getDestination() + " has been completed.\n\n" +
-                                "Please rate your driver using the link below:\n" +
-                                ratingLink + "\n\n" +
-                                "Thank you for using AssetIQ-Pro."
+                        requesterName,
+                        String.valueOf(request.getRequestId()),
+                        driverName,
+                        ratingLink
                 );
-                log.info("✅ Rating email sent");
+                log.info("✅ Rating email sent to: {}", requesterEmail);
             } catch (Exception e) {
                 log.error("❌ Failed to send rating email: {}", e.getMessage(), e);
             }
@@ -886,12 +920,9 @@ public class DriverService {
     }
 
     // ============================================
-    // Trip Categorization & Expiry - Add to DriverService.java
+    // Trip Categorization & Expiry
     // ============================================
 
-    /**
-     * Categorize a trip based on request time
-     */
     public String categorizeTrip(LocalDateTime requestTime) {
         LocalDate today = LocalDate.now();
         LocalDate requestDate = requestTime.toLocalDate();
@@ -907,21 +938,15 @@ public class DriverService {
         }
     }
 
-    /**
-     * Check and expire expired trips
-     * This should be run by a scheduled job
-     */
-    @Scheduled(fixedDelay = 60000) // Run every minute
+    @Scheduled(fixedDelay = 60000)
     @Transactional
     public void expireExpiredTrips() {
         log.info("Running scheduled expiry check for driver trips...");
         LocalDateTime now = LocalDateTime.now();
 
-        // Find all PENDING trips that are expired
         List<DriverRequest> expiredTrips = driverRequestRepository
                 .findByStatusAndIsExpiredFalseAndExpiryTimeBefore("PENDING", now);
 
-        // Also find PENDING_ADMIN trips that are expired
         expiredTrips.addAll(driverRequestRepository
                 .findByStatusAndIsExpiredFalseAndExpiryTimeBefore("PENDING_ADMIN", now));
 
@@ -933,15 +958,18 @@ public class DriverService {
             log.info("Expired trip {} for user {} to {}", trip.getRequestId(),
                     trip.getUserId(), trip.getDestination());
 
-            // Notify user that their request expired
+            // ✅ Send MODERN HTML email for expiry notification
             try {
                 String userEmail = getUserEmail(trip.getUserId());
-                emailService.sendSimpleEmail(
+                String userName = getRequesterName(trip.getUserId());
+                emailService.sendDriverRequestStatusUpdate(
                         userEmail,
-                        "Driver Request Expired",
+                        userName,
+                        String.valueOf(trip.getRequestId()),
+                        "EXPIRED",
+                        null, null, null,
                         "Your driver request to " + trip.getDestination() +
-                                " has expired because it was not actioned in time.\n\n" +
-                                "Please submit a new request if you still need a driver."
+                                " has expired because it was not actioned in time. Please submit a new request if you still need a driver."
                 );
             } catch (Exception e) {
                 log.error("Failed to send expiry notification: {}", e.getMessage());
@@ -950,8 +978,7 @@ public class DriverService {
     }
 
     // ============================================
-    // Query Methods
-    // ============================================
+    // Query Methods    // ============================================
 
     public List<DriverRequest> getDriverRequests() {
         return driverRequestRepository.findAllByOrderByRequestTimeDesc();
@@ -981,10 +1008,8 @@ public class DriverService {
         return driverRequestRepository.findByStatus("PENDING_ADMIN");
     }
 
-    // ✅ NEW: Get all pending driver requests (for admin to see cab requests)
     public List<DriverRequest> getPendingRequests() {
         log.info("Getting all pending driver requests including PENDING_ADMIN");
-        // Include both PENDING and PENDING_ADMIN statuses
         return driverRequestRepository.findByStatusIn(List.of("PENDING", "PENDING_ADMIN"));
     }
 
@@ -998,12 +1023,34 @@ public class DriverService {
                 .orElse("Driver #" + driverId);
     }
 
+    public String getRequesterName(Long userId) {
+        return userRepository.findById(userId)
+                .map(AppUser::getFullName)
+                .orElse("User #" + userId);
+    }
+
+    private void sendDriverRequestAcknowledgment(DriverRequest request) {
+        try {
+            String requesterEmail = getUserEmail(request.getUserId());
+            String requesterName = getRequesterName(request.getUserId());
+
+            emailService.sendDriverRequestAcknowledgment(
+                    requesterEmail,
+                    requesterName,
+                    String.valueOf(request.getRequestId())
+            );
+            log.info("✅ Acknowledgment email sent to: {}", requesterEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send acknowledgment email: {}", e.getMessage(), e);
+        }
+    }
+
     private void notifyAvailableDrivers(DriverRequest request) {
         log.info("📧 Notifying available drivers about request: {}", request.getRequestId());
 
         try {
             List<AppUser> drivers = userRepository.findByRole("DRIVER");
-            String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
+            String pickupTime = request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
             int notifiedCount = 0;
             for (AppUser driver : drivers) {
@@ -1013,15 +1060,15 @@ public class DriverService {
                 }
 
                 try {
-                    emailService.sendSimpleEmail(
+                    emailService.sendDriverRequestNotification(
                             driver.getEmail(),
-                            "New Driver Request - Action Required",
-                            "A new driver request has been created.\n\n" +
-                                    "Requester: " + request.getRequestedBy() + "\n" +
-                                    "Destination: " + request.getDestination() + "\n" +
-                                    "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                                    "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                                    "Please login to accept or decline: " + dashboardLink
+                            request.getRequestedBy() != null ? request.getRequestedBy() : "Employee",
+                            request.getDestination() != null ? request.getDestination() : "N/A",
+                            "N/A",
+                            pickupTime,
+                            request.getReason() != null ? request.getReason() : "N/A",
+                            String.valueOf(request.getRequestId()),
+                            "Driver"
                     );
                     notifiedCount++;
                 } catch (Exception e) {
@@ -1055,17 +1102,17 @@ public class DriverService {
         try {
             Optional<AppUser> driver = userRepository.findById(driverId);
             if (driver.isPresent()) {
-                String dashboardLink = baseUrlService.buildUrl("/bookings/driver-dashboard");
+                String pickupTime = request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
-                emailService.sendSimpleEmail(
+                emailService.sendDriverRequestNotification(
                         driver.get().getEmail(),
-                        "New Driver Request - Action Required",
-                        "You have been requested as a driver.\n\n" +
-                                "Requester: " + request.getRequestedBy() + "\n" +
-                                "Destination: " + request.getDestination() + "\n" +
-                                "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                                "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                                "Please login to accept or decline: " + dashboardLink
+                        request.getRequestedBy() != null ? request.getRequestedBy() : "Employee",
+                        request.getDestination() != null ? request.getDestination() : "N/A",
+                        "N/A",
+                        pickupTime,
+                        request.getReason() != null ? request.getReason() : "N/A",
+                        String.valueOf(request.getRequestId()),
+                        "Driver"
                 );
 
                 createNotification(
@@ -1092,19 +1139,19 @@ public class DriverService {
 
         try {
             List<AppUser> admins = userRepository.findByRole("ADMIN");
-            String dashboardLink = baseUrlService.buildUrl("/bookings/cab-requests");
+            String pickupTime = request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
             for (AppUser admin : admins) {
                 try {
-                    emailService.sendSimpleEmail(
+                    emailService.sendDriverRequestNotification(
                             admin.getEmail(),
-                            "New Cab Request - Action Required",
-                            "A new cab request has been created.\n\n" +
-                                    "Requester: " + request.getRequestedBy() + "\n" +
-                                    "Destination: " + request.getDestination() + "\n" +
-                                    "Requested At: " + request.getRequestTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + "\n" +
-                                    "Reason: " + (request.getReason() != null ? request.getReason() : "N/A") + "\n\n" +
-                                    "Please arrange for an external cab: " + dashboardLink
+                            request.getRequestedBy() != null ? request.getRequestedBy() : "Employee",
+                            request.getDestination() != null ? request.getDestination() : "N/A",
+                            "N/A",
+                            pickupTime,
+                            request.getReason() != null ? request.getReason() : "N/A",
+                            String.valueOf(request.getRequestId()),
+                            "Cab"
                     );
                     log.info("✅ Email sent to admin: {}", admin.getEmail());
                 } catch (Exception e) {
@@ -1197,9 +1244,6 @@ public class DriverService {
         dto.setDeclinedReason(request.getDeclinedReason());
         dto.setNotes(request.getNotes());
 
-        // ============================================
-        // ✅ ADD SLA TRACKING DATA
-        // ============================================
         try {
             RequestSLATracking slaTracking = slaService.getSLAStatus(request.getRequestId(), "DRIVER_REQUEST");
             if (slaTracking != null) {

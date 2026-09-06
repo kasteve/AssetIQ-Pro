@@ -14,9 +14,6 @@ currently, it is looking at all the signature fields yet some transfers can requ
 
 Add default permissions per role so that these permissions are assigned at creation of the user account
 
-During signing, send a single link if a signer has more than one slot to sign for that given transfer. Disable the sumbit button
-until their slots have been signed by that signer.
-
 8. Review and define default permissions for every user role so that they are assigned everytime a user is assigned that role
 
 19. Upon completion of the disposal cycle, the involved parties should be notified on email with a report.
