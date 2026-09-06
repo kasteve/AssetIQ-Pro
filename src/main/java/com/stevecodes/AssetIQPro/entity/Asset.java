@@ -214,6 +214,15 @@ public class Asset {
         return status.name();
     }
 
+    /**
+     * Check if asset can be disposed (not already disposed)
+     */
+    public boolean canBeDisposed() {
+        return status != AssetStatus.DISPOSED &&
+                !"DISPOSED".equals(disposalStatus) &&
+                !"DISPOSED".equals(assetLifecycleStatus);
+    }
+
     public boolean isAvailable() {
         return status == AssetStatus.AVAILABLE;
     }

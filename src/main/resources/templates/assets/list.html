@@ -28,12 +28,20 @@
         </div>
     </div>
 
+    <!-- ===== PAGE HEADER WITH BATCH UPLOAD ===== -->
     <div class="page-header-row">
         <h4><i class="fas fa-laptop me-2"></i>Asset Management</h4>
-        <div>
+        <div class="d-flex gap-2">
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAssetModal">
                 <i class="fas fa-plus me-2"></i>Add Asset
             </button>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchUploadModal">
+                <i class="fas fa-file-upload me-2"></i>Batch Upload
+            </button>
+            <!-- ✅ FIXED: Use th:href for context path -->
+            <a th:href="@{/api/assets/batch-template}" class="btn btn-outline-secondary" title="Download CSV Template">
+                <i class="fas fa-download me-1"></i>Template
+            </a>
         </div>
     </div>
 
@@ -141,7 +149,7 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end action-dropdown-menu">
 
-                                <!-- ===================== EDIT ===================== -->
+                                <!-- EDIT -->
                                 <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        data-bs-toggle="modal" data-bs-target="#editAssetModal"
@@ -171,7 +179,7 @@
                                     </a>
                                 </li>
 
-                                <!-- ===================== VIEW ===================== -->
+                                <!-- VIEW -->
                                 <li>
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -180,7 +188,7 @@
                                     </a>
                                 </li>
 
-                                <!-- ===================== TRANSFER ===================== -->
+                                <!-- TRANSFER -->
                                 <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item" href="javascript:void(0)"
                                        data-bs-toggle="modal" data-bs-target="#createTransferModal"
@@ -199,7 +207,7 @@
                                     </a>
                                 </li>
 
-                                <!-- ===================== REQUEST DISPOSAL ===================== -->
+                                <!-- REQUEST DISPOSAL -->
                                 <li th:if="${asset.status != 'DISPOSED' and (asset.eOLExpired or asset.eolDate != null)}">
                                     <a class="dropdown-item text-warning" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -214,7 +222,7 @@
 
                                 <li><hr class="dropdown-divider"></li>
 
-                                <!-- ===================== DELETE ===================== -->
+                                <!-- DELETE -->
                                 <li th:if="${asset.status != 'DISPOSED'}">
                                     <a class="dropdown-item text-danger" href="javascript:void(0)"
                                        th:data-assetid="${asset.assetId}"
@@ -237,6 +245,52 @@
             <div class="empty-state" th:if="${assets == null or assets.isEmpty()}">
                 <i class="fas fa-box-open"></i>
                 No assets found
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BATCH UPLOAD MODAL -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="batchUploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-file-upload me-2" style="color: #198754;"></i>Batch Upload Assets</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Upload a CSV file with asset data. <a th:href="@{/api/assets/batch-template}" class="alert-link">Download template</a> for reference.
+                        <ul class="mt-2 mb-0">
+                            <li><strong>Required fields:</strong> tag, name, serialNumber</li>
+                            <li><strong>Valid statuses:</strong> AVAILABLE, ASSIGNED, MAINTENANCE, RETIRED, TRANSFERRED</li>
+                            <li><strong>Date formats supported:</strong> yyyy-MM-dd (recommended), dd/MM/yyyy, dd-MM-yyyy, MM/dd/yyyy</li>
+                            <li>Category, Supplier, and Location names must match existing records or leave blank</li>
+                            <li>Leave Supplier and Location blank if they don't exist in the system</li>
+                        </ul>
+                    </div>
+
+                    <form id="batchUploadForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Select CSV File</label>
+                            <input type="file" id="csvFile" name="file" class="form-control" accept=".csv" required>
+                        </div>
+                        <div id="uploadProgress" style="display:none;">
+                            <div class="progress">
+                                <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%;">0%</div>
+                            </div>
+                        </div>
+                        <div id="uploadResult" style="display:none;"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="uploadBtn" onclick="submitBatchUpload()">
+                        <i class="fas fa-upload me-2"></i>Upload
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -496,9 +550,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- REQUEST DISPOSAL MODAL -->
-    <!-- ============================================================ -->
+    <!-- Request Disposal Modal -->
     <div class="modal fade" id="requestDisposalModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -770,10 +822,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Hidden CSRF token for AJAX -->
+    <meta th:name="_csrf" th:content="${_csrf.token}" th:header="${_csrf.headerName}"/>
 </div>
 
+<!-- ===== STYLES AND SCRIPTS ===== -->
 <div layout:fragment="styles">
     <style>
+        /* Same styles as before - keep them */
         .content { padding: 28px 32px; width: 100%; }
         .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
         .page-header-row h4 { font-weight: 700; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.3px; }
@@ -782,6 +839,8 @@
         .btn { border-radius: 10px !important; padding: 9px 20px !important; font-weight: 600 !important; font-size: 14px !important; }
         .btn-primary { background: var(--primary-color) !important; border: none !important; }
         .btn-primary:hover { background: var(--primary-dark) !important; }
+        .btn-success { background: #198754 !important; border: none !important; }
+        .btn-success:hover { background: #157347 !important; }
 
         .filter-card { background: white; border-radius: 14px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 22px; }
         .filter-card .card-body { padding: 18px 22px; }
@@ -798,8 +857,6 @@
         .assets-table tbody tr { transition: background 0.15s ease; }
         .assets-table tbody tr:hover { background: #f8f9fc; }
         .assets-table tbody tr:last-child td { border-bottom: none; }
-        .asset-tag { font-weight: 700; color: var(--ink); font-size: 13.5px; }
-        .asset-serial { font-size: 11.5px; color: #9aa0a6; }
 
         .pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
         .pill-category { background: #e8eefc; color: #0d6efd; }
@@ -828,13 +885,7 @@
             color: #6c757d;
             background: #fff;
         }
-        .action-dots-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .action-dots-btn:hover:not(:disabled),
-        .action-dots-btn:focus:not(:disabled),
-        .action-dots-btn.show:not(:disabled) {
+        .action-dots-btn:hover:not(:disabled), .action-dots-btn:focus:not(:disabled), .action-dots-btn.show:not(:disabled) {
             background: #f1f3f5;
             color: var(--ink);
             box-shadow: none;
@@ -855,8 +906,7 @@
             display: flex;
             align-items: center;
         }
-        .action-dropdown-menu .dropdown-item:hover:not(.disabled),
-        .action-dropdown-menu .dropdown-item:focus:not(.disabled) {
+        .action-dropdown-menu .dropdown-item:hover:not(.disabled), .action-dropdown-menu .dropdown-item:focus:not(.disabled) {
             background: #f1f3f5;
         }
         .action-dropdown-menu .dropdown-item.disabled {
@@ -864,17 +914,7 @@
             cursor: not-allowed;
             pointer-events: none;
         }
-        .action-dropdown-menu .dropdown-item.text-danger:hover:not(.disabled) {
-            background: #fbe9eb;
-        }
         .action-dropdown-menu .dropdown-divider { margin: 4px 0; }
-
-        .assets-pagination .page-link { border-radius: 10px !important; margin: 0 3px; border: 1px solid #e9ecef; color: var(--ink); font-weight: 500; font-size: 13.5px; }
-        .assets-pagination .page-item.active .page-link { background: var(--primary-color); border-color: var(--primary-color); }
-        .assets-pagination .page-item.disabled .page-link { color: #ced4da; }
-
-        .empty-state { text-align: center; padding: 50px 20px; color: #adb5bd; }
-        .empty-state i { font-size: 34px; margin-bottom: 10px; display: block; }
 
         .modal-content { border-radius: 16px; border: none; box-shadow: 0 24px 70px rgba(15,23,42,0.28); }
         .modal-header { border-bottom: 1px solid rgba(0,0,0,0.06); padding: 20px 24px; }
@@ -882,25 +922,7 @@
         .modal-title { font-weight: 700; font-size: 18px; }
         .modal-body .form-label { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 5px; }
         .modal-body .form-control, .modal-body .form-select { border-radius: 10px; border: 1px solid #e2e8f0; padding: 10px 14px; font-size: 14px; }
-        .modal-body .form-control:focus, .modal-body .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(13,110,253,0.08); }
 
-        .detail-item .label { font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: #9aa0a6; display: block; }
-        .detail-item .value { font-size: 14px; font-weight: 600; color: var(--ink); }
-
-        /* Corner Toast */
-        #toastContainer { max-width: 380px; }
-        .app-toast { border-radius: 12px !important; border: none !important; box-shadow: 0 12px 32px rgba(15,23,42,0.18) !important; overflow: hidden; }
-        .app-toast .toast-header { border-bottom: none !important; padding: 12px 14px 4px 14px; font-weight: 700; font-size: 13.5px; }
-        .app-toast .toast-body { padding: 4px 14px 14px 14px; font-size: 13.5px; color: var(--ink); }
-        .app-toast.toast-success .toast-header { color: #198754; background: #fff !important; }
-        .app-toast.toast-success .toast-header i { color: #198754; }
-        .app-toast.toast-error .toast-header { color: #dc3545; background: #fff !important; }
-        .app-toast.toast-error .toast-header i { color: #dc3545; }
-        .app-toast .btn-close { font-size: 10px; }
-
-        /* ============================================ */
-        /* CENTER TOAST STYLES                         */
-        /* ============================================ */
         .center-toast-overlay {
             position: fixed;
             top: 0;
@@ -917,12 +939,7 @@
             visibility: hidden;
             transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-
-        .center-toast-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
-
+        .center-toast-overlay.show { opacity: 1; visibility: visible; }
         .center-toast {
             background: white;
             border-radius: 20px;
@@ -933,58 +950,22 @@
             box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
             transform: scale(0.8) translateY(30px);
             transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            position: relative;
         }
-
-        .center-toast-overlay.show .center-toast {
-            transform: scale(1) translateY(0);
-        }
-
-        .center-toast .toast-icon {
-            font-size: 60px;
-            margin-bottom: 16px;
-        }
-
+        .center-toast-overlay.show .center-toast { transform: scale(1) translateY(0); }
+        .center-toast .toast-icon { font-size: 60px; margin-bottom: 16px; }
         .center-toast.toast-success .toast-icon { color: #198754; }
         .center-toast.toast-error .toast-icon { color: #dc3545; }
         .center-toast.toast-warning .toast-icon { color: #fd7e14; }
         .center-toast.toast-info .toast-icon { color: #0d6efd; }
-
-        .center-toast .toast-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--ink);
-            margin-bottom: 8px;
-        }
-
-        .center-toast .toast-message {
-            font-size: 16px;
-            color: #495057;
-            line-height: 1.6;
-            margin-bottom: 24px;
-        }
-
-        .center-toast .toast-btn {
-            padding: 10px 35px;
-            border-radius: 12px;
-            border: none;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .center-toast .toast-btn:hover {
-            transform: scale(1.05);
-        }
-
+        .center-toast .toast-title { font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+        .center-toast .toast-message { font-size: 16px; color: #495057; line-height: 1.6; margin-bottom: 24px; }
+        .center-toast .toast-btn { padding: 10px 35px; border-radius: 12px; border: none; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease; }
+        .center-toast .toast-btn:hover { transform: scale(1.05); }
         .center-toast .toast-btn.btn-primary { background: var(--primary-color); color: white; }
         .center-toast .toast-btn.btn-success { background: #198754; color: white; }
         .center-toast .toast-btn.btn-danger { background: #dc3545; color: white; }
         .center-toast .toast-btn.btn-warning { background: #fd7e14; color: white; }
 
-        /* Modal LG */
-        .modal-lg { max-width: 720px; }
         .wizard-steps { display: flex; align-items: center; justify-content: center; padding: 18px 24px 4px; gap: 6px; }
         .wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #adb5bd; flex-shrink: 0; }
         .wizard-step-dot .dot-num {
@@ -995,11 +976,8 @@
         .wizard-step-dot .dot-label { font-size: 11px; font-weight: 600; text-align: center; max-width: 90px; color: #9aa0a6; }
         .wizard-step-dot.active .dot-num { background: var(--primary-color); color: white; box-shadow: 0 4px 12px rgba(13,110,253,0.3); }
         .wizard-step-dot.active .dot-label { color: var(--ink); }
-        .wizard-step-dot.completed .dot-num { background: #198754; color: white; }
-        .wizard-step-dot.completed .dot-label { color: #198754; }
         .wizard-step-line { flex: 1; height: 2px; background: #eef0f3; max-width: 60px; margin-top: -18px; }
 
-        .wizard-pane { min-height: 120px; }
         .wizard-footer { justify-content: space-between !important; }
         .wizard-nav-btns { display: flex; gap: 8px; }
 
@@ -1027,19 +1005,8 @@
             color: white !important;
             border-color: var(--primary-color) !important;
         }
-        .dataTables_wrapper .dataTables_info {
-            color: #6c757d !important;
-            font-size: 13px !important;
-        }
-        .dt-buttons .btn {
-            border-radius: 10px !important;
-            padding: 6px 14px !important;
-            font-size: 13px !important;
-            margin-right: 4px !important;
-        }
 
         @media (max-width: 768px) {
-            #toastContainer { max-width: calc(100% - 24px); }
             .center-toast { padding: 30px 24px; }
             .center-toast .toast-icon { font-size: 44px; }
             .center-toast .toast-title { font-size: 20px; }
@@ -1049,7 +1016,7 @@
 </div>
 
 <div layout:fragment="scripts">
-    <!-- jQuery (required for DataTables) -->
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -1078,7 +1045,6 @@
             const titleEl = document.getElementById('centerToastTitle');
             const msgEl = document.getElementById('centerToastMessage');
 
-            // Set icon
             const icons = {
                 success: 'fa-check-circle',
                 error: 'fa-exclamation-circle',
@@ -1087,25 +1053,15 @@
             };
             icon.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '"></i>';
 
-            // Set class
             toast.className = 'center-toast toast-' + type;
-
-            // Set title and message
             titleEl.textContent = title;
             msgEl.textContent = message;
 
-            // Show
             overlay.classList.add('show');
 
-            // Auto-hide after 5 seconds for success/info, longer for errors
             const duration = (type === 'error' || type === 'warning') ? 8000 : 5000;
-
-            if (centerToastTimer) {
-                clearTimeout(centerToastTimer);
-            }
-            centerToastTimer = setTimeout(function() {
-                closeCenterToast();
-            }, duration);
+            if (centerToastTimer) clearTimeout(centerToastTimer);
+            centerToastTimer = setTimeout(function() { closeCenterToast(); }, duration);
         }
 
         function closeCenterToast() {
@@ -1118,50 +1074,152 @@
         }
 
         function getToastTitle(type) {
-            const titles = {
-                success: 'Success',
-                error: 'Error',
-                warning: 'Warning',
-                info: 'Notice'
-            };
+            const titles = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Notice' };
             return titles[type] || titles.info;
         }
 
         // ============================================
-        // Corner Toast (for non-critical messages)
+        // BATCH UPLOAD FUNCTIONS
         // ============================================
-        function showToast(message, type) {
-            type = type || 'success';
+        function submitBatchUpload() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
 
-            // Use center toast for errors and warnings
-            if (type === 'error' || type === 'warning') {
-                showCenterToast(message, type);
+            if (!file) {
+                showCenterToast('Please select a CSV file to upload.', 'warning', 'No File Selected');
                 return;
             }
 
-            // Use corner toast for success
-            const isSuccess = type === 'success';
-            const icon = isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle';
-            const label = isSuccess ? 'Success' : 'Error';
-            const toastId = 'toast-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showCenterToast('Please upload a CSV file.', 'error', 'Invalid File Type');
+                return;
+            }
 
-            const toastHtml = `
-                <div id="${toastId}" class="toast app-toast ${isSuccess ? 'toast-success' : 'toast-error'}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
-                    <div class="toast-header">
-                        <i class="fas ${icon} me-2"></i>
-                        <strong class="me-auto">${label}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const resultDiv = document.getElementById('uploadResult');
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
+            progressDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressBar.textContent = percent + '%';
+                }
+            });
+
+            xhr.onload = function() {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload';
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    displayUploadResult(response);
+                } catch (e) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Error processing upload: ${xhr.responseText}
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                }
+            };
+
+            xhr.onerror = function() {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload';
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Network error. Please try again.
                     </div>
-                    <div class="toast-body">${message}</div>
-                </div>
-            `;
+                `;
+                resultDiv.style.display = 'block';
+            };
 
-            const container = document.getElementById('toastContainer');
-            container.insertAdjacentHTML('beforeend', toastHtml);
-            const toastEl = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastEl);
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-            toast.show();
+            xhr.open('POST', '/assetIQ-pro/api/assets/batch-upload');
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+            if (csrfToken) {
+                xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+            }
+
+            xhr.send(formData);
+        }
+
+        function displayUploadResult(result) {
+            const resultDiv = document.getElementById('uploadResult');
+            resultDiv.style.display = 'block';
+
+            let html = '';
+
+            if (result.success && result.successfulRecords > 0) {
+                html += `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>${result.successfulRecords}</strong> assets imported successfully!
+                        ${result.failedRecords > 0 ? ` (${result.failedRecords} failed)` : ''}
+                    </div>
+                `;
+                if (result.successMessages && result.successMessages.length > 0) {
+                    html += `<ul class="list-unstyled small">`;
+                    result.successMessages.slice(0, 5).forEach(msg => {
+                        html += `<li><i class="fas fa-check text-success me-1"></i> ${msg}</li>`;
+                    });
+                    if (result.successMessages.length > 5) {
+                        html += `<li class="text-muted">... and ${result.successMessages.length - 5} more</li>`;
+                    }
+                    html += `</ul>`;
+                }
+            }
+
+            if (result.errors && result.errors.length > 0) {
+                html += `
+                    <div class="alert alert-danger mt-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>${result.errors.length}</strong> row(s) have errors:
+                    </div>
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm table-bordered table-striped">
+                            <thead><tr><th>Row</th><th>Tag</th><th>Name</th><th>Error</th></tr></thead>
+                            <tbody>
+                `;
+                result.errors.forEach(error => {
+                    html += `
+                        <tr>
+                            <td>${error.rowNumber || 'N/A'}</td>
+                            <td>${error.tag || 'N/A'}</td>
+                            <td>${error.name || 'N/A'}</td>
+                            <td class="text-danger small">${error.errorMessage || 'Unknown error'}</td>
+                        </tr>
+                    `;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            resultDiv.innerHTML = html;
+
+            if (result.successfulRecords > 0) {
+                const msg = `Successfully imported ${result.successfulRecords} assets${result.failedRecords > 0 ? ` with ${result.failedRecords} errors` : ''}`;
+                showCenterToast(msg, result.failedRecords > 0 ? 'warning' : 'success');
+            } else if (result.failedRecords > 0) {
+                showCenterToast(`Failed to import ${result.failedRecords} assets. Please check the errors below.`, 'error');
+            }
         }
 
         // ============================================
@@ -1198,16 +1256,13 @@
                     initActionDropdowns();
                 }
             });
-
             initActionDropdowns();
         });
 
         function initActionDropdowns() {
             document.querySelectorAll('#assetsTable .action-dots-btn').forEach(function (btn) {
                 var existing = bootstrap.Dropdown.getInstance(btn);
-                if (existing) {
-                    existing.dispose();
-                }
+                if (existing) existing.dispose();
                 new bootstrap.Dropdown(btn, {
                     popperConfig: function (defaultConfig) {
                         return Object.assign({}, defaultConfig, { strategy: 'fixed' });
@@ -1216,44 +1271,9 @@
             });
         }
 
-        function attachLifecycleAutoCalc(prefix) {
-            const purchaseEl = document.getElementById(prefix + 'PurchaseDate');
-            const warrantyYearsEl = document.getElementById(prefix + 'WarrantyYears');
-            const warrantyEndEl = document.getElementById(prefix + 'WarrantyEndDate');
-            const lifespanEl = document.getElementById(prefix + 'LifespanYears');
-            const eolEl = document.getElementById(prefix + 'EolDate');
-            if (!purchaseEl || !warrantyYearsEl || !warrantyEndEl || !lifespanEl || !eolEl) return;
-
-            function addYears(dateStr, years) {
-                const d = new Date(dateStr);
-                if (isNaN(d.getTime())) return '';
-                d.setFullYear(d.getFullYear() + parseInt(years, 10));
-                return d.toISOString().split('T')[0];
-            }
-            function recalcWarranty() {
-                if (purchaseEl.value && warrantyYearsEl.value) {
-                    warrantyEndEl.value = addYears(purchaseEl.value, warrantyYearsEl.value);
-                }
-            }
-            function recalcEol() {
-                if (purchaseEl.value && lifespanEl.value) {
-                    eolEl.value = addYears(purchaseEl.value, lifespanEl.value);
-                }
-            }
-
-            warrantyYearsEl.addEventListener('input', recalcWarranty);
-            lifespanEl.addEventListener('input', recalcEol);
-            purchaseEl.addEventListener('change', function () {
-                recalcWarranty();
-                recalcEol();
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            attachLifecycleAutoCalc('create');
-            attachLifecycleAutoCalc('edit');
-        });
-
+        // ============================================
+        // Asset CRUD Functions
+        // ============================================
         let currentAssetId = null;
         let currentAssetStatus = null;
 
@@ -1280,14 +1300,7 @@
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewAssetModal'));
             const body = document.getElementById('assetDetailBody');
 
-            body.innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            `;
-
+            body.innerHTML = `<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
             modal.show();
 
             fetch('/assetIQ-pro/api/assets/' + id)
@@ -1317,97 +1330,38 @@
                                     <td>${t.oldDepartmentName || 'N/A'}</td>
                                     <td>${t.newDepartmentName || 'N/A'}</td>
                                     <td>${t.transferDate || 'N/A'}</td>
-                                    <td>
-                                        <span class="badge ${t.isFullySigned ? 'bg-success' : 'bg-warning'}">
-                                            ${t.isFullySigned ? 'Completed' : 'Pending'}
-                                        </span>
-                                    </td>
+                                    <td><span class="badge ${t.isFullySigned ? 'bg-success' : 'bg-warning'}">${t.isFullySigned ? 'Completed' : 'Pending'}</span></td>
                                 </tr>
                             `;
                         });
                     } else {
-                        transferHtml = `
-                            <tr>
-                                <td colspan="6" class="text-center text-muted">No transfers found</td>
-                            </tr>
-                        `;
+                        transferHtml = `<tr><td colspan="6" class="text-center text-muted">No transfers found</td></tr>`;
                     }
 
                     body.innerHTML = `
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="detail-item mb-3">
-                                    <span class="label">Tag</span>
-                                    <span class="value fw-bold">${asset.tag || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Name</span>
-                                    <span class="value">${asset.name || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Serial Number</span>
-                                    <span class="value">${asset.serialNumber || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Category</span>
-                                    <span class="value">${asset.category?.name || 'Uncategorized'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Location</span>
-                                    <span class="value">${asset.locationName || asset.location?.name || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Supplier</span>
-                                    <span class="value">${asset.supplierName || asset.supplier?.name || 'N/A'}</span>
-                                </div>
+                                <div class="detail-item mb-3"><span class="label">Tag</span><span class="value fw-bold">${asset.tag || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Name</span><span class="value">${asset.name || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Serial Number</span><span class="value">${asset.serialNumber || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Category</span><span class="value">${asset.category?.name || 'Uncategorized'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Location</span><span class="value">${asset.locationName || asset.location?.name || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Supplier</span><span class="value">${asset.supplierName || asset.supplier?.name || 'N/A'}</span></div>
                             </div>
                             <div class="col-md-6">
-                                <div class="detail-item mb-3">
-                                    <span class="label">Status</span>
-                                    <span class="value">
-                                        <span class="pill pill-${(asset.status || 'AVAILABLE').toLowerCase()}">
-                                            ${asset.status || 'AVAILABLE'}
-                                        </span>
-                                    </span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Purchase Date</span>
-                                    <span class="value">${asset.purchaseDate || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Purchase Cost</span>
-                                    <span class="value">${asset.purchaseCost || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Warranty End Date</span>
-                                    <span class="value">${asset.warrantyEndDate || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">EOL Date</span>
-                                    <span class="value">${asset.eolDate || 'N/A'}</span>
-                                </div>
-                                <div class="detail-item mb-3">
-                                    <span class="label">Warranty Years</span>
-                                    <span class="value">${asset.warrantyYears || 'N/A'}</span>
-                                </div>
+                                <div class="detail-item mb-3"><span class="label">Status</span><span class="value"><span class="pill pill-${(asset.status || 'AVAILABLE').toLowerCase()}">${asset.status || 'AVAILABLE'}</span></span></div>
+                                <div class="detail-item mb-3"><span class="label">Purchase Date</span><span class="value">${asset.purchaseDate || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Purchase Cost</span><span class="value">${asset.purchaseCost || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Warranty End Date</span><span class="value">${asset.warrantyEndDate || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">EOL Date</span><span class="value">${asset.eolDate || 'N/A'}</span></div>
+                                <div class="detail-item mb-3"><span class="label">Warranty Years</span><span class="value">${asset.warrantyYears || 'N/A'}</span></div>
                             </div>
                         </div>
-
                         <hr>
-
                         <h6 class="fw-bold mt-3"><i class="fas fa-exchange-alt me-2"></i>Transfer History</h6>
                         <div class="table-responsive">
                             <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Transfer ID</th>
-                                        <th>Asset Tag</th>
-                                        <th>From</th>
-                                        <th>To</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
+                                <thead><tr><th>Transfer ID</th><th>Asset Tag</th><th>From</th><th>To</th><th>Date</th><th>Status</th></tr></thead>
                                 <tbody>${transferHtml}</tbody>
                             </table>
                         </div>
@@ -1415,12 +1369,7 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    body.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to load asset details.
-                        </div>
-                    `;
+                    body.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Failed to load asset details.</div>`;
                 });
         }
 
@@ -1430,16 +1379,13 @@
                 showCenterToast('Cannot edit a disposed asset.', 'error', 'Action Not Allowed');
                 return;
             }
-
             const viewModalEl = document.getElementById('viewAssetModal');
             const viewModal = bootstrap.Modal.getOrCreateInstance(viewModalEl);
-
             viewModalEl.addEventListener('hidden.bs.modal', function onHidden() {
                 viewModalEl.removeEventListener('hidden.bs.modal', onHidden);
                 const btn = document.querySelector(`a[data-assetid="${currentAssetId}"][data-tag]`);
                 if (btn) editAsset(btn);
             }, { once: true });
-
             viewModal.hide();
         }
 
@@ -1448,12 +1394,9 @@
             currentAssetId = id;
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editAssetModal'));
             const form = document.getElementById('editAssetForm');
-
             form.action = '/assetIQ-pro/assets/' + id + '/update';
-
             form.reset();
             document.getElementById('editInvoiceNote').textContent = '';
-
             modal.show();
 
             fetch('/assetIQ-pro/api/assets/' + id)
@@ -1475,7 +1418,6 @@
                     document.getElementById('editEolDate').value = asset.eolDate || '';
                     document.getElementById('editWarrantyNotificationDays').value = asset.warrantyNotificationDays != null ? asset.warrantyNotificationDays : 30;
                     document.getElementById('editEolNotificationDays').value = asset.eolNotificationDays != null ? asset.eolNotificationDays : 30;
-
                     if (asset.purchaseInvoicePath) {
                         document.getElementById('editInvoiceNote').textContent = 'Current invoice: ' + asset.purchaseInvoicePath;
                     }
@@ -1486,22 +1428,56 @@
                 });
         }
 
-        // ===== Transfer Modal Functions =====
+        function attachLifecycleAutoCalc(prefix) {
+            const purchaseEl = document.getElementById(prefix + 'PurchaseDate');
+            const warrantyYearsEl = document.getElementById(prefix + 'WarrantyYears');
+            const warrantyEndEl = document.getElementById(prefix + 'WarrantyEndDate');
+            const lifespanEl = document.getElementById(prefix + 'LifespanYears');
+            const eolEl = document.getElementById(prefix + 'EolDate');
+            if (!purchaseEl || !warrantyYearsEl || !warrantyEndEl || !lifespanEl || !eolEl) return;
+
+            function addYears(dateStr, years) {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return '';
+                d.setFullYear(d.getFullYear() + parseInt(years, 10));
+                return d.toISOString().split('T')[0];
+            }
+            function recalcWarranty() {
+                if (purchaseEl.value && warrantyYearsEl.value) {
+                    warrantyEndEl.value = addYears(purchaseEl.value, warrantyYearsEl.value);
+                }
+            }
+            function recalcEol() {
+                if (purchaseEl.value && lifespanEl.value) {
+                    eolEl.value = addYears(purchaseEl.value, lifespanEl.value);
+                }
+            }
+            warrantyYearsEl.addEventListener('input', recalcWarranty);
+            lifespanEl.addEventListener('input', recalcEol);
+            purchaseEl.addEventListener('change', function () { recalcWarranty(); recalcEol(); });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            attachLifecycleAutoCalc('create');
+            attachLifecycleAutoCalc('edit');
+        });
+
+        // ============================================
+        // Transfer Modal Functions
+        // ============================================
+        const TRANSFER_WIZARD_TOTAL_STEPS = 3;
+        let transferWizardStep = 1;
+
         function openTransferModal(button) {
             const tag = button.getAttribute('data-tag') || '';
             const serial = button.getAttribute('data-serial') || '';
             const categoryId = button.getAttribute('data-categoryid') || '';
-
             document.getElementById('transferAssetTag').value = tag;
             document.getElementById('transferSerialNumber').value = serial;
             document.getElementById('transferCategoryId').value = categoryId;
-
             transferWizardStep = 1;
             showTransferWizardStep(1);
         }
-
-        const TRANSFER_WIZARD_TOTAL_STEPS = 3;
-        let transferWizardStep = 1;
 
         function showTransferWizardStep(step) {
             document.querySelectorAll('#createTransferForm .wizard-pane').forEach(function (pane) {
@@ -1540,9 +1516,9 @@
             }
         }
 
-        // ============================================================
-        // DISPOSAL FUNCTIONS WITH CENTER TOAST
-        // ============================================================
+        // ============================================
+        // Disposal Functions
+        // ============================================
         function openDisposalModal(button) {
             const assetId = button.getAttribute('data-assetid');
             const tag = button.getAttribute('data-tag') || '';
@@ -1550,29 +1526,19 @@
             const eol = button.getAttribute('data-eol') || '';
             const status = button.getAttribute('data-status') || '';
 
-            // Check if asset already has a pending disposal request
             fetch('/assetIQ-pro/admin/disposal/api/asset/' + assetId + '/pending')
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error('API call failed');
-                    }
+                    if (!response.ok) throw new Error('API call failed');
                     return response.json();
                 })
                 .then(data => {
                     if (data.hasPending) {
-                        showCenterToast(
-                            'This asset already has a pending disposal request (ID: ' + data.requestId + '). Please wait for it to be processed before submitting another one.',
-                            'error',
-                            'Pending Request'
-                        );
+                        showCenterToast('This asset already has a pending disposal request (ID: ' + data.requestId + '). Please wait for it to be processed.', 'error', 'Pending Request');
                         return;
                     }
-
-                    // Proceed with opening the modal
                     document.getElementById('disposalAssetId').value = assetId;
                     document.getElementById('disposalAssetName').textContent = name + ' (' + status + ')';
                     document.getElementById('disposalAssetTag').textContent = 'Tag: ' + tag + (eol ? ' | EOL: ' + eol : '');
-
                     if (eol) {
                         const eolDate = new Date(eol);
                         const today = new Date();
@@ -1581,22 +1547,18 @@
                             document.getElementById('disposalReason').disabled = true;
                         }
                     }
-
                     const btn = document.getElementById('submitDisposalBtn');
                     if (btn) {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="fas fa-trash-alt me-2"></i>Request Disposal';
                     }
-
                     new bootstrap.Modal(document.getElementById('requestDisposalModal')).show();
                 })
                 .catch(error => {
                     console.error('Error checking pending requests:', error);
-                    // Still allow opening the modal if check fails
                     document.getElementById('disposalAssetId').value = assetId;
                     document.getElementById('disposalAssetName').textContent = name + ' (' + status + ')';
                     document.getElementById('disposalAssetTag').textContent = 'Tag: ' + tag + (eol ? ' | EOL: ' + eol : '');
-
                     if (eol) {
                         const eolDate = new Date(eol);
                         const today = new Date();
@@ -1605,13 +1567,11 @@
                             document.getElementById('disposalReason').disabled = true;
                         }
                     }
-
                     const btn = document.getElementById('submitDisposalBtn');
                     if (btn) {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="fas fa-trash-alt me-2"></i>Request Disposal';
                     }
-
                     new bootstrap.Modal(document.getElementById('requestDisposalModal')).show();
                 });
         }
@@ -1622,18 +1582,9 @@
             const disposalMethod = document.getElementById('disposalMethod').value;
             const priority = document.getElementById('disposalPriority').value;
 
-            if (!assetId) {
-                showCenterToast('No asset selected for disposal.', 'error', 'Submission Failed');
-                return;
-            }
-            if (!disposalReason) {
-                showCenterToast('Please select a disposal reason.', 'error', 'Submission Failed');
-                return;
-            }
-            if (!disposalMethod) {
-                showCenterToast('Please select a disposal method.', 'error', 'Submission Failed');
-                return;
-            }
+            if (!assetId) { showCenterToast('No asset selected for disposal.', 'error', 'Submission Failed'); return; }
+            if (!disposalReason) { showCenterToast('Please select a disposal reason.', 'error', 'Submission Failed'); return; }
+            if (!disposalMethod) { showCenterToast('Please select a disposal method.', 'error', 'Submission Failed'); return; }
 
             const btn = document.getElementById('submitDisposalBtn');
             if (btn.disabled) return;
@@ -1656,18 +1607,14 @@
                 body: params.toString()
             })
             .then(function (response) {
-                // ✅ Always try to parse as JSON first
                 return response.json().then(function (data) {
                     if (response.ok) {
-                        // Success
                         showCenterToast(data.message || 'Disposal request submitted successfully!', 'success');
                         const modalEl = document.getElementById('requestDisposalModal');
                         bootstrap.Modal.getInstance(modalEl)?.hide();
                         setTimeout(function () { window.location.reload(); }, 1500);
                     } else {
-                        // Error - show the error message from the response
                         const errorMsg = data.error || 'Failed to submit disposal request.';
-                        // Check for specific error patterns and make them user-friendly
                         let friendlyMsg = errorMsg;
                         if (errorMsg.includes('EOL') || errorMsg.includes('reached its End of Life')) {
                             friendlyMsg = 'This asset has not reached its End of Life (EOL) date yet. Disposal cannot be initiated.';
@@ -1683,9 +1630,7 @@
                 });
             })
             .catch(function (error) {
-                // If JSON parsing fails, check if it's a redirect
                 if (error.message && error.message.includes('JSON')) {
-                    // It might be a redirect with flash message
                     showCenterToast('Disposal request submitted successfully!', 'success');
                     const modalEl = document.getElementById('requestDisposalModal');
                     bootstrap.Modal.getInstance(modalEl)?.hide();
@@ -1720,7 +1665,6 @@
                 });
             }
 
-            // Close center toast on Escape key
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
                     closeCenterToast();

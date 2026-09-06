@@ -14,6 +14,9 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
 
     Optional<Category> findByName(String name);
 
+    // ✅ Fixed: returns Optional<Category> instead of Optional<Object>
+    Optional<Category> findByNameIgnoreCase(String name);
+
     @Query("SELECT c FROM Category c WHERE LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<Category> searchCategories(@Param("searchTerm") String searchTerm);
 

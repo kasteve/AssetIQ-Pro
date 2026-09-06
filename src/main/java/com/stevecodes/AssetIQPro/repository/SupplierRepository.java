@@ -16,6 +16,9 @@ public interface SupplierRepository extends JpaRepository<Supplier, Integer> {
 
     Optional<Supplier> findByEmail(String email);
 
+    // ✅ Fixed: returns Optional<Supplier> instead of Optional<Object>
+    Optional<Supplier> findByNameIgnoreCase(String name);
+
     @Query("SELECT s FROM Supplier s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(s.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(s.contact) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")

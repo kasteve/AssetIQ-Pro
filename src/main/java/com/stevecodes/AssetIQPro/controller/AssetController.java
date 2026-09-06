@@ -1,10 +1,14 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.dto.AssetDTO;
+import com.stevecodes.AssetIQPro.dto.BatchUploadResultDTO;
 import com.stevecodes.AssetIQPro.dto.TransferDTO;
+import com.stevecodes.AssetIQPro.entity.AppUser;
 import com.stevecodes.AssetIQPro.entity.Asset;
 import com.stevecodes.AssetIQPro.entity.AssetHistory;
 import com.stevecodes.AssetIQPro.security.Permissions;
+import com.stevecodes.AssetIQPro.security.SecurityUtils;
+import com.stevecodes.AssetIQPro.service.AssetCsvImportService;
 import com.stevecodes.AssetIQPro.service.AssetService;
 import com.stevecodes.AssetIQPro.service.AssetLifecycleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +25,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +39,7 @@ public class AssetController {
 
     private final AssetService assetService;
     private final AssetLifecycleService lifecycleService;
+    private final AssetCsvImportService assetCsvImportService;
 
     @PostMapping
     @Operation(summary = "Create a new asset")
@@ -211,6 +218,79 @@ public class AssetController {
             log.error("Error creating bulk assets: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to create assets: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Batch upload assets from CSV file
+     */
+    @PostMapping("/batch-upload")
+    @Operation(summary = "Upload assets from CSV file")
+    @PreAuthorize("hasAnyAuthority('ASSET_CREATE', 'EDIT_ASSETS', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<?> batchUploadAssets(@RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Please select a CSV file to upload"));
+            }
+
+            // Check file type
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || !fileName.toLowerCase().endsWith(".csv")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Only CSV files are supported"));
+            }
+
+            AppUser currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "User not authenticated"));
+            }
+
+            BatchUploadResultDTO result = assetCsvImportService.importAssetsFromCsv(file, currentUser.getUserId());
+
+            // Build response
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", !result.isHasErrors() || result.getSuccessfulRecords() > 0);
+            response.put("totalRecords", result.getTotalRecords());
+            response.put("successfulRecords", result.getSuccessfulRecords());
+            response.put("failedRecords", result.getFailedRecords());
+            response.put("hasErrors", result.isHasErrors());
+            response.put("errors", result.getErrors());
+            response.put("successMessages", result.getSuccessMessages());
+
+            if (result.isHasErrors() && result.getSuccessfulRecords() == 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error in batch upload: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to process CSV upload: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Download CSV template for batch upload
+     */
+    @GetMapping("/batch-template")
+    @Operation(summary = "Download CSV template for batch upload")
+    public ResponseEntity<byte[]> downloadBatchTemplate() {
+        try {
+            String template = "tag,name,serialNumber,category,supplier,location,purchaseDate,purchaseCost,status,warrantyYears,warrantyEndDate,eolDate,warrantyNotificationDays,eolNotificationDays,department,lifespanYears\n" +
+                    "AST-001,MacBook Pro,MN12345,Laptop,,,2024-01-15,2500.00,AVAILABLE,3,2027-01-15,2029-01-15,30,30,IT,5\n" +
+                    "AST-002,Dell XPS 15,SN67890,Laptop,,,2024-02-01,1800.00,ASSIGNED,2,2026-02-01,2028-02-01,30,30,Finance,4\n" +
+                    "AST-003,HP Monitor,HP-MON-001,Monitor,,,2023-12-01,350.00,AVAILABLE,2,2025-12-01,2027-12-01,30,30,IT,3\n";
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "text/csv")
+                    .header("Content-Disposition", "attachment; filename=asset_batch_template.csv")
+                    .body(template.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            log.error("Error generating CSV template: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

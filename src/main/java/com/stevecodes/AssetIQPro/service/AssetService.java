@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.service;
 
 import com.stevecodes.AssetIQPro.dto.AssetDTO;
+import com.stevecodes.AssetIQPro.dto.BatchUploadResultDTO;
 import com.stevecodes.AssetIQPro.dto.TransferDTO;
 import com.stevecodes.AssetIQPro.entity.Asset;
 import com.stevecodes.AssetIQPro.entity.AssetHistory;
@@ -37,6 +38,7 @@ public class AssetService {
     private final CategoryRepository categoryRepository;
     private final TransferRepository transferRepository;
     private final AuditService auditService;
+    private final AssetCsvImportService assetCsvImportService;
 
     private static final String UPLOAD_DIR = "./uploads/invoices/";
 
@@ -103,6 +105,15 @@ public class AssetService {
     public Page<AssetDTO> getAllAssets(Pageable pageable) {
         return assetRepository.findAll(pageable)
                 .map(AssetDTO::fromEntity);
+    }
+
+    /**
+     * Import assets from CSV file
+     */
+    @Transactional
+    public BatchUploadResultDTO importAssetsFromCsv(MultipartFile file, Long userId) {
+        // Delegate to AssetCsvImportService
+        return assetCsvImportService.importAssetsFromCsv(file, userId);
     }
 
     @Transactional

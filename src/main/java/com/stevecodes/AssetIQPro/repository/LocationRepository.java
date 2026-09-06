@@ -14,6 +14,9 @@ public interface LocationRepository extends JpaRepository<Location, Integer> {
 
     Optional<Location> findByName(String name);
 
+    // ✅ Fixed: returns Optional<Location> instead of Optional<Object>
+    Optional<Location> findByNameIgnoreCase(String name);
+
     @Query("SELECT l FROM Location l WHERE LOWER(l.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(l.city) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(l.country) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
