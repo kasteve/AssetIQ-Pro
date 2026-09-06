@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -119,6 +120,52 @@ public class TransferSigningService {
         return token;
     }
 
+    /**
+     * ✅ FIXED: Count only signers who actually received tokens (selected to sign)
+     * This replaces the old method that counted all possible signer fields
+     */
+    private int countRequiredSigners(Transfer transfer) {
+        // Get all tokens created for this transfer
+        List<TransferToken> tokens = tokenRepository.findByTransferId(transfer.getTransferId());
+
+        // Count unique signers (by employee ID, since one person can have multiple roles)
+        // This is the number of people who need to sign
+        long uniqueSignerCount = tokens.stream()
+                .map(TransferToken::getSignerEmployeeId)
+                .filter(id -> id != null)
+                .distinct()
+                .count();
+
+        // If no tokens, fall back to counting non-null signer fields (legacy)
+        if (uniqueSignerCount == 0) {
+            log.warn("⚠️ No tokens found for transfer {}, falling back to field-based signer count", transfer.getTransferId());
+            return countSignerFields(transfer);
+        }
+
+        log.info("📊 Transfer {} requires {} unique signers (based on tokens)",
+                transfer.getTransferId(), uniqueSignerCount);
+        return (int) uniqueSignerCount;
+    }
+
+    /**
+     * Legacy method to count signer fields (fallback)
+     */
+    private int countSignerFields(Transfer transfer) {
+        int count = 0;
+        if (transfer.getOldHandoverById() != null) count++;
+        if (transfer.getOldReceivedById() != null) count++;
+        if (transfer.getNewHandoverById() != null) count++;
+        if (transfer.getNewReceivedById() != null) count++;
+        if (transfer.getConfiguredById() != null) count++;
+        if (transfer.getInfraRepresentativeId() != null) count++;
+        if (transfer.getFinanceRepresentativeId() != null) count++;
+        return count;
+    }
+
+    /**
+     * ✅ UPDATED: Check if all signers have signed
+     * A transfer is fully signed when all token holders have completed signing
+     */
     public boolean isTransferFullySigned(Long transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
@@ -132,18 +179,69 @@ public class TransferSigningService {
             return true;
         }
 
-        // Second check: All tokens used
+        // ✅ NEW APPROACH: Check based on tokens (only selected signers matter)
         List<TransferToken> allTokens = tokenRepository.findByTransferId(transferId);
-        if (!allTokens.isEmpty() && allTokens.size() == countRequiredSigners(transfer)) {
+
+        if (!allTokens.isEmpty()) {
+            // Get unique signers (by employee ID)
+            List<Long> uniqueSignerIds = allTokens.stream()
+                    .map(TransferToken::getSignerEmployeeId)
+                    .filter(id -> id != null)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            int requiredSigners = uniqueSignerIds.size();
+
+            if (requiredSigners > 0) {
+                // Count how many unique signers have completed ALL their roles
+                int completedSigners = 0;
+                for (Long signerId : uniqueSignerIds) {
+                    // Get all tokens for this signer
+                    List<TransferToken> signerTokens = allTokens.stream()
+                            .filter(t -> signerId.equals(t.getSignerEmployeeId()))
+                            .collect(Collectors.toList());
+
+                    // Check if all roles for this signer are signed
+                    boolean allRolesSigned = true;
+                    for (TransferToken token : signerTokens) {
+                        // Check if this specific role is signed
+                        String role = token.getSignerRole();
+                        boolean roleSigned = transfer.isSignedForRole(role);
+                        if (!roleSigned) {
+                            allRolesSigned = false;
+                            break;
+                        }
+                    }
+
+                    if (allRolesSigned) {
+                        completedSigners++;
+                    }
+                }
+
+                log.info("📊 Transfer {}: {} of {} unique signers have completed all their roles",
+                        transferId, completedSigners, requiredSigners);
+
+                if (completedSigners == requiredSigners) {
+                    log.info("✅ Transfer {} fully signed - all {} unique signers completed",
+                            transferId, requiredSigners);
+                    completeTransferSigning(transfer);
+                    return true;
+                }
+            }
+        }
+
+        // Second check: Fallback to token-used check (all tokens used)
+        if (!allTokens.isEmpty()) {
             boolean allTokensUsed = allTokens.stream().allMatch(TransferToken::getIsUsed);
             if (allTokensUsed) {
-                log.info("✅ Transfer {} fully signed via tokens - all {} tokens used", transferId, allTokens.size());
+                log.info("✅ Transfer {} fully signed via tokens - all {} tokens used",
+                        transferId, allTokens.size());
                 completeTransferSigning(transfer);
                 return true;
             }
         }
 
-        // Third check: All timestamps are present
+        // Third check: Legacy timestamp check (for backward compatibility)
         boolean timestampsSigned = isTransferFullySignedByTimestamps(transfer);
         if (timestampsSigned) {
             log.info("✅ Transfer {} fully signed via timestamps", transferId);
@@ -151,46 +249,8 @@ public class TransferSigningService {
             return true;
         }
 
-        // Fourth check: Hybrid approach
-        if (!allTokens.isEmpty() && countRequiredSigners(transfer) > 0) {
-            boolean hybridComplete = isTransferCompleteByHybridApproach(transfer, allTokens);
-            if (hybridComplete) {
-                log.info("✅ Transfer {} fully signed via hybrid approach", transferId);
-                completeTransferSigning(transfer);
-                return true;
-            }
-        }
-
-        // Fifth check: Manual signature verification
-        boolean allSignaturesPresent = true;
-        if (transfer.getOldHandoverById() != null && transfer.getOldHandoverBySignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getOldReceivedById() != null && transfer.getOldReceivedBySignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getNewHandoverById() != null && transfer.getNewHandoverBySignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getNewReceivedById() != null && transfer.getNewReceivedBySignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getConfiguredById() != null && transfer.getConfiguredBySignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getInfraRepresentativeId() != null && transfer.getInfraRepSignedAt() == null) allSignaturesPresent = false;
-        if (transfer.getFinanceRepresentativeId() != null && transfer.getFinanceRepSignedAt() == null) allSignaturesPresent = false;
-
-        if (allSignaturesPresent && countRequiredSigners(transfer) > 0) {
-            log.info("✅ Transfer {} fully signed via manual signature check", transferId);
-            completeTransferSigning(transfer);
-            return true;
-        }
-
         log.info("❌ Transfer {} is NOT fully signed", transferId);
         return false;
-    }
-
-    private int countRequiredSigners(Transfer transfer) {
-        int count = 0;
-        if (transfer.getOldHandoverById() != null) count++;
-        if (transfer.getOldReceivedById() != null) count++;
-        if (transfer.getNewHandoverById() != null) count++;
-        if (transfer.getNewReceivedById() != null) count++;
-        if (transfer.getConfiguredById() != null) count++;
-        if (transfer.getInfraRepresentativeId() != null) count++;
-        if (transfer.getFinanceRepresentativeId() != null) count++;
-        return count;
     }
 
     private boolean isTransferCompleteByHybridApproach(Transfer transfer, List<TransferToken> tokens) {
@@ -269,7 +329,6 @@ public class TransferSigningService {
         return (tokenUsed || timestampExists);
     }
 
-    // ✅ FIXED: Ensure completeTransferSigning properly sets and saves
     private void completeTransferSigning(Transfer transfer) {
         log.info("=========================================");
         log.info("✅ COMPLETING TRANSFER SIGNING FOR: {}", transfer.getTransferId());
@@ -277,7 +336,6 @@ public class TransferSigningService {
 
         transfer.setIsFullySigned(true);
 
-        // Save immediately
         Transfer saved = transferRepository.save(transfer);
         log.info("✅ Transfer {} marked as fully signed (isFullySigned = {})",
                 saved.getTransferId(), saved.getIsFullySigned());
@@ -404,43 +462,22 @@ public class TransferSigningService {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
-        List<String> signerEmails = new ArrayList<>();
+        // ✅ Get signer emails from tokens (only the people who actually received signing links)
+        List<TransferToken> tokens = tokenRepository.findByTransferId(transferId);
+        List<String> signerEmails = tokens.stream()
+                .map(TransferToken::getSignerEmail)
+                .filter(email -> email != null && !email.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
 
-        if (transfer.getOldHandoverById() != null) {
-            String email = getEmployeeEmail(transfer.getOldHandoverById());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getOldReceivedById() != null) {
-            String email = getEmployeeEmail(transfer.getOldReceivedById());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getNewHandoverById() != null) {
-            String email = getEmployeeEmail(transfer.getNewHandoverById());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getNewReceivedById() != null) {
-            String email = getEmployeeEmail(transfer.getNewReceivedById());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getConfiguredById() != null) {
-            String email = getEmployeeEmail(transfer.getConfiguredById());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getInfraRepresentativeId() != null) {
-            String email = getEmployeeEmail(transfer.getInfraRepresentativeId());
-            if (email != null) signerEmails.add(email);
-        }
-        if (transfer.getFinanceRepresentativeId() != null) {
-            String email = getEmployeeEmail(transfer.getFinanceRepresentativeId());
-            if (email != null) signerEmails.add(email);
-        }
-
+        // Add admin as fallback
         signerEmails.add("admin@company.com");
 
         if (!signerEmails.isEmpty()) {
             try {
                 byte[] pdfBytes = Base64.getDecoder().decode(transfer.getFullySignedPDF());
-                log.info("Sending completed transfer email to {} recipients for transfer {}", signerEmails.size(), transferId);
+                log.info("Sending completed transfer email to {} recipients for transfer {}",
+                        signerEmails.size(), transferId);
                 emailService.sendCompletedTransferReport(signerEmails, transfer, pdfBytes);
             } catch (Exception e) {
                 log.error("Failed to send email for transfer {}: {}", transferId, e.getMessage());
@@ -478,12 +515,6 @@ public class TransferSigningService {
         return Base64.getDecoder().decode(transfer.getFullySignedPDF());
     }
 
-    // Add this method to TransferSigningService.java
-
-    /**
-     * Process a signature for a specific role within a transfer
-     * When a signer has multiple roles, they need to sign each one
-     */
     @Transactional
     public void processSignatureForRole(Long transferId, String tokenValue, String role, String base64Signature) {
         TransferToken token = tokenRepository.findByToken(tokenValue)
@@ -497,28 +528,23 @@ public class TransferSigningService {
             throw new IllegalStateException("Token has expired");
         }
 
-        // Verify the role is part of this token's roles
         List<String> allowedRoles = tokenService.getRolesFromToken(token);
         if (!allowedRoles.contains(role)) {
             throw new IllegalArgumentException("Role " + role + " is not assigned to this signer");
         }
 
-        // Save the signature for this specific role
         saveSignature(transferId, role, base64Signature);
 
-        // Check if all roles for this signer are now signed
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new IllegalArgumentException("Transfer not found: " + transferId));
 
         boolean allSlotsSigned = tokenService.areAllSlotsSigned(transfer, token);
         if (allSlotsSigned) {
-            // All roles for this signer are done
             token.setIsUsed(true);
             tokenRepository.save(token);
             log.info("✅ Signer {} has completed all their roles for transfer {}", token.getSignerEmail(), transferId);
         }
 
-        // Check if the entire transfer is fully signed
         if (isTransferFullySigned(transferId)) {
             log.info("🎉 Transfer {} is now fully signed!", transferId);
         }

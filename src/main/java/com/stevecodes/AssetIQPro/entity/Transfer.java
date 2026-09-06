@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "Transfers", schema = "dbo")
@@ -531,5 +533,22 @@ public class Transfer {
 
     public void setCategory(Category category) {
         this.category = category;
+    }
+
+    /**
+     * Get all signer IDs that have been assigned tokens
+     */
+    public List<Long> getTokenSignerIds() {
+        // This will be used by the service - the service will query tokens
+        // This is just a placeholder method for clarity
+        return new ArrayList<>();
+    }
+
+    /**
+     * Get count of unique signers with tokens
+     */
+    public int getUniqueSignerCount() {
+        // This will be used by the service - the service will query tokens
+        return 0;
     }
 }
