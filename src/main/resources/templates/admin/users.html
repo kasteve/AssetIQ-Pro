@@ -77,7 +77,6 @@
                         <span th:if="${user.department != null}" class="usr-dept" th:text="${user.department}">IT</span>
                         <span th:unless="${user.department != null}" class="usr-dept none">N/A</span>
                     </td>
-                    <!-- FIXED: Using th:switch instead of chained ternary to avoid SpEL parsing error -->
                     <td>
                         <th:block th:switch="${user.role}">
                             <span class="role-badge role-superadmin" th:case="'SUPERADMIN'" th:text="'SUPERADMIN'">SUPERADMIN</span>
@@ -160,7 +159,9 @@
         </div>
     </div>
 
-    <!-- Create User Modal -->
+    <!-- ============================================ -->
+    <!-- CREATE USER MODAL - WITH NEW LINE MANAGER    -->
+    <!-- ============================================ -->
     <div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -168,7 +169,7 @@
                     <h5 class="modal-title"><i class="fas fa-user-plus me-2" style="color: #0d6efd;"></i>Create New User</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form th:action="@{/admin/users/create}" method="post">
+                <form th:action="@{/admin/users/create}" method="post" id="createUserForm">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Staff ID *</label>
@@ -202,12 +203,48 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Line Manager</label>
-                            <select name="lineManagerId" class="form-select">
-                                <option value="">Select Line Manager</option>
+                            <select name="lineManagerId" class="form-select" id="createLineManagerSelect">
+                                <option value="">Select Existing Line Manager</option>
                                 <option th:each="emp : ${employees}"
                                         th:value="${emp.employeeId}"
                                         th:text="${emp.fullName + ' (' + emp.emailAddress + ')'}">John Doe</option>
+                                <option value="__NEW__">--- Create New Line Manager ---</option>
                             </select>
+                        </div>
+                        <!-- ✅ NEW: New Line Manager Fields (hidden initially) -->
+                        <div id="createNewLineManagerFields" style="display:none; border-top: 1px solid #eef0f3; padding-top: 15px; margin-top: 5px;">
+                            <h6 class="fw-bold mb-3"><i class="fas fa-user-plus me-2" style="color: #198754;"></i>New Line Manager Details</h6>
+                            <div class="mb-3">
+                                <label class="form-label">LM Staff ID *</label>
+                                <input type="text" name="lmStaffId" id="createLmStaffId" class="form-control" placeholder="e.g., LM001">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">LM First Name *</label>
+                                    <input type="text" name="lmFirstName" id="createLmFirstName" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">LM Surname *</label>
+                                    <input type="text" name="lmSurName" id="createLmSurName" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">LM Email *</label>
+                                <input type="email" name="lmEmail" id="createLmEmail" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">LM Phone</label>
+                                <input type="text" name="lmPhone" id="createLmPhone" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">LM Department</label>
+                                <select name="lmDepartmentId" id="createLmDepartmentId" class="form-select">
+                                    <option value="">Select Department</option>
+                                    <option th:each="dept : ${departments}"
+                                            th:value="${dept.departmentId}"
+                                            th:text="${dept.name}">IT</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Role *</label>
@@ -402,6 +439,7 @@
 
 <div layout:fragment="styles">
     <style>
+        /* ... (keep existing styles) ... */
         .page-header-row {
             display: flex;
             justify-content: space-between;
@@ -865,18 +903,33 @@
         let resetUserId = null;
 
         // ============================================
-        // Edit User - Load permissions
+        // Show/hide new line manager fields - CREATE MODAL
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
-            const resetModal = document.getElementById('resetPasswordModal');
-            if (resetModal) {
-                resetModal.addEventListener('show.bs.modal', function(event) {
-                    const button = event.relatedTarget;
-                    resetUserId = button.getAttribute('data-userid');
-                    document.getElementById('resetUsername').textContent = button.getAttribute('data-username');
+            // Create User Modal - Line Manager Select
+            const createLineManagerSelect = document.getElementById('createLineManagerSelect');
+            const createNewLmFields = document.getElementById('createNewLineManagerFields');
+
+            if (createLineManagerSelect) {
+                createLineManagerSelect.addEventListener('change', function() {
+                    if (this.value === '__NEW__') {
+                        createNewLmFields.style.display = 'block';
+                        // Make fields required
+                        document.getElementById('createLmStaffId').required = true;
+                        document.getElementById('createLmFirstName').required = true;
+                        document.getElementById('createLmSurName').required = true;
+                        document.getElementById('createLmEmail').required = true;
+                    } else {
+                        createNewLmFields.style.display = 'none';
+                        document.getElementById('createLmStaffId').required = false;
+                        document.getElementById('createLmFirstName').required = false;
+                        document.getElementById('createLmSurName').required = false;
+                        document.getElementById('createLmEmail').required = false;
+                    }
                 });
             }
 
+            // Edit User Modal - Load permissions
             const editModal = document.getElementById('editUserModal');
             if (editModal) {
                 editModal.addEventListener('show.bs.modal', function(event) {
@@ -930,6 +983,16 @@
                         console.error('Error loading permissions:', error);
                         showToast('Unable to load current permissions for this user.', 'error');
                     });
+                });
+            }
+
+            // Reset Password Modal
+            const resetModal = document.getElementById('resetPasswordModal');
+            if (resetModal) {
+                resetModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    resetUserId = button.getAttribute('data-userid');
+                    document.getElementById('resetUsername').textContent = button.getAttribute('data-username');
                 });
             }
         });

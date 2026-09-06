@@ -24,11 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -71,9 +67,160 @@ public class AppUserService {
     private RolePermissionService rolePermissionService;
 
     // ============================================
-    // Default Permissions for ALL New Users
+    // ✅ FIXED: COMPLETE ROLE-BASED DEFAULT PERMISSIONS
     // ============================================
-    private List<String> getDefaultPermissions() {
+    private static final Map<String, List<String>> ROLE_DEFAULT_PERMISSIONS = Map.of(
+            "SUPERADMIN", List.of(
+                    // Core Admin
+                    "SUPER_ADMIN", "ADMIN", "MANAGE_ROLES", "CREATE_USERS", "RESET_PASSWORDS",
+                    "MANAGE_CONFIG", "VIEW_AUDIT", "VIEW_ALL_TRANSACTIONS", "VIEW_REPORTS",
+                    "DOWNLOAD_REPORTS", "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
+                    "MANAGE_GROUPS", "VIEW_GROUPS",
+
+                    // Asset Management
+                    "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "EDIT_ASSETS", "DELETE_ASSETS",
+                    "TRANSFER_VIEW", "TRANSFER_CREATE", "MANAGE_WARRANTY", "MANAGE_EOL", "MANAGE_INVENTORY",
+
+                    // Disposal Management
+                    "DISPOSAL_VIEW", "DISPOSAL_REQUEST", "DISPOSAL_APPROVE", "DISPOSAL_EXECUTE",
+                    "DISPOSAL_REPORT", "DISPOSAL_FINANCE_APPROVE", "DISPOSAL_INFRA_APPROVE",
+                    "DISPOSAL_COMPLIANCE_APPROVE",
+
+                    // Infrastructure
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE", "INFRA_REQUEST_APPROVE",
+                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "REVIEW_INFRA",
+
+                    // Finance
+                    "APPROVE_FINANCE",
+
+                    // Bookings
+                    "MANAGE_BOOKINGS", "ROOM_VIEW_ALL", "ROOM_BOOK", "ROOM_CANCEL",
+                    "ROOM_CREATE", "ROOM_EDIT", "ROOM_DELETE",
+
+                    // Employees
+                    "EMPLOYEE_VIEW", "EMPLOYEE_EDIT", "EMPLOYEE_CREATE", "EMPLOYEE_DELETE",
+
+                    // Departments
+                    "DEPARTMENT_VIEW", "DEPARTMENT_EDIT", "DEPARTMENT_CREATE", "DEPARTMENT_DELETE",
+
+                    // Categories
+                    "CATEGORY_VIEW", "CATEGORY_EDIT", "CATEGORY_CREATE", "CATEGORY_DELETE",
+
+                    // Locations
+                    "LOCATION_VIEW", "LOCATION_EDIT", "LOCATION_CREATE", "LOCATION_DELETE",
+
+                    // Suppliers
+                    "SUPPLIER_VIEW", "SUPPLIER_EDIT", "SUPPLIER_CREATE", "SUPPLIER_DELETE",
+
+                    // Companies
+                    "COMPANY_VIEW", "COMPANY_EDIT", "COMPANY_CREATE", "COMPANY_DELETE",
+
+                    // Vouchers
+                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS",
+
+                    // Drivers
+                    "DRIVER_VIEW", "DRIVER_APPROVE", "DRIVER_REQUEST"
+            ),
+            "ADMIN", List.of(
+                    // Core Admin
+                    "ADMIN", "MANAGE_ROLES", "CREATE_USERS", "RESET_PASSWORDS",
+                    "MANAGE_CONFIG", "VIEW_AUDIT", "VIEW_ALL_TRANSACTIONS", "VIEW_REPORTS",
+                    "DOWNLOAD_REPORTS", "USER_VIEW", "USER_EDIT", "USER_DISABLE", "USER_LOCK",
+                    "MANAGE_GROUPS", "VIEW_GROUPS",
+
+                    // Asset Management
+                    "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "EDIT_ASSETS", "DELETE_ASSETS",
+                    "TRANSFER_VIEW", "TRANSFER_CREATE", "MANAGE_WARRANTY", "MANAGE_EOL", "MANAGE_INVENTORY",
+
+                    // Disposal Management
+                    "DISPOSAL_VIEW", "DISPOSAL_REQUEST", "DISPOSAL_APPROVE", "DISPOSAL_EXECUTE",
+                    "DISPOSAL_REPORT", "DISPOSAL_FINANCE_APPROVE", "DISPOSAL_INFRA_APPROVE",
+                    "DISPOSAL_COMPLIANCE_APPROVE",
+
+                    // Infrastructure
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE", "INFRA_REQUEST_APPROVE",
+                    "APPROVE_INFRA", "APPROVE_INFRA_REQUESTS", "REVIEW_INFRA",
+
+                    // Finance
+                    "APPROVE_FINANCE",
+
+                    // Bookings
+                    "MANAGE_BOOKINGS", "ROOM_VIEW_ALL", "ROOM_BOOK", "ROOM_CANCEL",
+                    "ROOM_CREATE", "ROOM_EDIT", "ROOM_DELETE",
+
+                    // Employees
+                    "EMPLOYEE_VIEW", "EMPLOYEE_EDIT", "EMPLOYEE_CREATE", "EMPLOYEE_DELETE",
+
+                    // Departments
+                    "DEPARTMENT_VIEW", "DEPARTMENT_EDIT", "DEPARTMENT_CREATE", "DEPARTMENT_DELETE",
+
+                    // Categories
+                    "CATEGORY_VIEW", "CATEGORY_EDIT", "CATEGORY_CREATE", "CATEGORY_DELETE",
+
+                    // Locations
+                    "LOCATION_VIEW", "LOCATION_EDIT", "LOCATION_CREATE", "LOCATION_DELETE",
+
+                    // Suppliers
+                    "SUPPLIER_VIEW", "SUPPLIER_EDIT", "SUPPLIER_CREATE", "SUPPLIER_DELETE",
+
+                    // Companies
+                    "COMPANY_VIEW", "COMPANY_EDIT", "COMPANY_CREATE", "COMPANY_DELETE",
+
+                    // Vouchers
+                    "GENERATE_VOUCHERS", "GENERATE_MULTIPLE_VOUCHERS",
+
+                    // Drivers
+                    "DRIVER_VIEW", "DRIVER_APPROVE", "DRIVER_REQUEST"
+            ),
+            "MANAGER", List.of(
+                    "GENERATE_VOUCHERS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_VIEW",
+                    "RESOURCE_REQUEST_CREATE", "ROOM_VIEW_ALL", "ROOM_BOOK", "ROOM_CANCEL",
+                    "DRIVER_VIEW", "APPROVE_LM", "EMPLOYEE_VIEW", "VIEW_REPORTS",
+                    "DISPOSAL_VIEW"
+            ),
+            "INFRA", List.of(
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE", "INFRA_REQUEST_APPROVE",
+                    "APPROVE_INFRA", "REVIEW_INFRA", "VIEW_REPORTS", "DOWNLOAD_REPORTS",
+                    "DISPOSAL_VIEW", "DISPOSAL_INFRA_APPROVE",
+                    "DRIVER_VIEW", "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_CREATE",
+                    "ROOM_VIEW_ALL", "ROOM_BOOK", "ROOM_CANCEL"
+            ),
+            "FINANCE", List.of(
+                    "APPROVE_FINANCE", "VIEW_REPORTS", "DOWNLOAD_REPORTS",
+                    "VIEW_ALL_TRANSACTIONS", "DISPOSAL_VIEW", "DISPOSAL_FINANCE_APPROVE",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE",
+                    "DRIVER_VIEW", "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_CREATE",
+                    "ROOM_VIEW_ALL", "ROOM_BOOK"
+            ),
+            "DRIVER", List.of(
+                    "DRIVER_VIEW", "DRIVER_REQUEST", "VIEW_OWN_TRANSACTIONS",
+                    "GENERATE_VOUCHERS", "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE",
+                    "RESOURCE_REQUEST_VIEW", "RESOURCE_REQUEST_CREATE", "DISPOSAL_VIEW"
+            ),
+            "EMPLOYEE", List.of(
+                    "GENERATE_VOUCHERS", "VIEW_OWN_TRANSACTIONS", "MANAGE_BOOKINGS",
+                    "INFRA_REQUEST_VIEW", "INFRA_REQUEST_CREATE", "RESOURCE_REQUEST_VIEW",
+                    "RESOURCE_REQUEST_CREATE", "ROOM_VIEW_ALL", "ROOM_BOOK", "ROOM_CANCEL",
+                    "DRIVER_VIEW"
+            )
+    );
+
+    // ============================================
+    // ✅ Get default permissions for a role
+    // ============================================
+    public Set<String> getDefaultPermissionsForRole(String roleName) {
+        if (roleName == null) {
+            return new HashSet<>(ROLE_DEFAULT_PERMISSIONS.getOrDefault("EMPLOYEE", List.of()));
+        }
+        return new HashSet<>(ROLE_DEFAULT_PERMISSIONS.getOrDefault(roleName.toUpperCase(),
+                ROLE_DEFAULT_PERMISSIONS.getOrDefault("EMPLOYEE", List.of())));
+    }
+
+    // ============================================
+    // Legacy Default Permissions (Fallback)
+    // ============================================
+    private List<String> getLegacyDefaultPermissions() {
         return List.of(
                 "GENERATE_VOUCHERS",
                 "VIEW_OWN_TRANSACTIONS",
@@ -162,13 +309,14 @@ public class AppUserService {
     }
 
     // ============================================
-    // User Management
+    // ✅ UPDATED: User Management with Role-Based Permissions
     // ============================================
 
     @Transactional
     public AppUser createUser(UserDTO userDTO) {
         log.info("Creating new user: {}", userDTO.getUsername());
 
+        // Validate unique fields
         if (userRepository.findByUsername(userDTO.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username '" + userDTO.getUsername() + "' is already taken.");
         }
@@ -211,7 +359,10 @@ public class AppUserService {
         user.setEmail(userDTO.getEmail());
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setFullName(userDTO.getFullName());
-        user.setRole(userDTO.getRole() != null ? userDTO.getRole() : "EMPLOYEE");
+
+        // ✅ Set role (default to EMPLOYEE if not provided)
+        String role = userDTO.getRole() != null ? userDTO.getRole().toUpperCase() : "EMPLOYEE";
+        user.setRole(role);
 
         if (userDTO.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(userDTO.getDepartmentId())
@@ -230,22 +381,27 @@ public class AppUserService {
         user.setLockedUntil(null);
         user.setEmployee(savedEmployee);
 
+        // ✅ Assign permissions based on role
         Set<Permission> permissions = new HashSet<>();
 
-        List<String> defaultPermissions = getDefaultPermissions();
-        for (String permName : defaultPermissions) {
+        // 1. Get default permissions for the role
+        Set<String> defaultPermNames = getDefaultPermissionsForRole(role);
+        log.info("📋 Default permissions for role '{}': {}", role, defaultPermNames);
+
+        // 2. Add custom permissions if provided
+        if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
+            defaultPermNames.addAll(userDTO.getPermissions());
+            log.info("📋 Additional custom permissions: {}", userDTO.getPermissions());
+        }
+
+        // 3. Resolve permission names to Permission entities
+        for (String permName : defaultPermNames) {
             permissionRepository.findByPermissionName(permName)
                     .ifPresent(permissions::add);
         }
 
-        if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
-            for (String permName : userDTO.getPermissions()) {
-                permissionRepository.findByPermissionName(permName)
-                        .ifPresent(permissions::add);
-            }
-        }
-
         user.setPermissions(permissions);
+        log.info("📋 Total permissions assigned: {}", permissions.size());
 
         AppUser savedUser = userRepository.save(user);
         log.info("User created successfully: {}", savedUser.getUsername());
@@ -259,7 +415,7 @@ public class AppUserService {
         log.info("Role: {}", savedUser.getRole());
         log.info("Department: {}", savedUser.getDepartment());
         log.info("Temporary Password: {}", tempPassword);
-        log.info("Default Permissions: {}", defaultPermissions);
+        log.info("Permissions: {}", permissions.stream().map(Permission::getPermissionName).collect(Collectors.toList()));
         log.info("Email: {}", savedUser.getEmail());
         log.info("=========================================");
 
@@ -283,8 +439,9 @@ public class AppUserService {
     }
 
     // ============================================
-    // Update User - FIXED with duplicate checks
+    // ✅ UPDATED: Update User with Role-Based Permissions Sync
     // ============================================
+
     @Transactional
     public AppUser updateUser(Long userId, UserDTO userDTO) {
         log.info("Updating user: {}", userId);
@@ -292,7 +449,7 @@ public class AppUserService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // ✅ CHECK FOR DUPLICATE EMAIL (excluding current user)
+        // Check for duplicate email
         if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
             Optional<AppUser> existingUser = userRepository.findByEmail(userDTO.getEmail());
             if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
@@ -301,7 +458,7 @@ public class AppUserService {
             user.setEmail(userDTO.getEmail());
         }
 
-        // ✅ CHECK FOR DUPLICATE USERNAME (excluding current user)
+        // Check for duplicate username
         if (userDTO.getUsername() != null && !userDTO.getUsername().equals(user.getUsername())) {
             Optional<AppUser> existingUser = userRepository.findByUsername(userDTO.getUsername());
             if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
@@ -310,7 +467,7 @@ public class AppUserService {
             user.setUsername(userDTO.getUsername());
         }
 
-        // ✅ CHECK FOR DUPLICATE STAFF ID (excluding current user)
+        // Check for duplicate staff ID
         if (userDTO.getStaffId() != null && !userDTO.getStaffId().equals(user.getStaffId())) {
             Optional<AppUser> existingUser = userRepository.findByStaffId(userDTO.getStaffId());
             if (existingUser.isPresent() && !existingUser.get().getUserId().equals(userId)) {
@@ -319,12 +476,18 @@ public class AppUserService {
             user.setStaffId(userDTO.getStaffId());
         }
 
-        // Update other fields
+        // Update fields
         if (userDTO.getFullName() != null) {
             user.setFullName(userDTO.getFullName());
         }
-        if (userDTO.getRole() != null) {
-            user.setRole(userDTO.getRole());
+
+        // ✅ Update role and sync permissions
+        boolean roleChanged = false;
+        if (userDTO.getRole() != null && !userDTO.getRole().equals(user.getRole())) {
+            String newRole = userDTO.getRole().toUpperCase();
+            user.setRole(newRole);
+            roleChanged = true;
+            log.info("Role changed from {} to {}", user.getRole(), newRole);
         }
 
         user.setActive(userDTO.isActive());
@@ -363,14 +526,27 @@ public class AppUserService {
             employeeRepository.save(employee);
         }
 
-        // Update permissions
-        if (userDTO.getPermissions() != null) {
+        // ✅ Update permissions
+        if (roleChanged || userDTO.getPermissions() != null) {
             Set<Permission> newPermissions = new HashSet<>();
-            for (String permName : userDTO.getPermissions()) {
+
+            // Get default permissions for the role
+            Set<String> permNames = getDefaultPermissionsForRole(user.getRole());
+
+            // Add custom permissions if provided
+            if (userDTO.getPermissions() != null && !userDTO.getPermissions().isEmpty()) {
+                permNames.addAll(userDTO.getPermissions());
+            }
+
+            // Resolve to Permission entities
+            for (String permName : permNames) {
                 permissionRepository.findByPermissionName(permName)
                         .ifPresent(newPermissions::add);
             }
+
             user.setPermissions(newPermissions);
+            log.info("Updated permissions for user {}: {}", user.getUsername(),
+                    newPermissions.stream().map(Permission::getPermissionName).collect(Collectors.toList()));
         }
 
         user.setUpdatedAt(LocalDateTime.now());
@@ -452,14 +628,20 @@ public class AppUserService {
 
         user.setRole(role);
 
+        // ✅ Sync permissions based on new role
         Set<Permission> permissions = new HashSet<>();
-        List<String> defaultPermissions = getDefaultPermissions();
-        for (String permName : defaultPermissions) {
+        Set<String> defaultPermNames = getDefaultPermissionsForRole(role);
+        for (String permName : defaultPermNames) {
             permissionRepository.findByPermissionName(permName)
                     .ifPresent(permissions::add);
         }
-        user.setPermissions(permissions);
 
+        // Preserve any custom permissions the user already has
+        if (user.getPermissions() != null) {
+            user.getPermissions().forEach(permissions::add);
+        }
+
+        user.setPermissions(permissions);
         userRepository.save(user);
         log.info("Role updated to {} for user: {}", role, user.getUsername());
 
@@ -684,10 +866,22 @@ public class AppUserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         Set<Permission> newPermissions = new HashSet<>();
-        for (String permName : permissionNames) {
+
+        // Start with default permissions for the user's role
+        Set<String> defaultPermNames = getDefaultPermissionsForRole(user.getRole());
+        for (String permName : defaultPermNames) {
             permissionRepository.findByPermissionName(permName)
                     .ifPresent(newPermissions::add);
         }
+
+        // Add custom permissions if provided
+        if (permissionNames != null && !permissionNames.isEmpty()) {
+            for (String permName : permissionNames) {
+                permissionRepository.findByPermissionName(permName)
+                        .ifPresent(newPermissions::add);
+            }
+        }
+
         user.setPermissions(newPermissions);
         userRepository.save(user);
 

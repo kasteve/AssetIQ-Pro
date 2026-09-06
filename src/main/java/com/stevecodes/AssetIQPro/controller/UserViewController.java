@@ -1,6 +1,8 @@
 package com.stevecodes.AssetIQPro.controller;
 
 import com.stevecodes.AssetIQPro.entity.AppUser;
+import com.stevecodes.AssetIQPro.entity.Department;
+import com.stevecodes.AssetIQPro.entity.Employee;
 import com.stevecodes.AssetIQPro.security.SecurityUtils;
 import com.stevecodes.AssetIQPro.dto.UserDTO;
 import com.stevecodes.AssetIQPro.exception.UserAlreadyExistsException;
@@ -74,21 +76,144 @@ public class UserViewController {
         return "admin/users";
     }
 
+    /**
+     * ✅ UPDATED: Create user with support for new line manager
+     */
     @PostMapping("/create")
     @PreAuthorize("hasAnyAuthority('CREATE_USERS', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
-    public String createUser(@ModelAttribute UserDTO userDTO, RedirectAttributes redirectAttributes) {
+    public String createUser(
+            @RequestParam String staffId,
+            @RequestParam String username,
+            @RequestParam String fullName,
+            @RequestParam String email,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam(required = false) String lineManagerId,
+            @RequestParam String role,
+            @RequestParam(required = false) List<String> permissions,
+            // ✅ NEW: Line Manager fields for creating new line manager
+            @RequestParam(required = false) String lmStaffId,
+            @RequestParam(required = false) String lmFirstName,
+            @RequestParam(required = false) String lmSurName,
+            @RequestParam(required = false) String lmEmail,
+            @RequestParam(required = false) String lmPhone,
+            @RequestParam(required = false) Integer lmDepartmentId,
+            RedirectAttributes redirectAttributes) {
+
+        log.info("=== CREATE USER START ===");
+        log.info("Creating user: {}", username);
+        log.info("Role: {}", role);
+        log.info("Line Manager ID: {}", lineManagerId);
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+            return "redirect:/login";
+        }
+
+        if (!currentUser.hasAnyPermission("CREATE_USERS", "MANAGE_USERS", "ADMIN")) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to create users.");
+            return "redirect:/admin/users";
+        }
+
         try {
-            AppUser currentUser = SecurityUtils.getCurrentUser();
-            if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+            UserDTO userDTO = new UserDTO();
+            userDTO.setStaffId(staffId);
+            userDTO.setUsername(username);
+            userDTO.setFullName(fullName);
+            userDTO.setEmail(email);
+            userDTO.setPhoneNumber(phoneNumber);
+            userDTO.setDepartmentId(departmentId);
+            userDTO.setRole(role);
+            userDTO.setActive(true);
+            userDTO.setBlocked(false);
+
+            // ✅ Handle permissions
+            if (permissions != null && !permissions.isEmpty()) {
+                userDTO.setPermissions(permissions);
             }
 
-            log.info("Creating user: {}", userDTO.getUsername());
-            userService.createUser(userDTO);
-            redirectAttributes.addFlashAttribute("success", "User created successfully! Welcome email sent.");
+            // ✅ Handle Line Manager - Check if we need to create a new one
+            Long lineManagerEmployeeId = null;
+            if (lineManagerId != null && !lineManagerId.isEmpty()) {
+                if ("__NEW__".equals(lineManagerId)) {
+                    // Create new line manager employee
+                    log.info("Creating new line manager: {} {}", lmFirstName, lmSurName);
+
+                    // Validate required fields for new line manager
+                    if (lmStaffId == null || lmStaffId.isEmpty()) {
+                        redirectAttributes.addFlashAttribute("error", "Line Manager Staff ID is required.");
+                        return "redirect:/admin/users";
+                    }
+                    if (lmFirstName == null || lmFirstName.isEmpty()) {
+                        redirectAttributes.addFlashAttribute("error", "Line Manager First Name is required.");
+                        return "redirect:/admin/users";
+                    }
+                    if (lmSurName == null || lmSurName.isEmpty()) {
+                        redirectAttributes.addFlashAttribute("error", "Line Manager Surname is required.");
+                        return "redirect:/admin/users";
+                    }
+                    if (lmEmail == null || lmEmail.isEmpty()) {
+                        redirectAttributes.addFlashAttribute("error", "Line Manager Email is required.");
+                        return "redirect:/admin/users";
+                    }
+
+                    // Check if line manager already exists
+                    if (employeeService.getEmployeeByStaffId(lmStaffId).isPresent()) {
+                        redirectAttributes.addFlashAttribute("error", "Line Manager Staff ID '" + lmStaffId + "' already exists!");
+                        return "redirect:/admin/users";
+                    }
+
+                    // Create line manager employee
+                    Employee lineManager = new Employee();
+                    lineManager.setStaffId(lmStaffId);
+                    lineManager.setFirstName(lmFirstName);
+                    lineManager.setSurName(lmSurName);
+                    lineManager.setEmailAddress(lmEmail);
+                    lineManager.setPhoneNumber(lmPhone);
+
+                    // Set department for line manager
+                    if (lmDepartmentId != null) {
+                        Department dept = departmentService.getDepartmentById(lmDepartmentId).orElse(null);
+                        lineManager.setDepartment(dept);
+                    } else if (departmentId != null) {
+                        // Use the same department as the user
+                        Department dept = departmentService.getDepartmentById(departmentId).orElse(null);
+                        lineManager.setDepartment(dept);
+                    }
+
+                    Employee savedLm = employeeService.createEmployee(lineManager);
+                    lineManagerEmployeeId = savedLm.getEmployeeId();
+                    log.info("✅ New line manager created with ID: {}", lineManagerEmployeeId);
+
+                } else {
+                    // Use existing line manager
+                    try {
+                        lineManagerEmployeeId = Long.parseLong(lineManagerId);
+                        log.info("Using existing line manager with ID: {}", lineManagerEmployeeId);
+                    } catch (NumberFormatException e) {
+                        redirectAttributes.addFlashAttribute("error", "Invalid Line Manager ID format.");
+                        return "redirect:/admin/users";
+                    }
+                }
+            }
+
+            // Set the line manager ID on the user DTO
+            userDTO.setLineManagerId(lineManagerEmployeeId);
+
+            // Create the user
+            AppUser createdUser = userService.createUser(userDTO);
+
+            log.info("✅ User created successfully with ID: {}", createdUser.getUserId());
+            log.info("✅ Permissions assigned: {}", createdUser.getPermissions().stream()
+                    .map(p -> p.getPermissionName())
+                    .collect(java.util.stream.Collectors.toList()));
+
+            redirectAttributes.addFlashAttribute("success",
+                    "User '" + username + "' created successfully! A welcome email with temporary password has been sent.");
+
         } catch (UserAlreadyExistsException e) {
-            log.warn("User creation failed: {}", e.getMessage());
+            log.warn("User creation failed - duplicate: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to create users.");
@@ -96,34 +221,65 @@ public class UserViewController {
             log.error("Error creating user: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to create user: " + e.getMessage());
         }
+
+        log.info("=== CREATE USER END ===");
         return "redirect:/admin/users";
     }
 
     @PostMapping("/update")
     @PreAuthorize("hasAnyAuthority('USER_EDIT', 'MANAGE_USERS', 'ADMIN', 'SUPER_ADMIN')")
-    public String updateUser(@ModelAttribute UserDTO userDTO, RedirectAttributes redirectAttributes) {
+    public String updateUser(
+            @RequestParam Long userId,
+            @RequestParam String fullName,
+            @RequestParam String email,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam(required = false) Long lineManagerId,
+            @RequestParam String role,
+            @RequestParam(required = false) boolean active,
+            @RequestParam(required = false) boolean blocked,
+            @RequestParam(required = false) List<String> permissions,
+            RedirectAttributes redirectAttributes) {
+
+        log.info("=== UPDATE USER START ===");
+        log.info("Updating user: {}", userId);
+
+        AppUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser == null) {
+            redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
+            return "redirect:/login";
+        }
+
+        if (!currentUser.hasAnyPermission("USER_EDIT", "MANAGE_USERS", "ADMIN")) {
+            redirectAttributes.addFlashAttribute("error", "You don't have permission to update users.");
+            return "redirect:/admin/users";
+        }
+
         try {
-            AppUser currentUser = SecurityUtils.getCurrentUser();
-            if (currentUser == null) {
-                redirectAttributes.addFlashAttribute("error", "You must be logged in to perform this action.");
-                return "redirect:/login";
+            UserDTO userDTO = new UserDTO();
+            userDTO.setUserId(userId);
+            userDTO.setFullName(fullName);
+            userDTO.setEmail(email);
+            userDTO.setPhoneNumber(phoneNumber);
+            userDTO.setDepartmentId(departmentId);
+            userDTO.setLineManagerId(lineManagerId);
+            userDTO.setRole(role);
+            userDTO.setActive(active);
+            userDTO.setBlocked(blocked);
+
+            if (permissions != null && !permissions.isEmpty()) {
+                userDTO.setPermissions(permissions);
             }
 
-            log.info("Updating user: {}", userDTO.getUserId());
-            log.info("UserDTO received: fullName={}, role={}, departmentId={}, email={}, active={}, blocked={}",
-                    userDTO.getFullName(), userDTO.getRole(), userDTO.getDepartmentId(),
-                    userDTO.getEmail(), userDTO.isActive(), userDTO.isBlocked());
+            AppUser updated = userService.updateUser(userId, userDTO);
 
-            if (userDTO.getUserId() == null) {
-                redirectAttributes.addFlashAttribute("error", "User ID is required for update.");
-                return "redirect:/admin/users";
-            }
+            log.info("✅ User updated successfully: {}", updated.getUsername());
 
-            userService.updateUser(userDTO.getUserId(), userDTO);
-            redirectAttributes.addFlashAttribute("success", "User updated successfully!");
+            redirectAttributes.addFlashAttribute("success",
+                    "User '" + updated.getUsername() + "' updated successfully!");
 
         } catch (UserAlreadyExistsException e) {
-            log.warn("User update failed: {}", e.getMessage());
+            log.warn("User update failed - duplicate: {}", e.getMessage());
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("error", "You don't have permission to update users.");
@@ -131,6 +287,8 @@ public class UserViewController {
             log.error("Error updating user: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to update user: " + e.getMessage());
         }
+
+        log.info("=== UPDATE USER END ===");
         return "redirect:/admin/users";
     }
 

@@ -34,4 +34,10 @@ public class UserDTO {
     private LocalDateTime lastPasswordChanged;
     private Long createdBy;
     private String resetPasswordUrl;
+    private String lmStaffId;
+    private String lmFirstName;
+    private String lmSurName;
+    private String lmEmail;
+    private String lmPhone;
+    private Integer lmDepartmentId;
 }
