@@ -43,7 +43,6 @@ public class InfraRequestViewController {
         Long userId = currentUser.getUserId();
         log.info("Current user ID: {}, Role: {}", userId, currentUser.getRole());
 
-        // ✅ Get filtered requests based on user role
         List<InfraRequestDTO> allRequests = requestService.getAllRequests();
         List<InfraRequestDTO> filteredRequests;
 
@@ -68,7 +67,6 @@ public class InfraRequestViewController {
 
         model.addAttribute("requests", filteredRequests);
 
-        // ✅ Filter pending requests from the filtered list
         List<InfraRequestDTO> pendingLMRequests = filteredRequests.stream()
                 .filter(r -> InfraRequest.RequestStatus.PENDING_LM_APPROVAL.name().equals(r.getStatus()))
                 .collect(Collectors.toList());
@@ -77,7 +75,6 @@ public class InfraRequestViewController {
                 .filter(r -> InfraRequest.RequestStatus.PENDING_INFRA_REVIEW.name().equals(r.getStatus()))
                 .collect(Collectors.toList());
 
-        // ✅ FIXED: Finance tab should show ALL finance-related statuses
         List<InfraRequestDTO> pendingFinanceRequests = filteredRequests.stream()
                 .filter(r -> InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL.name().equals(r.getStatus()) ||
                         InfraRequest.RequestStatus.PROCUREMENT.name().equals(r.getStatus()) ||
@@ -129,11 +126,24 @@ public class InfraRequestViewController {
         }
     }
 
+    /**
+     * Show the signing page
+     */
     @GetMapping("/sign")
     public String showSignPage(@RequestParam String token, Model model) {
         try {
-            log.info("Sign page accessed with token: {}", token);
+            log.info("=== SIGN PAGE ACCESSED ===");
+            log.info("Token: {}", token);
+
             InfraRequest request = requestService.getRequestBySigningToken(token);
+            log.info("Request found: ID={}, Status={}", request.getRequestId(), request.getStatus());
+
+            // Check if already signed
+            if (request.isSigned()) {
+                log.info("Request {} already signed on {}", request.getRequestId(), request.getRequesterSignedAt());
+                model.addAttribute("alreadySigned", true);
+                model.addAttribute("signedAt", request.getRequesterSignedAt());
+            }
 
             String requesterName = userService.getUserById(request.getRequesterId())
                     .map(user -> user.getFullName())
@@ -145,25 +155,54 @@ public class InfraRequestViewController {
             model.addAttribute("alreadySigned", request.isSigned());
 
             return "infra-requests/sign";
+
         } catch (Exception e) {
-            log.error("Error validating token: {}", e.getMessage(), e);
+            log.error("❌ Error validating token: {}", e.getMessage(), e);
             model.addAttribute("error", "Invalid or expired signing link: " + e.getMessage());
             return "infra-requests/sign-error";
         }
     }
 
+    /**
+     * Submit signature - FIXED: Better handling of signature data
+     */
     @PostMapping("/sign")
     public String submitSignature(@RequestParam Long requestId,
                                   @RequestParam String token,
                                   @RequestParam String signature,
                                   RedirectAttributes redirectAttributes) {
         try {
-            log.info("Submitting signature for request: {}, token: {}", requestId, token);
+            log.info("=== SUBMIT SIGNATURE START ===");
+            log.info("Request ID: {}, Token: {}", requestId, token);
+            log.info("Signature length: {}", signature != null ? signature.length() : 0);
+
+            // Validate signature is not empty
+            if (signature == null || signature.trim().isEmpty()) {
+                log.error("❌ Signature is empty!");
+                redirectAttributes.addFlashAttribute("error", "Please provide a signature.");
+                return "redirect:/infra-requests/sign-error";
+            }
+
+            // Validate signature is not the empty canvas
+            if (signature.length() < 100) {
+                log.error("❌ Signature too short! Length: {}", signature.length());
+                redirectAttributes.addFlashAttribute("error", "Invalid signature. Please draw your signature again.");
+                return "redirect:/infra-requests/sign-error";
+            }
+
+            // Save the signature
             requestService.saveRequesterSignature(requestId, token, signature);
-            redirectAttributes.addFlashAttribute("message", "Thank you! Request completed successfully.");
+
+            log.info("✅ Signature saved successfully for request: {}", requestId);
+            redirectAttributes.addFlashAttribute("message", "Thank you! Your signature has been recorded and the request is complete.");
             return "redirect:/infra-requests/sign-thankyou";
+
+        } catch (IllegalStateException e) {
+            log.warn("⚠️ {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/infra-requests/sign-error";
         } catch (Exception e) {
-            log.error("Error submitting signature: {}", e.getMessage());
+            log.error("❌ Error submitting signature: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to submit signature: " + e.getMessage());
             return "redirect:/infra-requests/sign-error";
         }
@@ -217,7 +256,6 @@ public class InfraRequestViewController {
                 .filter(r -> InfraRequest.RequestStatus.PENDING_LM_APPROVAL.name().equals(r.getStatus()))
                 .collect(Collectors.toList());
 
-        // ✅ FIXED: Dashboard should also show all finance-related statuses
         List<InfraRequestDTO> pendingFinanceRequests = filteredRequests.stream()
                 .filter(r -> InfraRequest.RequestStatus.PENDING_FINANCE_APPROVAL.name().equals(r.getStatus()) ||
                         InfraRequest.RequestStatus.PROCUREMENT.name().equals(r.getStatus()) ||

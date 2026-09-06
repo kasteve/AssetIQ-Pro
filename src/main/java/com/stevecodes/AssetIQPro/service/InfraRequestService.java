@@ -630,31 +630,72 @@ public class InfraRequestService {
         return signingLink;
     }
 
+    /**
+     * Save requester signature and complete the request
+     * ✅ FIXED: Better error handling, logging, and ensures signature is saved
+     */
     @Transactional
     public void saveRequesterSignature(Long requestId, String token, String signature) {
-        log.info("Saving signature for request: {}", requestId);
+        log.info("=== SAVE REQUESTER SIGNATURE START ===");
+        log.info("Request ID: {}, Token: {}", requestId, token);
+        log.info("Signature length: {}", signature != null ? signature.length() : 0);
+
+        // Validate signature
+        if (signature == null || signature.trim().isEmpty()) {
+            log.error("❌ Signature is null or empty!");
+            throw new RuntimeException("Signature cannot be empty");
+        }
+
+        // Validate signature is not the empty canvas
+        if (signature.length() < 100) {
+            log.error("❌ Signature too short! Length: {}", signature.length());
+            throw new RuntimeException("Invalid signature. Please draw your signature again.");
+        }
 
         InfraRequest request = validateRequest(requestId);
+        log.info("✅ Found request with status: {}", request.getStatus());
 
+        // Check if already signed
+        if (request.isSigned()) {
+            log.warn("⚠️ Request {} has already been signed", requestId);
+            throw new IllegalStateException("This request has already been signed.");
+        }
+
+        // Validate token
         if (!token.equals(request.getSigningToken())) {
+            log.error("❌ Invalid token. Expected: {}, Got: {}", request.getSigningToken(), token);
             throw new RuntimeException("Invalid token");
         }
+
+        // Check token expiry
         if (request.getSigningTokenExpiry() == null ||
                 request.getSigningTokenExpiry().isBefore(LocalDateTime.now())) {
+            log.error("❌ Token has expired. Expiry: {}, Now: {}",
+                    request.getSigningTokenExpiry(), LocalDateTime.now());
             throw new RuntimeException("Token has expired");
         }
 
-        // ✅ IMMEDIATE: Update request
+        log.info("✅ All validations passed");
+
+        // ✅ IMMEDIATE: Update request with signature
         request.setRequesterSignature(signature);
         request.setRequesterSignedAt(LocalDateTime.now());
-        request.setSigningToken(null);
+        request.setSigningToken(null);  // Clear the token so it can't be reused
         request.setSigningTokenExpiry(null);
         request.setStatus(RequestStatus.COMPLETED);
         request.setCompletedAt(LocalDateTime.now());
 
-        requestRepository.save(request);
+        // Save immediately - this is critical!
+        InfraRequest saved = requestRepository.save(request);
+        log.info("✅ Request saved with signature. Signature length: {}",
+                saved.getRequesterSignature() != null ? saved.getRequesterSignature().length() : 0);
 
-        // ✅ FIX: Capture final variables for lambdas
+        // Verify the signature was actually saved
+        if (saved.getRequesterSignature() == null || saved.getRequesterSignature().isEmpty()) {
+            log.error("❌ Signature was NOT saved to the database!");
+            throw new RuntimeException("Failed to save signature to database");
+        }
+
         final Long finalRequestId = requestId;
         final Long finalRequesterId = request.getRequesterId();
 
@@ -669,12 +710,28 @@ public class InfraRequestService {
         });
 
         // ✅ ASYNC: Generate PDF with signature
-        asyncPdfService.generateInfraRequestPdfAsync(finalRequestId);
-
-        // ✅ ASYNC: Send completion report (PDF attached) to requester + involved approvers
         CompletableFuture.runAsync(() -> {
             try {
-                sendCompletionReport(request);
+                Thread.sleep(1000); // Small delay to ensure DB is committed
+                asyncPdfService.generateInfraRequestPdfAsync(finalRequestId);
+                log.info("PDF generation initiated for request: {}", finalRequestId);
+            } catch (Exception e) {
+                log.error("Failed to generate PDF: {}", e.getMessage(), e);
+            }
+        });
+
+        // ✅ ASYNC: Send completion report with PDF
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(2000); // Wait for PDF generation
+                // Refresh the request to get the latest data including PDF path
+                InfraRequest freshRequest = requestRepository.findById(finalRequestId).orElse(null);
+                if (freshRequest != null && freshRequest.getPdfReportPath() != null) {
+                    sendCompletionReport(freshRequest);
+                    log.info("Completion report sent for request: {}", finalRequestId);
+                } else {
+                    log.warn("PDF not ready for request {}, skipping completion report", finalRequestId);
+                }
             } catch (Exception e) {
                 log.error("Failed to send completion report: {}", e.getMessage(), e);
             }
@@ -686,6 +743,8 @@ public class InfraRequestService {
                 "Request #" + finalRequestId + " signed by requester",
                 finalRequesterId
         );
+
+        log.info("=== SAVE REQUESTER SIGNATURE END - SUCCESS ===");
     }
 
     @Transactional

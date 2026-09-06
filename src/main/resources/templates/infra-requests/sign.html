@@ -53,6 +53,7 @@
             cursor: crosshair;
             background: white;
             touch-action: none;
+            border: 1px dashed #ddd;
         }
         .detail-row {
             padding: 6px 0;
@@ -120,6 +121,53 @@
             border-radius: 10px;
             border: 1px solid #f5c6cb;
         }
+        .signed-info {
+            background: #e6f7ec;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .signed-info .icon {
+            font-size: 48px;
+            color: #198754;
+        }
+
+        /* ✅ FIXED: Loading overlay styles */
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        #loadingOverlay.show {
+            display: flex;
+        }
+        .loading-content {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .loading-content .spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+        .loading-content h5 {
+            margin-top: 16px;
+            color: #1a1a2e;
+        }
+        .loading-content p {
+            color: #6c757d;
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -131,8 +179,8 @@
     <div class="card-body">
 
         <!-- Already Signed -->
-        <div th:if="${alreadySigned}" class="text-center py-4">
-            <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
+        <div th:if="${alreadySigned}" class="signed-info">
+            <div class="icon"><i class="fas fa-check-circle"></i></div>
             <h4 class="mt-3">Already Signed</h4>
             <p class="text-muted">This request was signed on <span th:text="${#temporals.format(request.requesterSignedAt, 'dd/MM/yyyy HH:mm')}"></span></p>
             <p class="text-muted">Signed by: <strong th:text="${requesterName}"></strong></p>
@@ -208,7 +256,7 @@
                     <div class="signature-pad">
                         <canvas id="signatureCanvas" width="500" height="150"></canvas>
                         <div class="d-flex justify-content-end mt-2">
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="clearSignature()">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">
                                 <i class="fas fa-eraser me-1"></i>Clear
                             </button>
                         </div>
@@ -216,7 +264,7 @@
                 </div>
 
                 <div class="d-grid gap-2 mt-4">
-                    <button type="submit" class="btn btn-success btn-lg" onclick="return prepareSubmit()">
+                    <button type="button" class="btn btn-success btn-lg" onclick="submitSignature()">
                         <i class="fas fa-check me-2"></i>Sign & Confirm Receipt
                     </button>
                     <a href="/assetIQ-pro/dashboard" class="btn btn-outline-secondary">Cancel</a>
@@ -226,12 +274,24 @@
     </div>
 </div>
 
+<!-- ✅ FIXED: Loading overlay -->
+<div id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary spinner" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h5>Submitting Signature...</h5>
+        <p>Please wait while we process your signature.</p>
+    </div>
+</div>
+
 <script>
     let canvas = null;
     let ctx = null;
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
+    let isInitialized = false;
 
     function initSignaturePad() {
         canvas = document.getElementById('signatureCanvas');
@@ -242,6 +302,7 @@
         ctx = canvas.getContext('2d');
         resizeCanvas();
 
+        // Remove old listeners to avoid duplicates
         canvas.removeEventListener('mousedown', startDrawing);
         canvas.removeEventListener('mousemove', draw);
         canvas.removeEventListener('mouseup', stopDrawing);
@@ -250,6 +311,7 @@
         canvas.removeEventListener('touchmove', draw);
         canvas.removeEventListener('touchend', stopDrawing);
 
+        // Add new listeners
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
@@ -257,21 +319,25 @@
         canvas.addEventListener('touchstart', startDrawing, { passive: false });
         canvas.addEventListener('touchmove', draw, { passive: false });
         canvas.addEventListener('touchend', stopDrawing, { passive: false });
+
         window.addEventListener('resize', resizeCanvas);
 
-        console.log('Signature pad initialized');
+        isInitialized = true;
+        console.log('Signature pad initialized successfully');
     }
 
     function resizeCanvas() {
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width;
+        canvas.width = rect.width || 500;
         canvas.height = 150;
         if (ctx) {
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#1a1a2e';
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
     }
 
@@ -305,38 +371,69 @@
     }
 
     function stopDrawing(e) {
-        e.preventDefault();
+        if (e) e.preventDefault();
         isDrawing = false;
     }
 
     function clearSignature() {
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         document.getElementById('signatureData').value = '';
     }
 
-    function prepareSubmit() {
-        if (!canvas) {
-            alert('⚠️ Signature pad not initialized.');
-            return false;
-        }
-
+    function isSignatureEmpty() {
+        if (!canvas) return true;
         const dataUrl = canvas.toDataURL('image/png');
         const emptySignature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-        if (dataUrl === emptySignature) {
-            alert('⚠️ Please draw your signature first.');
-            return false;
-        }
-
-        document.getElementById('signatureData').value = dataUrl;
-        console.log('Signature captured, submitting form...');
-        return true;
+        return dataUrl === emptySignature || dataUrl.length < 100;
     }
 
+    function submitSignature() {
+        console.log('submitSignature called');
+
+        if (!isInitialized) {
+            alert('⚠️ Signature pad is not ready. Please wait and try again.');
+            return;
+        }
+
+        if (isSignatureEmpty()) {
+            alert('⚠️ Please draw your signature first.');
+            return;
+        }
+
+        // ✅ Show loading overlay
+        document.getElementById('loadingOverlay').classList.add('show');
+
+        try {
+            const dataUrl = canvas.toDataURL('image/png');
+            console.log('Signature captured, length:', dataUrl.length);
+
+            document.getElementById('signatureData').value = dataUrl;
+
+            // Submit the form
+            document.getElementById('signForm').submit();
+        } catch (error) {
+            console.error('Error submitting signature:', error);
+            document.getElementById('loadingOverlay').classList.remove('show');
+            alert('An error occurred while submitting your signature. Please try again.');
+        }
+    }
+
+    // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded, initializing signature pad...');
-        setTimeout(initSignaturePad, 300);
+        setTimeout(initSignaturePad, 500);
+    });
+
+    // Also initialize if the page loads completely
+    window.addEventListener('load', function() {
+        if (!isInitialized) {
+            console.log('Window loaded, initializing signature pad...');
+            initSignaturePad();
+        }
     });
 </script>
 

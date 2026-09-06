@@ -8,9 +8,6 @@ asset status changes to disposed, those options should become inactive so that o
 
 1. The infra request final document does not capture signature of the requester after receiving their item requested for
 
-Need to introduce the logic for the system to consider only the selected people to sign and share signed copy to those involved int he transaction
-currently, it is looking at all the signature fields yet some transfers can require a few signers. It should be like a count of the signers selected to sign.
-
 Add default permissions per role so that these permissions are assigned at creation of the user account
 
 8. Review and define default permissions for every user role so that they are assigned everytime a user is assigned that role
