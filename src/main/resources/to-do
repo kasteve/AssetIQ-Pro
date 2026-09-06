@@ -7,7 +7,6 @@ Transfer, delete and Request Disposal options should become inactive after the a
 asset status changes to disposed, those options should become inactive so that only view is active.
 
 1. The infra request final document does not capture signature of the requester after receiving their item requested for
-2. Email template redesign for the driver or cab requests. Also link for signing asset transfer should be redesigned.
 
 Need to introduce the logic for the system to consider only the selected people to sign and share signed copy to those involved int he transaction
 currently, it is looking at all the signature fields yet some transfers can require a few signers. It should be like a count of the signers selected to sign.

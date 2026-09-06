@@ -1,6 +1,7 @@
 package com.stevecodes.AssetIQPro.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.stevecodes.AssetIQPro.entity.Category;
 import com.stevecodes.AssetIQPro.entity.Transfer;
 import lombok.Data;
@@ -91,6 +92,17 @@ public class TransferDTO {
 
     // ============================================
     // Signature Status
+    //
+    // NOTE ON JSON NAMES: these Java fields/getters keep their original
+    // names (oldHandoverSigned, infraSigned, financeSigned, etc.) so any
+    // existing backend code calling these methods keeps compiling. But the
+    // transfers list page's "View" modal JS reads transfer.oldHandoverBySignedAt,
+    // transfer.configuredBySignedAt, transfer.infraRepSignedAt,
+    // transfer.financeRepSignedAt (matching the entity's own naming), which
+    // never matched these DTO fields' default JSON keys - so the signature
+    // table always showed "Pending" even for fully-signed roles. The
+    // @JsonProperty annotations below fix only the JSON wire name, without
+    // renaming anything on the Java side.
     // ============================================
     private boolean oldHandoverSigned;
     private LocalDateTime oldHandoverSignedAt;
@@ -250,8 +262,10 @@ public class TransferDTO {
 
     // ============================================
     // Getters and Setters for Signature Status
+    // (Java names unchanged; @JsonProperty controls the JSON key only)
     // ============================================
 
+    @JsonProperty("oldHandoverBySigned")
     public boolean isOldHandoverSigned() {
         return oldHandoverSigned;
     }
@@ -260,6 +274,7 @@ public class TransferDTO {
         this.oldHandoverSigned = oldHandoverSigned;
     }
 
+    @JsonProperty("oldHandoverBySignedAt")
     public LocalDateTime getOldHandoverSignedAt() {
         return oldHandoverSignedAt;
     }
@@ -268,6 +283,7 @@ public class TransferDTO {
         this.oldHandoverSignedAt = oldHandoverSignedAt;
     }
 
+    @JsonProperty("oldReceivedBySigned")
     public boolean isOldReceivedSigned() {
         return oldReceivedSigned;
     }
@@ -276,6 +292,7 @@ public class TransferDTO {
         this.oldReceivedSigned = oldReceivedSigned;
     }
 
+    @JsonProperty("oldReceivedBySignedAt")
     public LocalDateTime getOldReceivedSignedAt() {
         return oldReceivedSignedAt;
     }
@@ -284,6 +301,7 @@ public class TransferDTO {
         this.oldReceivedSignedAt = oldReceivedSignedAt;
     }
 
+    @JsonProperty("newHandoverBySigned")
     public boolean isNewHandoverSigned() {
         return newHandoverSigned;
     }
@@ -292,6 +310,7 @@ public class TransferDTO {
         this.newHandoverSigned = newHandoverSigned;
     }
 
+    @JsonProperty("newHandoverBySignedAt")
     public LocalDateTime getNewHandoverSignedAt() {
         return newHandoverSignedAt;
     }
@@ -300,6 +319,7 @@ public class TransferDTO {
         this.newHandoverSignedAt = newHandoverSignedAt;
     }
 
+    @JsonProperty("newReceivedBySigned")
     public boolean isNewReceivedSigned() {
         return newReceivedSigned;
     }
@@ -308,6 +328,7 @@ public class TransferDTO {
         this.newReceivedSigned = newReceivedSigned;
     }
 
+    @JsonProperty("newReceivedBySignedAt")
     public LocalDateTime getNewReceivedSignedAt() {
         return newReceivedSignedAt;
     }
@@ -316,6 +337,7 @@ public class TransferDTO {
         this.newReceivedSignedAt = newReceivedSignedAt;
     }
 
+    @JsonProperty("configuredBySigned")
     public boolean isConfiguredSigned() {
         return configuredSigned;
     }
@@ -324,6 +346,7 @@ public class TransferDTO {
         this.configuredSigned = configuredSigned;
     }
 
+    @JsonProperty("configuredBySignedAt")
     public LocalDateTime getConfiguredSignedAt() {
         return configuredSignedAt;
     }
@@ -332,6 +355,7 @@ public class TransferDTO {
         this.configuredSignedAt = configuredSignedAt;
     }
 
+    @JsonProperty("infraRepSigned")
     public boolean isInfraSigned() {
         return infraSigned;
     }
@@ -340,6 +364,7 @@ public class TransferDTO {
         this.infraSigned = infraSigned;
     }
 
+    @JsonProperty("infraRepSignedAt")
     public LocalDateTime getInfraSignedAt() {
         return infraSignedAt;
     }
@@ -348,6 +373,7 @@ public class TransferDTO {
         this.infraSignedAt = infraSignedAt;
     }
 
+    @JsonProperty("financeRepSigned")
     public boolean isFinanceSigned() {
         return financeSigned;
     }
@@ -356,6 +382,7 @@ public class TransferDTO {
         this.financeSigned = financeSigned;
     }
 
+    @JsonProperty("financeRepSignedAt")
     public LocalDateTime getFinanceSignedAt() {
         return financeSignedAt;
     }
